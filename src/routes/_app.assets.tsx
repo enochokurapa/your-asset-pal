@@ -171,7 +171,12 @@ function AssetsPage() {
               <div className="grid gap-4 py-2 sm:grid-cols-2">
                 <div className="space-y-2 sm:col-span-1">
                   <Label htmlFor="tag">Asset tag *</Label>
-                  <Input id="tag" value={form.asset_tag} onChange={(e) => setForm({ ...form, asset_tag: e.target.value })} placeholder="LAP-001" />
+                  <div className="flex gap-2">
+                    <Input id="tag" value={form.asset_tag} onChange={(e) => setForm({ ...form, asset_tag: e.target.value })} placeholder="LAP-001" />
+                    <Button type="button" size="icon" variant="outline" onClick={() => { setScanMode("field"); setScanOpen(true); }}>
+                      <ScanLine className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-2 sm:col-span-1">
                   <Label htmlFor="name">Name *</Label>
