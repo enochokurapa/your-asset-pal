@@ -118,7 +118,7 @@ function AssetsPage() {
     }
   };
 
-
+  const save = async () => {
     if (!form.asset_tag.trim() || !form.name.trim()) { toast.error("Tag and name are required"); return; }
     const payload = {
       asset_tag: form.asset_tag.trim(),
