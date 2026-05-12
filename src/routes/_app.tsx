@@ -11,13 +11,13 @@ export const Route = createFileRoute("/_app")({
   component: AppLayout,
 });
 
-const nav = [
+const nav: Array<{ to: string; label: string; icon: any; adminOnly?: boolean }> = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/assets", label: "Assets", icon: Package },
   { to: "/categories", label: "Categories", icon: Tags },
   { to: "/locations", label: "Locations", icon: MapPin },
   { to: "/users", label: "Users", icon: Users, adminOnly: true },
-] as const;
+];
 
 function AppLayout() {
   const { user, loading, signOut, isAdmin, roles } = useAuth();
