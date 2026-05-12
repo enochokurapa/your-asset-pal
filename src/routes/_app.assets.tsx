@@ -225,7 +225,8 @@ function AssetsPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        )}
+          )}
+        </div>
       </div>
 
       <Card className="p-4">
