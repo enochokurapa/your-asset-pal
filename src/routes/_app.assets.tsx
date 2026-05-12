@@ -156,7 +156,11 @@ function AssetsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Assets</h1>
           <p className="text-sm text-muted-foreground">Manage your organization's fixed assets.</p>
         </div>
-        {canWrite && (
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => { setScanMode("lookup"); setScanOpen(true); }}>
+            <ScanLine className="mr-2 h-4 w-4" /> Scan
+          </Button>
+          {canWrite && (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New asset</Button></DialogTrigger>
             <DialogContent className="max-w-lg">
