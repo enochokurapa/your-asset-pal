@@ -96,7 +96,29 @@ function AssetsPage() {
     setOpen(true);
   };
 
-  const save = async () => {
+  const handleScan = (text: string) => {
+    const tag = text.trim();
+    if (!tag) return;
+    if (scanMode === "field") {
+      setForm((f) => ({ ...f, asset_tag: tag }));
+      toast.success(`Tag scanned: ${tag}`);
+      return;
+    }
+    // lookup mode
+    const found = assets.find((a: any) => a.asset_tag.toLowerCase() === tag.toLowerCase());
+    if (found) {
+      openEdit(found);
+      toast.success(`Asset found: ${found.name}`);
+    } else if (canWrite) {
+      setForm({ ...empty, asset_tag: tag });
+      setOpen(true);
+      toast.message("New tag detected", { description: "Fill in details to create this asset." });
+    } else {
+      toast.error(`No asset matches tag "${tag}"`);
+    }
+  };
+
+
     if (!form.asset_tag.trim() || !form.name.trim()) { toast.error("Tag and name are required"); return; }
     const payload = {
       asset_tag: form.asset_tag.trim(),
