@@ -291,6 +291,8 @@ function AssetsPage() {
           )}
         </div>
       </Card>
+
+      <ScannerDialog open={scanOpen} onOpenChange={setScanOpen} onScan={handleScan} />
     </div>
   );
 }
