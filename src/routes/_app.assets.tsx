@@ -12,8 +12,9 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Search, Package } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Package, ScanLine } from "lucide-react";
 import { toast } from "sonner";
+import { ScannerDialog } from "@/components/scanner-dialog";
 
 export const Route = createFileRoute("/_app/assets")({
   component: AssetsPage,
@@ -54,6 +55,8 @@ function AssetsPage() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<AssetForm>(empty);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanMode, setScanMode] = useState<"lookup" | "field">("lookup");
 
   const { data: assets = [], isLoading } = useQuery({
     queryKey: ["assets"],
@@ -91,6 +94,28 @@ function AssetsPage() {
       purchase_date: a.purchase_date ?? "",
     });
     setOpen(true);
+  };
+
+  const handleScan = (text: string) => {
+    const tag = text.trim();
+    if (!tag) return;
+    if (scanMode === "field") {
+      setForm((f) => ({ ...f, asset_tag: tag }));
+      toast.success(`Tag scanned: ${tag}`);
+      return;
+    }
+    // lookup mode
+    const found = assets.find((a: any) => a.asset_tag.toLowerCase() === tag.toLowerCase());
+    if (found) {
+      openEdit(found);
+      toast.success(`Asset found: ${found.name}`);
+    } else if (canWrite) {
+      setForm({ ...empty, asset_tag: tag });
+      setOpen(true);
+      toast.message("New tag detected", { description: "Fill in details to create this asset." });
+    } else {
+      toast.error(`No asset matches tag "${tag}"`);
+    }
   };
 
   const save = async () => {
@@ -131,7 +156,11 @@ function AssetsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Assets</h1>
           <p className="text-sm text-muted-foreground">Manage your organization's fixed assets.</p>
         </div>
-        {canWrite && (
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => { setScanMode("lookup"); setScanOpen(true); }}>
+            <ScanLine className="mr-2 h-4 w-4" /> Scan
+          </Button>
+          {canWrite && (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New asset</Button></DialogTrigger>
             <DialogContent className="max-w-lg">
@@ -142,7 +171,12 @@ function AssetsPage() {
               <div className="grid gap-4 py-2 sm:grid-cols-2">
                 <div className="space-y-2 sm:col-span-1">
                   <Label htmlFor="tag">Asset tag *</Label>
-                  <Input id="tag" value={form.asset_tag} onChange={(e) => setForm({ ...form, asset_tag: e.target.value })} placeholder="LAP-001" />
+                  <div className="flex gap-2">
+                    <Input id="tag" value={form.asset_tag} onChange={(e) => setForm({ ...form, asset_tag: e.target.value })} placeholder="LAP-001" />
+                    <Button type="button" size="icon" variant="outline" onClick={() => { setScanMode("field"); setScanOpen(true); }}>
+                      <ScanLine className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-2 sm:col-span-1">
                   <Label htmlFor="name">Name *</Label>
@@ -196,7 +230,8 @@ function AssetsPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        )}
+          )}
+        </div>
       </div>
 
       <Card className="p-4">
@@ -256,6 +291,8 @@ function AssetsPage() {
           )}
         </div>
       </Card>
+
+      <ScannerDialog open={scanOpen} onOpenChange={setScanOpen} onScan={handleScan} />
     </div>
   );
 }
