@@ -55,6 +55,8 @@ function AssetsPage() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<AssetForm>(empty);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanMode, setScanMode] = useState<"lookup" | "field">("lookup");
 
   const { data: assets = [], isLoading } = useQuery({
     queryKey: ["assets"],
