@@ -15,20 +15,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Pencil, Trash2, Search, Package, ScanLine } from "lucide-react";
 import { toast } from "sonner";
 import { ScannerDialog } from "@/components/scanner-dialog";
+import { AssetDetailTabs } from "@/components/asset-detail-tabs";
 
 export const Route = createFileRoute("/_app/assets")({
   component: AssetsPage,
 });
 
-type Status = "in_use" | "in_storage" | "under_repair" | "retired";
+type Status = "in_use" | "in_storage" | "under_repair" | "retired" | "lost" | "disposed";
 const STATUS_LABEL: Record<Status, string> = {
-  in_use: "In use", in_storage: "In storage", under_repair: "Under repair", retired: "Retired",
+  in_use: "In use", in_storage: "In storage", under_repair: "Under repair",
+  retired: "Retired", lost: "Lost", disposed: "Disposed",
 };
 const STATUS_TONE: Record<Status, string> = {
   in_use: "bg-success/15 text-success",
   in_storage: "bg-secondary text-secondary-foreground",
   under_repair: "bg-warning/20 text-warning-foreground",
   retired: "bg-muted text-muted-foreground",
+  lost: "bg-destructive/15 text-destructive",
+  disposed: "bg-muted text-muted-foreground line-through",
 };
 
 interface AssetForm {
@@ -163,7 +167,7 @@ function AssetsPage() {
           {canWrite && (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New asset</Button></DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{form.id ? "Edit asset" : "New asset"}</DialogTitle>
                 <DialogDescription>Fill in the details below.</DialogDescription>
@@ -228,6 +232,11 @@ function AssetsPage() {
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
                 <Button onClick={save}>{form.id ? "Save changes" : "Create asset"}</Button>
               </DialogFooter>
+              {form.id && (
+                <div className="border-t pt-4">
+                  <AssetDetailTabs assetId={form.id} />
+                </div>
+              )}
             </DialogContent>
           </Dialog>
           )}

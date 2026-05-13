@@ -14,6 +14,190 @@ export type Database = {
   }
   public: {
     Tables: {
+      asset_assignments: {
+        Row: {
+          asset_id: string
+          assigned_to_name: string | null
+          assigned_to_user: string | null
+          assignment_date: string
+          created_at: string
+          created_by: string | null
+          department: string | null
+          id: string
+          notes: string | null
+          return_date: string | null
+        }
+        Insert: {
+          asset_id: string
+          assigned_to_name?: string | null
+          assigned_to_user?: string | null
+          assignment_date?: string
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          id?: string
+          notes?: string | null
+          return_date?: string | null
+        }
+        Update: {
+          asset_id?: string
+          assigned_to_name?: string | null
+          assigned_to_user?: string | null
+          assignment_date?: string
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          id?: string
+          notes?: string | null
+          return_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_assignments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asset_attachments: {
+        Row: {
+          asset_id: string
+          created_at: string
+          file_name: string
+          id: string
+          kind: string
+          mime_type: string | null
+          storage_path: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          asset_id: string
+          created_at?: string
+          file_name: string
+          id?: string
+          kind: string
+          mime_type?: string | null
+          storage_path: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          asset_id?: string
+          created_at?: string
+          file_name?: string
+          id?: string
+          kind?: string
+          mime_type?: string | null
+          storage_path?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_attachments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asset_disposals: {
+        Row: {
+          approval_notes: string | null
+          asset_id: string
+          created_at: string
+          disposal_date: string
+          disposal_reason: string
+          disposal_value: number | null
+          id: string
+          recorded_by: string | null
+        }
+        Insert: {
+          approval_notes?: string | null
+          asset_id: string
+          created_at?: string
+          disposal_date?: string
+          disposal_reason: string
+          disposal_value?: number | null
+          id?: string
+          recorded_by?: string | null
+        }
+        Update: {
+          approval_notes?: string | null
+          asset_id?: string
+          created_at?: string
+          disposal_date?: string
+          disposal_reason?: string
+          disposal_value?: number | null
+          id?: string
+          recorded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_disposals_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asset_movements: {
+        Row: {
+          asset_id: string
+          created_at: string
+          from_location_id: string | null
+          id: string
+          moved_at: string
+          moved_by: string | null
+          reason: string | null
+          to_location_id: string | null
+        }
+        Insert: {
+          asset_id: string
+          created_at?: string
+          from_location_id?: string | null
+          id?: string
+          moved_at?: string
+          moved_by?: string | null
+          reason?: string | null
+          to_location_id?: string | null
+        }
+        Update: {
+          asset_id?: string
+          created_at?: string
+          from_location_id?: string | null
+          id?: string
+          moved_at?: string
+          moved_by?: string | null
+          reason?: string | null
+          to_location_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_movements_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_movements_from_location_id_fkey"
+            columns: ["from_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_movements_to_location_id_fkey"
+            columns: ["to_location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assets: {
         Row: {
           asset_tag: string
@@ -83,20 +267,31 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          parent_id: string | null
         }
         Insert: {
           created_at?: string
           description?: string | null
           id?: string
           name: string
+          parent_id?: string | null
         }
         Update: {
           created_at?: string
           description?: string | null
           id?: string
           name?: string
+          parent_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       locations: {
         Row: {
@@ -177,7 +372,13 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "manager" | "staff"
-      asset_status: "in_use" | "in_storage" | "under_repair" | "retired"
+      asset_status:
+        | "in_use"
+        | "in_storage"
+        | "under_repair"
+        | "retired"
+        | "lost"
+        | "disposed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -306,7 +507,14 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "manager", "staff"],
-      asset_status: ["in_use", "in_storage", "under_repair", "retired"],
+      asset_status: [
+        "in_use",
+        "in_storage",
+        "under_repair",
+        "retired",
+        "lost",
+        "disposed",
+      ],
     },
   },
 } as const

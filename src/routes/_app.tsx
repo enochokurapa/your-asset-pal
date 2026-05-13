@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, Link, Navigate, useRouterState } from "@tansta
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import {
-  LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X,
+  LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X, FileBarChart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ const nav: Array<{ to: string; label: string; icon: any; adminOnly?: boolean }> 
   { to: "/assets", label: "Assets", icon: Package },
   { to: "/categories", label: "Categories", icon: Tags },
   { to: "/locations", label: "Locations", icon: MapPin },
+  { to: "/reports", label: "Reports", icon: FileBarChart },
   { to: "/users", label: "Users", icon: Users, adminOnly: true },
 ];
 
