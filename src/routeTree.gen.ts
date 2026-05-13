@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppUsersRouteImport } from './routes/_app.users'
+import { Route as AppReportsRouteImport } from './routes/_app.reports'
 import { Route as AppLocationsRouteImport } from './routes/_app.locations'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppCategoriesRouteImport } from './routes/_app.categories'
@@ -35,6 +36,11 @@ const IndexRoute = IndexRouteImport.update({
 const AppUsersRoute = AppUsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppReportsRoute = AppReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => AppRoute,
 } as any)
 const AppLocationsRoute = AppLocationsRouteImport.update({
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/categories': typeof AppCategoriesRoute
   '/dashboard': typeof AppDashboardRoute
   '/locations': typeof AppLocationsRoute
+  '/reports': typeof AppReportsRoute
   '/users': typeof AppUsersRoute
 }
 export interface FileRoutesByTo {
@@ -74,6 +81,7 @@ export interface FileRoutesByTo {
   '/categories': typeof AppCategoriesRoute
   '/dashboard': typeof AppDashboardRoute
   '/locations': typeof AppLocationsRoute
+  '/reports': typeof AppReportsRoute
   '/users': typeof AppUsersRoute
 }
 export interface FileRoutesById {
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   '/_app/categories': typeof AppCategoriesRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/locations': typeof AppLocationsRoute
+  '/_app/reports': typeof AppReportsRoute
   '/_app/users': typeof AppUsersRoute
 }
 export interface FileRouteTypes {
@@ -96,6 +105,7 @@ export interface FileRouteTypes {
     | '/categories'
     | '/dashboard'
     | '/locations'
+    | '/reports'
     | '/users'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
     | '/categories'
     | '/dashboard'
     | '/locations'
+    | '/reports'
     | '/users'
   id:
     | '__root__'
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
     | '/_app/categories'
     | '/_app/dashboard'
     | '/_app/locations'
+    | '/_app/reports'
     | '/_app/users'
   fileRoutesById: FileRoutesById
 }
@@ -154,6 +166,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppUsersRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/reports': {
+      id: '/_app/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof AppReportsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/locations': {
       id: '/_app/locations'
       path: '/locations'
@@ -190,6 +209,7 @@ interface AppRouteChildren {
   AppCategoriesRoute: typeof AppCategoriesRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppLocationsRoute: typeof AppLocationsRoute
+  AppReportsRoute: typeof AppReportsRoute
   AppUsersRoute: typeof AppUsersRoute
 }
 
@@ -198,6 +218,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCategoriesRoute: AppCategoriesRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppLocationsRoute: AppLocationsRoute,
+  AppReportsRoute: AppReportsRoute,
   AppUsersRoute: AppUsersRoute,
 }
 
@@ -211,3 +232,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
