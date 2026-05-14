@@ -105,6 +105,8 @@ export type Database = {
       asset_disposals: {
         Row: {
           approval_notes: string | null
+          approved_at: string | null
+          approved_by: string | null
           asset_id: string
           created_at: string
           disposal_date: string
@@ -112,9 +114,12 @@ export type Database = {
           disposal_value: number | null
           id: string
           recorded_by: string | null
+          status: string
         }
         Insert: {
           approval_notes?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           asset_id: string
           created_at?: string
           disposal_date?: string
@@ -122,9 +127,12 @@ export type Database = {
           disposal_value?: number | null
           id?: string
           recorded_by?: string | null
+          status?: string
         }
         Update: {
           approval_notes?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           asset_id?: string
           created_at?: string
           disposal_date?: string
@@ -132,6 +140,7 @@ export type Database = {
           disposal_value?: number | null
           id?: string
           recorded_by?: string | null
+          status?: string
         }
         Relationships: [
           {
