@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Download, Upload, FileText } from "lucide-react";
+import { Plus, Trash2, Download, Upload, FileText, Check, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
 const ATTACH_KINDS = [
@@ -283,13 +284,31 @@ function DisposalPanel({ assetId }: { assetId: string }) {
       disposal_value: form.disposal_value ? Number(form.disposal_value) : null,
       approval_notes: form.approval_notes || null,
       recorded_by: user?.id ?? null,
-    });
+      status: "pending",
+    } as any);
     if (error) { toast.error(error.message); return; }
-    await supabase.from("assets").update({ status: "disposed" }).eq("id", assetId);
-    toast.success("Disposal recorded — asset marked as disposed");
+    toast.success("Disposal submitted — awaiting approval");
     setForm({ disposal_reason: "", disposal_date: new Date().toISOString().slice(0, 10), disposal_value: "", approval_notes: "" });
     qc.invalidateQueries({ queryKey: ["asset-disposals", assetId] });
+  };
+  const approve = async (id: string) => {
+    const { error } = await supabase.from("asset_disposals")
+      .update({ status: "approved", approved_by: user?.id ?? null, approved_at: new Date().toISOString() } as any)
+      .eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    await supabase.from("assets").update({ status: "disposed" }).eq("id", assetId);
+    toast.success("Disposal approved — asset marked as disposed");
+    qc.invalidateQueries({ queryKey: ["asset-disposals", assetId] });
     qc.invalidateQueries({ queryKey: ["assets"] });
+  };
+  const reject = async (id: string) => {
+    if (!confirm("Reject this disposal request?")) return;
+    const { error } = await supabase.from("asset_disposals")
+      .update({ status: "rejected", approved_by: user?.id ?? null, approved_at: new Date().toISOString() } as any)
+      .eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Disposal rejected");
+    qc.invalidateQueries({ queryKey: ["asset-disposals", assetId] });
   };
   const remove = async (id: string) => {
     if (!confirm("Delete this disposal record?")) return;
@@ -304,22 +323,41 @@ function DisposalPanel({ assetId }: { assetId: string }) {
           <div className="space-y-1"><Label>Date</Label><Input type="date" value={form.disposal_date} onChange={(e) => setForm({ ...form, disposal_date: e.target.value })} /></div>
           <div className="space-y-1"><Label>Value</Label><Input type="number" step="0.01" value={form.disposal_value} onChange={(e) => setForm({ ...form, disposal_value: e.target.value })} /></div>
           <div className="space-y-1 sm:col-span-2"><Label>Approval notes</Label><Textarea rows={2} value={form.approval_notes} onChange={(e) => setForm({ ...form, approval_notes: e.target.value })} /></div>
-          <div className="sm:col-span-2"><Button size="sm" onClick={add}><Plus className="mr-1 h-4 w-4" />Record disposal</Button></div>
+          <div className="sm:col-span-2"><Button size="sm" onClick={add}><Plus className="mr-1 h-4 w-4" />Submit for approval</Button></div>
         </div>
       )}
       <div className="space-y-2">
         {data.length === 0 ? <p className="text-sm text-muted-foreground">No disposal records.</p> :
-          data.map((r: any) => (
-            <div key={r.id} className="flex items-start justify-between gap-2 rounded-lg border p-3 text-sm">
-              <div>
-                <p className="font-medium">{r.disposal_reason}</p>
-                <p className="text-xs text-muted-foreground">{r.disposal_date}{r.disposal_value ? ` · $${Number(r.disposal_value).toLocaleString()}` : ""}</p>
-                {r.approval_notes && <p className="mt-1 text-xs">{r.approval_notes}</p>}
+          data.map((r: any) => {
+            const status = r.status ?? "pending";
+            const variant = status === "approved" ? "default" : status === "rejected" ? "destructive" : "secondary";
+            const isPending = status === "pending";
+            const canApprove = canWrite && isPending && r.recorded_by !== user?.id;
+            return (
+              <div key={r.id} className="flex items-start justify-between gap-2 rounded-lg border p-3 text-sm">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">{r.disposal_reason}</p>
+                    <Badge variant={variant as any} className="capitalize">{status}</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{r.disposal_date}{r.disposal_value ? ` · $${Number(r.disposal_value).toLocaleString()}` : ""}</p>
+                  {r.approval_notes && <p className="mt-1 text-xs">{r.approval_notes}</p>}
+                  {r.approved_at && <p className="mt-1 text-xs text-muted-foreground">{status === "approved" ? "Approved" : "Reviewed"} {new Date(r.approved_at).toLocaleDateString()}</p>}
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  {canApprove && (
+                    <>
+                      <Button size="icon" variant="ghost" title="Approve" onClick={() => approve(r.id)}><Check className="h-4 w-4 text-green-600" /></Button>
+                      <Button size="icon" variant="ghost" title="Reject" onClick={() => reject(r.id)}><X className="h-4 w-4 text-destructive" /></Button>
+                    </>
+                  )}
+                  {canWrite && <Button size="icon" variant="ghost" onClick={() => remove(r.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
+                </div>
               </div>
-              {canWrite && <Button size="icon" variant="ghost" onClick={() => remove(r.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
-            </div>
-          ))}
+            );
+          })}
       </div>
+      {canWrite && <p className="text-xs text-muted-foreground">Disposals require a separate manager's approval before the asset is marked as disposed. You cannot approve a record you submitted yourself.</p>}
     </div>
   );
 }
