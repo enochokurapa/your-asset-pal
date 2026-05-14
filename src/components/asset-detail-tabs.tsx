@@ -347,8 +347,8 @@ function DisposalPanel({ assetId }: { assetId: string }) {
                 <div className="flex shrink-0 gap-1">
                   {canApprove && (
                     <>
-                      <Button size="icon" variant="ghost" title="Approve" onClick={() => approve(r.id)}><Check className="h-4 w-4 text-green-600" /></Button>
-                      <Button size="icon" variant="ghost" title="Reject" onClick={() => reject(r.id)}><X className="h-4 w-4 text-destructive" /></Button>
+                      <Button size="icon" variant="ghost" title="Approve" onClick={() => decide(r.id, "approved", r.approval_notes)}><Check className="h-4 w-4 text-green-600" /></Button>
+                      <Button size="icon" variant="ghost" title="Reject" onClick={() => decide(r.id, "rejected", r.approval_notes)}><X className="h-4 w-4 text-destructive" /></Button>
                     </>
                   )}
                   {canWrite && <Button size="icon" variant="ghost" onClick={() => remove(r.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
