@@ -291,24 +291,24 @@ function DisposalPanel({ assetId }: { assetId: string }) {
     setForm({ disposal_reason: "", disposal_date: new Date().toISOString().slice(0, 10), disposal_value: "", approval_notes: "" });
     qc.invalidateQueries({ queryKey: ["asset-disposals", assetId] });
   };
-  const approve = async (id: string) => {
+  const decide = async (id: string, decision: "approved" | "rejected", existingNotes: string | null) => {
+    const label = decision === "approved" ? "approval" : "rejection";
+    const reason = window.prompt(`Reason for ${label} (optional but recommended):`, "");
+    if (reason === null) return; // cancelled
+    const stamp = `[${decision.toUpperCase()} ${new Date().toLocaleString()}${user?.email ? ` by ${user.email}` : ""}]${reason.trim() ? ` ${reason.trim()}` : ""}`;
+    const merged = existingNotes ? `${existingNotes}\n${stamp}` : stamp;
     const { error } = await supabase.from("asset_disposals")
-      .update({ status: "approved", approved_by: user?.id ?? null, approved_at: new Date().toISOString() } as any)
+      .update({ status: decision, approved_by: user?.id ?? null, approved_at: new Date().toISOString(), approval_notes: merged } as any)
       .eq("id", id);
     if (error) { toast.error(error.message); return; }
-    await supabase.from("assets").update({ status: "disposed" }).eq("id", assetId);
-    toast.success("Disposal approved — asset marked as disposed");
+    if (decision === "approved") {
+      await supabase.from("assets").update({ status: "disposed" }).eq("id", assetId);
+      toast.success("Disposal approved — asset marked as disposed");
+    } else {
+      toast.success("Disposal rejected");
+    }
     qc.invalidateQueries({ queryKey: ["asset-disposals", assetId] });
     qc.invalidateQueries({ queryKey: ["assets"] });
-  };
-  const reject = async (id: string) => {
-    if (!confirm("Reject this disposal request?")) return;
-    const { error } = await supabase.from("asset_disposals")
-      .update({ status: "rejected", approved_by: user?.id ?? null, approved_at: new Date().toISOString() } as any)
-      .eq("id", id);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Disposal rejected");
-    qc.invalidateQueries({ queryKey: ["asset-disposals", assetId] });
   };
   const remove = async (id: string) => {
     if (!confirm("Delete this disposal record?")) return;
