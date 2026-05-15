@@ -17,6 +17,8 @@ import { Route as AppReportsRouteImport } from './routes/_app.reports'
 import { Route as AppLocationsRouteImport } from './routes/_app.locations'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppCategoriesRouteImport } from './routes/_app.categories'
+import { Route as AppBranchesRouteImport } from './routes/_app.branches'
+import { Route as AppAuditRouteImport } from './routes/_app.audit'
 import { Route as AppAssetsRouteImport } from './routes/_app.assets'
 
 const LoginRoute = LoginRouteImport.update({
@@ -58,6 +60,16 @@ const AppCategoriesRoute = AppCategoriesRouteImport.update({
   path: '/categories',
   getParentRoute: () => AppRoute,
 } as any)
+const AppBranchesRoute = AppBranchesRouteImport.update({
+  id: '/branches',
+  path: '/branches',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAuditRoute = AppAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAssetsRoute = AppAssetsRouteImport.update({
   id: '/assets',
   path: '/assets',
@@ -68,6 +80,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/assets': typeof AppAssetsRoute
+  '/audit': typeof AppAuditRoute
+  '/branches': typeof AppBranchesRoute
   '/categories': typeof AppCategoriesRoute
   '/dashboard': typeof AppDashboardRoute
   '/locations': typeof AppLocationsRoute
@@ -78,6 +92,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/assets': typeof AppAssetsRoute
+  '/audit': typeof AppAuditRoute
+  '/branches': typeof AppBranchesRoute
   '/categories': typeof AppCategoriesRoute
   '/dashboard': typeof AppDashboardRoute
   '/locations': typeof AppLocationsRoute
@@ -90,6 +106,8 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/_app/assets': typeof AppAssetsRoute
+  '/_app/audit': typeof AppAuditRoute
+  '/_app/branches': typeof AppBranchesRoute
   '/_app/categories': typeof AppCategoriesRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/locations': typeof AppLocationsRoute
@@ -102,6 +120,8 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/assets'
+    | '/audit'
+    | '/branches'
     | '/categories'
     | '/dashboard'
     | '/locations'
@@ -112,6 +132,8 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/assets'
+    | '/audit'
+    | '/branches'
     | '/categories'
     | '/dashboard'
     | '/locations'
@@ -123,6 +145,8 @@ export interface FileRouteTypes {
     | '/_app'
     | '/login'
     | '/_app/assets'
+    | '/_app/audit'
+    | '/_app/branches'
     | '/_app/categories'
     | '/_app/dashboard'
     | '/_app/locations'
@@ -194,6 +218,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCategoriesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/branches': {
+      id: '/_app/branches'
+      path: '/branches'
+      fullPath: '/branches'
+      preLoaderRoute: typeof AppBranchesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/audit': {
+      id: '/_app/audit'
+      path: '/audit'
+      fullPath: '/audit'
+      preLoaderRoute: typeof AppAuditRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/assets': {
       id: '/_app/assets'
       path: '/assets'
@@ -206,6 +244,8 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppAssetsRoute: typeof AppAssetsRoute
+  AppAuditRoute: typeof AppAuditRoute
+  AppBranchesRoute: typeof AppBranchesRoute
   AppCategoriesRoute: typeof AppCategoriesRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppLocationsRoute: typeof AppLocationsRoute
@@ -215,6 +255,8 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAssetsRoute: AppAssetsRoute,
+  AppAuditRoute: AppAuditRoute,
+  AppBranchesRoute: AppBranchesRoute,
   AppCategoriesRoute: AppCategoriesRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppLocationsRoute: AppLocationsRoute,
@@ -232,3 +274,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
