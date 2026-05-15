@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, Link, Navigate, useRouterState } from "@tansta
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import {
-  LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X, FileBarChart,
+  LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X, FileBarChart, Building2, History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -11,17 +11,19 @@ export const Route = createFileRoute("/_app")({
   component: AppLayout,
 });
 
-const nav: Array<{ to: string; label: string; icon: any; adminOnly?: boolean }> = [
+const nav: Array<{ to: string; label: string; icon: any; adminOnly?: boolean; managerOnly?: boolean }> = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/assets", label: "Assets", icon: Package },
   { to: "/categories", label: "Categories", icon: Tags },
   { to: "/locations", label: "Locations", icon: MapPin },
+  { to: "/branches", label: "Branches", icon: Building2, adminOnly: true },
   { to: "/reports", label: "Reports", icon: FileBarChart },
+  { to: "/audit", label: "Audit Trail", icon: History, managerOnly: true },
   { to: "/users", label: "Users", icon: Users, adminOnly: true },
 ];
 
 function AppLayout() {
-  const { user, loading, signOut, isAdmin, roles } = useAuth();
+  const { user, loading, signOut, isAdmin, canWrite, roles } = useAuth();
   const [open, setOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -34,7 +36,11 @@ function AppLayout() {
   }
   if (!user) return <Navigate to="/login" />;
 
-  const visibleNav = nav.filter((n) => !n.adminOnly || isAdmin);
+  const visibleNav = nav.filter((n) => {
+    if (n.adminOnly && !isAdmin) return false;
+    if (n.managerOnly && !canWrite) return false;
+    return true;
+  });
 
   return (
     <div className="flex min-h-screen w-full bg-background">
