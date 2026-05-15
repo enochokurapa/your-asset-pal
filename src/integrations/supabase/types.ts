@@ -20,6 +20,7 @@ export type Database = {
           assigned_to_name: string | null
           assigned_to_user: string | null
           assignment_date: string
+          branch_id: string | null
           created_at: string
           created_by: string | null
           department: string | null
@@ -32,6 +33,7 @@ export type Database = {
           assigned_to_name?: string | null
           assigned_to_user?: string | null
           assignment_date?: string
+          branch_id?: string | null
           created_at?: string
           created_by?: string | null
           department?: string | null
@@ -44,6 +46,7 @@ export type Database = {
           assigned_to_name?: string | null
           assigned_to_user?: string | null
           assignment_date?: string
+          branch_id?: string | null
           created_at?: string
           created_by?: string | null
           department?: string | null
@@ -57,6 +60,13 @@ export type Database = {
             columns: ["asset_id"]
             isOneToOne: false
             referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_assignments_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
             referencedColumns: ["id"]
           },
         ]
@@ -114,6 +124,7 @@ export type Database = {
           disposal_value: number | null
           id: string
           recorded_by: string | null
+          retirement_reason: string | null
           status: string
         }
         Insert: {
@@ -127,6 +138,7 @@ export type Database = {
           disposal_value?: number | null
           id?: string
           recorded_by?: string | null
+          retirement_reason?: string | null
           status?: string
         }
         Update: {
@@ -140,6 +152,7 @@ export type Database = {
           disposal_value?: number | null
           id?: string
           recorded_by?: string | null
+          retirement_reason?: string | null
           status?: string
         }
         Relationships: [
@@ -156,32 +169,47 @@ export type Database = {
         Row: {
           asset_id: string
           created_at: string
+          from_branch_id: string | null
           from_location_id: string | null
+          from_user: string | null
           id: string
           moved_at: string
           moved_by: string | null
           reason: string | null
+          to_branch_id: string | null
           to_location_id: string | null
+          to_user: string | null
+          transfer_type: string
         }
         Insert: {
           asset_id: string
           created_at?: string
+          from_branch_id?: string | null
           from_location_id?: string | null
+          from_user?: string | null
           id?: string
           moved_at?: string
           moved_by?: string | null
           reason?: string | null
+          to_branch_id?: string | null
           to_location_id?: string | null
+          to_user?: string | null
+          transfer_type?: string
         }
         Update: {
           asset_id?: string
           created_at?: string
+          from_branch_id?: string | null
           from_location_id?: string | null
+          from_user?: string | null
           id?: string
           moved_at?: string
           moved_by?: string | null
           reason?: string | null
+          to_branch_id?: string | null
           to_location_id?: string | null
+          to_user?: string | null
+          transfer_type?: string
         }
         Relationships: [
           {
@@ -192,10 +220,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "asset_movements_from_branch_id_fkey"
+            columns: ["from_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "asset_movements_from_location_id_fkey"
             columns: ["from_location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_movements_to_branch_id_fkey"
+            columns: ["to_branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
             referencedColumns: ["id"]
           },
           {
@@ -211,6 +253,7 @@ export type Database = {
         Row: {
           asset_tag: string
           assigned_to: string | null
+          branch_id: string | null
           category_id: string | null
           created_at: string
           created_by: string | null
@@ -220,12 +263,14 @@ export type Database = {
           name: string
           purchase_date: string | null
           purchase_value: number | null
+          serial_number: string | null
           status: Database["public"]["Enums"]["asset_status"]
           updated_at: string
         }
         Insert: {
           asset_tag: string
           assigned_to?: string | null
+          branch_id?: string | null
           category_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -235,12 +280,14 @@ export type Database = {
           name: string
           purchase_date?: string | null
           purchase_value?: number | null
+          serial_number?: string | null
           status?: Database["public"]["Enums"]["asset_status"]
           updated_at?: string
         }
         Update: {
           asset_tag?: string
           assigned_to?: string | null
+          branch_id?: string | null
           category_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -250,10 +297,18 @@ export type Database = {
           name?: string
           purchase_date?: string | null
           purchase_value?: number | null
+          serial_number?: string | null
           status?: Database["public"]["Enums"]["asset_status"]
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "assets_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "assets_category_id_fkey"
             columns: ["category_id"]
@@ -269,6 +324,69 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      audit_log: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          created_at: string
+          details: Json | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      branches: {
+        Row: {
+          address: string | null
+          code: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       categories: {
         Row: {
