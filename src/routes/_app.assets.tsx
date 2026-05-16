@@ -22,17 +22,17 @@ export const Route = createFileRoute("/_app/assets")({
   component: AssetsPage,
 });
 
-type Status = "in_use" | "in_storage" | "under_repair" | "retired" | "lost" | "disposed";
+type Status = "in_use" | "in_storage" | "under_repair" | "retired" | "missing" | "disposed";
 const STATUS_LABEL: Record<Status, string> = {
   in_use: "In use", in_storage: "In storage", under_repair: "Under repair",
-  retired: "Retired", lost: "Lost", disposed: "Disposed",
+  retired: "Retired", missing: "Missing", disposed: "Disposed",
 };
 const STATUS_TONE: Record<Status, string> = {
   in_use: "bg-success/15 text-success",
   in_storage: "bg-secondary text-secondary-foreground",
   under_repair: "bg-warning/20 text-warning-foreground",
   retired: "bg-muted text-muted-foreground",
-  lost: "bg-destructive/15 text-destructive",
+  missing: "bg-destructive/15 text-destructive",
   disposed: "bg-muted text-muted-foreground line-through",
 };
 

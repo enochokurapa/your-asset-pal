@@ -14,7 +14,7 @@ const STATUS_COLORS: Record<string, string> = {
   in_storage: "hsl(220 14% 60%)",
   under_repair: "hsl(38 92% 50%)",
   retired: "hsl(220 9% 46%)",
-  lost: "hsl(0 84% 60%)",
+  missing: "hsl(0 84% 60%)",
   disposed: "hsl(220 9% 30%)",
 };
 
@@ -34,7 +34,7 @@ function Dashboard() {
         ...b,
         assetCount: list.filter((a: any) => a.branch_id === b.id).length,
       }));
-      const statusCounts = ["in_use", "in_storage", "under_repair", "retired", "lost", "disposed"].map((s) => ({
+      const statusCounts = ["in_use", "in_storage", "under_repair", "retired", "missing", "disposed"].map((s) => ({
         name: s.replace("_", " "),
         key: s,
         value: list.filter((a: any) => a.status === s).length,

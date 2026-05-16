@@ -262,7 +262,7 @@ function ReportsPage() {
   };
 
   // Condition / status counts for charts
-  const statusCounts = ["in_use", "in_storage", "under_repair", "retired", "lost", "disposed"].map((s) => ({
+  const statusCounts = ["in_use", "in_storage", "under_repair", "retired", "missing", "disposed"].map((s) => ({
     name: s.replace("_", " "),
     value: enrichedAssets.filter((a: any) => a.status === s).length,
   })).filter((d) => d.value > 0);
@@ -274,7 +274,7 @@ function ReportsPage() {
       in_use: list.filter((a: any) => a.status === "in_use").length,
       under_repair: list.filter((a: any) => a.status === "under_repair").length,
       retired: list.filter((a: any) => a.status === "retired").length,
-      lost: list.filter((a: any) => a.status === "lost").length,
+      missing: list.filter((a: any) => a.status === "missing").length,
     };
   });
 
@@ -344,7 +344,7 @@ function ReportsPage() {
                         <Bar dataKey="in_use" stackId="s" fill="hsl(142 71% 45%)" />
                         <Bar dataKey="under_repair" stackId="s" fill="hsl(38 92% 50%)" />
                         <Bar dataKey="retired" stackId="s" fill="hsl(220 9% 46%)" />
-                        <Bar dataKey="lost" stackId="s" fill="hsl(0 84% 60%)" />
+                        <Bar dataKey="missing" stackId="s" fill="hsl(0 84% 60%)" />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
