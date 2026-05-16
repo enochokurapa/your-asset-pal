@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { NotificationBell } from "@/components/notification-bell";
 
 export const Route = createFileRoute("/_app")({
   component: AppLayout,
@@ -120,6 +121,7 @@ function AppLayout() {
           <div className="hidden text-sm text-muted-foreground sm:block">
             {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
           </div>
+          <NotificationBell />
         </header>
         <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
           <Outlet />
