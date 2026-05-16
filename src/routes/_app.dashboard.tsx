@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, CheckCircle2, Wrench, Archive, Tags, MapPin, Building2 } from "lucide-react";
+import { Package, CheckCircle2, Wrench, Archive, Tags, MapPin, Building2, AlertTriangle, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import { PendingApprovalsCard } from "@/components/pending-approvals-card";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: Dashboard,
@@ -23,7 +24,7 @@ function Dashboard() {
     queryKey: ["dashboard-stats"],
     queryFn: async () => {
       const [assets, cats, locs, branches] = await Promise.all([
-        supabase.from("assets").select("id,status,name,asset_tag,branch_id,created_at").order("created_at", { ascending: false }),
+        supabase.from("assets").select("id,status,name,asset_tag,branch_id,set_for_disposal,created_at").order("created_at", { ascending: false }),
         supabase.from("categories").select("id", { count: "exact", head: true }),
         supabase.from("locations").select("id", { count: "exact", head: true }),
         supabase.from("branches").select("id,name,code,is_active"),
@@ -44,12 +45,13 @@ function Dashboard() {
         inUse: list.filter((a) => a.status === "in_use").length,
         repair: list.filter((a) => a.status === "under_repair").length,
         retired: list.filter((a) => a.status === "retired").length,
+        missing: list.filter((a) => a.status === "missing").length,
+        forDisposal: list.filter((a: any) => a.set_for_disposal).length,
         catCount: cats.count ?? 0,
         locCount: locs.count ?? 0,
         branchCount: branchList.length,
         perBranch,
         statusCounts,
-        recent: list.slice(0, 5),
       };
     },
   });
@@ -60,6 +62,8 @@ function Dashboard() {
     { label: "In Use", value: data?.inUse ?? 0, icon: CheckCircle2, tone: "text-success bg-success/10" },
     { label: "Under Repair", value: data?.repair ?? 0, icon: Wrench, tone: "text-warning bg-warning/15" },
     { label: "Retired", value: data?.retired ?? 0, icon: Archive, tone: "text-muted-foreground bg-muted" },
+    { label: "Missing", value: data?.missing ?? 0, icon: AlertTriangle, tone: "text-destructive bg-destructive/10" },
+    { label: "For Disposal", value: data?.forDisposal ?? 0, icon: Trash2, tone: "text-warning bg-warning/15" },
   ];
 
   const pieData = (data?.statusCounts ?? []).filter((s) => s.value > 0);
@@ -127,26 +131,7 @@ function Dashboard() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="p-5 md:col-span-2">
-          <h2 className="text-sm font-semibold">Recently added</h2>
-          <div className="mt-4 divide-y">
-            {isLoading && <p className="py-6 text-center text-sm text-muted-foreground">Loading…</p>}
-            {!isLoading && data?.recent.length === 0 && (
-              <p className="py-6 text-center text-sm text-muted-foreground">No assets yet.</p>
-            )}
-            {data?.recent.map((a) => (
-              <div key={a.id} className="flex items-center justify-between py-3">
-                <div>
-                  <p className="text-sm font-medium">{a.name}</p>
-                  <p className="text-xs text-muted-foreground">{a.asset_tag}</p>
-                </div>
-                <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-secondary-foreground">
-                  {a.status.replace("_", " ")}
-                </span>
-              </div>
-            ))}
-          </div>
-        </Card>
+        <div className="md:col-span-2"><PendingApprovalsCard /></div>
 
         <Card className="p-5">
           <h2 className="text-sm font-semibold">Portfolio</h2>
