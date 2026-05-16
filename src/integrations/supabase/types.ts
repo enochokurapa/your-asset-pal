@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      approval_requests: {
+        Row: {
+          approver_id: string | null
+          asset_id: string | null
+          created_at: string
+          decided_at: string | null
+          id: string
+          kind: string
+          payload: Json
+          reason: string | null
+          requested_by: string
+          status: string
+        }
+        Insert: {
+          approver_id?: string | null
+          asset_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          id?: string
+          kind: string
+          payload?: Json
+          reason?: string | null
+          requested_by: string
+          status?: string
+        }
+        Update: {
+          approver_id?: string | null
+          asset_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          id?: string
+          kind?: string
+          payload?: Json
+          reason?: string | null
+          requested_by?: string
+          status?: string
+        }
+        Relationships: []
+      }
       asset_assignments: {
         Row: {
           asset_id: string
@@ -165,6 +204,39 @@ export type Database = {
           },
         ]
       }
+      asset_imports: {
+        Row: {
+          created_at: string
+          error_rows: number
+          errors: Json | null
+          file_name: string
+          id: string
+          imported_by: string | null
+          success_rows: number
+          total_rows: number
+        }
+        Insert: {
+          created_at?: string
+          error_rows?: number
+          errors?: Json | null
+          file_name: string
+          id?: string
+          imported_by?: string | null
+          success_rows?: number
+          total_rows?: number
+        }
+        Update: {
+          created_at?: string
+          error_rows?: number
+          errors?: Json | null
+          file_name?: string
+          id?: string
+          imported_by?: string | null
+          success_rows?: number
+          total_rows?: number
+        }
+        Relationships: []
+      }
       asset_movements: {
         Row: {
           asset_id: string
@@ -261,9 +333,11 @@ export type Database = {
           id: string
           location_id: string | null
           name: string
+          previous_status: Database["public"]["Enums"]["asset_status"] | null
           purchase_date: string | null
           purchase_value: number | null
           serial_number: string | null
+          set_for_disposal: boolean
           status: Database["public"]["Enums"]["asset_status"]
           updated_at: string
         }
@@ -278,9 +352,11 @@ export type Database = {
           id?: string
           location_id?: string | null
           name: string
+          previous_status?: Database["public"]["Enums"]["asset_status"] | null
           purchase_date?: string | null
           purchase_value?: number | null
           serial_number?: string | null
+          set_for_disposal?: boolean
           status?: Database["public"]["Enums"]["asset_status"]
           updated_at?: string
         }
@@ -295,9 +371,11 @@ export type Database = {
           id?: string
           location_id?: string | null
           name?: string
+          previous_status?: Database["public"]["Enums"]["asset_status"] | null
           purchase_date?: string | null
           purchase_value?: number | null
           serial_number?: string | null
+          set_for_disposal?: boolean
           status?: Database["public"]["Enums"]["asset_status"]
           updated_at?: string
         }
@@ -329,6 +407,8 @@ export type Database = {
         Row: {
           action: string
           actor_user_id: string | null
+          cleared_at: string | null
+          cleared_by: string | null
           created_at: string
           details: Json | null
           entity_id: string | null
@@ -338,6 +418,8 @@ export type Database = {
         Insert: {
           action: string
           actor_user_id?: string | null
+          cleared_at?: string | null
+          cleared_by?: string | null
           created_at?: string
           details?: Json | null
           entity_id?: string | null
@@ -347,6 +429,8 @@ export type Database = {
         Update: {
           action?: string
           actor_user_id?: string | null
+          cleared_at?: string | null
+          cleared_by?: string | null
           created_at?: string
           details?: Json | null
           entity_id?: string | null
@@ -393,6 +477,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          is_active: boolean
           name: string
           parent_id: string | null
         }
@@ -400,6 +485,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_active?: boolean
           name: string
           parent_id?: string | null
         }
@@ -407,6 +493,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_active?: boolean
           name?: string
           parent_id?: string | null
         }
@@ -425,6 +512,7 @@ export type Database = {
           address: string | null
           created_at: string
           id: string
+          is_active: boolean
           name: string
           parent_id: string | null
         }
@@ -432,6 +520,7 @@ export type Database = {
           address?: string | null
           created_at?: string
           id?: string
+          is_active?: boolean
           name: string
           parent_id?: string | null
         }
@@ -439,6 +528,7 @@ export type Database = {
           address?: string | null
           created_at?: string
           id?: string
+          is_active?: boolean
           name?: string
           parent_id?: string | null
         }
@@ -451,6 +541,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notifications: {
+        Row: {
+          action_status: string
+          beep: boolean
+          body: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          read_at: string | null
+          requires_action: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          action_status?: string
+          beep?: boolean
+          body?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          read_at?: string | null
+          requires_action?: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          action_status?: string
+          beep?: boolean
+          body?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          read_at?: string | null
+          requires_action?: boolean
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -515,7 +650,7 @@ export type Database = {
         | "in_storage"
         | "under_repair"
         | "retired"
-        | "lost"
+        | "missing"
         | "disposed"
     }
     CompositeTypes: {
@@ -650,7 +785,7 @@ export const Constants = {
         "in_storage",
         "under_repair",
         "retired",
-        "lost",
+        "missing",
         "disposed",
       ],
     },
