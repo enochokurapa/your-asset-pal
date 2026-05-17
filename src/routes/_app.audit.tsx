@@ -63,10 +63,43 @@ function AuditPage() {
   const entityLink = (r: any) => {
     if (!r.entity_id) return null;
     if (r.entity_type === "assets") return `/assets?focus=${r.entity_id}`;
+    if (r.entity_type === "asset_movements" || r.entity_type === "asset_assignments" || r.entity_type === "asset_disposals") {
+      const aid = r.details?.after?.asset_id ?? r.details?.before?.asset_id ?? r.details?.asset_id;
+      return aid ? `/assets?focus=${aid}` : null;
+    }
+    if (r.entity_type === "approval_requests") return `/dashboard`;
     if (r.entity_type === "branches") return `/branches`;
     if (r.entity_type === "locations") return `/locations`;
     if (r.entity_type === "categories") return `/categories`;
     return null;
+  };
+
+  // Friendlier labels for raw action strings produced by the audit trigger
+  const friendlyAction = (r: any) => {
+    const t = r.entity_type;
+    const a = r.action as string;
+    if (t === "assets") {
+      if (a === "created") return "New asset added";
+      if (a === "retired") return "Asset retired";
+      if (a === "updated") return "Asset details updated";
+      if (a === "deleted") return "Asset removed";
+    }
+    if (t === "asset_movements" && a === "created") return "Asset movement recorded";
+    if (t === "asset_assignments" && a === "created") return "Custodian assigned";
+    if (t === "asset_disposals") {
+      if (a === "created") return "Retirement / disposal requested";
+      if (a === "disposal_approved") return "Disposal approved";
+      if (a === "disposal_rejected") return "Disposal rejected";
+    }
+    if (t === "approval_requests") {
+      if (a === "created") return "Approval requested";
+      if (a === "updated") return "Approval decided";
+    }
+    if (t === "branches" || t === "locations" || t === "categories") {
+      if (a === "created") return `New ${t.slice(0, -1)} added`;
+      if (a === "updated") return `${t.slice(0, -1)} updated`;
+    }
+    return a.replace(/_/g, " ");
   };
 
   return (
@@ -134,7 +167,7 @@ function AuditPage() {
                       <tr key={r.id} className={"border-b last:border-0 " + (r.cleared_at ? "opacity-50" : "")}>
                         <td className="px-3 py-2 whitespace-nowrap text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString()}</td>
                         <td className="px-3 py-2"><Badge variant="outline" className="text-xs">{r.entity_type}</Badge></td>
-                        <td className="px-3 py-2 capitalize">{r.action.replace(/_/g, " ")}</td>
+                        <td className="px-3 py-2">{friendlyAction(r)}</td>
                         <td className="px-3 py-2 text-xs">{p?.full_name ?? p?.email ?? "—"}</td>
                         <td className="px-3 py-2">
                           {link && (
