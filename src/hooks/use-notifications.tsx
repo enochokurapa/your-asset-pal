@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -45,35 +45,11 @@ export function useNotifications() {
     return () => { supabase.removeChannel(ch); };
   }, [user, qc]);
 
-  // Beep loop while any unread requires_action+beep notification exists
   const notifs = query.data ?? [];
-  const needsBeep = notifs.some((n) => !n.read_at && n.requires_action && n.beep && n.action_status === "pending");
-  const intervalRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!needsBeep) {
-      if (intervalRef.current) { window.clearInterval(intervalRef.current); intervalRef.current = null; }
-      return;
-    }
-    const play = () => {
-      try {
-        const Ctor = (window as any).AudioContext || (window as any).webkitAudioContext;
-        if (!Ctor) return;
-        const ctx = new Ctor();
-        const o = ctx.createOscillator();
-        const g = ctx.createGain();
-        o.type = "sine"; o.frequency.value = 880;
-        g.gain.value = 0.05;
-        o.connect(g); g.connect(ctx.destination);
-        o.start();
-        setTimeout(() => { o.stop(); ctx.close(); }, 120);
-      } catch { /* ignore */ }
-    };
-    play();
-    intervalRef.current = window.setInterval(play, 6000);
-    return () => { if (intervalRef.current) window.clearInterval(intervalRef.current); };
-  }, [needsBeep]);
-
+  // Visual blink — no sound — whenever there's a pending action-required notification.
+  const needsAttention = notifs.some(
+    (n) => !n.read_at && n.requires_action && n.action_status === "pending",
+  );
   const unreadCount = notifs.filter((n) => !n.read_at).length;
 
   const markRead = async (id: string) => {
@@ -85,5 +61,5 @@ export function useNotifications() {
     qc.invalidateQueries({ queryKey: ["notifications", user?.id] });
   };
 
-  return { notifications: notifs, unreadCount, isLoading: query.isLoading, markRead, markAllRead };
+  return { notifications: notifs, unreadCount, needsAttention, isLoading: query.isLoading, markRead, markAllRead };
 }

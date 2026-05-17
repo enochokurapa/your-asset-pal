@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { createFileRoute, useSearch, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -12,7 +12,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Search, Package, ScanLine, Archive, AlertCircle } from "lucide-react";
+import { Plus, Pencil, Search, Package, ScanLine, Archive, AlertCircle, FilterX } from "lucide-react";
 import { toast } from "sonner";
 import { ScannerDialog } from "@/components/scanner-dialog";
 import { AssetDetailTabs } from "@/components/asset-detail-tabs";
@@ -20,6 +20,7 @@ import { formatUGX } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/assets")({
   component: AssetsPage,
+  validateSearch: (s: Record<string, unknown>) => ({ focus: typeof s.focus === "string" ? s.focus : undefined }),
 });
 
 type Status = "in_use" | "in_storage" | "under_repair" | "retired" | "missing" | "disposed";
@@ -48,22 +49,35 @@ interface AssetForm {
   status: Status;
   purchase_value: string;
   purchase_date: string;
+  // Inline custodian (only used on create)
+  assigned_to_name: string;
+  department: string;
 }
 
 const empty: AssetForm = {
   asset_tag: "", serial_number: "", name: "", description: "",
   category_id: null, location_id: null, branch_id: null, status: "in_storage",
   purchase_value: "", purchase_date: "",
+  assigned_to_name: "", department: "",
 };
 
 function AssetsPage() {
   const { canWrite, isAdmin, user } = useAuth();
   const qc = useQueryClient();
-  const [search, setSearch] = useState("");
+  const search = useSearch({ from: "/_app/assets" });
+  const nav = useNavigate();
+
+  const [q, setQ] = useState("");
+  const [fBranch, setFBranch] = useState("");
+  const [fCategory, setFCategory] = useState("");
+  const [fLocation, setFLocation] = useState("");
+  const [fStatus, setFStatus] = useState("");
+  const [fDept, setFDept] = useState("");
+
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<AssetForm>(empty);
   const [scanOpen, setScanOpen] = useState(false);
-  const [scanMode, setScanMode] = useState<"lookup" | "field">("lookup");
+  const [scanMode, setScanMode] = useState<"lookup" | "tag" | "serial">("lookup");
   const [dupOpen, setDupOpen] = useState(false);
   const [dupAsset, setDupAsset] = useState<any>(null);
   const [retireOpen, setRetireOpen] = useState(false);
@@ -93,13 +107,41 @@ function AssetsPage() {
     queryKey: ["branches-active"],
     queryFn: async () => (await supabase.from("branches").select("id,name,code,is_active").eq("is_active", true).order("name")).data ?? [],
   });
+  // Pull current assignments (latest per asset) for custodian/department display & filters
+  const { data: assignments = [] } = useQuery({
+    queryKey: ["asset-assignments-current"],
+    queryFn: async () => (await supabase.from("asset_assignments")
+      .select("asset_id, assigned_to_name, department, assignment_date")
+      .order("assignment_date", { ascending: false })).data ?? [],
+  });
+  const currentBy: Record<string, any> = useMemo(() => {
+    const m: Record<string, any> = {};
+    assignments.forEach((a: any) => { if (!m[a.asset_id]) m[a.asset_id] = a; });
+    return m;
+  }, [assignments]);
 
-  const filtered = assets.filter((a: any) =>
-    !search ||
-    a.name.toLowerCase().includes(search.toLowerCase()) ||
-    a.asset_tag.toLowerCase().includes(search.toLowerCase()) ||
-    (a.serial_number ?? "").toLowerCase().includes(search.toLowerCase())
-  );
+  const enriched = useMemo(() => (assets as any[]).map((a) => ({
+    ...a,
+    custodian: currentBy[a.id]?.assigned_to_name ?? "",
+    department: currentBy[a.id]?.department ?? "",
+  })), [assets, currentBy]);
+
+  const filtered = enriched.filter((a) => {
+    if (q) {
+      const needle = q.toLowerCase();
+      const hit = [a.name, a.asset_tag, a.serial_number, a.custodian, a.department]
+        .some((v) => (v ?? "").toString().toLowerCase().includes(needle));
+      if (!hit) return false;
+    }
+    if (fBranch && a.branch_id !== fBranch) return false;
+    if (fCategory && a.category_id !== fCategory) return false;
+    if (fLocation && a.location_id !== fLocation) return false;
+    if (fStatus && a.status !== fStatus) return false;
+    if (fDept && !(a.department ?? "").toLowerCase().includes(fDept.toLowerCase())) return false;
+    return true;
+  });
+
+  const clearFilters = () => { setQ(""); setFBranch(""); setFCategory(""); setFLocation(""); setFStatus(""); setFDept(""); };
 
   const openNew = () => { setForm(empty); setOpen(true); };
   const openEdit = (a: any) => {
@@ -110,30 +152,38 @@ function AssetsPage() {
       status: a.status,
       purchase_value: a.purchase_value?.toString() ?? "",
       purchase_date: a.purchase_date ?? "",
+      assigned_to_name: "", department: "",
     });
     setOpen(true);
   };
 
+  // Auto-open the asset from ?focus= query
+  useEffect(() => {
+    if (!search.focus || assets.length === 0) return;
+    const a = (assets as any[]).find((x) => x.id === search.focus);
+    if (a) {
+      openEdit(a);
+      nav({ to: "/assets", search: {}, replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.focus, assets]);
+
   const handleScan = (text: string) => {
     const code = text.trim();
     if (!code) return;
-    if (scanMode === "field") {
-      // Duplicate guard: if this code already exists on a different asset, warn.
-      const existing = assets.find((a: any) =>
+    if (scanMode === "tag" || scanMode === "serial") {
+      const existing = (assets as any[]).find((a) =>
         (a.asset_tag.toLowerCase() === code.toLowerCase() ||
          (a.serial_number ?? "").toLowerCase() === code.toLowerCase()) &&
         a.id !== form.id
       );
-      if (existing) {
-        setDupAsset(existing);
-        setDupOpen(true);
-        return;
-      }
-      setForm((f) => ({ ...f, asset_tag: code }));
-      toast.success(`Tag scanned: ${code}`);
+      if (existing) { setDupAsset(existing); setDupOpen(true); return; }
+      if (scanMode === "tag") setForm((f) => ({ ...f, asset_tag: code }));
+      else setForm((f) => ({ ...f, serial_number: code }));
+      toast.success(`${scanMode === "tag" ? "Tag" : "Serial"} scanned: ${code}`);
       return;
     }
-    const found = assets.find((a: any) =>
+    const found = (assets as any[]).find((a) =>
       a.asset_tag.toLowerCase() === code.toLowerCase() ||
       (a.serial_number ?? "").toLowerCase() === code.toLowerCase()
     );
@@ -153,20 +203,15 @@ function AssetsPage() {
     if (!form.asset_tag.trim() || !form.name.trim()) { toast.error("Tag and name are required"); return; }
     if (!form.branch_id) { toast.error("Branch is required"); return; }
 
-    // Duplicate guard against existing tag/serial belonging to another asset
     const tagLower = form.asset_tag.trim().toLowerCase();
     const serialLower = form.serial_number.trim().toLowerCase();
-    const dup = assets.find((a: any) =>
+    const dup = (assets as any[]).find((a) =>
       a.id !== form.id && (
         a.asset_tag.toLowerCase() === tagLower ||
         (serialLower && (a.serial_number ?? "").toLowerCase() === serialLower)
       )
     );
-    if (dup) {
-      setDupAsset(dup);
-      setDupOpen(true);
-      return;
-    }
+    if (dup) { setDupAsset(dup); setDupOpen(true); return; }
 
     const payload = {
       asset_tag: form.asset_tag.trim(),
@@ -180,19 +225,35 @@ function AssetsPage() {
       purchase_value: form.purchase_value ? Number(form.purchase_value) : null,
       purchase_date: form.purchase_date || null,
     };
-    const { error } = form.id
-      ? await supabase.from("assets").update(payload).eq("id", form.id)
-      : await supabase.from("assets").insert({ ...payload, created_by: user?.id ?? null });
-    if (error) { toast.error(error.message); return; }
-    toast.success(form.id ? "Asset updated" : "Asset created");
+
+    if (form.id) {
+      const { error } = await supabase.from("assets").update(payload).eq("id", form.id);
+      if (error) { toast.error(error.message); return; }
+      toast.success("Asset updated");
+    } else {
+      const { data: created, error } = await supabase
+        .from("assets").insert({ ...payload, created_by: user?.id ?? null }).select().single();
+      if (error || !created) { toast.error(error?.message ?? "Failed"); return; }
+      // Create the initial custody record inline if provided
+      if (form.assigned_to_name.trim() || form.department.trim()) {
+        await supabase.from("asset_assignments").insert({
+          asset_id: created.id,
+          assigned_to_name: form.assigned_to_name.trim() || null,
+          department: form.department.trim() || null,
+          branch_id: form.branch_id,
+          assignment_date: new Date().toISOString().slice(0, 10),
+          created_by: user?.id ?? null,
+        });
+      }
+      toast.success("Asset created");
+    }
     setOpen(false);
     qc.invalidateQueries({ queryKey: ["assets"] });
+    qc.invalidateQueries({ queryKey: ["asset-assignments-current"] });
     qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
   };
 
-  const requestRetire = (a: any) => {
-    setRetireAsset(a); setRetireReason(""); setRetireOpen(true);
-  };
+  const requestRetire = (a: any) => { setRetireAsset(a); setRetireReason(""); setRetireOpen(true); };
   const submitRetire = async () => {
     if (!retireReason.trim()) { toast.error("Reason is required"); return; }
     const { error } = await supabase.from("asset_disposals").insert({
@@ -233,14 +294,19 @@ function AssetsPage() {
                   <Label htmlFor="tag">Asset tag *</Label>
                   <div className="flex gap-2">
                     <Input id="tag" value={form.asset_tag} onChange={(e) => setForm({ ...form, asset_tag: e.target.value })} placeholder="LAP-001" />
-                    <Button type="button" size="icon" variant="outline" onClick={() => { setScanMode("field"); setScanOpen(true); }}>
+                    <Button type="button" size="icon" variant="outline" title="Scan tag (QR or barcode)" onClick={() => { setScanMode("tag"); setScanOpen(true); }}>
                       <ScanLine className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
                 <div className="space-y-2 sm:col-span-1">
                   <Label htmlFor="serial">Serial number</Label>
-                  <Input id="serial" value={form.serial_number} onChange={(e) => setForm({ ...form, serial_number: e.target.value })} placeholder="SN-XXXXXXXX" />
+                  <div className="flex gap-2">
+                    <Input id="serial" value={form.serial_number} onChange={(e) => setForm({ ...form, serial_number: e.target.value })} placeholder="SN-XXXXXXXX" />
+                    <Button type="button" size="icon" variant="outline" title="Scan serial (QR or barcode)" onClick={() => { setScanMode("serial"); setScanOpen(true); }}>
+                      <ScanLine className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="name">Name *</Label>
@@ -299,6 +365,24 @@ function AssetsPage() {
                   <Label htmlFor="date">Purchase date</Label>
                   <Input id="date" type="date" value={form.purchase_date} onChange={(e) => setForm({ ...form, purchase_date: e.target.value })} />
                 </div>
+
+                {/* Inline custodian on create */}
+                {!form.id && (
+                  <div className="sm:col-span-2 rounded-lg border bg-muted/30 p-3">
+                    <p className="mb-2 text-sm font-medium">Assign custodian (optional)</p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="custodian">Custodian (full name)</Label>
+                        <Input id="custodian" value={form.assigned_to_name} onChange={(e) => setForm({ ...form, assigned_to_name: e.target.value })} placeholder="Jane Doe" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="dept">Department</Label>
+                        <Input id="dept" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} placeholder="Finance" />
+                      </div>
+                    </div>
+                    <p className="mt-2 text-[11px] text-muted-foreground">Creates an initial custody record assigned to this person & department.</p>
+                  </div>
+                )}
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
@@ -316,9 +400,43 @@ function AssetsPage() {
       </div>
 
       <Card className="p-4">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search by name, tag or serial…" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
+          <div className="relative md:col-span-3 lg:col-span-2">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input placeholder="Search name, tag, serial, custodian…" className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+          <Select value={fBranch || "all"} onValueChange={(v) => setFBranch(v === "all" ? "" : v)}>
+            <SelectTrigger><SelectValue placeholder="Branch" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All branches</SelectItem>
+              {branches.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={fCategory || "all"} onValueChange={(v) => setFCategory(v === "all" ? "" : v)}>
+            <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All categories</SelectItem>
+              {categories.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={fLocation || "all"} onValueChange={(v) => setFLocation(v === "all" ? "" : v)}>
+            <SelectTrigger><SelectValue placeholder="Location" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All locations</SelectItem>
+              {locations.map((l: any) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={fStatus || "all"} onValueChange={(v) => setFStatus(v === "all" ? "" : v)}>
+            <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {Object.entries(STATUS_LABEL).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <div className="flex gap-2 md:col-span-3 lg:col-span-2">
+            <Input placeholder="Department…" value={fDept} onChange={(e) => setFDept(e.target.value)} />
+            <Button variant="outline" size="icon" onClick={clearFilters} title="Clear filters"><FilterX className="h-4 w-4" /></Button>
+          </div>
         </div>
 
         <div className="mt-4 overflow-x-auto">
@@ -327,7 +445,7 @@ function AssetsPage() {
           ) : filtered.length === 0 ? (
             <div className="py-12 text-center">
               <Package className="mx-auto h-10 w-10 text-muted-foreground/40" />
-              <p className="mt-3 text-sm text-muted-foreground">No assets found.</p>
+              <p className="mt-3 text-sm text-muted-foreground">No assets match the filters.</p>
             </div>
           ) : (
             <table className="w-full text-sm">
@@ -338,6 +456,7 @@ function AssetsPage() {
                   <th className="hidden px-3 py-3 font-medium md:table-cell">Branch</th>
                   <th className="hidden px-3 py-3 font-medium lg:table-cell">Category</th>
                   <th className="hidden px-3 py-3 font-medium lg:table-cell">Location</th>
+                  <th className="hidden px-3 py-3 font-medium md:table-cell">Custodian</th>
                   <th className="px-3 py-3 font-medium">Status</th>
                   <th className="hidden px-3 py-3 text-right font-medium sm:table-cell">Value</th>
                   {canWrite && <th className="px-3 py-3" />}
@@ -351,6 +470,9 @@ function AssetsPage() {
                     <td className="hidden px-3 py-3 text-muted-foreground md:table-cell">{a.branches?.name ?? "—"}</td>
                     <td className="hidden px-3 py-3 text-muted-foreground lg:table-cell">{a.categories?.name ?? "—"}</td>
                     <td className="hidden px-3 py-3 text-muted-foreground lg:table-cell">{a.locations?.name ?? "—"}</td>
+                    <td className="hidden px-3 py-3 text-muted-foreground md:table-cell">
+                      {a.custodian || "—"}{a.department && <span className="block text-[11px]">{a.department}</span>}
+                    </td>
                     <td className="px-3 py-3">
                       <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_TONE[a.status as Status]}`}>
                         {STATUS_LABEL[a.status as Status]}
@@ -379,7 +501,6 @@ function AssetsPage() {
 
       <ScannerDialog open={scanOpen} onOpenChange={setScanOpen} onScan={handleScan} />
 
-      {/* Duplicate detection dialog */}
       <Dialog open={dupOpen} onOpenChange={setDupOpen}>
         <DialogContent>
           <DialogHeader>
@@ -403,7 +524,6 @@ function AssetsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Retirement request dialog */}
       <Dialog open={retireOpen} onOpenChange={setRetireOpen}>
         <DialogContent>
           <DialogHeader>

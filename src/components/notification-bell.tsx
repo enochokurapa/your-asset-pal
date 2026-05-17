@@ -8,20 +8,25 @@ import { useNotifications } from "@/hooks/use-notifications";
 import { cn } from "@/lib/utils";
 
 export function NotificationBell() {
-  const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
+  const { notifications, unreadCount, needsAttention, markRead, markAllRead } = useNotifications();
   const nav = useNavigate();
 
   const handleClick = (n: any) => {
     markRead(n.id);
     if (n.entity_type === "approval_requests") nav({ to: "/dashboard" });
-    else if (n.entity_type === "assets" && n.entity_id) nav({ to: "/assets" });
+    else if (n.entity_type === "assets" && n.entity_id) nav({ to: "/assets", search: { focus: n.entity_id } as any });
   };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
-          <Bell className={cn("h-5 w-5", unreadCount > 0 && "text-primary")} />
+          <span className={cn("relative flex items-center justify-center", needsAttention && "animate-pulse")}>
+            {needsAttention && (
+              <span className="absolute inline-flex h-7 w-7 rounded-full bg-destructive/40 motion-safe:animate-ping" aria-hidden />
+            )}
+            <Bell className={cn("relative h-5 w-5", needsAttention ? "text-destructive" : unreadCount > 0 && "text-primary")} />
+          </span>
           {unreadCount > 0 && (
             <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
               {unreadCount > 9 ? "9+" : unreadCount}
