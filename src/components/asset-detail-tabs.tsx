@@ -200,14 +200,9 @@ function MovementsPanel({ assetId }: { assetId: string }) {
     <div className="space-y-3">
       {canWrite && (
         <div className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">
-          <div className="space-y-1"><Label>From location</Label>
-            <Select value={form.from_location_id || "none"} onValueChange={(v) => setForm({ ...form, from_location_id: v === "none" ? "" : v })}>
-              <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">— None —</SelectItem>
-                {locs.map((l: any) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+          <div className="rounded-md bg-muted/40 p-2 text-xs sm:col-span-2">
+            <p className="font-medium text-muted-foreground">Currently with</p>
+            <p className="mt-1">{from.user || "—"}{from.department ? ` · ${from.department}` : ""} · {brName(from.branch_id)} · {locName(from.location_id)}</p>
           </div>
           <div className="space-y-1"><Label>To location</Label>
             <Select value={form.to_location_id || "none"} onValueChange={(v) => setForm({ ...form, to_location_id: v === "none" ? "" : v })}>
@@ -215,15 +210,6 @@ function MovementsPanel({ assetId }: { assetId: string }) {
               <SelectContent>
                 <SelectItem value="none">— None —</SelectItem>
                 {locs.map((l: any) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1"><Label>From branch</Label>
-            <Select value={form.from_branch_id || "none"} onValueChange={(v) => setForm({ ...form, from_branch_id: v === "none" ? "" : v })}>
-              <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">— None —</SelectItem>
-                {branches.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -236,8 +222,8 @@ function MovementsPanel({ assetId }: { assetId: string }) {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1"><Label>From person</Label><Input value={form.from_user} onChange={(e) => setForm({ ...form, from_user: e.target.value })} placeholder="Previous custodian" /></div>
           <div className="space-y-1"><Label>To person</Label><Input value={form.to_user} onChange={(e) => setForm({ ...form, to_user: e.target.value })} placeholder="New custodian" /></div>
+          <div className="space-y-1"><Label>To department</Label><Input value={form.to_department} onChange={(e) => setForm({ ...form, to_department: e.target.value })} placeholder="Finance" /></div>
           <div className="space-y-1"><Label>Date</Label><Input type="date" value={form.moved_at} onChange={(e) => setForm({ ...form, moved_at: e.target.value })} /></div>
           <div className="space-y-1"><Label>Reason</Label><Input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="Office relocation / inter-branch transfer" /></div>
           <div className="sm:col-span-2"><Button size="sm" onClick={add}><Plus className="mr-1 h-4 w-4" />Record movement</Button></div>
