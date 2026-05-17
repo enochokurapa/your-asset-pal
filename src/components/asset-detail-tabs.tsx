@@ -130,22 +130,42 @@ function MovementsPanel({ assetId }: { assetId: string }) {
       .select("*, from:from_location_id(name), to:to_location_id(name), fromBranch:from_branch_id(name), toBranch:to_branch_id(name)")
       .eq("asset_id", assetId).order("moved_at", { ascending: false })).data ?? [],
   });
+  // Current state of the asset (for auto-filled "from" fields)
+  const { data: asset } = useQuery({
+    queryKey: ["asset", assetId],
+    queryFn: async () => (await supabase.from("assets").select("location_id, branch_id").eq("id", assetId).single()).data,
+  });
+  const { data: currentAssn } = useQuery({
+    queryKey: ["asset-current-assn", assetId],
+    queryFn: async () => (await supabase.from("asset_assignments")
+      .select("assigned_to_name, department, branch_id")
+      .eq("asset_id", assetId).order("assignment_date", { ascending: false }).limit(1).maybeSingle()).data,
+  });
   const [form, setForm] = useState({
-    from_location_id: "", to_location_id: "",
-    from_branch_id: "", to_branch_id: "",
-    from_user: "", to_user: "",
+    to_location_id: "", to_branch_id: "", to_user: "", to_department: "",
     moved_at: new Date().toISOString().slice(0, 10), reason: "",
   });
+  const from = {
+    location_id: asset?.location_id ?? "",
+    branch_id: currentAssn?.branch_id ?? asset?.branch_id ?? "",
+    user: currentAssn?.assigned_to_name ?? "",
+    department: currentAssn?.department ?? "",
+  };
+  const locName = (id: string) => locs.find((l: any) => l.id === id)?.name ?? "—";
+  const brName = (id: string) => branches.find((b: any) => b.id === id)?.name ?? "—";
+
   const add = async () => {
-    if (!form.to_location_id && !form.to_branch_id) { toast.error("Choose a destination location or branch"); return; }
-    const transfer_type = form.from_branch_id && form.to_branch_id && form.from_branch_id !== form.to_branch_id ? "external" : "internal";
+    if (!form.to_location_id && !form.to_branch_id && !form.to_user.trim()) {
+      toast.error("Choose a destination location, branch or person"); return;
+    }
+    const transfer_type = from.branch_id && form.to_branch_id && from.branch_id !== form.to_branch_id ? "external" : "internal";
     const { error } = await supabase.from("asset_movements").insert({
       asset_id: assetId,
-      from_location_id: form.from_location_id || null,
+      from_location_id: from.location_id || null,
       to_location_id: form.to_location_id || null,
-      from_branch_id: form.from_branch_id || null,
+      from_branch_id: from.branch_id || null,
       to_branch_id: form.to_branch_id || null,
-      from_user: form.from_user || null,
+      from_user: from.user || null,
       to_user: form.to_user || null,
       transfer_type,
       moved_at: form.moved_at,
@@ -157,9 +177,23 @@ function MovementsPanel({ assetId }: { assetId: string }) {
     if (form.to_location_id) updates.location_id = form.to_location_id;
     if (form.to_branch_id) updates.branch_id = form.to_branch_id;
     if (Object.keys(updates).length) await supabase.from("assets").update(updates).eq("id", assetId);
+    // Open a new custody record for the new person/department if provided
+    if (form.to_user.trim() || form.to_department.trim()) {
+      await supabase.from("asset_assignments").insert({
+        asset_id: assetId,
+        assigned_to_name: form.to_user.trim() || null,
+        department: form.to_department.trim() || null,
+        branch_id: form.to_branch_id || from.branch_id || null,
+        assignment_date: form.moved_at,
+        created_by: user?.id ?? null,
+      });
+    }
     toast.success(`Movement recorded (${transfer_type})`);
-    setForm({ from_location_id: "", to_location_id: "", from_branch_id: "", to_branch_id: "", from_user: "", to_user: "", moved_at: new Date().toISOString().slice(0, 10), reason: "" });
+    setForm({ to_location_id: "", to_branch_id: "", to_user: "", to_department: "", moved_at: new Date().toISOString().slice(0, 10), reason: "" });
     qc.invalidateQueries({ queryKey: ["asset-movements", assetId] });
+    qc.invalidateQueries({ queryKey: ["asset", assetId] });
+    qc.invalidateQueries({ queryKey: ["asset-current-assn", assetId] });
+    qc.invalidateQueries({ queryKey: ["asset-assignments", assetId] });
     qc.invalidateQueries({ queryKey: ["assets"] });
   };
   return (
