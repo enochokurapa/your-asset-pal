@@ -298,6 +298,20 @@ function AssetsPage() {
           <Button variant="outline" onClick={() => { setScanMode("lookup"); setScanOpen(true); }}>
             <ScanLine className="mr-2 h-4 w-4" /> Scan
           </Button>
+          <Button variant="outline" onClick={downloadTemplate} title="Download Excel import template">
+            <Download className="mr-2 h-4 w-4" /> Template
+          </Button>
+          {canWrite && (
+            <label className="inline-flex">
+              <input type="file" accept=".xlsx,.xls" className="hidden" disabled={importing}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ""; }} />
+              <span>
+                <Button variant="outline" disabled={importing} asChild={false} onClick={(e) => (e.currentTarget.previousElementSibling as HTMLInputElement)?.click()}>
+                  <Upload className="mr-2 h-4 w-4" /> {importing ? "Importing…" : "Import"}
+                </Button>
+              </span>
+            </label>
+          )}
           {canWrite && (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New asset</Button></DialogTrigger>
