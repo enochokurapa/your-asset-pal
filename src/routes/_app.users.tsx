@@ -176,7 +176,7 @@ function UsersPage() {
                 onApproval={toggleApproval}
                 onActive={onToggleActive}
                 onDelete={onDelete}
-                onReset={async (uid, pwd) => {
+                onReset={async (uid: string, pwd: string) => {
                   try { await resetFn({ data: { user_id: uid, new_password: pwd } }); toast.success("Password reset. Share it with the user."); }
                   catch (e: any) { toast.error(e?.message ?? "Failed"); }
                 }}
