@@ -12,11 +12,13 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Search, Package, ScanLine, Archive, AlertCircle, FilterX } from "lucide-react";
+import { Plus, Pencil, Search, Package, ScanLine, Archive, AlertCircle, FilterX, Trash2, Download, Upload, Send } from "lucide-react";
 import { toast } from "sonner";
 import { ScannerDialog } from "@/components/scanner-dialog";
 import { AssetDetailTabs } from "@/components/asset-detail-tabs";
 import { formatUGX } from "@/lib/utils";
+import { submitApproval } from "@/lib/approvals";
+import { downloadTemplate, importAssetsFromFile } from "@/lib/bulk-import";
 
 export const Route = createFileRoute("/_app/assets")({
   component: AssetsPage,
@@ -253,21 +255,36 @@ function AssetsPage() {
     qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
   };
 
-  const requestRetire = (a: any) => { setRetireAsset(a); setRetireReason(""); setRetireOpen(true); };
+  const [reqKind, setReqKind] = useState<"retirement" | "disposal" | null>(null);
+  const requestRetire = (a: any, kind: "retirement" | "disposal" = "retirement") => { setRetireAsset(a); setRetireReason(""); setReqKind(kind); setRetireOpen(true); };
   const submitRetire = async () => {
     if (!retireReason.trim()) { toast.error("Reason is required"); return; }
-    const { error } = await supabase.from("asset_disposals").insert({
-      asset_id: retireAsset.id,
-      disposal_reason: retireReason.trim(),
-      retirement_reason: retireReason.trim(),
-      disposal_date: new Date().toISOString().slice(0, 10),
-      recorded_by: user?.id ?? null,
-      status: "pending",
-    } as any);
+    try {
+      await submitApproval({ kind: reqKind ?? "retirement", assetId: retireAsset.id, reason: retireReason.trim() });
+      setRetireOpen(false);
+      qc.invalidateQueries({ queryKey: ["pending-approvals"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+  };
+
+  const removeAsset = async (a: any) => {
+    if (!confirm(`Permanently delete asset "${a.name}" (${a.asset_tag})? This also removes its history.`)) return;
+    const { error } = await supabase.from("assets").delete().eq("id", a.id);
     if (error) { toast.error(error.message); return; }
-    toast.success("Retirement requested — awaiting admin approval");
-    setRetireOpen(false);
-    qc.invalidateQueries({ queryKey: ["asset-disposals", retireAsset.id] });
+    toast.success("Asset deleted");
+    qc.invalidateQueries({ queryKey: ["assets"] });
+    qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+  };
+
+  const [importing, setImporting] = useState(false);
+  const onImport = async (f: File) => {
+    setImporting(true);
+    try {
+      const r = await importAssetsFromFile(f, user?.id ?? null);
+      toast.success(`Imported ${r.success} of ${r.total} rows`, { description: r.errors.length ? `${r.errors.length} rows had errors — check the asset_imports record.` : undefined });
+      qc.invalidateQueries({ queryKey: ["assets"] });
+    } catch (e: any) { toast.error(e?.message ?? "Import failed"); }
+    finally { setImporting(false); }
   };
 
   return (
