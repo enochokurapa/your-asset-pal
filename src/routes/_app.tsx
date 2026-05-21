@@ -25,7 +25,7 @@ const nav: Array<{ to: string; label: string; icon: any; module?: ModuleKey; adm
 ];
 
 function AppLayout() {
-  const { user, loading, signOut, isAdmin, roles, canView } = useAuth();
+  const { user, loading, signOut, isAdmin, roles, canView, mustChangePassword } = useAuth();
   const [open, setOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -37,6 +37,7 @@ function AppLayout() {
     );
   }
   if (!user) return <Navigate to="/login" />;
+  if (mustChangePassword) return <Navigate to="/welcome" />;
 
   const visibleNav = nav.filter((n) => {
     if (n.adminOnly && !isAdmin) return false;
