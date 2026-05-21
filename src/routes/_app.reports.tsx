@@ -215,6 +215,7 @@ function ReportsPage() {
     columns: [
       { header: "Tag", key: "asset_tag" },
       { header: "Name", key: "name" },
+      { header: "Description", key: "description" },
       { header: "Status", key: "status" },
       { header: "Branch", key: "branch" },
       { header: "Location", key: "location" },
