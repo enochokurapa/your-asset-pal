@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Download, Upload, FileText, Check, X, History } from "lucide-react";
+import { Plus, Trash2, Download, Upload, FileText, Check, X, History, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { formatUGX } from "@/lib/utils";
+import { submitApproval } from "@/lib/approvals";
 
 const ATTACH_KINDS = [
   { value: "invoice", label: "Invoice" },
@@ -159,42 +160,28 @@ function MovementsPanel({ assetId }: { assetId: string }) {
       toast.error("Choose a destination location, branch or person"); return;
     }
     const transfer_type = from.branch_id && form.to_branch_id && from.branch_id !== form.to_branch_id ? "external" : "internal";
-    const { error } = await supabase.from("asset_movements").insert({
-      asset_id: assetId,
-      from_location_id: from.location_id || null,
-      to_location_id: form.to_location_id || null,
-      from_branch_id: from.branch_id || null,
-      to_branch_id: form.to_branch_id || null,
-      from_user: from.user || null,
-      to_user: form.to_user || null,
-      transfer_type,
-      moved_at: form.moved_at,
-      reason: form.reason || null,
-      moved_by: user?.id ?? null,
-    } as any);
-    if (error) { toast.error(error.message); return; }
-    const updates: any = {};
-    if (form.to_location_id) updates.location_id = form.to_location_id;
-    if (form.to_branch_id) updates.branch_id = form.to_branch_id;
-    if (Object.keys(updates).length) await supabase.from("assets").update(updates).eq("id", assetId);
-    // Open a new custody record for the new person/department if provided
-    if (form.to_user.trim() || form.to_department.trim()) {
-      await supabase.from("asset_assignments").insert({
-        asset_id: assetId,
-        assigned_to_name: form.to_user.trim() || null,
-        department: form.to_department.trim() || null,
-        branch_id: form.to_branch_id || from.branch_id || null,
-        assignment_date: form.moved_at,
-        created_by: user?.id ?? null,
+    try {
+      await submitApproval({
+        kind: "movement",
+        assetId,
+        reason: form.reason || undefined,
+        payload: {
+          from_location_id: from.location_id || null,
+          to_location_id: form.to_location_id || null,
+          from_branch_id: from.branch_id || null,
+          to_branch_id: form.to_branch_id || null,
+          from_user: from.user || null,
+          to_user: form.to_user || null,
+          to_department: form.to_department || null,
+          transfer_type,
+          moved_at: form.moved_at,
+          reason: form.reason || null,
+        },
       });
-    }
-    toast.success(`Movement recorded (${transfer_type})`);
-    setForm({ to_location_id: "", to_branch_id: "", to_user: "", to_department: "", moved_at: new Date().toISOString().slice(0, 10), reason: "" });
-    qc.invalidateQueries({ queryKey: ["asset-movements", assetId] });
-    qc.invalidateQueries({ queryKey: ["asset", assetId] });
-    qc.invalidateQueries({ queryKey: ["asset-current-assn", assetId] });
-    qc.invalidateQueries({ queryKey: ["asset-assignments", assetId] });
-    qc.invalidateQueries({ queryKey: ["assets"] });
+      setForm({ to_location_id: "", to_branch_id: "", to_user: "", to_department: "", moved_at: new Date().toISOString().slice(0, 10), reason: "" });
+      qc.invalidateQueries({ queryKey: ["pending-approvals"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
   };
   return (
     <div className="space-y-3">
@@ -226,7 +213,7 @@ function MovementsPanel({ assetId }: { assetId: string }) {
           <div className="space-y-1"><Label>To department</Label><Input value={form.to_department} onChange={(e) => setForm({ ...form, to_department: e.target.value })} placeholder="Finance" /></div>
           <div className="space-y-1"><Label>Date</Label><Input type="date" value={form.moved_at} onChange={(e) => setForm({ ...form, moved_at: e.target.value })} /></div>
           <div className="space-y-1"><Label>Reason</Label><Input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="Office relocation / inter-branch transfer" /></div>
-          <div className="sm:col-span-2"><Button size="sm" onClick={add}><Plus className="mr-1 h-4 w-4" />Record movement</Button></div>
+          <div className="sm:col-span-2"><Button size="sm" onClick={add}><Send className="mr-1 h-4 w-4" />Request movement (admin approval)</Button></div>
         </div>
       )}
       <div className="space-y-2">

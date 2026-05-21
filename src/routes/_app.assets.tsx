@@ -12,11 +12,13 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Search, Package, ScanLine, Archive, AlertCircle, FilterX } from "lucide-react";
+import { Plus, Pencil, Search, Package, ScanLine, Archive, AlertCircle, FilterX, Trash2, Download, Upload, Send } from "lucide-react";
 import { toast } from "sonner";
 import { ScannerDialog } from "@/components/scanner-dialog";
 import { AssetDetailTabs } from "@/components/asset-detail-tabs";
 import { formatUGX } from "@/lib/utils";
+import { submitApproval } from "@/lib/approvals";
+import { downloadTemplate, importAssetsFromFile } from "@/lib/bulk-import";
 
 export const Route = createFileRoute("/_app/assets")({
   component: AssetsPage,
@@ -253,21 +255,36 @@ function AssetsPage() {
     qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
   };
 
-  const requestRetire = (a: any) => { setRetireAsset(a); setRetireReason(""); setRetireOpen(true); };
+  const [reqKind, setReqKind] = useState<"retirement" | "disposal" | null>(null);
+  const requestRetire = (a: any, kind: "retirement" | "disposal" = "retirement") => { setRetireAsset(a); setRetireReason(""); setReqKind(kind); setRetireOpen(true); };
   const submitRetire = async () => {
     if (!retireReason.trim()) { toast.error("Reason is required"); return; }
-    const { error } = await supabase.from("asset_disposals").insert({
-      asset_id: retireAsset.id,
-      disposal_reason: retireReason.trim(),
-      retirement_reason: retireReason.trim(),
-      disposal_date: new Date().toISOString().slice(0, 10),
-      recorded_by: user?.id ?? null,
-      status: "pending",
-    } as any);
+    try {
+      await submitApproval({ kind: reqKind ?? "retirement", assetId: retireAsset.id, reason: retireReason.trim() });
+      setRetireOpen(false);
+      qc.invalidateQueries({ queryKey: ["pending-approvals"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+  };
+
+  const removeAsset = async (a: any) => {
+    if (!confirm(`Permanently delete asset "${a.name}" (${a.asset_tag})? This also removes its history.`)) return;
+    const { error } = await supabase.from("assets").delete().eq("id", a.id);
     if (error) { toast.error(error.message); return; }
-    toast.success("Retirement requested — awaiting admin approval");
-    setRetireOpen(false);
-    qc.invalidateQueries({ queryKey: ["asset-disposals", retireAsset.id] });
+    toast.success("Asset deleted");
+    qc.invalidateQueries({ queryKey: ["assets"] });
+    qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+  };
+
+  const [importing, setImporting] = useState(false);
+  const onImport = async (f: File) => {
+    setImporting(true);
+    try {
+      const r = await importAssetsFromFile(f, user?.id ?? null);
+      toast.success(`Imported ${r.success} of ${r.total} rows`, { description: r.errors.length ? `${r.errors.length} rows had errors — check the asset_imports record.` : undefined });
+      qc.invalidateQueries({ queryKey: ["assets"] });
+    } catch (e: any) { toast.error(e?.message ?? "Import failed"); }
+    finally { setImporting(false); }
   };
 
   return (
@@ -281,6 +298,18 @@ function AssetsPage() {
           <Button variant="outline" onClick={() => { setScanMode("lookup"); setScanOpen(true); }}>
             <ScanLine className="mr-2 h-4 w-4" /> Scan
           </Button>
+          <Button variant="outline" onClick={downloadTemplate} title="Download Excel import template">
+            <Download className="mr-2 h-4 w-4" /> Template
+          </Button>
+          {canWrite && (
+            <label className="inline-flex">
+              <input type="file" accept=".xlsx,.xls" className="hidden" disabled={importing}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ""; }} />
+              <Button variant="outline" disabled={importing} type="button" asChild>
+                <span><Upload className="mr-2 h-4 w-4" /> {importing ? "Importing…" : "Import"}</span>
+              </Button>
+            </label>
+          )}
           {canWrite && (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New asset</Button></DialogTrigger>
@@ -484,8 +513,18 @@ function AssetsPage() {
                         <div className="flex justify-end gap-1">
                           <Button size="icon" variant="ghost" onClick={() => openEdit(a)}><Pencil className="h-4 w-4" /></Button>
                           {a.status !== "retired" && a.status !== "disposed" && (
-                            <Button size="icon" variant="ghost" title="Request retirement" onClick={() => requestRetire(a)}>
-                              <Archive className="h-4 w-4 text-muted-foreground" />
+                            <>
+                              <Button size="icon" variant="ghost" title="Request retirement" onClick={() => requestRetire(a, "retirement")}>
+                                <Archive className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                              <Button size="icon" variant="ghost" title="Request disposal" onClick={() => requestRetire(a, "disposal")}>
+                                <Send className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            </>
+                          )}
+                          {isAdmin && (
+                            <Button size="icon" variant="ghost" title="Delete asset (admin)" onClick={() => removeAsset(a)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           )}
                         </div>
@@ -527,13 +566,13 @@ function AssetsPage() {
       <Dialog open={retireOpen} onOpenChange={setRetireOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Request retirement</DialogTitle>
+            <DialogTitle>Request {reqKind ?? "retirement"}</DialogTitle>
             <DialogDescription>
-              {retireAsset && <>Asset <strong>{retireAsset.name}</strong> ({retireAsset.asset_tag}). An admin must approve before the asset is marked retired.</>}
+              {retireAsset && <>Asset <strong>{retireAsset.name}</strong> ({retireAsset.asset_tag}). An admin must approve before action is taken.</>}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2">
-            <Label>Reason for retirement *</Label>
+            <Label>Reason *</Label>
             <Textarea rows={3} value={retireReason} onChange={(e) => setRetireReason(e.target.value)} placeholder="End of useful life / damaged beyond repair / lost…" />
           </div>
           <DialogFooter>

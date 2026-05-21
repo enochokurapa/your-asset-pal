@@ -593,20 +593,87 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          is_active: boolean
+          must_change_password: boolean
         }
         Insert: {
           created_at?: string
           email?: string | null
           full_name?: string | null
           id: string
+          is_active?: boolean
+          must_change_password?: boolean
         }
         Update: {
           created_at?: string
           email?: string | null
           full_name?: string | null
           id?: string
+          is_active?: boolean
+          must_change_password?: boolean
         }
         Relationships: []
+      }
+      user_approval_rights: {
+        Row: {
+          approval_kind: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          approval_kind: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          approval_kind?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_approval_rights_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_permissions: {
+        Row: {
+          can_view: boolean
+          created_at: string
+          id: string
+          module: string
+          user_id: string
+        }
+        Insert: {
+          can_view?: boolean
+          created_at?: string
+          id?: string
+          module: string
+          user_id: string
+        }
+        Update: {
+          can_view?: boolean
+          created_at?: string
+          id?: string
+          module?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permissions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {

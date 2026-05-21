@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, Link, Navigate, useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, ModuleKey } from "@/hooks/use-auth";
 import {
   LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X, FileBarChart, Building2, History, UserCircle,
 } from "lucide-react";
@@ -12,20 +12,20 @@ export const Route = createFileRoute("/_app")({
   component: AppLayout,
 });
 
-const nav: Array<{ to: string; label: string; icon: any; adminOnly?: boolean; managerOnly?: boolean }> = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/assets", label: "Assets", icon: Package },
-  { to: "/categories", label: "Categories", icon: Tags },
-  { to: "/locations", label: "Locations", icon: MapPin },
-  { to: "/branches", label: "Branches", icon: Building2, adminOnly: true },
-  { to: "/reports", label: "Reports", icon: FileBarChart },
-  { to: "/audit", label: "Audit Trail", icon: History, managerOnly: true },
-  { to: "/users", label: "Users", icon: Users, adminOnly: true },
+const nav: Array<{ to: string; label: string; icon: any; module?: ModuleKey; adminOnly?: boolean }> = [
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
+  { to: "/assets", label: "Assets", icon: Package, module: "assets" },
+  { to: "/categories", label: "Categories", icon: Tags, module: "categories" },
+  { to: "/locations", label: "Locations", icon: MapPin, module: "locations" },
+  { to: "/branches", label: "Branches", icon: Building2, module: "branches", adminOnly: true },
+  { to: "/reports", label: "Reports", icon: FileBarChart, module: "reports" },
+  { to: "/audit", label: "Audit Trail", icon: History, module: "audit" },
+  { to: "/users", label: "Users", icon: Users, module: "users", adminOnly: true },
   { to: "/profile", label: "My profile", icon: UserCircle },
 ];
 
 function AppLayout() {
-  const { user, loading, signOut, isAdmin, canWrite, roles } = useAuth();
+  const { user, loading, signOut, isAdmin, roles, canView } = useAuth();
   const [open, setOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -40,7 +40,7 @@ function AppLayout() {
 
   const visibleNav = nav.filter((n) => {
     if (n.adminOnly && !isAdmin) return false;
-    if (n.managerOnly && !canWrite) return false;
+    if (n.module && !canView(n.module)) return false;
     return true;
   });
 
