@@ -513,8 +513,18 @@ function AssetsPage() {
                         <div className="flex justify-end gap-1">
                           <Button size="icon" variant="ghost" onClick={() => openEdit(a)}><Pencil className="h-4 w-4" /></Button>
                           {a.status !== "retired" && a.status !== "disposed" && (
-                            <Button size="icon" variant="ghost" title="Request retirement" onClick={() => requestRetire(a)}>
-                              <Archive className="h-4 w-4 text-muted-foreground" />
+                            <>
+                              <Button size="icon" variant="ghost" title="Request retirement" onClick={() => requestRetire(a, "retirement")}>
+                                <Archive className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                              <Button size="icon" variant="ghost" title="Request disposal" onClick={() => requestRetire(a, "disposal")}>
+                                <Send className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            </>
+                          )}
+                          {isAdmin && (
+                            <Button size="icon" variant="ghost" title="Delete asset (admin)" onClick={() => removeAsset(a)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           )}
                         </div>
