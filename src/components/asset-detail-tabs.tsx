@@ -164,7 +164,7 @@ function MovementsPanel({ assetId }: { assetId: string }) {
       await submitApproval({
         kind: "movement",
         assetId,
-        reason: form.reason || null,
+        reason: form.reason || undefined,
         payload: {
           from_location_id: from.location_id || null,
           to_location_id: form.to_location_id || null,
