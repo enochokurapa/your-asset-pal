@@ -566,13 +566,13 @@ function AssetsPage() {
       <Dialog open={retireOpen} onOpenChange={setRetireOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Request retirement</DialogTitle>
+            <DialogTitle>Request {reqKind ?? "retirement"}</DialogTitle>
             <DialogDescription>
-              {retireAsset && <>Asset <strong>{retireAsset.name}</strong> ({retireAsset.asset_tag}). An admin must approve before the asset is marked retired.</>}
+              {retireAsset && <>Asset <strong>{retireAsset.name}</strong> ({retireAsset.asset_tag}). An admin must approve before action is taken.</>}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2">
-            <Label>Reason for retirement *</Label>
+            <Label>Reason *</Label>
             <Textarea rows={3} value={retireReason} onChange={(e) => setRetireReason(e.target.value)} placeholder="End of useful life / damaged beyond repair / lost…" />
           </div>
           <DialogFooter>
