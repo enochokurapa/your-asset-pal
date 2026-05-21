@@ -305,11 +305,9 @@ function AssetsPage() {
             <label className="inline-flex">
               <input type="file" accept=".xlsx,.xls" className="hidden" disabled={importing}
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ""; }} />
-              <span>
-                <Button variant="outline" disabled={importing} asChild={false} onClick={(e) => (e.currentTarget.previousElementSibling as HTMLInputElement)?.click()}>
-                  <Upload className="mr-2 h-4 w-4" /> {importing ? "Importing…" : "Import"}
-                </Button>
-              </span>
+              <Button variant="outline" disabled={importing} type="button" asChild>
+                <span><Upload className="mr-2 h-4 w-4" /> {importing ? "Importing…" : "Import"}</span>
+              </Button>
             </label>
           )}
           {canWrite && (
