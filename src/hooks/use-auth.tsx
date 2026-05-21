@@ -24,6 +24,8 @@ interface AuthCtx {
   permissions: Set<ModuleKey>;
   approvalRights: Set<ApprovalKind>;
   loading: boolean;
+  mustChangePassword: boolean;
+  isActive: boolean;
   isAdmin: boolean;
   isManager: boolean;
   canWrite: boolean;
@@ -39,24 +41,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [permissions, setPermissions] = useState<Set<ModuleKey>>(new Set());
   const [approvalRights, setApprovalRights] = useState<Set<ApprovalKind>>(new Set());
+  const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [isActive, setIsActive] = useState(true);
   const [loading, setLoading] = useState(true);
 
   const loadFor = async (uid: string) => {
-    const [{ data: r }, { data: p }, { data: a }] = await Promise.all([
+    const [{ data: r }, { data: p }, { data: a }, { data: prof }] = await Promise.all([
       supabase.from("user_roles").select("role").eq("user_id", uid),
       supabase.from("user_permissions" as any).select("module,can_view").eq("user_id", uid),
       supabase.from("user_approval_rights" as any).select("approval_kind").eq("user_id", uid),
+      supabase.from("profiles").select("must_change_password,is_active").eq("id", uid).maybeSingle(),
     ]);
     setRoles((r ?? []).map((x: any) => x.role as AppRole));
     setPermissions(new Set((p ?? []).filter((x: any) => x.can_view).map((x: any) => x.module as ModuleKey)));
     setApprovalRights(new Set((a ?? []).map((x: any) => x.approval_kind as ApprovalKind)));
+    setMustChangePassword(Boolean((prof as any)?.must_change_password));
+    setIsActive((prof as any)?.is_active !== false);
   };
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
       setSession(s);
       if (s?.user) setTimeout(() => loadFor(s.user.id), 0);
-      else { setRoles([]); setPermissions(new Set()); setApprovalRights(new Set()); }
+      else { setRoles([]); setPermissions(new Set()); setApprovalRights(new Set()); setMustChangePassword(false); setIsActive(true); }
     });
     supabase.auth.getSession().then(async ({ data }) => {
       setSession(data.session);
@@ -79,6 +86,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     permissions,
     approvalRights,
     loading,
+    mustChangePassword,
+    isActive,
     isAdmin,
     isManager,
     canWrite: isAdmin || isManager,
