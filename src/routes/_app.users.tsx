@@ -113,6 +113,27 @@ function UsersPage() {
     }
     invalidate();
   };
+  const toggleAction = async (userId: string, kind: ActionKind, on: boolean) => {
+    if (on) {
+      const { error } = await supabase.from("user_action_rights" as any).delete().eq("user_id", userId).eq("action_kind", kind);
+      if (error) return toast.error(error.message);
+    } else {
+      const { error } = await supabase.from("user_action_rights" as any).insert({ user_id: userId, action_kind: kind });
+      if (error) return toast.error(error.message);
+    }
+    invalidate();
+  };
+
+  const toggleBranch = async (userId: string, branchId: string, on: boolean) => {
+    if (on) {
+      const { error } = await supabase.from("user_branch_access" as any).delete().eq("user_id", userId).eq("branch_id", branchId);
+      if (error) return toast.error(error.message);
+    } else {
+      const { error } = await supabase.from("user_branch_access" as any).insert({ user_id: userId, branch_id: branchId });
+      if (error) return toast.error(error.message);
+    }
+    invalidate();
+  };
 
   const toggleApproval = async (userId: string, kind: ApprovalKind, on: boolean) => {
     if (on) {
