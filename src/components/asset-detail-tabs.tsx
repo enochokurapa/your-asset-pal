@@ -115,7 +115,8 @@ function CustodyPanel({ assetId }: { assetId: string }) {
 
 /* ---------- Movements ---------- */
 function MovementsPanel({ assetId }: { assetId: string }) {
-  const { canWrite, user } = useAuth();
+  const { canWrite, canDo, user } = useAuth();
+  const canMove = canWrite || canDo("initiate_movement");
   const qc = useQueryClient();
   const { data: locs = [] } = useQuery({
     queryKey: ["locations-list"],
