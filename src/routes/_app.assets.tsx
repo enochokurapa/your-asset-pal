@@ -519,10 +519,10 @@ function AssetsPage() {
                       </span>
                     </td>
                     <td className="hidden px-3 py-3 text-right tabular-nums sm:table-cell">{formatUGX(a.purchase_value)}</td>
-                    {(canWrite || canRequestRetire || canRequestDispose) && (
+                    {(canEdit || canRequestRetire || canRequestDispose || isAdmin) && (
                       <td className="px-3 py-3 text-right">
                         <div className="flex justify-end gap-1">
-                          {canWrite && (
+                          {canEdit && (
                             <Button size="icon" variant="ghost" onClick={() => openEdit(a)}><Pencil className="h-4 w-4" /></Button>
                           )}
                           {a.status !== "retired" && a.status !== "disposed" && (
