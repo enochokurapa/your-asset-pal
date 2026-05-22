@@ -202,9 +202,12 @@ function UsersPage() {
                 key={u.id}
                 u={u}
                 self={u.id === me?.id}
+                branchesAll={branchesAll}
                 onRole={setRole}
                 onModule={toggleModule}
                 onApproval={toggleApproval}
+                onAction={toggleAction}
+                onBranch={toggleBranch}
                 onActive={onToggleActive}
                 onDelete={onDelete}
                 onReset={async (uid: string, pwd: string) => {
