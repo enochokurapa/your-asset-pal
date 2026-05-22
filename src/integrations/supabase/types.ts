@@ -614,6 +614,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_action_rights: {
+        Row: {
+          action_kind: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          action_kind: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          action_kind?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_approval_rights: {
         Row: {
           approval_kind: string
@@ -642,6 +663,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_branch_access: {
+        Row: {
+          branch_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_permissions: {
         Row: {
@@ -701,6 +743,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_do: { Args: { _action: string; _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

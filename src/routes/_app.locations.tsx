@@ -12,6 +12,8 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, MapPin } from "lucide-react";
 import { toast } from "sonner";
 
@@ -19,13 +21,13 @@ export const Route = createFileRoute("/_app/locations")({
   component: LocationsPage,
 });
 
-type Loc = { id: string; name: string; address: string | null; parent_id: string | null };
+type Loc = { id: string; name: string; address: string | null; parent_id: string | null; is_active: boolean };
 
 function LocationsPage() {
   const { canWrite } = useAuth();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<{ id?: string; name: string; address: string; parent_id: string }>({ name: "", address: "", parent_id: "" });
+  const [form, setForm] = useState<{ id?: string; name: string; address: string; parent_id: string; is_active: boolean }>({ name: "", address: "", parent_id: "", is_active: true });
 
   const { data = [], isLoading } = useQuery({
     queryKey: ["locations"],
@@ -49,6 +51,7 @@ function LocationsPage() {
       name: form.name.trim(),
       address: form.address || null,
       parent_id: form.parent_id || null,
+      is_active: form.is_active,
     };
     const { error } = form.id
       ? await supabase.from("locations").update(payload).eq("id", form.id)
@@ -66,15 +69,24 @@ function LocationsPage() {
     toast.success("Deleted");
     qc.invalidateQueries({ queryKey: ["locations"] });
   };
+  const toggleActive = async (l: Loc) => {
+    const { error } = await supabase.from("locations").update({ is_active: !l.is_active }).eq("id", l.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(!l.is_active ? "Activated" : "Deactivated");
+    qc.invalidateQueries({ queryKey: ["locations"] });
+  };
 
-  const openNew = () => { setForm({ name: "", address: "", parent_id: "" }); setOpen(true); };
-  const openEdit = (l: Loc) => { setForm({ id: l.id, name: l.name, address: l.address ?? "", parent_id: l.parent_id ?? "" }); setOpen(true); };
+  const openNew = () => { setForm({ name: "", address: "", parent_id: "", is_active: true }); setOpen(true); };
+  const openEdit = (l: Loc) => { setForm({ id: l.id, name: l.name, address: l.address ?? "", parent_id: l.parent_id ?? "", is_active: l.is_active }); setOpen(true); };
 
   const renderCard = (l: Loc, isChild = false) => (
     <div key={l.id} className={`rounded-xl border bg-card p-4 ${isChild ? "ml-4 border-dashed" : ""}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate font-semibold">{l.name}</p>
+          <div className="flex items-center gap-2">
+            <p className="truncate font-semibold">{l.name}</p>
+            {!l.is_active && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
+          </div>
           {l.address && <p className="mt-1 whitespace-pre-line text-sm text-muted-foreground">{l.address}</p>}
         </div>
         {canWrite && (
@@ -84,6 +96,12 @@ function LocationsPage() {
           </div>
         )}
       </div>
+      {canWrite && (
+        <div className="mt-3 flex items-center gap-2 border-t pt-2 text-xs">
+          <Switch checked={l.is_active} onCheckedChange={() => toggleActive(l)} />
+          <span className="text-muted-foreground">{l.is_active ? "Active" : "Inactive"}</span>
+        </div>
+      )}
     </div>
   );
 
@@ -130,6 +148,10 @@ function LocationsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2"><Label>Address</Label><Textarea rows={3} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />
+                  Active
+                </label>
               </div>
               <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={save}>Save</Button></DialogFooter>
             </DialogContent>

@@ -3,7 +3,7 @@ import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth, AppRole, ALL_MODULES, ALL_APPROVAL_KINDS, ModuleKey, ApprovalKind } from "@/hooks/use-auth";
+import { useAuth, AppRole, ALL_MODULES, ALL_APPROVAL_KINDS, ALL_ACTION_KINDS, ModuleKey, ApprovalKind, ActionKind } from "@/hooks/use-auth";
 import {
   createUserAccount, adminResetPassword, setUserActive, deleteUserAccount,
 } from "@/lib/admin-users.functions";
@@ -43,21 +43,31 @@ function UsersPage() {
   const activeFn = useServerFn(setUserActive);
   const deleteFn = useServerFn(deleteUserAccount);
 
+  const { data: branchesAll = [] } = useQuery({
+    queryKey: ["branches-all-for-perms"],
+    enabled: isAdmin,
+    queryFn: async () => (await supabase.from("branches").select("id,name,code").order("name")).data ?? [],
+  });
+
   const { data = [], isLoading } = useQuery({
     queryKey: ["users-with-roles"],
     enabled: isAdmin,
     queryFn: async () => {
-      const [{ data: profiles }, { data: roles }, { data: perms }, { data: rights }] = await Promise.all([
+      const [{ data: profiles }, { data: roles }, { data: perms }, { data: rights }, { data: acts }, { data: brs }] = await Promise.all([
         supabase.from("profiles").select("*").order("created_at", { ascending: false }),
         supabase.from("user_roles").select("user_id, role"),
         supabase.from("user_permissions" as any).select("user_id, module, can_view"),
         supabase.from("user_approval_rights" as any).select("user_id, approval_kind"),
+        supabase.from("user_action_rights" as any).select("user_id, action_kind"),
+        supabase.from("user_branch_access" as any).select("user_id, branch_id"),
       ]);
       return (profiles ?? []).map((p) => ({
         ...p,
         roles: (roles ?? []).filter((r) => r.user_id === p.id).map((r) => r.role as AppRole),
         modules: new Set(((perms as any) ?? []).filter((x: any) => x.user_id === p.id && x.can_view).map((x: any) => x.module as ModuleKey)),
         approvals: new Set(((rights as any) ?? []).filter((x: any) => x.user_id === p.id).map((x: any) => x.approval_kind as ApprovalKind)),
+        actions: new Set(((acts as any) ?? []).filter((x: any) => x.user_id === p.id).map((x: any) => x.action_kind as ActionKind)),
+        branches: new Set(((brs as any) ?? []).filter((x: any) => x.user_id === p.id).map((x: any) => x.branch_id as string)),
       }));
     },
   });
@@ -99,6 +109,27 @@ function UsersPage() {
       if (error) return toast.error(error.message);
     } else {
       const { error } = await supabase.from("user_permissions" as any).insert({ user_id: userId, module, can_view: true });
+      if (error) return toast.error(error.message);
+    }
+    invalidate();
+  };
+  const toggleAction = async (userId: string, kind: ActionKind, on: boolean) => {
+    if (on) {
+      const { error } = await supabase.from("user_action_rights" as any).delete().eq("user_id", userId).eq("action_kind", kind);
+      if (error) return toast.error(error.message);
+    } else {
+      const { error } = await supabase.from("user_action_rights" as any).insert({ user_id: userId, action_kind: kind });
+      if (error) return toast.error(error.message);
+    }
+    invalidate();
+  };
+
+  const toggleBranch = async (userId: string, branchId: string, on: boolean) => {
+    if (on) {
+      const { error } = await supabase.from("user_branch_access" as any).delete().eq("user_id", userId).eq("branch_id", branchId);
+      if (error) return toast.error(error.message);
+    } else {
+      const { error } = await supabase.from("user_branch_access" as any).insert({ user_id: userId, branch_id: branchId });
       if (error) return toast.error(error.message);
     }
     invalidate();
@@ -171,9 +202,12 @@ function UsersPage() {
                 key={u.id}
                 u={u}
                 self={u.id === me?.id}
+                branchesAll={branchesAll}
                 onRole={setRole}
                 onModule={toggleModule}
                 onApproval={toggleApproval}
+                onAction={toggleAction}
+                onBranch={toggleBranch}
                 onActive={onToggleActive}
                 onDelete={onDelete}
                 onReset={async (uid: string, pwd: string) => {
@@ -189,7 +223,7 @@ function UsersPage() {
   );
 }
 
-function UserRow({ u, self, onRole, onModule, onApproval, onActive, onDelete, onReset }: any) {
+function UserRow({ u, self, branchesAll, onRole, onModule, onApproval, onAction, onBranch, onActive, onDelete, onReset }: any) {
   const [resetOpen, setResetOpen] = useState(false);
   const [newPwd, setNewPwd] = useState("");
   const [permsOpen, setPermsOpen] = useState(false);
@@ -304,6 +338,40 @@ function UserRow({ u, self, onRole, onModule, onApproval, onActive, onDelete, on
               })}
             </div>
             <p className="mt-2 text-xs text-muted-foreground">Admins approve everything by default.</p>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Asset actions they can initiate</p>
+            <div className="grid grid-cols-1 gap-2">
+              {ALL_ACTION_KINDS.map((k) => {
+                const on = u.actions.has(k);
+                return (
+                  <label key={k} className="flex items-center gap-2 text-sm capitalize">
+                    <Checkbox checked={on} onCheckedChange={() => onAction(u.id, k, on)} />
+                    {k.replace(/_/g, " ")}
+                  </label>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">"Add asset" unlocks manual entry, bulk import and scanning. Initiate rights let staff submit movement / retirement / disposal requests for admin approval.</p>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Visible branches</p>
+            {(branchesAll ?? []).length === 0 ? (
+              <p className="text-sm text-muted-foreground">No branches created yet.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {(branchesAll ?? []).map((b: any) => {
+                  const on = u.branches.has(b.id);
+                  return (
+                    <label key={b.id} className="flex items-center gap-2 text-sm">
+                      <Checkbox checked={on} onCheckedChange={() => onBranch(u.id, b.id, on)} />
+                      <span>{b.name}{b.code ? <span className="ml-1 text-xs text-muted-foreground">({b.code})</span> : null}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            <p className="mt-2 text-xs text-muted-foreground">Leave all unticked to grant access to every branch. Tick specific branches to limit what this user sees.</p>
           </div>
         </div>
       )}

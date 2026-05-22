@@ -11,7 +11,12 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Building2 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Switch } from "@/components/ui/switch";
+import { Plus, Pencil, Building2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/branches")({
@@ -75,12 +80,27 @@ function BranchesPage() {
     qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
   };
 
+  const toggleActive = async (b: any) => {
+    const { error } = await supabase.from("branches").update({ is_active: !b.is_active }).eq("id", b.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(!b.is_active ? "Branch activated" : "Branch deactivated");
+    qc.invalidateQueries({ queryKey: ["branches"] });
+  };
+
+  const remove = async (b: any) => {
+    const { error } = await supabase.from("branches").delete().eq("id", b.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Branch deleted");
+    qc.invalidateQueries({ queryKey: ["branches"] });
+    qc.invalidateQueries({ queryKey: ["branch-asset-counts"] });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Branches</h1>
-          <p className="text-sm text-muted-foreground">Company branches. Branches are never deleted — deactivate to retire.</p>
+          <p className="text-sm text-muted-foreground">Company branches. Deactivate to hide from new asset entry, or delete to remove entirely.</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New branch</Button></DialogTrigger>
@@ -124,7 +144,30 @@ function BranchesPage() {
                       {b.address && <p className="mt-1 text-xs text-muted-foreground">{b.address}</p>}
                       <p className="mt-2 text-sm tabular-nums"><span className="font-semibold">{counts[b.id] ?? 0}</span> <span className="text-muted-foreground">assets</span></p>
                     </div>
-                    <Button size="icon" variant="ghost" onClick={() => openEdit(b)}><Pencil className="h-4 w-4" /></Button>
+                    <div className="flex flex-col items-end gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => openEdit(b)}><Pencil className="h-4 w-4" /></Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="icon" variant="ghost" title="Delete branch"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete branch?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Permanently remove <strong>{b.name}</strong>. Assets currently linked to this branch will become unassigned. This cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => remove(b)}>Delete</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 border-t pt-2 text-xs">
+                    <Switch checked={b.is_active} onCheckedChange={() => toggleActive(b)} />
+                    <span className="text-muted-foreground">{b.is_active ? "Active" : "Inactive"}</span>
                   </div>
                 </div>
               ))}

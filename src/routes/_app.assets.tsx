@@ -64,7 +64,10 @@ const empty: AssetForm = {
 };
 
 function AssetsPage() {
-  const { canWrite, isAdmin, user } = useAuth();
+  const { canWrite, isAdmin, user, canDo, canSeeBranch } = useAuth();
+  const canAdd = canWrite || canDo("add_asset");
+  const canRequestRetire = canWrite || canDo("initiate_retirement");
+  const canRequestDispose = canWrite || canDo("initiate_disposal");
   const qc = useQueryClient();
   const search = useSearch({ from: "/_app/assets" });
   const nav = useNavigate();
@@ -122,11 +125,18 @@ function AssetsPage() {
     return m;
   }, [assignments]);
 
-  const enriched = useMemo(() => (assets as any[]).map((a) => ({
-    ...a,
-    custodian: currentBy[a.id]?.assigned_to_name ?? "",
-    department: currentBy[a.id]?.department ?? "",
-  })), [assets, currentBy]);
+  const visibleBranches = useMemo(
+    () => (branches as any[]).filter((b) => canSeeBranch(b.id)),
+    [branches, canSeeBranch],
+  );
+
+  const enriched = useMemo(() => (assets as any[])
+    .filter((a) => canSeeBranch(a.branch_id))
+    .map((a) => ({
+      ...a,
+      custodian: currentBy[a.id]?.assigned_to_name ?? "",
+      department: currentBy[a.id]?.department ?? "",
+    })), [assets, currentBy, canSeeBranch]);
 
   const filtered = enriched.filter((a) => {
     if (q) {
@@ -192,7 +202,7 @@ function AssetsPage() {
     if (found) {
       openEdit(found);
       toast.success(`Asset found: ${found.name}`);
-    } else if (canWrite) {
+    } else if (canAdd) {
       setForm({ ...empty, asset_tag: code });
       setOpen(true);
       toast.message("New tag detected", { description: "Fill in details to register this asset." });
@@ -301,7 +311,7 @@ function AssetsPage() {
           <Button variant="outline" onClick={downloadTemplate} title="Download Excel import template">
             <Download className="mr-2 h-4 w-4" /> Template
           </Button>
-          {canWrite && (
+          {canAdd && (
             <label className="inline-flex">
               <input type="file" accept=".xlsx,.xls" className="hidden" disabled={importing}
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ""; }} />
@@ -310,7 +320,7 @@ function AssetsPage() {
               </Button>
             </label>
           )}
-          {canWrite && (
+          {canAdd && (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New asset</Button></DialogTrigger>
             <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
@@ -350,7 +360,7 @@ function AssetsPage() {
                   <Select value={form.branch_id ?? ""} onValueChange={(v) => setForm({ ...form, branch_id: v })}>
                     <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
                     <SelectContent>
-                      {branches.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.name}{b.code ? ` (${b.code})` : ""}</SelectItem>)}
+                      {visibleBranches.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.name}{b.code ? ` (${b.code})` : ""}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -438,7 +448,7 @@ function AssetsPage() {
             <SelectTrigger><SelectValue placeholder="Branch" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All branches</SelectItem>
-              {branches.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+              {visibleBranches.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={fCategory || "all"} onValueChange={(v) => setFCategory(v === "all" ? "" : v)}>
@@ -488,7 +498,7 @@ function AssetsPage() {
                   <th className="hidden px-3 py-3 font-medium md:table-cell">Custodian</th>
                   <th className="px-3 py-3 font-medium">Status</th>
                   <th className="hidden px-3 py-3 text-right font-medium sm:table-cell">Value</th>
-                  {canWrite && <th className="px-3 py-3" />}
+                  {(canWrite || canRequestRetire || canRequestDispose) && <th className="px-3 py-3" />}
                 </tr>
               </thead>
               <tbody>
@@ -508,18 +518,24 @@ function AssetsPage() {
                       </span>
                     </td>
                     <td className="hidden px-3 py-3 text-right tabular-nums sm:table-cell">{formatUGX(a.purchase_value)}</td>
-                    {canWrite && (
+                    {(canWrite || canRequestRetire || canRequestDispose) && (
                       <td className="px-3 py-3 text-right">
                         <div className="flex justify-end gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => openEdit(a)}><Pencil className="h-4 w-4" /></Button>
+                          {canWrite && (
+                            <Button size="icon" variant="ghost" onClick={() => openEdit(a)}><Pencil className="h-4 w-4" /></Button>
+                          )}
                           {a.status !== "retired" && a.status !== "disposed" && (
                             <>
-                              <Button size="icon" variant="ghost" title="Request retirement" onClick={() => requestRetire(a, "retirement")}>
-                                <Archive className="h-4 w-4 text-muted-foreground" />
-                              </Button>
-                              <Button size="icon" variant="ghost" title="Request disposal" onClick={() => requestRetire(a, "disposal")}>
-                                <Send className="h-4 w-4 text-muted-foreground" />
-                              </Button>
+                              {canRequestRetire && (
+                                <Button size="icon" variant="ghost" title="Request retirement" onClick={() => requestRetire(a, "retirement")}>
+                                  <Archive className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                              )}
+                              {canRequestDispose && (
+                                <Button size="icon" variant="ghost" title="Request disposal" onClick={() => requestRetire(a, "disposal")}>
+                                  <Send className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                              )}
                             </>
                           )}
                           {isAdmin && (
