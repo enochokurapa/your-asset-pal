@@ -202,7 +202,7 @@ function AssetsPage() {
     if (found) {
       openEdit(found);
       toast.success(`Asset found: ${found.name}`);
-    } else if (canWrite) {
+    } else if (canAdd) {
       setForm({ ...empty, asset_tag: code });
       setOpen(true);
       toast.message("New tag detected", { description: "Fill in details to register this asset." });
