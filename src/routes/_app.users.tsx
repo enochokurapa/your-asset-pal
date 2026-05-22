@@ -223,7 +223,7 @@ function UsersPage() {
   );
 }
 
-function UserRow({ u, self, onRole, onModule, onApproval, onActive, onDelete, onReset }: any) {
+function UserRow({ u, self, branchesAll, onRole, onModule, onApproval, onAction, onBranch, onActive, onDelete, onReset }: any) {
   const [resetOpen, setResetOpen] = useState(false);
   const [newPwd, setNewPwd] = useState("");
   const [permsOpen, setPermsOpen] = useState(false);
