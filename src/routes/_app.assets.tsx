@@ -125,11 +125,18 @@ function AssetsPage() {
     return m;
   }, [assignments]);
 
-  const enriched = useMemo(() => (assets as any[]).map((a) => ({
-    ...a,
-    custodian: currentBy[a.id]?.assigned_to_name ?? "",
-    department: currentBy[a.id]?.department ?? "",
-  })), [assets, currentBy]);
+  const visibleBranches = useMemo(
+    () => (branches as any[]).filter((b) => canSeeBranch(b.id)),
+    [branches, canSeeBranch],
+  );
+
+  const enriched = useMemo(() => (assets as any[])
+    .filter((a) => canSeeBranch(a.branch_id))
+    .map((a) => ({
+      ...a,
+      custodian: currentBy[a.id]?.assigned_to_name ?? "",
+      department: currentBy[a.id]?.department ?? "",
+    })), [assets, currentBy, canSeeBranch]);
 
   const filtered = enriched.filter((a) => {
     if (q) {
