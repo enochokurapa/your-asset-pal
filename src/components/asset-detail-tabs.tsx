@@ -437,6 +437,123 @@ function DisposalPanel({ assetId }: { assetId: string }) {
   );
 }
 
+/* ---------- Maintenance ---------- */
+function MaintenancePanel({ assetId }: { assetId: string }) {
+  const { canDo, canApprove, user } = useAuth();
+  const canRequest = canDo("initiate_maintenance");
+  const qc = useQueryClient();
+  const { data = [] } = useQuery({
+    queryKey: ["asset-maintenance", assetId],
+    queryFn: async () => (await supabase.from("approval_requests")
+      .select("*").eq("asset_id", assetId).eq("kind", "maintenance")
+      .order("created_at", { ascending: false })).data ?? [],
+  });
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["profiles-list"],
+    queryFn: async () => (await supabase.from("profiles").select("id,email,full_name")).data ?? [],
+  });
+  const profileMap = Object.fromEntries(profiles.map((p: any) => [p.id, p]));
+
+  const [form, setForm] = useState({
+    issue: "", priority: "normal", scheduled_for: "", estimated_cost: "", notes: "",
+  });
+
+  const submit = async () => {
+    if (!form.issue.trim()) { toast.error("Describe the issue"); return; }
+    try {
+      await submitApproval({
+        kind: "maintenance",
+        assetId,
+        reason: form.issue.trim(),
+        payload: {
+          priority: form.priority,
+          scheduled_for: form.scheduled_for || null,
+          estimated_cost: form.estimated_cost ? Number(form.estimated_cost) : null,
+          notes: form.notes || null,
+        },
+      });
+      setForm({ issue: "", priority: "normal", scheduled_for: "", estimated_cost: "", notes: "" });
+      qc.invalidateQueries({ queryKey: ["asset-maintenance", assetId] });
+      qc.invalidateQueries({ queryKey: ["pending-approvals"] });
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+  };
+
+  const decide = async (r: any, decision: "approved" | "rejected") => {
+    const { decideApproval } = await import("@/lib/approvals");
+    const reason = decision === "rejected"
+      ? window.prompt("Reason for rejection:", "") ?? undefined
+      : window.prompt("Approval note (optional):", "") ?? undefined;
+    try {
+      await decideApproval(r.id, decision, reason);
+      qc.invalidateQueries({ queryKey: ["asset-maintenance", assetId] });
+      qc.invalidateQueries({ queryKey: ["assets"] });
+      qc.invalidateQueries({ queryKey: ["pending-approvals"] });
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+  };
+
+  return (
+    <div className="space-y-3">
+      {canRequest && (
+        <div className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">
+          <div className="space-y-1 sm:col-span-2"><Label>Issue *</Label><Input value={form.issue} onChange={(e) => setForm({ ...form, issue: e.target.value })} placeholder="Screen flickering / not powering on" /></div>
+          <div className="space-y-1"><Label>Priority</Label>
+            <Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="low">Low</SelectItem>
+                <SelectItem value="normal">Normal</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="urgent">Urgent</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1"><Label>Scheduled for</Label><Input type="date" value={form.scheduled_for} onChange={(e) => setForm({ ...form, scheduled_for: e.target.value })} /></div>
+          <div className="space-y-1 sm:col-span-2"><Label>Estimated cost (UGX)</Label><Input type="number" step="1" value={form.estimated_cost} onChange={(e) => setForm({ ...form, estimated_cost: e.target.value })} /></div>
+          <div className="space-y-1 sm:col-span-2"><Label>Notes</Label><Textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+          <div className="sm:col-span-2"><Button size="sm" onClick={submit}><Send className="mr-1 h-4 w-4" />Submit maintenance requisition</Button></div>
+        </div>
+      )}
+      <div className="space-y-2">
+        {data.length === 0 ? <p className="text-sm text-muted-foreground">No maintenance requests.</p> :
+          data.map((r: any) => {
+            const status = r.status ?? "pending";
+            const variant = status === "approved" ? "default" : status === "rejected" ? "destructive" : "secondary";
+            const isPending = status === "pending";
+            const mayDecide = isPending && canApprove("maintenance") && r.requested_by !== user?.id;
+            const requester = profileMap[r.requested_by];
+            const p = r.payload ?? {};
+            return (
+              <div key={r.id} className="flex items-start justify-between gap-2 rounded-lg border p-3 text-sm">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">{r.reason ?? "—"}</p>
+                    {p.priority && <Badge variant="outline" className="text-xs capitalize">{p.priority}</Badge>}
+                    <Badge variant={variant as any} className="capitalize">{status}</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {p.scheduled_for ? `Scheduled ${p.scheduled_for}` : new Date(r.created_at).toLocaleDateString()}
+                    {p.estimated_cost ? ` · ${formatUGX(p.estimated_cost)}` : ""}
+                    {requester ? ` · by ${requester.full_name ?? requester.email}` : ""}
+                  </p>
+                  {p.notes && <p className="mt-1 whitespace-pre-line text-xs">{p.notes}</p>}
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  {mayDecide && (
+                    <>
+                      <Button size="icon" variant="ghost" title="Approve" onClick={() => decide(r, "approved")}><Check className="h-4 w-4 text-green-600" /></Button>
+                      <Button size="icon" variant="ghost" title="Reject" onClick={() => decide(r, "rejected")}><X className="h-4 w-4 text-destructive" /></Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+      </div>
+      {!canRequest && <p className="text-xs text-muted-foreground">You don't have permission to raise maintenance requisitions. Ask an admin to grant the right.</p>}
+    </div>
+  );
+}
+
 /* ---------- Activity (per-asset audit trail) ---------- */
 function ActivityPanel({ assetId }: { assetId: string }) {
   const { data = [] } = useQuery({
