@@ -66,6 +66,7 @@ const empty: AssetForm = {
 function AssetsPage() {
   const { canWrite, isAdmin, user, canDo, canSeeBranch } = useAuth();
   const canAdd = canWrite || canDo("add_asset");
+  const canEdit = canWrite || canDo("edit_asset");
   const canRequestRetire = canWrite || canDo("initiate_retirement");
   const canRequestDispose = canWrite || canDo("initiate_disposal");
   const qc = useQueryClient();
