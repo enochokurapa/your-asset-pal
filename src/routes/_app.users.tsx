@@ -339,6 +339,40 @@ function UserRow({ u, self, branchesAll, onRole, onModule, onApproval, onAction,
             </div>
             <p className="mt-2 text-xs text-muted-foreground">Admins approve everything by default.</p>
           </div>
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Asset actions they can initiate</p>
+            <div className="grid grid-cols-1 gap-2">
+              {ALL_ACTION_KINDS.map((k) => {
+                const on = u.actions.has(k);
+                return (
+                  <label key={k} className="flex items-center gap-2 text-sm capitalize">
+                    <Checkbox checked={on} onCheckedChange={() => onAction(u.id, k, on)} />
+                    {k.replace(/_/g, " ")}
+                  </label>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">"Add asset" unlocks manual entry, bulk import and scanning. Initiate rights let staff submit movement / retirement / disposal requests for admin approval.</p>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Visible branches</p>
+            {(branchesAll ?? []).length === 0 ? (
+              <p className="text-sm text-muted-foreground">No branches created yet.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {(branchesAll ?? []).map((b: any) => {
+                  const on = u.branches.has(b.id);
+                  return (
+                    <label key={b.id} className="flex items-center gap-2 text-sm">
+                      <Checkbox checked={on} onCheckedChange={() => onBranch(u.id, b.id, on)} />
+                      <span>{b.name}{b.code ? <span className="ml-1 text-xs text-muted-foreground">({b.code})</span> : null}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            <p className="mt-2 text-xs text-muted-foreground">Leave all unticked to grant access to every branch. Tick specific branches to limit what this user sees.</p>
+          </div>
         </div>
       )}
     </div>
