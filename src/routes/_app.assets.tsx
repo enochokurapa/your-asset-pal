@@ -64,7 +64,10 @@ const empty: AssetForm = {
 };
 
 function AssetsPage() {
-  const { canWrite, isAdmin, user } = useAuth();
+  const { canWrite, isAdmin, user, canDo, canSeeBranch } = useAuth();
+  const canAdd = canWrite || canDo("add_asset");
+  const canRequestRetire = canWrite || canDo("initiate_retirement");
+  const canRequestDispose = canWrite || canDo("initiate_disposal");
   const qc = useQueryClient();
   const search = useSearch({ from: "/_app/assets" });
   const nav = useNavigate();
