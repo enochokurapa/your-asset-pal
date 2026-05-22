@@ -24,7 +24,8 @@ export const Route = createFileRoute("/_app/locations")({
 type Loc = { id: string; name: string; address: string | null; parent_id: string | null; is_active: boolean };
 
 function LocationsPage() {
-  const { canWrite } = useAuth();
+  const { canWrite, canDo } = useAuth();
+  const canEdit = canWrite || canDo("edit_location");
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<{ id?: string; name: string; address: string; parent_id: string; is_active: boolean }>({ name: "", address: "", parent_id: "", is_active: true });
