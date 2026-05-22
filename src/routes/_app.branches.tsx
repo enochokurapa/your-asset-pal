@@ -80,12 +80,27 @@ function BranchesPage() {
     qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
   };
 
+  const toggleActive = async (b: any) => {
+    const { error } = await supabase.from("branches").update({ is_active: !b.is_active }).eq("id", b.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(!b.is_active ? "Branch activated" : "Branch deactivated");
+    qc.invalidateQueries({ queryKey: ["branches"] });
+  };
+
+  const remove = async (b: any) => {
+    const { error } = await supabase.from("branches").delete().eq("id", b.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Branch deleted");
+    qc.invalidateQueries({ queryKey: ["branches"] });
+    qc.invalidateQueries({ queryKey: ["branch-asset-counts"] });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Branches</h1>
-          <p className="text-sm text-muted-foreground">Company branches. Branches are never deleted — deactivate to retire.</p>
+          <p className="text-sm text-muted-foreground">Company branches. Deactivate to hide from new asset entry, or delete to remove entirely.</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New branch</Button></DialogTrigger>
