@@ -186,7 +186,7 @@ function MovementsPanel({ assetId }: { assetId: string }) {
   };
   return (
     <div className="space-y-3">
-      {canWrite && (
+      {canMove && (
         <div className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">
           <div className="rounded-md bg-muted/40 p-2 text-xs sm:col-span-2">
             <p className="font-medium text-muted-foreground">Currently with</p>
