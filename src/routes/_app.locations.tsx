@@ -51,6 +51,7 @@ function LocationsPage() {
       name: form.name.trim(),
       address: form.address || null,
       parent_id: form.parent_id || null,
+      is_active: form.is_active,
     };
     const { error } = form.id
       ? await supabase.from("locations").update(payload).eq("id", form.id)
@@ -68,9 +69,15 @@ function LocationsPage() {
     toast.success("Deleted");
     qc.invalidateQueries({ queryKey: ["locations"] });
   };
+  const toggleActive = async (l: Loc) => {
+    const { error } = await supabase.from("locations").update({ is_active: !l.is_active }).eq("id", l.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(!l.is_active ? "Activated" : "Deactivated");
+    qc.invalidateQueries({ queryKey: ["locations"] });
+  };
 
-  const openNew = () => { setForm({ name: "", address: "", parent_id: "" }); setOpen(true); };
-  const openEdit = (l: Loc) => { setForm({ id: l.id, name: l.name, address: l.address ?? "", parent_id: l.parent_id ?? "" }); setOpen(true); };
+  const openNew = () => { setForm({ name: "", address: "", parent_id: "", is_active: true }); setOpen(true); };
+  const openEdit = (l: Loc) => { setForm({ id: l.id, name: l.name, address: l.address ?? "", parent_id: l.parent_id ?? "", is_active: l.is_active }); setOpen(true); };
 
   const renderCard = (l: Loc, isChild = false) => (
     <div key={l.id} className={`rounded-xl border bg-card p-4 ${isChild ? "ml-4 border-dashed" : ""}`}>
