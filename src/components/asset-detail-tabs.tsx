@@ -304,98 +304,121 @@ function AttachmentsPanel({ assetId }: { assetId: string }) {
 
 /* ---------- Disposal / Retirement ---------- */
 function DisposalPanel({ assetId }: { assetId: string }) {
-  const { canWrite, isAdmin, user } = useAuth();
+  const { canDo, canApprove, user } = useAuth();
   const qc = useQueryClient();
+  const canRetire = canDo("initiate_retirement");
+  const canDispose = canDo("initiate_disposal");
+  const canInitiate = canRetire || canDispose;
+
+  // Pending/decided requests for this asset (retirement + disposal)
   const { data = [] } = useQuery({
-    queryKey: ["asset-disposals", assetId],
-    queryFn: async () => (await supabase.from("asset_disposals").select("*")
-      .eq("asset_id", assetId).order("disposal_date", { ascending: false })).data ?? [],
+    queryKey: ["asset-approvals", assetId],
+    queryFn: async () => (await supabase.from("approval_requests")
+      .select("*")
+      .eq("asset_id", assetId)
+      .in("kind", ["retirement", "disposal"])
+      .order("created_at", { ascending: false })).data ?? [],
   });
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["profiles-list"],
+    queryFn: async () => (await supabase.from("profiles").select("id,email,full_name")).data ?? [],
+  });
+  const profileMap = Object.fromEntries(profiles.map((p: any) => [p.id, p]));
+
+  const defaultAction: "retire" | "dispose" = canRetire ? "retire" : "dispose";
   const [form, setForm] = useState({
-    action: "retire" as "retire" | "dispose",
-    disposal_reason: "", disposal_date: new Date().toISOString().slice(0, 10),
-    disposal_value: "", approval_notes: "",
+    action: defaultAction,
+    reason: "",
+    notes: "",
+    disposal_value: "",
+    date: new Date().toISOString().slice(0, 10),
   });
-  const add = async () => {
-    if (!form.disposal_reason.trim()) { toast.error("Reason is required"); return; }
-    const { error } = await supabase.from("asset_disposals").insert({
-      asset_id: assetId,
-      disposal_reason: form.disposal_reason.trim(),
-      retirement_reason: form.action === "retire" ? form.disposal_reason.trim() : null,
-      disposal_date: form.disposal_date,
-      disposal_value: form.disposal_value ? Number(form.disposal_value) : null,
-      approval_notes: form.approval_notes || null,
-      recorded_by: user?.id ?? null,
-      status: "pending",
-    } as any);
-    if (error) { toast.error(error.message); return; }
-    toast.success(`${form.action === "retire" ? "Retirement" : "Disposal"} submitted — awaiting admin approval`);
-    setForm({ action: form.action, disposal_reason: "", disposal_date: new Date().toISOString().slice(0, 10), disposal_value: "", approval_notes: "" });
-    qc.invalidateQueries({ queryKey: ["asset-disposals", assetId] });
+
+  const submit = async () => {
+    if (!form.reason.trim()) { toast.error("Reason is required"); return; }
+    const kind = form.action === "retire" ? "retirement" : "disposal";
+    if (form.action === "retire" && !canRetire) { toast.error("You don't have permission to request retirement"); return; }
+    if (form.action === "dispose" && !canDispose) { toast.error("You don't have permission to request disposal"); return; }
+    try {
+      await submitApproval({
+        kind,
+        assetId,
+        reason: form.reason.trim(),
+        payload: {
+          notes: form.notes || null,
+          disposal_value: form.disposal_value ? Number(form.disposal_value) : null,
+          date: form.date,
+        },
+      });
+      setForm({ action: form.action, reason: "", notes: "", disposal_value: "", date: new Date().toISOString().slice(0, 10) });
+      qc.invalidateQueries({ queryKey: ["asset-approvals", assetId] });
+      qc.invalidateQueries({ queryKey: ["pending-approvals"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
   };
+
   const decide = async (r: any, decision: "approved" | "rejected") => {
-    const label = decision === "approved" ? "approval" : "rejection";
-    const reason = window.prompt(`Reason for ${label} (optional but recommended):`, "");
-    if (reason === null) return;
-    const stamp = `[${decision.toUpperCase()} ${new Date().toLocaleString()}${user?.email ? ` by ${user.email}` : ""}]${reason.trim() ? ` ${reason.trim()}` : ""}`;
-    const merged = r.approval_notes ? `${r.approval_notes}\n${stamp}` : stamp;
-    const { error } = await supabase.from("asset_disposals")
-      .update({ status: decision, approved_by: user?.id ?? null, approved_at: new Date().toISOString(), approval_notes: merged } as any)
-      .eq("id", r.id);
-    if (error) { toast.error(error.message); return; }
-    if (decision === "approved") {
-      const newStatus = r.retirement_reason ? "retired" : "disposed";
-      await supabase.from("assets").update({ status: newStatus }).eq("id", assetId);
-      toast.success(`Approved — asset marked as ${newStatus}`);
-    } else {
-      toast.success("Rejected");
-    }
-    qc.invalidateQueries({ queryKey: ["asset-disposals", assetId] });
-    qc.invalidateQueries({ queryKey: ["assets"] });
+    const { decideApproval } = await import("@/lib/approvals");
+    const reason = decision === "rejected"
+      ? window.prompt("Reason for rejection:", "") ?? undefined
+      : window.prompt("Approval note (optional):", "") ?? undefined;
+    try {
+      await decideApproval(r.id, decision, reason);
+      qc.invalidateQueries({ queryKey: ["asset-approvals", assetId] });
+      qc.invalidateQueries({ queryKey: ["assets"] });
+      qc.invalidateQueries({ queryKey: ["pending-approvals"] });
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
   };
+
   return (
     <div className="space-y-3">
-      {canWrite && (
+      {canInitiate && (
         <div className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">
           <div className="space-y-1 sm:col-span-2">
             <Label>Action</Label>
             <Select value={form.action} onValueChange={(v) => setForm({ ...form, action: v as any })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="retire">Retire (end of useful life)</SelectItem>
-                <SelectItem value="dispose">Dispose (sold / scrapped)</SelectItem>
+                {canRetire && <SelectItem value="retire">Retire (end of useful life)</SelectItem>}
+                {canDispose && <SelectItem value="dispose">Dispose (sold / scrapped)</SelectItem>}
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1 sm:col-span-2"><Label>Reason *</Label><Input value={form.disposal_reason} onChange={(e) => setForm({ ...form, disposal_reason: e.target.value })} placeholder="End of life / sold / damaged" /></div>
-          <div className="space-y-1"><Label>Date</Label><Input type="date" value={form.disposal_date} onChange={(e) => setForm({ ...form, disposal_date: e.target.value })} /></div>
+          <div className="space-y-1 sm:col-span-2"><Label>Reason *</Label><Input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="End of life / sold / damaged" /></div>
+          <div className="space-y-1"><Label>Date</Label><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></div>
           <div className="space-y-1"><Label>Value (UGX)</Label><Input type="number" step="1" value={form.disposal_value} onChange={(e) => setForm({ ...form, disposal_value: e.target.value })} /></div>
-          <div className="space-y-1 sm:col-span-2"><Label>Notes</Label><Textarea rows={2} value={form.approval_notes} onChange={(e) => setForm({ ...form, approval_notes: e.target.value })} /></div>
-          <div className="sm:col-span-2"><Button size="sm" onClick={add}><Plus className="mr-1 h-4 w-4" />Submit for approval</Button></div>
+          <div className="space-y-1 sm:col-span-2"><Label>Notes</Label><Textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+          <div className="sm:col-span-2"><Button size="sm" onClick={submit}><Send className="mr-1 h-4 w-4" />Submit for approval</Button></div>
         </div>
       )}
       <div className="space-y-2">
-        {data.length === 0 ? <p className="text-sm text-muted-foreground">No retirement / disposal records.</p> :
+        {data.length === 0 ? <p className="text-sm text-muted-foreground">No retirement / disposal requests.</p> :
           data.map((r: any) => {
             const status = r.status ?? "pending";
             const variant = status === "approved" ? "default" : status === "rejected" ? "destructive" : "secondary";
             const isPending = status === "pending";
-            const canApprove = isAdmin && isPending && r.recorded_by !== user?.id;
-            const kind = r.retirement_reason ? "Retirement" : "Disposal";
+            const kindLabel = r.kind === "retirement" ? "Retirement" : "Disposal";
+            const mayDecide = isPending && canApprove(r.kind) && r.requested_by !== user?.id;
+            const requester = profileMap[r.requested_by];
+            const p = r.payload ?? {};
             return (
               <div key={r.id} className="flex items-start justify-between gap-2 rounded-lg border p-3 text-sm">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">{r.disposal_reason}</p>
-                    <Badge variant="outline" className="text-xs">{kind}</Badge>
+                    <p className="font-medium">{r.reason ?? "—"}</p>
+                    <Badge variant="outline" className="text-xs">{kindLabel}</Badge>
                     <Badge variant={variant as any} className="capitalize">{status}</Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground">{r.disposal_date}{r.disposal_value ? ` · ${formatUGX(r.disposal_value)}` : ""}</p>
-                  {r.approval_notes && <p className="mt-1 whitespace-pre-line text-xs">{r.approval_notes}</p>}
-                  {r.approved_at && <p className="mt-1 text-xs text-muted-foreground">{status === "approved" ? "Approved" : "Reviewed"} {new Date(r.approved_at).toLocaleDateString()}</p>}
+                  <p className="text-xs text-muted-foreground">
+                    {p.date ?? new Date(r.created_at).toLocaleDateString()}
+                    {p.disposal_value ? ` · ${formatUGX(p.disposal_value)}` : ""}
+                    {requester ? ` · by ${requester.full_name ?? requester.email}` : ""}
+                  </p>
+                  {p.notes && <p className="mt-1 whitespace-pre-line text-xs">{p.notes}</p>}
+                  {r.decided_at && <p className="mt-1 text-xs text-muted-foreground">{status === "approved" ? "Approved" : "Reviewed"} {new Date(r.decided_at).toLocaleString()}</p>}
                 </div>
                 <div className="flex shrink-0 gap-1">
-                  {canApprove && (
+                  {mayDecide && (
                     <>
                       <Button size="icon" variant="ghost" title="Approve" onClick={() => decide(r, "approved")}><Check className="h-4 w-4 text-green-600" /></Button>
                       <Button size="icon" variant="ghost" title="Reject" onClick={() => decide(r, "rejected")}><X className="h-4 w-4 text-destructive" /></Button>
@@ -406,7 +429,8 @@ function DisposalPanel({ assetId }: { assetId: string }) {
             );
           })}
       </div>
-      {canWrite && <p className="text-xs text-muted-foreground">Retirements and disposals require admin approval. You cannot approve a record you submitted.</p>}
+      {canInitiate && <p className="text-xs text-muted-foreground">Requests are routed to users granted approval rights by the admin. You cannot approve your own request.</p>}
+      {!canInitiate && <p className="text-xs text-muted-foreground">You don't have permission to initiate retirement or disposal. Ask an admin to grant you the right.</p>}
     </div>
   );
 }
