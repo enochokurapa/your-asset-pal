@@ -311,7 +311,7 @@ function AssetsPage() {
           <Button variant="outline" onClick={downloadTemplate} title="Download Excel import template">
             <Download className="mr-2 h-4 w-4" /> Template
           </Button>
-          {canWrite && (
+          {canAdd && (
             <label className="inline-flex">
               <input type="file" accept=".xlsx,.xls" className="hidden" disabled={importing}
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ""; }} />
@@ -320,7 +320,7 @@ function AssetsPage() {
               </Button>
             </label>
           )}
-          {canWrite && (
+          {canAdd && (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New asset</Button></DialogTrigger>
             <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
