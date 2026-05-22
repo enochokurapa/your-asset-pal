@@ -498,7 +498,7 @@ function AssetsPage() {
                   <th className="hidden px-3 py-3 font-medium md:table-cell">Custodian</th>
                   <th className="px-3 py-3 font-medium">Status</th>
                   <th className="hidden px-3 py-3 text-right font-medium sm:table-cell">Value</th>
-                  {canWrite && <th className="px-3 py-3" />}
+                  {(canWrite || canRequestRetire || canRequestDispose) && <th className="px-3 py-3" />}
                 </tr>
               </thead>
               <tbody>
@@ -518,18 +518,24 @@ function AssetsPage() {
                       </span>
                     </td>
                     <td className="hidden px-3 py-3 text-right tabular-nums sm:table-cell">{formatUGX(a.purchase_value)}</td>
-                    {canWrite && (
+                    {(canWrite || canRequestRetire || canRequestDispose) && (
                       <td className="px-3 py-3 text-right">
                         <div className="flex justify-end gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => openEdit(a)}><Pencil className="h-4 w-4" /></Button>
+                          {canWrite && (
+                            <Button size="icon" variant="ghost" onClick={() => openEdit(a)}><Pencil className="h-4 w-4" /></Button>
+                          )}
                           {a.status !== "retired" && a.status !== "disposed" && (
                             <>
-                              <Button size="icon" variant="ghost" title="Request retirement" onClick={() => requestRetire(a, "retirement")}>
-                                <Archive className="h-4 w-4 text-muted-foreground" />
-                              </Button>
-                              <Button size="icon" variant="ghost" title="Request disposal" onClick={() => requestRetire(a, "disposal")}>
-                                <Send className="h-4 w-4 text-muted-foreground" />
-                              </Button>
+                              {canRequestRetire && (
+                                <Button size="icon" variant="ghost" title="Request retirement" onClick={() => requestRetire(a, "retirement")}>
+                                  <Archive className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                              )}
+                              {canRequestDispose && (
+                                <Button size="icon" variant="ghost" title="Request disposal" onClick={() => requestRetire(a, "disposal")}>
+                                  <Send className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                              )}
                             </>
                           )}
                           {isAdmin && (
