@@ -24,7 +24,8 @@ export const Route = createFileRoute("/_app/locations")({
 type Loc = { id: string; name: string; address: string | null; parent_id: string | null; is_active: boolean };
 
 function LocationsPage() {
-  const { canWrite } = useAuth();
+  const { canWrite, canDo } = useAuth();
+  const canEdit = canWrite || canDo("edit_location");
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<{ id?: string; name: string; address: string; parent_id: string; is_active: boolean }>({ name: "", address: "", parent_id: "", is_active: true });
@@ -89,14 +90,14 @@ function LocationsPage() {
           </div>
           {l.address && <p className="mt-1 whitespace-pre-line text-sm text-muted-foreground">{l.address}</p>}
         </div>
-        {canWrite && (
+        {canEdit && (
           <div className="flex gap-1">
             <Button size="icon" variant="ghost" onClick={() => openEdit(l)}><Pencil className="h-4 w-4" /></Button>
-            <Button size="icon" variant="ghost" onClick={() => remove(l.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+            {canWrite && <Button size="icon" variant="ghost" onClick={() => remove(l.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
           </div>
         )}
       </div>
-      {canWrite && (
+      {canEdit && (
         <div className="mt-3 flex items-center gap-2 border-t pt-2 text-xs">
           <Switch checked={l.is_active} onCheckedChange={() => toggleActive(l)} />
           <span className="text-muted-foreground">{l.is_active ? "Active" : "Inactive"}</span>

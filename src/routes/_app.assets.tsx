@@ -66,6 +66,7 @@ const empty: AssetForm = {
 function AssetsPage() {
   const { canWrite, isAdmin, user, canDo, canSeeBranch } = useAuth();
   const canAdd = canWrite || canDo("add_asset");
+  const canEdit = canWrite || canDo("edit_asset");
   const canRequestRetire = canWrite || canDo("initiate_retirement");
   const canRequestDispose = canWrite || canDo("initiate_disposal");
   const qc = useQueryClient();
@@ -498,7 +499,7 @@ function AssetsPage() {
                   <th className="hidden px-3 py-3 font-medium md:table-cell">Custodian</th>
                   <th className="px-3 py-3 font-medium">Status</th>
                   <th className="hidden px-3 py-3 text-right font-medium sm:table-cell">Value</th>
-                  {(canWrite || canRequestRetire || canRequestDispose) && <th className="px-3 py-3" />}
+                  {(canEdit || canRequestRetire || canRequestDispose || isAdmin) && <th className="px-3 py-3" />}
                 </tr>
               </thead>
               <tbody>
@@ -518,10 +519,10 @@ function AssetsPage() {
                       </span>
                     </td>
                     <td className="hidden px-3 py-3 text-right tabular-nums sm:table-cell">{formatUGX(a.purchase_value)}</td>
-                    {(canWrite || canRequestRetire || canRequestDispose) && (
+                    {(canEdit || canRequestRetire || canRequestDispose || isAdmin) && (
                       <td className="px-3 py-3 text-right">
                         <div className="flex justify-end gap-1">
-                          {canWrite && (
+                          {canEdit && (
                             <Button size="icon" variant="ghost" onClick={() => openEdit(a)}><Pencil className="h-4 w-4" /></Button>
                           )}
                           {a.status !== "retired" && a.status !== "disposed" && (
