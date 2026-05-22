@@ -43,21 +43,31 @@ function UsersPage() {
   const activeFn = useServerFn(setUserActive);
   const deleteFn = useServerFn(deleteUserAccount);
 
+  const { data: branchesAll = [] } = useQuery({
+    queryKey: ["branches-all-for-perms"],
+    enabled: isAdmin,
+    queryFn: async () => (await supabase.from("branches").select("id,name,code").order("name")).data ?? [],
+  });
+
   const { data = [], isLoading } = useQuery({
     queryKey: ["users-with-roles"],
     enabled: isAdmin,
     queryFn: async () => {
-      const [{ data: profiles }, { data: roles }, { data: perms }, { data: rights }] = await Promise.all([
+      const [{ data: profiles }, { data: roles }, { data: perms }, { data: rights }, { data: acts }, { data: brs }] = await Promise.all([
         supabase.from("profiles").select("*").order("created_at", { ascending: false }),
         supabase.from("user_roles").select("user_id, role"),
         supabase.from("user_permissions" as any).select("user_id, module, can_view"),
         supabase.from("user_approval_rights" as any).select("user_id, approval_kind"),
+        supabase.from("user_action_rights" as any).select("user_id, action_kind"),
+        supabase.from("user_branch_access" as any).select("user_id, branch_id"),
       ]);
       return (profiles ?? []).map((p) => ({
         ...p,
         roles: (roles ?? []).filter((r) => r.user_id === p.id).map((r) => r.role as AppRole),
         modules: new Set(((perms as any) ?? []).filter((x: any) => x.user_id === p.id && x.can_view).map((x: any) => x.module as ModuleKey)),
         approvals: new Set(((rights as any) ?? []).filter((x: any) => x.user_id === p.id).map((x: any) => x.approval_kind as ApprovalKind)),
+        actions: new Set(((acts as any) ?? []).filter((x: any) => x.user_id === p.id).map((x: any) => x.action_kind as ActionKind)),
+        branches: new Set(((brs as any) ?? []).filter((x: any) => x.user_id === p.id).map((x: any) => x.branch_id as string)),
       }));
     },
   });
