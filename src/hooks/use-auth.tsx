@@ -7,20 +7,20 @@ export type ModuleKey =
   | "dashboard" | "assets" | "categories" | "locations" | "branches"
   | "users" | "reports" | "audit";
 export type ApprovalKind =
-  | "movement" | "retirement" | "disposal" | "reactivation" | "set_for_disposal";
+  | "movement" | "retirement" | "disposal" | "reactivation" | "set_for_disposal" | "maintenance";
 export type ActionKind =
   | "add_asset" | "edit_asset" | "edit_location"
-  | "initiate_movement" | "initiate_retirement" | "initiate_disposal";
+  | "initiate_movement" | "initiate_retirement" | "initiate_disposal" | "initiate_maintenance";
 
 export const ALL_MODULES: ModuleKey[] = [
   "dashboard", "assets", "categories", "locations", "branches", "users", "reports", "audit",
 ];
 export const ALL_APPROVAL_KINDS: ApprovalKind[] = [
-  "movement", "retirement", "disposal", "reactivation", "set_for_disposal",
+  "movement", "retirement", "disposal", "reactivation", "set_for_disposal", "maintenance",
 ];
 export const ALL_ACTION_KINDS: ActionKind[] = [
   "add_asset", "edit_asset", "edit_location",
-  "initiate_movement", "initiate_retirement", "initiate_disposal",
+  "initiate_movement", "initiate_retirement", "initiate_disposal", "initiate_maintenance",
 ];
 export const DEFAULT_NEW_USER_MODULES: ModuleKey[] = ["dashboard", "assets"];
 

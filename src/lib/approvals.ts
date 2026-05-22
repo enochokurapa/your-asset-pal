@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-export type ApprovalKind = "movement" | "retirement" | "disposal" | "reactivation" | "update" | "set_for_disposal";
+export type ApprovalKind = "movement" | "retirement" | "disposal" | "reactivation" | "update" | "set_for_disposal" | "maintenance";
 
 export async function submitApproval(params: {
   kind: ApprovalKind;
@@ -44,6 +44,11 @@ export async function decideApproval(id: string, status: "approved" | "rejected"
       await supabase.from("assets").update({ set_for_disposal: true }).eq("id", req.asset_id);
     } else if (req.kind === "disposal") {
       await supabase.from("assets").update({ status: "disposed", set_for_disposal: false }).eq("id", req.asset_id);
+    } else if (req.kind === "maintenance") {
+      const { data: a } = await supabase.from("assets").select("status").eq("id", req.asset_id).single();
+      if (a?.status !== "under_repair") {
+        await supabase.from("assets").update({ status: "under_repair", previous_status: a?.status ?? null }).eq("id", req.asset_id);
+      }
     } else if (req.kind === "movement" && req.payload) {
       const p = req.payload as any;
       await supabase.from("asset_movements").insert({
