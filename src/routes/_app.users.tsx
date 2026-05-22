@@ -3,7 +3,7 @@ import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth, AppRole, ALL_MODULES, ALL_APPROVAL_KINDS, ModuleKey, ApprovalKind } from "@/hooks/use-auth";
+import { useAuth, AppRole, ALL_MODULES, ALL_APPROVAL_KINDS, ALL_ACTION_KINDS, ModuleKey, ApprovalKind, ActionKind } from "@/hooks/use-auth";
 import {
   createUserAccount, adminResetPassword, setUserActive, deleteUserAccount,
 } from "@/lib/admin-users.functions";
