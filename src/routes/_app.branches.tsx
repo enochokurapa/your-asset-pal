@@ -144,7 +144,30 @@ function BranchesPage() {
                       {b.address && <p className="mt-1 text-xs text-muted-foreground">{b.address}</p>}
                       <p className="mt-2 text-sm tabular-nums"><span className="font-semibold">{counts[b.id] ?? 0}</span> <span className="text-muted-foreground">assets</span></p>
                     </div>
-                    <Button size="icon" variant="ghost" onClick={() => openEdit(b)}><Pencil className="h-4 w-4" /></Button>
+                    <div className="flex flex-col items-end gap-1">
+                      <Button size="icon" variant="ghost" onClick={() => openEdit(b)}><Pencil className="h-4 w-4" /></Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="icon" variant="ghost" title="Delete branch"><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete branch?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Permanently remove <strong>{b.name}</strong>. Assets currently linked to this branch will become unassigned. This cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => remove(b)}>Delete</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 border-t pt-2 text-xs">
+                    <Switch checked={b.is_active} onCheckedChange={() => toggleActive(b)} />
+                    <span className="text-muted-foreground">{b.is_active ? "Active" : "Inactive"}</span>
                   </div>
                 </div>
               ))}
