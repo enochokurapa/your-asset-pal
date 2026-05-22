@@ -83,7 +83,10 @@ function LocationsPage() {
     <div key={l.id} className={`rounded-xl border bg-card p-4 ${isChild ? "ml-4 border-dashed" : ""}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate font-semibold">{l.name}</p>
+          <div className="flex items-center gap-2">
+            <p className="truncate font-semibold">{l.name}</p>
+            {!l.is_active && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
+          </div>
           {l.address && <p className="mt-1 whitespace-pre-line text-sm text-muted-foreground">{l.address}</p>}
         </div>
         {canWrite && (
@@ -93,6 +96,12 @@ function LocationsPage() {
           </div>
         )}
       </div>
+      {canWrite && (
+        <div className="mt-3 flex items-center gap-2 border-t pt-2 text-xs">
+          <Switch checked={l.is_active} onCheckedChange={() => toggleActive(l)} />
+          <span className="text-muted-foreground">{l.is_active ? "Active" : "Inactive"}</span>
+        </div>
+      )}
     </div>
   );
 
