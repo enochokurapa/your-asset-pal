@@ -27,11 +27,18 @@ export function PendingApprovalsCard() {
     queryFn: async () => {
       const { data } = await supabase
         .from("approval_requests")
-        .select("*, asset:assets(name, asset_tag), requester:profiles!approval_requests_requested_by_fkey(full_name,email)")
+        .select("*, asset:assets(name, asset_tag)")
         .eq("status", "pending")
         .order("created_at", { ascending: false })
         .limit(50);
-      return data ?? [];
+      const list = data ?? [];
+      const ids = Array.from(new Set(list.map((r: any) => r.requested_by).filter(Boolean)));
+      let profMap: Record<string, any> = {};
+      if (ids.length) {
+        const { data: profs } = await supabase.from("profiles").select("id,full_name,email").in("id", ids);
+        profMap = Object.fromEntries((profs ?? []).map((p: any) => [p.id, p]));
+      }
+      return list.map((r: any) => ({ ...r, requester: profMap[r.requested_by] ?? null }));
     },
     refetchInterval: 10000,
   });
