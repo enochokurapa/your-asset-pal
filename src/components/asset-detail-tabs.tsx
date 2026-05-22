@@ -25,15 +25,17 @@ const ATTACH_KINDS = [
 export function AssetDetailTabs({ assetId }: { assetId: string }) {
   return (
     <Tabs defaultValue="custody" className="mt-2">
-      <TabsList className="w-full">
+      <TabsList className="w-full flex-wrap">
         <TabsTrigger value="custody" className="flex-1">Custody</TabsTrigger>
         <TabsTrigger value="movements" className="flex-1">Movements</TabsTrigger>
+        <TabsTrigger value="maintenance" className="flex-1">Maintenance</TabsTrigger>
         <TabsTrigger value="attachments" className="flex-1">Files</TabsTrigger>
         <TabsTrigger value="disposal" className="flex-1">Retire/Dispose</TabsTrigger>
         <TabsTrigger value="activity" className="flex-1">Activity</TabsTrigger>
       </TabsList>
       <TabsContent value="custody"><CustodyPanel assetId={assetId} /></TabsContent>
       <TabsContent value="movements"><MovementsPanel assetId={assetId} /></TabsContent>
+      <TabsContent value="maintenance"><MaintenancePanel assetId={assetId} /></TabsContent>
       <TabsContent value="attachments"><AttachmentsPanel assetId={assetId} /></TabsContent>
       <TabsContent value="disposal"><DisposalPanel assetId={assetId} /></TabsContent>
       <TabsContent value="activity"><ActivityPanel assetId={assetId} /></TabsContent>
