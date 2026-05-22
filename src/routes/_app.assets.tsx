@@ -499,7 +499,7 @@ function AssetsPage() {
                   <th className="hidden px-3 py-3 font-medium md:table-cell">Custodian</th>
                   <th className="px-3 py-3 font-medium">Status</th>
                   <th className="hidden px-3 py-3 text-right font-medium sm:table-cell">Value</th>
-                  {(canWrite || canRequestRetire || canRequestDispose) && <th className="px-3 py-3" />}
+                  {(canEdit || canRequestRetire || canRequestDispose || isAdmin) && <th className="px-3 py-3" />}
                 </tr>
               </thead>
               <tbody>
