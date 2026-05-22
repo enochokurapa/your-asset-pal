@@ -148,6 +148,10 @@ function LocationsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2"><Label>Address</Label><Textarea rows={3} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />
+                  Active
+                </label>
               </div>
               <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button onClick={save}>Save</Button></DialogFooter>
             </DialogContent>
