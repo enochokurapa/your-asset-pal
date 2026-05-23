@@ -59,7 +59,7 @@ export function PendingApprovalsCard() {
   return (
     <Card className="p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Pending approvals</h2>
+        <h2 className="text-sm font-semibold">Pending approvals &amp; requisitions</h2>
         <Badge variant="secondary">{rows.length}</Badge>
       </div>
       <div className="mt-4 divide-y">
