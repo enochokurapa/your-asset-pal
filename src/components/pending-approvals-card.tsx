@@ -144,21 +144,32 @@ export function PendingApprovalsCard() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!rejectOpen} onOpenChange={(o) => !o && setRejectOpen(null)}>
+      <Dialog open={!!decideOpen} onOpenChange={(o) => !o && setDecideOpen(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Reason for rejection</DialogTitle></DialogHeader>
-          <Textarea rows={4} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)}
-            placeholder="Explain why this request is being rejected…" />
+          <DialogHeader>
+            <DialogTitle>
+              {decideOpen?.status === "approved" ? "Reason for approval" : "Reason for rejection"}
+            </DialogTitle>
+            <DialogDescription>
+              A short note is required so the requester understands the decision.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea rows={4} value={decideReason} onChange={(e) => setDecideReason(e.target.value)}
+            placeholder={decideOpen?.status === "approved"
+              ? "e.g. Approved — proceed with the transfer."
+              : "Explain why this request is being rejected…"} />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectOpen(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDecideOpen(null)}>Cancel</Button>
             <Button
-              variant="destructive"
-              disabled={!rejectReason.trim()}
+              variant={decideOpen?.status === "approved" ? "default" : "destructive"}
+              disabled={!decideReason.trim()}
               onClick={async () => {
-                if (rejectOpen) await handleDecide(rejectOpen, "rejected", rejectReason.trim());
-                setRejectOpen(null);
+                if (decideOpen) await handleDecide(decideOpen.id, decideOpen.status, decideReason.trim());
+                setDecideOpen(null);
               }}
-            >Reject request</Button>
+            >
+              {decideOpen?.status === "approved" ? "Approve request" : "Reject request"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
