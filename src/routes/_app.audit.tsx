@@ -46,6 +46,16 @@ function AuditPage() {
   if (!canWrite) return <Navigate to="/dashboard" />;
 
   const filtered = rows.filter((r: any) => {
+    if (approvalKind) {
+      if (r.entity_type !== "approval_requests") return false;
+      const k = r.details?.after?.kind ?? r.details?.before?.kind ?? r.details?.kind;
+      if (k !== approvalKind) return false;
+    }
+    if (decisionStatus) {
+      if (r.entity_type !== "approval_requests") return false;
+      const s = r.details?.after?.status ?? r.details?.status;
+      if (s !== decisionStatus) return false;
+    }
     if (!q) return true;
     const actor = profileMap[r.actor_user_id]?.email ?? "";
     return [r.entity_type, r.action, actor, r.entity_id].some((v) => v?.toLowerCase().includes(q.toLowerCase()));
