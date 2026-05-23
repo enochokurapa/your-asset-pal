@@ -506,12 +506,12 @@ function AssetsPage() {
                   <th className="hidden px-3 py-3 font-medium md:table-cell">Custodian</th>
                   <th className="px-3 py-3 font-medium">Status</th>
                   <th className="hidden px-3 py-3 text-right font-medium sm:table-cell">Value</th>
-                  {(canEdit || canRequestRetire || canRequestDispose || isAdmin) && <th className="px-3 py-3" />}
+                  <th className="px-3 py-3" />
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((a: any) => (
-                  <tr key={a.id} className="border-b last:border-0 hover:bg-muted/40">
+                  <tr key={a.id} className="border-b last:border-0 hover:bg-muted/40 cursor-pointer" onClick={() => openView(a, "activity")}>
                     <td className="px-3 py-3 font-mono text-xs">{a.asset_tag}</td>
                     <td className="px-3 py-3 font-medium">{a.name}{a.serial_number && <span className="ml-2 font-mono text-[10px] text-muted-foreground">SN: {a.serial_number}</span>}</td>
                     <td className="hidden px-3 py-3 text-muted-foreground md:table-cell">{a.branches?.name ?? "—"}</td>
@@ -526,34 +526,45 @@ function AssetsPage() {
                       </span>
                     </td>
                     <td className="hidden px-3 py-3 text-right tabular-nums sm:table-cell">{formatUGX(a.purchase_value)}</td>
-                    {(canEdit || canRequestRetire || canRequestDispose || isAdmin) && (
-                      <td className="px-3 py-3 text-right">
-                        <div className="flex justify-end gap-1">
-                          {canEdit && (
-                            <Button size="icon" variant="ghost" onClick={() => openEdit(a)}><Pencil className="h-4 w-4" /></Button>
-                          )}
-                          {a.status !== "retired" && a.status !== "disposed" && (
-                            <>
-                              {canRequestRetire && (
-                                <Button size="icon" variant="ghost" title="Request retirement" onClick={() => requestRetire(a, "retirement")}>
-                                  <Archive className="h-4 w-4 text-muted-foreground" />
-                                </Button>
-                              )}
-                              {canRequestDispose && (
-                                <Button size="icon" variant="ghost" title="Request disposal" onClick={() => requestRetire(a, "disposal")}>
-                                  <Send className="h-4 w-4 text-muted-foreground" />
-                                </Button>
-                              )}
-                            </>
-                          )}
-                          {isAdmin && (
-                            <Button size="icon" variant="ghost" title="Delete asset (admin)" onClick={() => removeAsset(a)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    )}
+                    <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex justify-end gap-1">
+                        <Button size="icon" variant="ghost" title="View details & history" onClick={() => openView(a, "activity")}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        {canEdit && (
+                          <Button size="icon" variant="ghost" title="Edit" onClick={() => openEdit(a)}><Pencil className="h-4 w-4" /></Button>
+                        )}
+                        {a.status !== "retired" && a.status !== "disposed" && (
+                          <>
+                            {canRequestMove && (
+                              <Button size="icon" variant="ghost" title="Request movement" onClick={() => openView(a, "movements")}>
+                                <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            )}
+                            {canRequestMaint && (
+                              <Button size="icon" variant="ghost" title="Request maintenance" onClick={() => openView(a, "maintenance")}>
+                                <Wrench className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            )}
+                            {canRequestRetire && (
+                              <Button size="icon" variant="ghost" title="Request retirement" onClick={() => requestRetire(a, "retirement")}>
+                                <Archive className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            )}
+                            {canRequestDispose && (
+                              <Button size="icon" variant="ghost" title="Request disposal" onClick={() => requestRetire(a, "disposal")}>
+                                <Send className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            )}
+                          </>
+                        )}
+                        {isAdmin && (
+                          <Button size="icon" variant="ghost" title="Delete asset (admin)" onClick={() => removeAsset(a)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -561,6 +572,7 @@ function AssetsPage() {
           )}
         </div>
       </Card>
+
 
       <ScannerDialog open={scanOpen} onOpenChange={setScanOpen} onScan={handleScan} />
 
