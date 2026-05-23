@@ -22,9 +22,9 @@ const ATTACH_KINDS = [
   { value: "other", label: "Other" },
 ];
 
-export function AssetDetailTabs({ assetId }: { assetId: string }) {
+export function AssetDetailTabs({ assetId, defaultTab = "custody" }: { assetId: string; defaultTab?: string }) {
   return (
-    <Tabs defaultValue="custody" className="mt-2">
+    <Tabs defaultValue={defaultTab} className="mt-2">
       <TabsList className="w-full flex-wrap">
         <TabsTrigger value="custody" className="flex-1">Custody</TabsTrigger>
         <TabsTrigger value="movements" className="flex-1">Movements</TabsTrigger>
@@ -554,37 +554,72 @@ function MaintenancePanel({ assetId }: { assetId: string }) {
   );
 }
 
-/* ---------- Activity (per-asset audit trail) ---------- */
+/* ---------- Activity (per-asset audit trail, visible to everyone) ---------- */
 function ActivityPanel({ assetId }: { assetId: string }) {
-  const { data = [] } = useQuery({
-    queryKey: ["asset-audit", assetId],
-    queryFn: async () => (await supabase.from("audit_log").select("*")
-      .eq("entity_type", "assets").eq("entity_id", assetId)
-      .order("created_at", { ascending: false })).data ?? [],
+  const { data: movements = [] } = useQuery({
+    queryKey: ["activity-movements", assetId],
+    queryFn: async () => (await supabase.from("asset_movements")
+      .select("*, from:from_location_id(name), to:to_location_id(name), fromBranch:from_branch_id(name), toBranch:to_branch_id(name)")
+      .eq("asset_id", assetId)).data ?? [],
+  });
+  const { data: assignments = [] } = useQuery({
+    queryKey: ["activity-assignments", assetId],
+    queryFn: async () => (await supabase.from("asset_assignments").select("*, branches(name)").eq("asset_id", assetId)).data ?? [],
+  });
+  const { data: approvals = [] } = useQuery({
+    queryKey: ["activity-approvals", assetId],
+    queryFn: async () => (await supabase.from("approval_requests").select("*").eq("asset_id", assetId)).data ?? [],
   });
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles-list"],
     queryFn: async () => (await supabase.from("profiles").select("id,email,full_name")).data ?? [],
   });
-  const profileMap = Object.fromEntries(profiles.map((p: any) => [p.id, p]));
+  const pm = Object.fromEntries(profiles.map((p: any) => [p.id, p.full_name ?? p.email]));
+
+  type Ev = { id: string; ts: string; title: string; subtitle?: string; reason?: string; tone?: string };
+  const events: Ev[] = [];
+  for (const m of movements as any[]) {
+    events.push({
+      id: `mv-${m.id}`, ts: m.moved_at ?? m.created_at,
+      title: `Moved: ${m.from?.name ?? m.fromBranch?.name ?? "—"} → ${m.to?.name ?? m.toBranch?.name ?? "—"}`,
+      subtitle: `${m.transfer_type ?? "internal"}${m.from_user || m.to_user ? ` · custody ${m.from_user ?? "—"} → ${m.to_user ?? "—"}` : ""} · by ${pm[m.moved_by] ?? "—"}`,
+      reason: m.reason ?? undefined,
+    });
+  }
+  for (const a of assignments as any[]) {
+    events.push({
+      id: `as-${a.id}`, ts: a.assignment_date ?? a.created_at,
+      title: `Assigned to ${a.assigned_to_name ?? a.department ?? "—"}`,
+      subtitle: `${a.branches?.name ? a.branches.name + " · " : ""}${a.return_date ? `until ${a.return_date}` : "open"} · by ${pm[a.created_by] ?? "—"}`,
+      reason: a.notes ?? undefined,
+    });
+  }
+  for (const r of approvals as any[]) {
+    const kindLabel = String(r.kind).replace(/_/g, " ");
+    events.push({
+      id: `ap-${r.id}`, ts: r.decided_at ?? r.created_at,
+      title: `${kindLabel} request ${r.status}`,
+      subtitle: `requested by ${pm[r.requested_by] ?? "—"}${r.approver_id ? ` · decided by ${pm[r.approver_id] ?? "—"}` : ""}`,
+      reason: r.reason ?? undefined,
+      tone: r.status === "approved" ? "text-green-600" : r.status === "rejected" ? "text-destructive" : "text-muted-foreground",
+    });
+  }
+  events.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
+
   return (
     <div className="space-y-2">
-      {data.length === 0 ? (
+      {events.length === 0 ? (
         <div className="py-6 text-center text-sm text-muted-foreground">
           <History className="mx-auto mb-2 h-6 w-6 opacity-40" />
           No activity recorded yet.
         </div>
-      ) : data.map((r: any) => {
-        const p = profileMap[r.actor_user_id];
-        return (
-          <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg border p-3 text-sm">
-            <div>
-              <p className="font-medium capitalize">{r.action.replace(/_/g, " ")}</p>
-              <p className="text-xs text-muted-foreground">{p?.full_name ?? p?.email ?? "system"} · {new Date(r.created_at).toLocaleString()}</p>
-            </div>
-          </div>
-        );
-      })}
+      ) : events.map((e) => (
+        <div key={e.id} className="rounded-lg border p-3 text-sm">
+          <p className={`font-medium capitalize ${e.tone ?? ""}`}>{e.title}</p>
+          {e.subtitle && <p className="text-xs text-muted-foreground">{e.subtitle} · {new Date(e.ts).toLocaleString()}</p>}
+          {e.reason && <p className="mt-1 whitespace-pre-line text-xs"><span className="text-muted-foreground">Reason: </span>{e.reason}</p>}
+        </div>
+      ))}
     </div>
   );
 }
