@@ -8,9 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { UserCircle } from "lucide-react";
+import { UserCircle, Bell } from "lucide-react";
+import { ALL_APPROVAL_KINDS, type ApprovalKind } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_app/profile")({
   component: ProfilePage,
