@@ -22,6 +22,7 @@ export type Database = {
           decided_at: string | null
           id: string
           kind: string
+          last_reminded_at: string | null
           payload: Json
           reason: string | null
           requested_by: string
@@ -34,6 +35,7 @@ export type Database = {
           decided_at?: string | null
           id?: string
           kind: string
+          last_reminded_at?: string | null
           payload?: Json
           reason?: string | null
           requested_by: string
@@ -46,6 +48,7 @@ export type Database = {
           decided_at?: string | null
           id?: string
           kind?: string
+          last_reminded_at?: string | null
           payload?: Json
           reason?: string | null
           requested_by?: string
@@ -685,6 +688,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_notification_prefs: {
+        Row: {
+          approval_kind: string
+          created_at: string
+          email: boolean
+          id: string
+          in_app: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          approval_kind: string
+          created_at?: string
+          email?: boolean
+          id?: string
+          in_app?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          approval_kind?: string
+          created_at?: string
+          email?: boolean
+          id?: string
+          in_app?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_permissions: {
         Row: {
           can_view: boolean
@@ -744,6 +777,7 @@ export type Database = {
     }
     Functions: {
       can_do: { Args: { _action: string; _user_id: string }; Returns: boolean }
+      enqueue_approval_reminders: { Args: never; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
