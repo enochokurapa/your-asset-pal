@@ -518,17 +518,18 @@ function MaintenancePanel({ assetId }: { assetId: string }) {
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
   };
 
-  const decide = async (r: any, decision: "approved" | "rejected") => {
-    const { decideApproval } = await import("@/lib/approvals");
-    const reason = decision === "rejected"
-      ? window.prompt("Reason for rejection:", "") ?? undefined
-      : window.prompt("Approval note (optional):", "") ?? undefined;
+  const [pending, setPending] = useState<{ r: any; status: "approved" | "rejected" } | null>(null);
+  const decide = (r: any, decision: "approved" | "rejected") => setPending({ r, status: decision });
+  const confirmDecide = async (reason: string) => {
+    if (!pending) return;
     try {
-      await decideApproval(r.id, decision, reason);
+      await decideApproval(pending.r.id, pending.status, reason);
       qc.invalidateQueries({ queryKey: ["asset-maintenance", assetId] });
       qc.invalidateQueries({ queryKey: ["assets"] });
       qc.invalidateQueries({ queryKey: ["pending-approvals"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    setPending(null);
   };
 
   return (
