@@ -18,8 +18,8 @@ import { useAuth, ApprovalKind } from "@/hooks/use-auth";
 export function PendingApprovalsCard() {
   const { canApprove, user } = useAuth();
   const qc = useQueryClient();
-  const [rejectOpen, setRejectOpen] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
+  const [decideOpen, setDecideOpen] = useState<{ id: string; status: "approved" | "rejected" } | null>(null);
+  const [decideReason, setDecideReason] = useState("");
   const [detail, setDetail] = useState<any>(null);
 
   const { data: rows = [] } = useQuery({
