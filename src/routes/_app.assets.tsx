@@ -12,7 +12,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Search, Package, ScanLine, Archive, AlertCircle, FilterX, Trash2, Download, Upload, Send } from "lucide-react";
+import { Plus, Pencil, Search, Package, ScanLine, Archive, AlertCircle, FilterX, Trash2, Download, Upload, Send, Eye, ArrowRightLeft, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { ScannerDialog } from "@/components/scanner-dialog";
 import { AssetDetailTabs } from "@/components/asset-detail-tabs";
