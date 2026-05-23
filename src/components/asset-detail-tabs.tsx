@@ -12,7 +12,45 @@ import { Plus, Trash2, Download, Upload, FileText, Check, X, History, Send } fro
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { formatUGX } from "@/lib/utils";
-import { submitApproval } from "@/lib/approvals";
+import { submitApproval, decideApproval } from "@/lib/approvals";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
+
+function DecideDialog({
+  open, status, onCancel, onConfirm,
+}: {
+  open: boolean;
+  status: "approved" | "rejected" | null;
+  onCancel: () => void;
+  onConfirm: (reason: string) => void | Promise<void>;
+}) {
+  const [reason, setReason] = useState("");
+  // reset reason when dialog opens
+  if (!open && reason) setTimeout(() => setReason(""), 0);
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onCancel()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{status === "approved" ? "Reason for approval" : "Reason for rejection"}</DialogTitle>
+          <DialogDescription>A short note is required so the requester understands the decision.</DialogDescription>
+        </DialogHeader>
+        <Textarea rows={4} value={reason} onChange={(e) => setReason(e.target.value)}
+          placeholder={status === "approved" ? "e.g. Approved — proceed." : "Explain why this is being rejected…"} />
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel}>Cancel</Button>
+          <Button
+            variant={status === "approved" ? "default" : "destructive"}
+            disabled={!reason.trim()}
+            onClick={async () => { await onConfirm(reason.trim()); setReason(""); }}
+          >
+            {status === "approved" ? "Approve request" : "Reject request"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 const ATTACH_KINDS = [
   { value: "invoice", label: "Invoice" },
