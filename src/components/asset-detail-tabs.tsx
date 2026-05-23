@@ -12,7 +12,45 @@ import { Plus, Trash2, Download, Upload, FileText, Check, X, History, Send } fro
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { formatUGX } from "@/lib/utils";
-import { submitApproval } from "@/lib/approvals";
+import { submitApproval, decideApproval } from "@/lib/approvals";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
+
+function DecideDialog({
+  open, status, onCancel, onConfirm,
+}: {
+  open: boolean;
+  status: "approved" | "rejected" | null;
+  onCancel: () => void;
+  onConfirm: (reason: string) => void | Promise<void>;
+}) {
+  const [reason, setReason] = useState("");
+  // reset reason when dialog opens
+  if (!open && reason) setTimeout(() => setReason(""), 0);
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onCancel()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{status === "approved" ? "Reason for approval" : "Reason for rejection"}</DialogTitle>
+          <DialogDescription>A short note is required so the requester understands the decision.</DialogDescription>
+        </DialogHeader>
+        <Textarea rows={4} value={reason} onChange={(e) => setReason(e.target.value)}
+          placeholder={status === "approved" ? "e.g. Approved — proceed." : "Explain why this is being rejected…"} />
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel}>Cancel</Button>
+          <Button
+            variant={status === "approved" ? "default" : "destructive"}
+            disabled={!reason.trim()}
+            onClick={async () => { await onConfirm(reason.trim()); setReason(""); }}
+          >
+            {status === "approved" ? "Approve request" : "Reject request"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 const ATTACH_KINDS = [
   { value: "invoice", label: "Invoice" },
@@ -359,17 +397,18 @@ function DisposalPanel({ assetId }: { assetId: string }) {
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
   };
 
-  const decide = async (r: any, decision: "approved" | "rejected") => {
-    const { decideApproval } = await import("@/lib/approvals");
-    const reason = decision === "rejected"
-      ? window.prompt("Reason for rejection:", "") ?? undefined
-      : window.prompt("Approval note (optional):", "") ?? undefined;
+  const [pending, setPending] = useState<{ r: any; status: "approved" | "rejected" } | null>(null);
+  const decide = (r: any, decision: "approved" | "rejected") => setPending({ r, status: decision });
+  const confirmDecide = async (reason: string) => {
+    if (!pending) return;
     try {
-      await decideApproval(r.id, decision, reason);
+      await decideApproval(pending.r.id, pending.status, reason);
       qc.invalidateQueries({ queryKey: ["asset-approvals", assetId] });
       qc.invalidateQueries({ queryKey: ["assets"] });
       qc.invalidateQueries({ queryKey: ["pending-approvals"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    setPending(null);
   };
 
   return (
@@ -433,6 +472,7 @@ function DisposalPanel({ assetId }: { assetId: string }) {
       </div>
       {canInitiate && <p className="text-xs text-muted-foreground">Requests are routed to users granted approval rights by the admin. You cannot approve your own request.</p>}
       {!canInitiate && <p className="text-xs text-muted-foreground">You don't have permission to initiate retirement or disposal. Ask an admin to grant you the right.</p>}
+      <DecideDialog open={!!pending} status={pending?.status ?? null} onCancel={() => setPending(null)} onConfirm={confirmDecide} />
     </div>
   );
 }
@@ -478,17 +518,18 @@ function MaintenancePanel({ assetId }: { assetId: string }) {
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
   };
 
-  const decide = async (r: any, decision: "approved" | "rejected") => {
-    const { decideApproval } = await import("@/lib/approvals");
-    const reason = decision === "rejected"
-      ? window.prompt("Reason for rejection:", "") ?? undefined
-      : window.prompt("Approval note (optional):", "") ?? undefined;
+  const [pending, setPending] = useState<{ r: any; status: "approved" | "rejected" } | null>(null);
+  const decide = (r: any, decision: "approved" | "rejected") => setPending({ r, status: decision });
+  const confirmDecide = async (reason: string) => {
+    if (!pending) return;
     try {
-      await decideApproval(r.id, decision, reason);
+      await decideApproval(pending.r.id, pending.status, reason);
       qc.invalidateQueries({ queryKey: ["asset-maintenance", assetId] });
       qc.invalidateQueries({ queryKey: ["assets"] });
       qc.invalidateQueries({ queryKey: ["pending-approvals"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    setPending(null);
   };
 
   return (
@@ -550,6 +591,7 @@ function MaintenancePanel({ assetId }: { assetId: string }) {
           })}
       </div>
       {!canRequest && <p className="text-xs text-muted-foreground">You don't have permission to raise maintenance requisitions. Ask an admin to grant the right.</p>}
+      <DecideDialog open={!!pending} status={pending?.status ?? null} onCancel={() => setPending(null)} onConfirm={confirmDecide} />
     </div>
   );
 }
