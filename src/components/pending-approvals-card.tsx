@@ -18,8 +18,8 @@ import { useAuth, ApprovalKind } from "@/hooks/use-auth";
 export function PendingApprovalsCard() {
   const { canApprove, user } = useAuth();
   const qc = useQueryClient();
-  const [rejectOpen, setRejectOpen] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
+  const [decideOpen, setDecideOpen] = useState<{ id: string; status: "approved" | "rejected" } | null>(null);
+  const [decideReason, setDecideReason] = useState("");
   const [detail, setDetail] = useState<any>(null);
 
   const { data: rows = [] } = useQuery({
@@ -59,7 +59,7 @@ export function PendingApprovalsCard() {
   return (
     <Card className="p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Pending approvals</h2>
+        <h2 className="text-sm font-semibold">Pending approvals &amp; requisitions</h2>
         <Badge variant="secondary">{rows.length}</Badge>
       </div>
       <div className="mt-4 divide-y">
@@ -92,10 +92,10 @@ export function PendingApprovalsCard() {
                   <DropdownMenuItem onClick={() => setDetail(r)}>
                     <Eye className="mr-2 h-4 w-4" /> Review details
                   </DropdownMenuItem>
-                  <DropdownMenuItem disabled={!allowed} onClick={() => allowed && handleDecide(r.id, "approved")}>
-                    <CheckCircle2 className="mr-2 h-4 w-4 text-success" /> Approve
+                  <DropdownMenuItem disabled={!allowed} onClick={() => { if (!allowed) return; setDecideReason(""); setDecideOpen({ id: r.id, status: "approved" }); }}>
+                    <CheckCircle2 className="mr-2 h-4 w-4 text-success" /> Approve…
                   </DropdownMenuItem>
-                  <DropdownMenuItem disabled={!allowed} onClick={() => { if (!allowed) return; setRejectReason(""); setRejectOpen(r.id); }}>
+                  <DropdownMenuItem disabled={!allowed} onClick={() => { if (!allowed) return; setDecideReason(""); setDecideOpen({ id: r.id, status: "rejected" }); }}>
                     <XCircle className="mr-2 h-4 w-4 text-destructive" /> Reject…
                   </DropdownMenuItem>
                   {!allowed && (
@@ -144,21 +144,32 @@ export function PendingApprovalsCard() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!rejectOpen} onOpenChange={(o) => !o && setRejectOpen(null)}>
+      <Dialog open={!!decideOpen} onOpenChange={(o) => !o && setDecideOpen(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Reason for rejection</DialogTitle></DialogHeader>
-          <Textarea rows={4} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)}
-            placeholder="Explain why this request is being rejected…" />
+          <DialogHeader>
+            <DialogTitle>
+              {decideOpen?.status === "approved" ? "Reason for approval" : "Reason for rejection"}
+            </DialogTitle>
+            <DialogDescription>
+              A short note is required so the requester understands the decision.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea rows={4} value={decideReason} onChange={(e) => setDecideReason(e.target.value)}
+            placeholder={decideOpen?.status === "approved"
+              ? "e.g. Approved — proceed with the transfer."
+              : "Explain why this request is being rejected…"} />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectOpen(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDecideOpen(null)}>Cancel</Button>
             <Button
-              variant="destructive"
-              disabled={!rejectReason.trim()}
+              variant={decideOpen?.status === "approved" ? "default" : "destructive"}
+              disabled={!decideReason.trim()}
               onClick={async () => {
-                if (rejectOpen) await handleDecide(rejectOpen, "rejected", rejectReason.trim());
-                setRejectOpen(null);
+                if (decideOpen) await handleDecide(decideOpen.id, decideOpen.status, decideReason.trim());
+                setDecideOpen(null);
               }}
-            >Reject request</Button>
+            >
+              {decideOpen?.status === "approved" ? "Approve request" : "Reject request"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

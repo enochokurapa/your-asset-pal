@@ -8,9 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { UserCircle } from "lucide-react";
+import { UserCircle, Bell } from "lucide-react";
+import { ALL_APPROVAL_KINDS, type ApprovalKind } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_app/profile")({
   component: ProfilePage,
@@ -114,6 +116,84 @@ function ProfilePage() {
           <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save changes"}</Button>
         </div>
       </Card>
+
+      <NotificationPrefsCard />
     </div>
+  );
+}
+
+function NotificationPrefsCard() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const { data: prefs = [] } = useQuery({
+    queryKey: ["notif-prefs", user?.id],
+    enabled: !!user,
+    queryFn: async () => (await supabase.from("user_notification_prefs" as any)
+      .select("approval_kind,in_app,email").eq("user_id", user!.id)).data ?? [],
+  });
+  const map = Object.fromEntries(prefs.map((p: any) => [p.approval_kind, p]));
+
+  const toggle = async (kind: ApprovalKind, channel: "in_app" | "email", value: boolean) => {
+    const existing = map[kind] ?? { approval_kind: kind, in_app: true, email: false };
+    const next = { ...existing, [channel]: value };
+    const { error } = await supabase.from("user_notification_prefs" as any).upsert({
+      user_id: user!.id,
+      approval_kind: kind,
+      in_app: next.in_app,
+      email: next.email,
+    }, { onConflict: "user_id,approval_kind" });
+    if (error) { toast.error(error.message); return; }
+    qc.invalidateQueries({ queryKey: ["notif-prefs", user?.id] });
+  };
+
+  return (
+    <Card className="p-6 space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <Bell className="h-5 w-5" />
+        </div>
+        <div>
+          <h2 className="font-semibold">Notification settings</h2>
+          <p className="text-xs text-muted-foreground">
+            Choose which approval events alert you in-app and via email.
+          </p>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+              <th className="py-2 pr-3">Approval kind</th>
+              <th className="py-2 pr-3 text-center">In-app</th>
+              <th className="py-2 text-center">Email</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ALL_APPROVAL_KINDS.map((k) => {
+              const p = map[k] ?? { in_app: true, email: false };
+              return (
+                <tr key={k} className="border-b last:border-0">
+                  <td className="py-3 pr-3 capitalize">{k.replace(/_/g, " ")}</td>
+                  <td className="py-3 pr-3 text-center">
+                    <div className="flex justify-center">
+                      <Switch checked={!!p.in_app} onCheckedChange={(v) => toggle(k, "in_app", v)} />
+                    </div>
+                  </td>
+                  <td className="py-3 text-center">
+                    <div className="flex justify-center">
+                      <Switch checked={!!p.email} onCheckedChange={(v) => toggle(k, "email", v)} />
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Email alerts require email infrastructure to be enabled for this workspace; the toggle is stored either way.
+      </p>
+    </Card>
   );
 }

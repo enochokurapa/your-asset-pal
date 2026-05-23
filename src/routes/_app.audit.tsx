@@ -20,6 +20,8 @@ function AuditPage() {
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [entityType, setEntityType] = useState("");
+  const [approvalKind, setApprovalKind] = useState("");
+  const [decisionStatus, setDecisionStatus] = useState("");
   const [showCleared, setShowCleared] = useState(false);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -44,6 +46,16 @@ function AuditPage() {
   if (!canWrite) return <Navigate to="/dashboard" />;
 
   const filtered = rows.filter((r: any) => {
+    if (approvalKind) {
+      if (r.entity_type !== "approval_requests") return false;
+      const k = r.details?.after?.kind ?? r.details?.before?.kind ?? r.details?.kind;
+      if (k !== approvalKind) return false;
+    }
+    if (decisionStatus) {
+      if (r.entity_type !== "approval_requests") return false;
+      const s = r.details?.after?.status ?? r.details?.status;
+      if (s !== decisionStatus) return false;
+    }
     if (!q) return true;
     const actor = profileMap[r.actor_user_id]?.email ?? "";
     return [r.entity_type, r.action, actor, r.entity_id].some((v) => v?.toLowerCase().includes(q.toLowerCase()));
@@ -135,6 +147,21 @@ function AuditPage() {
           </select>
           <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
           <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <select className="rounded-md border bg-background px-3 py-2 text-sm" value={approvalKind} onChange={(e) => setApprovalKind(e.target.value)}>
+            <option value="">All approval kinds</option>
+            <option value="movement">Movement</option>
+            <option value="retirement">Retirement</option>
+            <option value="disposal">Disposal</option>
+            <option value="reactivation">Reactivation</option>
+            <option value="set_for_disposal">Set for disposal</option>
+            <option value="maintenance">Maintenance</option>
+          </select>
+          <select className="rounded-md border bg-background px-3 py-2 text-sm" value={decisionStatus} onChange={(e) => setDecisionStatus(e.target.value)}>
+            <option value="">All decisions</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
         </div>
         <div className="mb-3 flex items-center gap-2 text-sm">
           <Checkbox id="cleared" checked={showCleared} onCheckedChange={(v) => setShowCleared(!!v)} />
