@@ -147,6 +147,21 @@ function AuditPage() {
           </select>
           <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
           <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <select className="rounded-md border bg-background px-3 py-2 text-sm" value={approvalKind} onChange={(e) => setApprovalKind(e.target.value)}>
+            <option value="">All approval kinds</option>
+            <option value="movement">Movement</option>
+            <option value="retirement">Retirement</option>
+            <option value="disposal">Disposal</option>
+            <option value="reactivation">Reactivation</option>
+            <option value="set_for_disposal">Set for disposal</option>
+            <option value="maintenance">Maintenance</option>
+          </select>
+          <select className="rounded-md border bg-background px-3 py-2 text-sm" value={decisionStatus} onChange={(e) => setDecisionStatus(e.target.value)}>
+            <option value="">All decisions</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
         </div>
         <div className="mb-3 flex items-center gap-2 text-sm">
           <Checkbox id="cleared" checked={showCleared} onCheckedChange={(v) => setShowCleared(!!v)} />
