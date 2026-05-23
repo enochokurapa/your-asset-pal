@@ -591,6 +591,7 @@ function MaintenancePanel({ assetId }: { assetId: string }) {
           })}
       </div>
       {!canRequest && <p className="text-xs text-muted-foreground">You don't have permission to raise maintenance requisitions. Ask an admin to grant the right.</p>}
+      <DecideDialog open={!!pending} status={pending?.status ?? null} onCancel={() => setPending(null)} onConfirm={confirmDecide} />
     </div>
   );
 }
