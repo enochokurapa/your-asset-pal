@@ -576,6 +576,19 @@ function AssetsPage() {
 
       <ScannerDialog open={scanOpen} onOpenChange={setScanOpen} onScan={handleScan} />
 
+      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{viewAsset?.name} <span className="ml-2 font-mono text-xs text-muted-foreground">{viewAsset?.asset_tag}</span></DialogTitle>
+            <DialogDescription>
+              Full history & audit trail{viewAsset?.status ? ` · Status: ${STATUS_LABEL[viewAsset.status as Status]}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {viewAsset && <AssetDetailTabs assetId={viewAsset.id} defaultTab={viewTab} />}
+        </DialogContent>
+      </Dialog>
+
+
       <Dialog open={dupOpen} onOpenChange={setDupOpen}>
         <DialogContent>
           <DialogHeader>
