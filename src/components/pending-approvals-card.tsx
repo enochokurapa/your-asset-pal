@@ -92,10 +92,10 @@ export function PendingApprovalsCard() {
                   <DropdownMenuItem onClick={() => setDetail(r)}>
                     <Eye className="mr-2 h-4 w-4" /> Review details
                   </DropdownMenuItem>
-                  <DropdownMenuItem disabled={!allowed} onClick={() => allowed && handleDecide(r.id, "approved")}>
-                    <CheckCircle2 className="mr-2 h-4 w-4 text-success" /> Approve
+                  <DropdownMenuItem disabled={!allowed} onClick={() => { if (!allowed) return; setDecideReason(""); setDecideOpen({ id: r.id, status: "approved" }); }}>
+                    <CheckCircle2 className="mr-2 h-4 w-4 text-success" /> Approve…
                   </DropdownMenuItem>
-                  <DropdownMenuItem disabled={!allowed} onClick={() => { if (!allowed) return; setRejectReason(""); setRejectOpen(r.id); }}>
+                  <DropdownMenuItem disabled={!allowed} onClick={() => { if (!allowed) return; setDecideReason(""); setDecideOpen({ id: r.id, status: "rejected" }); }}>
                     <XCircle className="mr-2 h-4 w-4 text-destructive" /> Reject…
                   </DropdownMenuItem>
                   {!allowed && (
