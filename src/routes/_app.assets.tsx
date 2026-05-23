@@ -91,6 +91,11 @@ function AssetsPage() {
   const [retireOpen, setRetireOpen] = useState(false);
   const [retireAsset, setRetireAsset] = useState<any>(null);
   const [retireReason, setRetireReason] = useState("");
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewAsset, setViewAsset] = useState<any>(null);
+  const [viewTab, setViewTab] = useState<string>("activity");
+  const openView = (a: any, tab: string = "activity") => { setViewAsset(a); setViewTab(tab); setViewOpen(true); };
+
 
   const { data: assets = [], isLoading } = useQuery({
     queryKey: ["assets"],
