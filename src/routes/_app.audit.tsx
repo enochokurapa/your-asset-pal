@@ -20,6 +20,8 @@ function AuditPage() {
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [entityType, setEntityType] = useState("");
+  const [approvalKind, setApprovalKind] = useState("");
+  const [decisionStatus, setDecisionStatus] = useState("");
   const [showCleared, setShowCleared] = useState(false);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
