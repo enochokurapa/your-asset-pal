@@ -564,7 +564,7 @@ function MaintenancePanel({ assetId }: { assetId: string }) {
             const status = r.status ?? "pending";
             const variant = status === "approved" ? "default" : status === "rejected" ? "destructive" : "secondary";
             const isPending = status === "pending";
-            const mayDecide = isPending && canApprove("maintenance") && r.requested_by !== user?.id;
+            const mayDecide = isPending && canApprove("maintenance") && (isAdmin || r.requested_by !== user?.id);
             const requester = profileMap[r.requested_by];
             const p = r.payload ?? {};
             return (
