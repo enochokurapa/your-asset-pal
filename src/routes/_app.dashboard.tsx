@@ -60,10 +60,12 @@ function Dashboard() {
 
   const stats = [
     { label: "Total Assets", value: data?.total ?? 0, icon: Package, tone: "text-primary bg-primary/10" },
+    { label: "Active Assets", value: data?.active ?? 0, icon: CheckCircle2, tone: "text-success bg-success/10" },
     { label: "Branches", value: data?.branchCount ?? 0, icon: Building2, tone: "text-primary bg-primary/10" },
     { label: "In Use", value: data?.inUse ?? 0, icon: CheckCircle2, tone: "text-success bg-success/10" },
     { label: "Under Repair", value: data?.repair ?? 0, icon: Wrench, tone: "text-warning bg-warning/15" },
     { label: "Retired", value: data?.retired ?? 0, icon: Archive, tone: "text-muted-foreground bg-muted" },
+    { label: "Disposed", value: data?.disposed ?? 0, icon: Trash2, tone: "text-muted-foreground bg-muted" },
     { label: "Missing", value: data?.missing ?? 0, icon: AlertTriangle, tone: "text-destructive bg-destructive/10" },
     { label: "For Disposal", value: data?.forDisposal ?? 0, icon: Trash2, tone: "text-warning bg-warning/15" },
   ];
