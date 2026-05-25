@@ -13,8 +13,20 @@ export function NotificationBell() {
 
   const handleClick = (n: any) => {
     markRead(n.id);
-    if (n.entity_type === "approval_requests") nav({ to: "/dashboard" });
-    else if (n.entity_type === "assets" && n.entity_id) nav({ to: "/assets", search: { focus: n.entity_id } as any });
+    if (n.entity_type === "approval_requests" && n.entity_id) {
+      // approval_requested → admin/manager should approve/reject
+      // approval_reminder → same
+      // approval_decided → requester just views
+      const action =
+        n.type === "approval_decided" ? "view" :
+        n.type === "approval_requested" || n.type === "approval_reminder" ? "approve" :
+        "view";
+      nav({ to: "/dashboard", search: { approval: n.entity_id, action } as any });
+    } else if (n.entity_type === "assets" && n.entity_id) {
+      nav({ to: "/assets", search: { focus: n.entity_id } as any });
+    } else {
+      nav({ to: "/dashboard" });
+    }
   };
 
   return (
