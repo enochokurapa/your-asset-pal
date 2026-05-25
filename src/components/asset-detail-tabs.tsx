@@ -472,7 +472,7 @@ function DisposalPanel({ assetId }: { assetId: string }) {
             );
           })}
       </div>
-      {canInitiate && <p className="text-xs text-muted-foreground">Requests are routed to users granted approval rights by the admin. You cannot approve your own request.</p>}
+      {canInitiate && <p className="text-xs text-muted-foreground">Requests are routed to users granted approval rights by the admin. Admins may approve their own requests.</p>}
       {!canInitiate && <p className="text-xs text-muted-foreground">You don't have permission to initiate retirement or disposal. Ask an admin to grant you the right.</p>}
       <DecideDialog open={!!pending} status={pending?.status ?? null} onCancel={() => setPending(null)} onConfirm={confirmDecide} />
     </div>
