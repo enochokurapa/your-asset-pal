@@ -407,6 +407,8 @@ function DisposalPanel({ assetId }: { assetId: string }) {
       qc.invalidateQueries({ queryKey: ["assets"] });
       qc.invalidateQueries({ queryKey: ["pending-approvals"] });
       qc.invalidateQueries({ queryKey: ["notifications"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      qc.invalidateQueries({ queryKey: ["asset-detail"] });
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
     setPending(null);
   };
