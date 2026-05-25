@@ -72,7 +72,7 @@ export function PendingApprovalsCard() {
       if (cancelled) return;
       const isPending = row.status === "pending";
       if (isPending && (action === "approve" || action === "reject")) {
-        const allowed = canApprove(row.kind) && row.requested_by !== user?.id;
+        const allowed = canApprove(row.kind) && (isAdmin || row.requested_by !== user?.id);
         if (allowed) {
           setDecideReason("");
           setDecideOpen({ id: row.id, status: action === "approve" ? "approved" : "rejected" });
