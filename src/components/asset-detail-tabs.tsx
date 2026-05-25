@@ -344,7 +344,7 @@ function AttachmentsPanel({ assetId }: { assetId: string }) {
 
 /* ---------- Disposal / Retirement ---------- */
 function DisposalPanel({ assetId }: { assetId: string }) {
-  const { canDo, canApprove, user } = useAuth();
+  const { canDo, canApprove, user, isAdmin } = useAuth();
   const qc = useQueryClient();
   const canRetire = canDo("initiate_retirement");
   const canDispose = canDo("initiate_disposal");
@@ -441,7 +441,7 @@ function DisposalPanel({ assetId }: { assetId: string }) {
             const variant = status === "approved" ? "default" : status === "rejected" ? "destructive" : "secondary";
             const isPending = status === "pending";
             const kindLabel = r.kind === "retirement" ? "Retirement" : "Disposal";
-            const mayDecide = isPending && canApprove(r.kind) && r.requested_by !== user?.id;
+            const mayDecide = isPending && canApprove(r.kind) && (isAdmin || r.requested_by !== user?.id);
             const requester = profileMap[r.requested_by];
             const p = r.payload ?? {};
             return (
@@ -472,7 +472,7 @@ function DisposalPanel({ assetId }: { assetId: string }) {
             );
           })}
       </div>
-      {canInitiate && <p className="text-xs text-muted-foreground">Requests are routed to users granted approval rights by the admin. You cannot approve your own request.</p>}
+      {canInitiate && <p className="text-xs text-muted-foreground">Requests are routed to users granted approval rights by the admin. Admins may approve their own requests.</p>}
       {!canInitiate && <p className="text-xs text-muted-foreground">You don't have permission to initiate retirement or disposal. Ask an admin to grant you the right.</p>}
       <DecideDialog open={!!pending} status={pending?.status ?? null} onCancel={() => setPending(null)} onConfirm={confirmDecide} />
     </div>
@@ -481,7 +481,7 @@ function DisposalPanel({ assetId }: { assetId: string }) {
 
 /* ---------- Maintenance ---------- */
 function MaintenancePanel({ assetId }: { assetId: string }) {
-  const { canDo, canApprove, user } = useAuth();
+  const { canDo, canApprove, user, isAdmin } = useAuth();
   const canRequest = canDo("initiate_maintenance");
   const qc = useQueryClient();
   const { data = [] } = useQuery({
@@ -564,7 +564,7 @@ function MaintenancePanel({ assetId }: { assetId: string }) {
             const status = r.status ?? "pending";
             const variant = status === "approved" ? "default" : status === "rejected" ? "destructive" : "secondary";
             const isPending = status === "pending";
-            const mayDecide = isPending && canApprove("maintenance") && r.requested_by !== user?.id;
+            const mayDecide = isPending && canApprove("maintenance") && (isAdmin || r.requested_by !== user?.id);
             const requester = profileMap[r.requested_by];
             const p = r.payload ?? {};
             return (

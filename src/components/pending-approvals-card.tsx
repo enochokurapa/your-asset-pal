@@ -17,7 +17,7 @@ import { decideApproval } from "@/lib/approvals";
 import { useAuth, ApprovalKind } from "@/hooks/use-auth";
 
 export function PendingApprovalsCard() {
-  const { canApprove, user } = useAuth();
+  const { canApprove, user, isAdmin } = useAuth();
   const qc = useQueryClient();
   const nav = useNavigate();
   const location = useLocation();
@@ -72,7 +72,7 @@ export function PendingApprovalsCard() {
       if (cancelled) return;
       const isPending = row.status === "pending";
       if (isPending && (action === "approve" || action === "reject")) {
-        const allowed = canApprove(row.kind) && row.requested_by !== user?.id;
+        const allowed = canApprove(row.kind) && (isAdmin || row.requested_by !== user?.id);
         if (allowed) {
           setDecideReason("");
           setDecideOpen({ id: row.id, status: action === "approve" ? "approved" : "rejected" });
@@ -115,7 +115,7 @@ export function PendingApprovalsCard() {
         {rows.map((r: any) => {
           const kind = r.kind as ApprovalKind;
           const isOwn = r.requested_by === user?.id;
-          const allowed = canApprove(kind) && !isOwn;
+          const allowed = canApprove(kind) && (isAdmin || !isOwn);
           return (
             <div key={r.id} className="flex items-center justify-between py-3">
               <div className="min-w-0">
@@ -146,7 +146,7 @@ export function PendingApprovalsCard() {
                   </DropdownMenuItem>
                   {!allowed && (
                     <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-                      {isOwn ? "You can't decide your own request" : "You don't have rights to approve this kind"}
+                      {isOwn ? "Only admins can decide their own request" : "You don't have rights to approve this kind"}
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
