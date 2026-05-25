@@ -344,7 +344,7 @@ function AttachmentsPanel({ assetId }: { assetId: string }) {
 
 /* ---------- Disposal / Retirement ---------- */
 function DisposalPanel({ assetId }: { assetId: string }) {
-  const { canDo, canApprove, user } = useAuth();
+  const { canDo, canApprove, user, isAdmin } = useAuth();
   const qc = useQueryClient();
   const canRetire = canDo("initiate_retirement");
   const canDispose = canDo("initiate_disposal");
