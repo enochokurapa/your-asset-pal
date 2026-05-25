@@ -484,10 +484,15 @@ function MaintenancePanel({ assetId }: { assetId: string }) {
   const { canDo, canApprove, user, isAdmin } = useAuth();
   const canRequest = canDo("initiate_maintenance");
   const qc = useQueryClient();
+  const { data: asset } = useQuery({
+    queryKey: ["asset-status", assetId],
+    queryFn: async () => (await supabase.from("assets").select("status,previous_status").eq("id", assetId).single()).data,
+  });
+  const isUnderRepair = asset?.status === "under_repair";
   const { data = [] } = useQuery({
     queryKey: ["asset-maintenance", assetId],
     queryFn: async () => (await supabase.from("approval_requests")
-      .select("*").eq("asset_id", assetId).eq("kind", "maintenance")
+      .select("*").eq("asset_id", assetId).in("kind", ["maintenance", "reactivation"])
       .order("created_at", { ascending: false })).data ?? [],
   });
   const { data: profiles = [] } = useQuery({
