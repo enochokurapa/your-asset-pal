@@ -481,7 +481,7 @@ function DisposalPanel({ assetId }: { assetId: string }) {
 
 /* ---------- Maintenance ---------- */
 function MaintenancePanel({ assetId }: { assetId: string }) {
-  const { canDo, canApprove, user } = useAuth();
+  const { canDo, canApprove, user, isAdmin } = useAuth();
   const canRequest = canDo("initiate_maintenance");
   const qc = useQueryClient();
   const { data = [] } = useQuery({
