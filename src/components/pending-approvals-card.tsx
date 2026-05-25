@@ -146,7 +146,7 @@ export function PendingApprovalsCard() {
                   </DropdownMenuItem>
                   {!allowed && (
                     <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-                      {isOwn ? "You can't decide your own request" : "You don't have rights to approve this kind"}
+                      {isOwn ? "Only admins can decide their own request" : "You don't have rights to approve this kind"}
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
