@@ -42,7 +42,7 @@ function Dashboard() {
       }));
       return {
         total: list.length,
-        active: list.filter((a: any) => a.status !== "disposed" && a.status !== "retired").length,
+        active: list.filter((a: any) => a.status !== "disposed" && a.status !== "retired" && a.status !== "under_repair" && a.status !== "missing").length,
         inUse: list.filter((a) => a.status === "in_use").length,
         repair: list.filter((a) => a.status === "under_repair").length,
         retired: list.filter((a) => a.status === "retired").length,
