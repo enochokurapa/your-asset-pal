@@ -115,7 +115,7 @@ export function PendingApprovalsCard() {
         {rows.map((r: any) => {
           const kind = r.kind as ApprovalKind;
           const isOwn = r.requested_by === user?.id;
-          const allowed = canApprove(kind) && !isOwn;
+          const allowed = canApprove(kind) && (isAdmin || !isOwn);
           return (
             <div key={r.id} className="flex items-center justify-between py-3">
               <div className="min-w-0">
