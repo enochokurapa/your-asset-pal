@@ -525,6 +525,18 @@ function MaintenancePanel({ assetId }: { assetId: string }) {
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
   };
 
+  const requestReturn = async () => {
+    try {
+      await submitApproval({
+        kind: "reactivation",
+        assetId,
+        reason: "Return from repair",
+      });
+      qc.invalidateQueries({ queryKey: ["asset-maintenance", assetId] });
+      qc.invalidateQueries({ queryKey: ["pending-approvals"] });
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+  };
+
   const [pending, setPending] = useState<{ r: any; status: "approved" | "rejected" } | null>(null);
   const decide = (r: any, decision: "approved" | "rejected") => setPending({ r, status: decision });
   const confirmDecide = async (reason: string) => {
