@@ -54,25 +54,39 @@ export function PendingApprovalsCard() {
   const approvalId: string | undefined = search?.approval;
   const action: string | undefined = search?.action;
   useEffect(() => {
-    if (!approvalId || !rows.length) return;
-    const row = rows.find((r: any) => r.id === approvalId);
-    if (!row) return;
-    cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    if (action === "approve" || action === "reject") {
-      const allowed = canApprove(row.kind) && row.requested_by !== user?.id;
-      if (allowed) {
-        setDecideReason("");
-        setDecideOpen({ id: row.id, status: action === "approve" ? "approved" : "rejected" });
+    if (!approvalId) return;
+    let cancelled = false;
+    (async () => {
+      cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      let row: any = rows.find((r: any) => r.id === approvalId);
+      if (!row) {
+        // Possibly already decided — fetch directly
+        const { data } = await supabase.from("approval_requests").select("*").eq("id", approvalId).maybeSingle();
+        if (!data) { nav({ to: "/dashboard", search: {} as any, replace: true }); return; }
+        const [{ data: prof }, { data: asset }] = await Promise.all([
+          data.requested_by ? supabase.from("profiles").select("id,full_name,email").eq("id", data.requested_by).maybeSingle() : Promise.resolve({ data: null }),
+          data.asset_id ? supabase.from("assets").select("id,name,asset_tag").eq("id", data.asset_id).maybeSingle() : Promise.resolve({ data: null }),
+        ]);
+        row = { ...data, requester: prof, asset };
+      }
+      if (cancelled) return;
+      const isPending = row.status === "pending";
+      if (isPending && (action === "approve" || action === "reject")) {
+        const allowed = canApprove(row.kind) && row.requested_by !== user?.id;
+        if (allowed) {
+          setDecideReason("");
+          setDecideOpen({ id: row.id, status: action === "approve" ? "approved" : "rejected" });
+        } else {
+          setDetail(row);
+        }
       } else {
         setDetail(row);
       }
-    } else {
-      setDetail(row);
-    }
-    // clear the params so it doesn't re-fire
-    nav({ to: "/dashboard", search: {} as any, replace: true });
+      nav({ to: "/dashboard", search: {} as any, replace: true });
+    })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [approvalId, action, rows.length]);
+  }, [approvalId, action]);
 
 
   const handleDecide = async (id: string, status: "approved" | "rejected", reason?: string) => {
