@@ -441,7 +441,7 @@ function DisposalPanel({ assetId }: { assetId: string }) {
             const variant = status === "approved" ? "default" : status === "rejected" ? "destructive" : "secondary";
             const isPending = status === "pending";
             const kindLabel = r.kind === "retirement" ? "Retirement" : "Disposal";
-            const mayDecide = isPending && canApprove(r.kind) && r.requested_by !== user?.id;
+            const mayDecide = isPending && canApprove(r.kind) && (isAdmin || r.requested_by !== user?.id);
             const requester = profileMap[r.requested_by];
             const p = r.payload ?? {};
             return (
