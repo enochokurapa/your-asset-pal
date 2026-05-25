@@ -19,6 +19,9 @@ import { useAuth, ApprovalKind } from "@/hooks/use-auth";
 export function PendingApprovalsCard() {
   const { canApprove, user } = useAuth();
   const qc = useQueryClient();
+  const nav = useNavigate();
+  const location = useLocation();
+  const cardRef = useRef<HTMLDivElement | null>(null);
   const [decideOpen, setDecideOpen] = useState<{ id: string; status: "approved" | "rejected" } | null>(null);
   const [decideReason, setDecideReason] = useState("");
   const [detail, setDetail] = useState<any>(null);
@@ -28,21 +31,49 @@ export function PendingApprovalsCard() {
     queryFn: async () => {
       const { data } = await supabase
         .from("approval_requests")
-        .select("*, asset:assets(name, asset_tag)")
+        .select("*")
         .eq("status", "pending")
         .order("created_at", { ascending: false })
         .limit(50);
       const list = data ?? [];
-      const ids = Array.from(new Set(list.map((r: any) => r.requested_by).filter(Boolean)));
-      let profMap: Record<string, any> = {};
-      if (ids.length) {
-        const { data: profs } = await supabase.from("profiles").select("id,full_name,email").in("id", ids);
-        profMap = Object.fromEntries((profs ?? []).map((p: any) => [p.id, p]));
-      }
-      return list.map((r: any) => ({ ...r, requester: profMap[r.requested_by] ?? null }));
+      const userIds = Array.from(new Set(list.map((r: any) => r.requested_by).filter(Boolean)));
+      const assetIds = Array.from(new Set(list.map((r: any) => r.asset_id).filter(Boolean)));
+      const [profsRes, assetsRes] = await Promise.all([
+        userIds.length ? supabase.from("profiles").select("id,full_name,email").in("id", userIds) : Promise.resolve({ data: [] as any[] }),
+        assetIds.length ? supabase.from("assets").select("id,name,asset_tag").in("id", assetIds) : Promise.resolve({ data: [] as any[] }),
+      ]);
+      const profMap = Object.fromEntries(((profsRes as any).data ?? []).map((p: any) => [p.id, p]));
+      const assetMap = Object.fromEntries(((assetsRes as any).data ?? []).map((a: any) => [a.id, a]));
+      return list.map((r: any) => ({ ...r, requester: profMap[r.requested_by] ?? null, asset: assetMap[r.asset_id] ?? null }));
     },
     refetchInterval: 10000,
   });
+
+  // Deep link: /dashboard?approval=<id>&action=approve|reject|view
+  const search = location.search as any;
+  const approvalId: string | undefined = search?.approval;
+  const action: string | undefined = search?.action;
+  useEffect(() => {
+    if (!approvalId || !rows.length) return;
+    const row = rows.find((r: any) => r.id === approvalId);
+    if (!row) return;
+    cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (action === "approve" || action === "reject") {
+      const allowed = canApprove(row.kind) && row.requested_by !== user?.id;
+      if (allowed) {
+        setDecideReason("");
+        setDecideOpen({ id: row.id, status: action === "approve" ? "approved" : "rejected" });
+      } else {
+        setDetail(row);
+      }
+    } else {
+      setDetail(row);
+    }
+    // clear the params so it doesn't re-fire
+    nav({ to: "/dashboard", search: {} as any, replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [approvalId, action, rows.length]);
+
 
   const handleDecide = async (id: string, status: "approved" | "rejected", reason?: string) => {
     try {
