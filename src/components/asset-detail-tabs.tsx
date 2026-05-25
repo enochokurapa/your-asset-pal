@@ -549,13 +549,23 @@ function MaintenancePanel({ assetId }: { assetId: string }) {
       qc.invalidateQueries({ queryKey: ["notifications"] });
       qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
       qc.invalidateQueries({ queryKey: ["asset-detail"] });
+      qc.invalidateQueries({ queryKey: ["asset-status", assetId] });
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
     setPending(null);
   };
 
   return (
     <div className="space-y-3">
-      {canRequest && (
+      {isUnderRepair && canRequest && (
+        <div className="flex items-center justify-between rounded-lg border border-warning/40 bg-warning/5 p-3">
+          <div className="text-sm">
+            <p className="font-medium">This asset is currently under repair.</p>
+            <p className="text-xs text-muted-foreground">Once repair is complete, request a return to put it back in service.</p>
+          </div>
+          <Button size="sm" variant="outline" onClick={requestReturn}><Send className="mr-1 h-4 w-4" />Request return from repair</Button>
+        </div>
+      )}
+      {canRequest && !isUnderRepair && (
         <div className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">
           <div className="space-y-1 sm:col-span-2"><Label>Issue *</Label><Input value={form.issue} onChange={(e) => setForm({ ...form, issue: e.target.value })} placeholder="Screen flickering / not powering on" /></div>
           <div className="space-y-1"><Label>Priority</Label>
