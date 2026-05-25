@@ -17,7 +17,7 @@ import { decideApproval } from "@/lib/approvals";
 import { useAuth, ApprovalKind } from "@/hooks/use-auth";
 
 export function PendingApprovalsCard() {
-  const { canApprove, user } = useAuth();
+  const { canApprove, user, isAdmin } = useAuth();
   const qc = useQueryClient();
   const nav = useNavigate();
   const location = useLocation();
