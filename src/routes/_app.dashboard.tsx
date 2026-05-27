@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -5,6 +6,7 @@ import { Package, CheckCircle2, Wrench, Archive, Tags, MapPin, Building2, AlertT
 import { Card } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { PendingApprovalsCard } from "@/components/pending-approvals-card";
+import { TileAssetsDialog, type TileFilter } from "@/components/tile-assets-dialog";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: Dashboard,
