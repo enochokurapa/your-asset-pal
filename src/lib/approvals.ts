@@ -72,6 +72,11 @@ export async function decideApproval(id: string, status: "approved" | "rejected"
     }
   }
 
+  // On rejection of a disposal/set-for-disposal request, clear the pending flag.
+  if (status === "rejected" && req.asset_id && (req.kind === "disposal" || req.kind === "set_for_disposal")) {
+    await supabase.from("assets").update({ set_for_disposal: false }).eq("id", req.asset_id);
+  }
+
   const { error } = await supabase.from("approval_requests").update({
     status, reason: reason ?? null, approver_id: u.user.id, decided_at: new Date().toISOString(),
   }).eq("id", id);
