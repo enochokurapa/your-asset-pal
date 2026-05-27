@@ -19,6 +19,10 @@ export async function submitApproval(params: {
     reason: params.reason ?? null,
   }).select().single();
   if (error) throw error;
+  // Reflect pending disposal on the asset so dashboard tiles update immediately.
+  if (params.assetId && (params.kind === "disposal" || params.kind === "set_for_disposal")) {
+    await supabase.from("assets").update({ set_for_disposal: true }).eq("id", params.assetId);
+  }
   toast.success("Submitted for approval");
   return data;
 }
