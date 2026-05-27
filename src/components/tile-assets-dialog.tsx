@@ -168,7 +168,7 @@ export function TileAssetsDialog({
               </div>
             )}
 
-            <AssetDetailTabs asset={selected} defaultTab="activity" />
+            <AssetDetailTabs assetId={selected.id} defaultTab="activity" />
           </>
         )}
       </DialogContent>
