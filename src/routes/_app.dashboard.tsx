@@ -85,7 +85,11 @@ function Dashboard() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {stats.map((s) => (
-          <Card key={s.label} className="p-5">
+          <Card
+            key={s.label}
+            onClick={() => setTile({ title: s.label, filter: s.filter })}
+            className="cursor-pointer p-5 transition hover:shadow-md hover:border-primary/40"
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">{s.label}</p>
@@ -98,6 +102,13 @@ function Dashboard() {
           </Card>
         ))}
       </div>
+
+      <TileAssetsDialog
+        open={!!tile}
+        onOpenChange={(v) => { if (!v) setTile(null); }}
+        title={tile?.title ?? ""}
+        filter={tile?.filter ?? { kind: "all" }}
+      />
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="p-5">
