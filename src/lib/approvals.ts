@@ -19,6 +19,10 @@ export async function submitApproval(params: {
     reason: params.reason ?? null,
   }).select().single();
   if (error) throw error;
+  // Reflect pending disposal on the asset so dashboard tiles update immediately.
+  if (params.assetId && (params.kind === "disposal" || params.kind === "set_for_disposal")) {
+    await supabase.from("assets").update({ set_for_disposal: true }).eq("id", params.assetId);
+  }
   toast.success("Submitted for approval");
   return data;
 }
@@ -66,6 +70,11 @@ export async function decideApproval(id: string, status: "approved" | "rejected"
       if (p.to_location_id) await supabase.from("assets").update({ location_id: p.to_location_id }).eq("id", req.asset_id);
       if (p.to_branch_id)   await supabase.from("assets").update({ branch_id: p.to_branch_id }).eq("id", req.asset_id);
     }
+  }
+
+  // On rejection of a disposal/set-for-disposal request, clear the pending flag.
+  if (status === "rejected" && req.asset_id && (req.kind === "disposal" || req.kind === "set_for_disposal")) {
+    await supabase.from("assets").update({ set_for_disposal: false }).eq("id", req.asset_id);
   }
 
   const { error } = await supabase.from("approval_requests").update({
