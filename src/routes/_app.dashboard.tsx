@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -5,6 +6,7 @@ import { Package, CheckCircle2, Wrench, Archive, Tags, MapPin, Building2, AlertT
 import { Card } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { PendingApprovalsCard } from "@/components/pending-approvals-card";
+import { TileAssetsDialog, type TileFilter } from "@/components/tile-assets-dialog";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: Dashboard,
@@ -58,17 +60,19 @@ function Dashboard() {
     },
   });
 
-  const stats = [
-    { label: "Total Assets", value: data?.total ?? 0, icon: Package, tone: "text-primary bg-primary/10" },
-    { label: "Active Assets", value: data?.active ?? 0, icon: CheckCircle2, tone: "text-success bg-success/10" },
-    { label: "Branches", value: data?.branchCount ?? 0, icon: Building2, tone: "text-primary bg-primary/10" },
-    { label: "In Use", value: data?.inUse ?? 0, icon: CheckCircle2, tone: "text-success bg-success/10" },
-    { label: "Under Repair", value: data?.repair ?? 0, icon: Wrench, tone: "text-warning bg-warning/15" },
-    { label: "Retired", value: data?.retired ?? 0, icon: Archive, tone: "text-muted-foreground bg-muted" },
-    { label: "Disposed", value: data?.disposed ?? 0, icon: Trash2, tone: "text-muted-foreground bg-muted" },
-    { label: "Missing", value: data?.missing ?? 0, icon: AlertTriangle, tone: "text-destructive bg-destructive/10" },
-    { label: "For Disposal", value: data?.forDisposal ?? 0, icon: Trash2, tone: "text-warning bg-warning/15" },
+  const stats: { label: string; value: number; icon: any; tone: string; filter: TileFilter }[] = [
+    { label: "Total Assets", value: data?.total ?? 0, icon: Package, tone: "text-primary bg-primary/10", filter: { kind: "all" } },
+    { label: "Active Assets", value: data?.active ?? 0, icon: CheckCircle2, tone: "text-success bg-success/10", filter: { kind: "active" } },
+    { label: "Branches", value: data?.branchCount ?? 0, icon: Building2, tone: "text-primary bg-primary/10", filter: { kind: "all" } },
+    { label: "In Use", value: data?.inUse ?? 0, icon: CheckCircle2, tone: "text-success bg-success/10", filter: { kind: "status", status: "in_use" } },
+    { label: "Under Repair", value: data?.repair ?? 0, icon: Wrench, tone: "text-warning bg-warning/15", filter: { kind: "status", status: "under_repair" } },
+    { label: "Retired", value: data?.retired ?? 0, icon: Archive, tone: "text-muted-foreground bg-muted", filter: { kind: "status", status: "retired" } },
+    { label: "Disposed", value: data?.disposed ?? 0, icon: Trash2, tone: "text-muted-foreground bg-muted", filter: { kind: "status", status: "disposed" } },
+    { label: "Missing", value: data?.missing ?? 0, icon: AlertTriangle, tone: "text-destructive bg-destructive/10", filter: { kind: "status", status: "missing" } },
+    { label: "For Disposal", value: data?.forDisposal ?? 0, icon: Trash2, tone: "text-warning bg-warning/15", filter: { kind: "for_disposal" } },
   ];
+
+  const [tile, setTile] = useState<{ title: string; filter: TileFilter } | null>(null);
 
   const pieData = (data?.statusCounts ?? []).filter((s) => s.value > 0);
 
@@ -81,7 +85,11 @@ function Dashboard() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {stats.map((s) => (
-          <Card key={s.label} className="p-5">
+          <Card
+            key={s.label}
+            onClick={() => setTile({ title: s.label, filter: s.filter })}
+            className="cursor-pointer p-5 transition hover:shadow-md hover:border-primary/40"
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">{s.label}</p>
@@ -94,6 +102,13 @@ function Dashboard() {
           </Card>
         ))}
       </div>
+
+      <TileAssetsDialog
+        open={!!tile}
+        onOpenChange={(v) => { if (!v) setTile(null); }}
+        title={tile?.title ?? ""}
+        filter={tile?.filter ?? { kind: "all" }}
+      />
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="p-5">
