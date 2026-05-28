@@ -786,6 +786,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin_or_manager: { Args: { _user_id: string }; Returns: boolean }
+      mark_for_disposal: {
+        Args: { _asset_id: string; _on: boolean }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "manager" | "staff"
