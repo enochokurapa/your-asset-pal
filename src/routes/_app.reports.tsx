@@ -110,6 +110,7 @@ function applyText(val: any, q?: string) {
 }
 
 function ReportsPage() {
+  const { canView, loading } = useAuth();
   const [tab, setTab] = useState("register");
 
   const { data: assets = [] } = useQuery({
