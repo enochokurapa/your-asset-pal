@@ -465,6 +465,9 @@ function ReportsPage() {
     };
   });
 
+  if (loading) return null;
+  if (!canView("reports")) return <Navigate to="/dashboard" />;
+
   return (
     <div className="space-y-6">
       <div>
