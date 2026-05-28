@@ -16,7 +16,7 @@ export const Route = createFileRoute("/_app/audit")({
 });
 
 function AuditPage() {
-  const { canWrite, isAdmin } = useAuth();
+  const { canView, isAdmin } = useAuth();
   const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [entityType, setEntityType] = useState("");
