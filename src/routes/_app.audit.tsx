@@ -43,7 +43,7 @@ function AuditPage() {
   });
   const profileMap = Object.fromEntries(profiles.map((p: any) => [p.id, p]));
 
-  if (!canWrite) return <Navigate to="/dashboard" />;
+  if (!canView("audit")) return <Navigate to="/dashboard" />;
 
   const filtered = rows.filter((r: any) => {
     if (approvalKind) {
