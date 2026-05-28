@@ -20,8 +20,10 @@ export async function submitApproval(params: {
   }).select().single();
   if (error) throw error;
   // Reflect pending disposal on the asset so dashboard tiles update immediately.
+  // Uses a SECURITY DEFINER helper so staff without direct UPDATE rights on
+  // `assets` can still flip this flag when submitting their own request.
   if (params.assetId && (params.kind === "disposal" || params.kind === "set_for_disposal")) {
-    await supabase.from("assets").update({ set_for_disposal: true }).eq("id", params.assetId);
+    await supabase.rpc("mark_for_disposal" as any, { _asset_id: params.assetId, _on: true });
   }
   toast.success("Submitted for approval");
   return data;
@@ -74,7 +76,7 @@ export async function decideApproval(id: string, status: "approved" | "rejected"
 
   // On rejection of a disposal/set-for-disposal request, clear the pending flag.
   if (status === "rejected" && req.asset_id && (req.kind === "disposal" || req.kind === "set_for_disposal")) {
-    await supabase.from("assets").update({ set_for_disposal: false }).eq("id", req.asset_id);
+    await supabase.rpc("mark_for_disposal" as any, { _asset_id: req.asset_id, _on: false });
   }
 
   const { error } = await supabase.from("approval_requests").update({

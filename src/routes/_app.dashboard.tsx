@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, CheckCircle2, Wrench, Archive, Tags, MapPin, Building2, AlertTriangle, Trash2 } from "lucide-react";
+import { Package, CheckCircle2, Wrench, Archive, Tags, MapPin, Building2, AlertTriangle, Trash2, Boxes } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { PendingApprovalsCard } from "@/components/pending-approvals-card";
@@ -64,6 +64,7 @@ function Dashboard() {
     { label: "Total Assets", value: data?.total ?? 0, icon: Package, tone: "text-primary bg-primary/10", filter: { kind: "all" } },
     { label: "Active Assets", value: data?.active ?? 0, icon: CheckCircle2, tone: "text-success bg-success/10", filter: { kind: "active" } },
     { label: "Branches", value: data?.branchCount ?? 0, icon: Building2, tone: "text-primary bg-primary/10", filter: { kind: "all" } },
+    { label: "In Storage", value: data?.statusCounts.find((s) => s.key === "in_storage")?.value ?? 0, icon: Boxes, tone: "text-primary bg-primary/10", filter: { kind: "status", status: "in_storage" } },
     { label: "In Use", value: data?.inUse ?? 0, icon: CheckCircle2, tone: "text-success bg-success/10", filter: { kind: "status", status: "in_use" } },
     { label: "Under Repair", value: data?.repair ?? 0, icon: Wrench, tone: "text-warning bg-warning/15", filter: { kind: "status", status: "under_repair" } },
     { label: "Retired", value: data?.retired ?? 0, icon: Archive, tone: "text-muted-foreground bg-muted", filter: { kind: "status", status: "retired" } },

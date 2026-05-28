@@ -394,7 +394,7 @@ function DisposalPanel({ assetId }: { assetId: string }) {
       qc.invalidateQueries({ queryKey: ["asset-approvals", assetId] });
       qc.invalidateQueries({ queryKey: ["pending-approvals"] });
       qc.invalidateQueries({ queryKey: ["notifications"] });
-      qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-stats"] }); qc.invalidateQueries({ queryKey: ["tile-assets"] });
       qc.invalidateQueries({ queryKey: ["assets"] });
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
   };
@@ -409,7 +409,7 @@ function DisposalPanel({ assetId }: { assetId: string }) {
       qc.invalidateQueries({ queryKey: ["assets"] });
       qc.invalidateQueries({ queryKey: ["pending-approvals"] });
       qc.invalidateQueries({ queryKey: ["notifications"] });
-      qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-stats"] }); qc.invalidateQueries({ queryKey: ["tile-assets"] });
       qc.invalidateQueries({ queryKey: ["asset-detail"] });
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
     setPending(null);
@@ -549,7 +549,7 @@ function MaintenancePanel({ assetId }: { assetId: string }) {
       qc.invalidateQueries({ queryKey: ["assets"] });
       qc.invalidateQueries({ queryKey: ["pending-approvals"] });
       qc.invalidateQueries({ queryKey: ["notifications"] });
-      qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-stats"] }); qc.invalidateQueries({ queryKey: ["tile-assets"] });
       qc.invalidateQueries({ queryKey: ["asset-detail"] });
       qc.invalidateQueries({ queryKey: ["asset-status", assetId] });
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }

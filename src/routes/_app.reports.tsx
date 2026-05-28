@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -109,6 +110,7 @@ function applyText(val: any, q?: string) {
 }
 
 function ReportsPage() {
+  const { canView, loading } = useAuth();
   const [tab, setTab] = useState("register");
 
   const { data: assets = [] } = useQuery({
@@ -462,6 +464,9 @@ function ReportsPage() {
       missing: list.filter((a: any) => a.status === "missing").length,
     };
   });
+
+  if (loading) return null;
+  if (!canView("reports")) return <Navigate to="/dashboard" />;
 
   return (
     <div className="space-y-6">
