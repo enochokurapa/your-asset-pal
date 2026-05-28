@@ -270,7 +270,7 @@ function AssetsPage() {
     setOpen(false);
     qc.invalidateQueries({ queryKey: ["assets"] });
     qc.invalidateQueries({ queryKey: ["asset-assignments-current"] });
-    qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+    qc.invalidateQueries({ queryKey: ["dashboard-stats"] }); qc.invalidateQueries({ queryKey: ["tile-assets"] });
   };
 
   const [reqKind, setReqKind] = useState<"retirement" | "disposal" | null>(null);
@@ -291,7 +291,7 @@ function AssetsPage() {
     if (error) { toast.error(error.message); return; }
     toast.success("Asset deleted");
     qc.invalidateQueries({ queryKey: ["assets"] });
-    qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+    qc.invalidateQueries({ queryKey: ["dashboard-stats"] }); qc.invalidateQueries({ queryKey: ["tile-assets"] });
   };
 
   const [importing, setImporting] = useState(false);

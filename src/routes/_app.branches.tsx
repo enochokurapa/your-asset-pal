@@ -77,7 +77,7 @@ function BranchesPage() {
     toast.success(form.id ? "Branch updated" : "Branch added");
     setOpen(false);
     qc.invalidateQueries({ queryKey: ["branches"] });
-    qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+    qc.invalidateQueries({ queryKey: ["dashboard-stats"] }); qc.invalidateQueries({ queryKey: ["tile-assets"] });
   };
 
   const toggleActive = async (b: any) => {

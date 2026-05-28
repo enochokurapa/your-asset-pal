@@ -93,7 +93,7 @@ export function PendingApprovalsCard() {
     try {
       await decideApproval(id, status, reason);
       qc.invalidateQueries({ queryKey: ["pending-approvals"] });
-      qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-stats"] }); qc.invalidateQueries({ queryKey: ["tile-assets"] });
       qc.invalidateQueries({ queryKey: ["assets"] });
       qc.invalidateQueries({ queryKey: ["asset-detail"] });
     } catch (e: any) {
