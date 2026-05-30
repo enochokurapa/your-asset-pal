@@ -25,14 +25,16 @@ function Dashboard() {
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: async () => {
-      const [assets, cats, locs, branches] = await Promise.all([
+      const [assets, cats, locs, branches, pending] = await Promise.all([
         supabase.from("assets").select("id,status,name,asset_tag,branch_id,set_for_disposal,created_at").order("created_at", { ascending: false }),
         supabase.from("categories").select("id", { count: "exact", head: true }),
         supabase.from("locations").select("id", { count: "exact", head: true }),
         supabase.from("branches").select("id,name,code,is_active"),
+        supabase.from("approval_requests").select("id,kind,asset_id,status").eq("status", "pending"),
       ]);
       const list = assets.data ?? [];
       const branchList = branches.data ?? [];
+      const pendList = pending.data ?? [];
       const perBranch = branchList.map((b: any) => ({
         ...b,
         assetCount: list.filter((a: any) => a.branch_id === b.id).length,
@@ -51,6 +53,7 @@ function Dashboard() {
         disposed: list.filter((a: any) => a.status === "disposed").length,
         missing: list.filter((a) => a.status === "missing").length,
         forDisposal: list.filter((a: any) => a.set_for_disposal).length,
+        forRetirement: pendList.filter((p: any) => p.kind === "retirement").length,
         catCount: cats.count ?? 0,
         locCount: locs.count ?? 0,
         branchCount: branchList.length,
@@ -60,17 +63,18 @@ function Dashboard() {
     },
   });
 
-  const stats: { label: string; value: number; icon: any; tone: string; filter: TileFilter }[] = [
+  const stats: { label: string; value: number; icon: any; tone: string; color?: string; filter: TileFilter }[] = [
     { label: "Total Assets", value: data?.total ?? 0, icon: Package, tone: "text-primary bg-primary/10", filter: { kind: "all" } },
     { label: "Active Assets", value: data?.active ?? 0, icon: CheckCircle2, tone: "text-success bg-success/10", filter: { kind: "active" } },
     { label: "Branches", value: data?.branchCount ?? 0, icon: Building2, tone: "text-primary bg-primary/10", filter: { kind: "all" } },
-    { label: "In Storage", value: data?.statusCounts.find((s) => s.key === "in_storage")?.value ?? 0, icon: Boxes, tone: "text-primary bg-primary/10", filter: { kind: "status", status: "in_storage" } },
-    { label: "In Use", value: data?.inUse ?? 0, icon: CheckCircle2, tone: "text-success bg-success/10", filter: { kind: "status", status: "in_use" } },
-    { label: "Under Repair", value: data?.repair ?? 0, icon: Wrench, tone: "text-warning bg-warning/15", filter: { kind: "status", status: "under_repair" } },
-    { label: "Retired", value: data?.retired ?? 0, icon: Archive, tone: "text-muted-foreground bg-muted", filter: { kind: "status", status: "retired" } },
-    { label: "Disposed", value: data?.disposed ?? 0, icon: Trash2, tone: "text-muted-foreground bg-muted", filter: { kind: "status", status: "disposed" } },
-    { label: "Missing", value: data?.missing ?? 0, icon: AlertTriangle, tone: "text-destructive bg-destructive/10", filter: { kind: "status", status: "missing" } },
+    { label: "In Storage", value: data?.statusCounts.find((s) => s.key === "in_storage")?.value ?? 0, icon: Boxes, tone: "", color: STATUS_COLORS.in_storage, filter: { kind: "status", status: "in_storage" } },
+    { label: "In Use", value: data?.inUse ?? 0, icon: CheckCircle2, tone: "", color: STATUS_COLORS.in_use, filter: { kind: "status", status: "in_use" } },
+    { label: "Under Repair", value: data?.repair ?? 0, icon: Wrench, tone: "", color: STATUS_COLORS.under_repair, filter: { kind: "status", status: "under_repair" } },
+    { label: "Retired", value: data?.retired ?? 0, icon: Archive, tone: "", color: STATUS_COLORS.retired, filter: { kind: "status", status: "retired" } },
+    { label: "Disposed", value: data?.disposed ?? 0, icon: Trash2, tone: "", color: STATUS_COLORS.disposed, filter: { kind: "status", status: "disposed" } },
+    { label: "Missing", value: data?.missing ?? 0, icon: AlertTriangle, tone: "", color: STATUS_COLORS.missing, filter: { kind: "status", status: "missing" } },
     { label: "For Disposal", value: data?.forDisposal ?? 0, icon: Trash2, tone: "text-warning bg-warning/15", filter: { kind: "for_disposal" } },
+    { label: "For Retirement", value: data?.forRetirement ?? 0, icon: Archive, tone: "text-warning bg-warning/15", filter: { kind: "pending_retirement" } },
   ];
 
   const [tile, setTile] = useState<{ title: string; filter: TileFilter } | null>(null);
