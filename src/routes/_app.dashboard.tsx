@@ -100,7 +100,10 @@ function Dashboard() {
                 <p className="text-sm text-muted-foreground">{s.label}</p>
                 <p className="mt-2 text-3xl font-bold tabular-nums">{isLoading ? "—" : s.value}</p>
               </div>
-              <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${s.tone}`}>
+              <div
+                className={`flex h-11 w-11 items-center justify-center rounded-xl ${s.tone}`}
+                style={s.color ? { backgroundColor: `color-mix(in oklab, ${s.color} 18%, transparent)`, color: s.color } : undefined}
+              >
                 <s.icon className="h-5 w-5" />
               </div>
             </div>
