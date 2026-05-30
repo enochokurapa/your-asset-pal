@@ -37,16 +37,19 @@ export function TileAssetsDialog({
     enabled: open,
     queryKey: ["tile-assets"],
     queryFn: async () => {
-      const [{ data: a }, { data: assigns }] = await Promise.all([
+      const [{ data: a }, { data: assigns }, { data: pendings }] = await Promise.all([
         supabase.from("assets").select("*, categories(name), locations(name), branches(name,code)").order("created_at", { ascending: false }),
         supabase.from("asset_assignments").select("asset_id, assigned_to_name, department, assignment_date").order("assignment_date", { ascending: false }),
+        supabase.from("approval_requests").select("asset_id, kind, status").eq("status", "pending"),
       ]);
       const cur: Record<string, any> = {};
       (assigns ?? []).forEach((x: any) => { if (!cur[x.asset_id]) cur[x.asset_id] = x; });
+      const pendingRet = new Set((pendings ?? []).filter((p: any) => p.kind === "retirement").map((p: any) => p.asset_id));
       return (a ?? []).map((row: any) => ({
         ...row,
         custodian: cur[row.id]?.assigned_to_name ?? "",
         department: cur[row.id]?.department ?? "",
+        _pending_retirement: pendingRet.has(row.id),
       }));
     },
   });
@@ -57,6 +60,7 @@ export function TileAssetsDialog({
     if (filter.kind === "active") list = list.filter((a) => !inactive.has(a.status));
     else if (filter.kind === "status") list = list.filter((a) => a.status === filter.status);
     else if (filter.kind === "for_disposal") list = list.filter((a) => a.set_for_disposal);
+    else if (filter.kind === "pending_retirement") list = list.filter((a) => a._pending_retirement);
     if (q) {
       const n = q.toLowerCase();
       list = list.filter((a) =>
