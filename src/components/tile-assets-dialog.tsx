@@ -18,7 +18,8 @@ export type TileFilter =
   | { kind: "all" }
   | { kind: "active" }
   | { kind: "status"; status: string }
-  | { kind: "for_disposal" };
+  | { kind: "for_disposal" }
+  | { kind: "pending_retirement" };
 
 export function TileAssetsDialog({
   open, onOpenChange, title, filter,
