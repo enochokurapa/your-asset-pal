@@ -19,7 +19,8 @@ export type TileFilter =
   | { kind: "active" }
   | { kind: "status"; status: string }
   | { kind: "for_disposal" }
-  | { kind: "pending_retirement" };
+  | { kind: "pending_retirement" }
+  | { kind: "pending_repair" };
 
 export function TileAssetsDialog({
   open, onOpenChange, title, filter,
@@ -45,11 +46,15 @@ export function TileAssetsDialog({
       const cur: Record<string, any> = {};
       (assigns ?? []).forEach((x: any) => { if (!cur[x.asset_id]) cur[x.asset_id] = x; });
       const pendingRet = new Set((pendings ?? []).filter((p: any) => p.kind === "retirement").map((p: any) => p.asset_id));
+      const pendingRep = new Set((pendings ?? []).filter((p: any) => p.kind === "maintenance").map((p: any) => p.asset_id));
       return (a ?? []).map((row: any) => ({
         ...row,
         custodian: cur[row.id]?.assigned_to_name ?? "",
         department: cur[row.id]?.department ?? "",
+        condition: (row.status ?? "").replace(/_/g, " "),
         _pending_retirement: pendingRet.has(row.id),
+        _pending_repair: pendingRep.has(row.id),
+        _parked: row.set_for_disposal || pendingRet.has(row.id) || pendingRep.has(row.id),
       }));
     },
   });
@@ -57,14 +62,15 @@ export function TileAssetsDialog({
   const filtered = useMemo(() => {
     const inactive = new Set(["disposed", "retired", "under_repair", "missing"]);
     let list = (assets as any[]).filter((a) => canSeeBranch(a.branch_id));
-    if (filter.kind === "active") list = list.filter((a) => !inactive.has(a.status));
-    else if (filter.kind === "status") list = list.filter((a) => a.status === filter.status);
+    if (filter.kind === "active") list = list.filter((a) => !inactive.has(a.status) && !a._parked);
+    else if (filter.kind === "status") list = list.filter((a) => a.status === filter.status && !a._parked);
     else if (filter.kind === "for_disposal") list = list.filter((a) => a.set_for_disposal);
     else if (filter.kind === "pending_retirement") list = list.filter((a) => a._pending_retirement);
+    else if (filter.kind === "pending_repair") list = list.filter((a) => a._pending_repair);
     if (q) {
       const n = q.toLowerCase();
       list = list.filter((a) =>
-        [a.name, a.asset_tag, a.serial_number, a.custodian, a.department, a.branches?.name, a.categories?.name]
+        [a.name, a.asset_tag, a.serial_number, a.custodian, a.department, a.condition, a.branches?.name, a.categories?.name]
           .some((v) => (v ?? "").toString().toLowerCase().includes(n)),
       );
     }
