@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { PendingApprovalsCard } from "@/components/pending-approvals-card";
 import { TileAssetsDialog, type TileFilter } from "@/components/tile-assets-dialog";
+import { formatUGX } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: Dashboard,
