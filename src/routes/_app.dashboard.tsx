@@ -35,25 +35,31 @@ function Dashboard() {
       const list = assets.data ?? [];
       const branchList = branches.data ?? [];
       const pendList = pending.data ?? [];
+
+      const pendingRet = new Set(pendList.filter((p: any) => p.kind === "retirement").map((p: any) => p.asset_id));
+      const pendingRepair = new Set(pendList.filter((p: any) => p.kind === "maintenance").map((p: any) => p.asset_id));
+      // Asset is "parked" (idle) while awaiting decision — exclude from its source tile.
+      const isParked = (a: any) => a.set_for_disposal || pendingRet.has(a.id) || pendingRepair.has(a.id);
+
       const perBranch = branchList.map((b: any) => ({
         ...b,
         assetCount: list.filter((a: any) => a.branch_id === b.id).length,
       }));
+      const countStatus = (s: string) => list.filter((a: any) => a.status === s && !isParked(a)).length;
       const statusCounts = ["in_use", "in_storage", "under_repair", "retired", "missing", "disposed"].map((s) => ({
-        name: s.replace("_", " "),
-        key: s,
-        value: list.filter((a: any) => a.status === s).length,
+        name: s.replace("_", " "), key: s, value: countStatus(s),
       }));
       return {
         total: list.length,
-        active: list.filter((a: any) => a.status !== "disposed" && a.status !== "retired" && a.status !== "under_repair" && a.status !== "missing").length,
-        inUse: list.filter((a) => a.status === "in_use").length,
-        repair: list.filter((a) => a.status === "under_repair").length,
-        retired: list.filter((a) => a.status === "retired").length,
-        disposed: list.filter((a: any) => a.status === "disposed").length,
-        missing: list.filter((a) => a.status === "missing").length,
+        active: list.filter((a: any) => !["disposed", "retired", "under_repair", "missing"].includes(a.status) && !isParked(a)).length,
+        inUse: countStatus("in_use"),
+        repair: countStatus("under_repair"),
+        retired: countStatus("retired"),
+        disposed: countStatus("disposed"),
+        missing: countStatus("missing"),
         forDisposal: list.filter((a: any) => a.set_for_disposal).length,
-        forRetirement: pendList.filter((p: any) => p.kind === "retirement").length,
+        forRetirement: pendingRet.size,
+        forRepair: pendingRepair.size,
         catCount: cats.count ?? 0,
         locCount: locs.count ?? 0,
         branchCount: branchList.length,
@@ -75,6 +81,7 @@ function Dashboard() {
     { label: "Missing", value: data?.missing ?? 0, icon: AlertTriangle, tone: "", color: STATUS_COLORS.missing, filter: { kind: "status", status: "missing" } },
     { label: "For Disposal", value: data?.forDisposal ?? 0, icon: Trash2, tone: "text-warning bg-warning/15", filter: { kind: "for_disposal" } },
     { label: "For Retirement", value: data?.forRetirement ?? 0, icon: Archive, tone: "text-warning bg-warning/15", filter: { kind: "pending_retirement" } },
+    { label: "For Repair", value: data?.forRepair ?? 0, icon: Wrench, tone: "text-warning bg-warning/15", filter: { kind: "pending_repair" } },
   ];
 
   const [tile, setTile] = useState<{ title: string; filter: TileFilter } | null>(null);
