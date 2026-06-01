@@ -121,6 +121,9 @@ function Dashboard() {
               <div>
                 <p className="text-sm text-muted-foreground">{s.label}</p>
                 <p className="mt-2 text-3xl font-bold tabular-nums">{isLoading ? "—" : s.value}</p>
+                {s.subtotal !== undefined && s.subtotal > 0 && (
+                  <p className="mt-1 text-xs font-medium text-muted-foreground tabular-nums">{formatUGX(s.subtotal)}</p>
+                )}
               </div>
               <div
                 className={`flex h-11 w-11 items-center justify-center rounded-xl ${s.tone}`}
