@@ -88,9 +88,11 @@ export function TileAssetsDialog({
         {!selected ? (
           <>
             <DialogHeader>
-              <DialogTitle>{title}</DialogTitle>
+              <DialogTitle>{title} — Report</DialogTitle>
               <DialogDescription>
-                {isLoading ? "Loading…" : `${filtered.length} asset(s). Click a row to see details.`}
+                {isLoading
+                  ? "Loading…"
+                  : `Generated ${new Date().toLocaleString()} · ${filtered.length} asset(s). Click a row for details.`}
               </DialogDescription>
             </DialogHeader>
 
@@ -113,7 +115,8 @@ export function TileAssetsDialog({
                   <tr className="text-left">
                     <th className="px-3 py-2">Tag</th>
                     <th className="px-3 py-2">Name</th>
-                    <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Condition</th>
+                    <th className="px-3 py-2">Department</th>
                     <th className="px-3 py-2">Branch</th>
                     <th className="px-3 py-2">Custodian</th>
                     <th className="px-3 py-2 text-right">Value</th>
@@ -125,14 +128,15 @@ export function TileAssetsDialog({
                       className="cursor-pointer border-t hover:bg-accent">
                       <td className="px-3 py-2 font-mono text-xs">{a.asset_tag}</td>
                       <td className="px-3 py-2">{a.name}</td>
-                      <td className="px-3 py-2"><Badge variant="secondary">{(a.status ?? "").replace(/_/g, " ")}</Badge></td>
+                      <td className="px-3 py-2"><Badge variant="secondary">{a.condition}</Badge></td>
+                      <td className="px-3 py-2">{a.department || "—"}</td>
                       <td className="px-3 py-2">{a.branches?.name ?? ""}</td>
-                      <td className="px-3 py-2">{a.custodian}</td>
+                      <td className="px-3 py-2">{a.custodian || "—"}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{a.purchase_value ? formatUGX(a.purchase_value) : "—"}</td>
                     </tr>
                   ))}
                   {!filtered.length && !isLoading && (
-                    <tr><td colSpan={6} className="px-3 py-10 text-center text-muted-foreground">No assets.</td></tr>
+                    <tr><td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">No assets.</td></tr>
                   )}
                 </tbody>
               </table>
