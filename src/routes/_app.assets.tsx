@@ -54,6 +54,13 @@ interface AssetForm {
   // Inline custodian (only used on create)
   assigned_to_name: string;
   department: string;
+  // Depreciation
+  depreciation_method: string;
+  useful_life_months: string;
+  residual_value: string;
+  depreciation_start_date: string;
+  depreciation_frequency: string;
+  total_units: string;
 }
 
 const empty: AssetForm = {
@@ -61,6 +68,8 @@ const empty: AssetForm = {
   category_id: null, location_id: null, branch_id: null, status: "in_storage",
   purchase_value: "", purchase_date: "",
   assigned_to_name: "", department: "",
+  depreciation_method: "", useful_life_months: "", residual_value: "",
+  depreciation_start_date: "", depreciation_frequency: "monthly", total_units: "",
 };
 
 function AssetsPage() {
