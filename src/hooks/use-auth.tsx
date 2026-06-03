@@ -5,15 +5,16 @@ import type { Session, User } from "@supabase/supabase-js";
 export type AppRole = "admin" | "manager" | "staff";
 export type ModuleKey =
   | "dashboard" | "assets" | "categories" | "locations" | "branches"
-  | "users" | "reports" | "audit";
+  | "users" | "reports" | "audit" | "depreciation";
 export type ApprovalKind =
   | "movement" | "retirement" | "disposal" | "reactivation" | "set_for_disposal" | "maintenance";
 export type ActionKind =
   | "add_asset" | "edit_asset" | "edit_location"
-  | "initiate_movement" | "initiate_retirement" | "initiate_disposal" | "initiate_maintenance";
+  | "initiate_movement" | "initiate_retirement" | "initiate_disposal" | "initiate_maintenance"
+  | "manage_depreciation" | "run_depreciation" | "override_depreciation";
 
 export const ALL_MODULES: ModuleKey[] = [
-  "dashboard", "assets", "categories", "locations", "branches", "users", "reports", "audit",
+  "dashboard", "assets", "categories", "locations", "branches", "users", "reports", "audit", "depreciation",
 ];
 export const ALL_APPROVAL_KINDS: ApprovalKind[] = [
   "movement", "retirement", "disposal", "reactivation", "set_for_disposal", "maintenance",
@@ -21,6 +22,7 @@ export const ALL_APPROVAL_KINDS: ApprovalKind[] = [
 export const ALL_ACTION_KINDS: ActionKind[] = [
   "add_asset", "edit_asset", "edit_location",
   "initiate_movement", "initiate_retirement", "initiate_disposal", "initiate_maintenance",
+  "manage_depreciation", "run_depreciation", "override_depreciation",
 ];
 export const DEFAULT_NEW_USER_MODULES: ModuleKey[] = ["dashboard", "assets"];
 
