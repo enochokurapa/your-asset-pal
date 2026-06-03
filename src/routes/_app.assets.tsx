@@ -248,7 +248,7 @@ function AssetsPage() {
     );
     if (dup) { setDupAsset(dup); setDupOpen(true); return; }
 
-    const payload = {
+    const payload: any = {
       asset_tag: form.asset_tag.trim(),
       serial_number: form.serial_number.trim() || null,
       name: form.name.trim(),
@@ -259,7 +259,20 @@ function AssetsPage() {
       status: form.status,
       purchase_value: form.purchase_value ? Number(form.purchase_value) : null,
       purchase_date: form.purchase_date || null,
+      depreciation_method: form.depreciation_method || null,
+      useful_life_months: form.useful_life_months ? Number(form.useful_life_months) : null,
+      residual_value: form.residual_value ? Number(form.residual_value) : 0,
+      depreciation_start_date: form.depreciation_start_date || null,
+      depreciation_frequency: form.depreciation_frequency || "monthly",
+      total_units: form.total_units ? Number(form.total_units) : null,
     };
+    // Validation: residual < cost, useful life > 0
+    if (payload.purchase_value && payload.residual_value >= payload.purchase_value) {
+      toast.error("Residual value must be less than purchase value"); return;
+    }
+    if (payload.useful_life_months !== null && payload.useful_life_months <= 0) {
+      toast.error("Useful life must be greater than 0"); return;
+    }
 
     if (form.id) {
       const { error } = await supabase.from("assets").update(payload).eq("id", form.id);
