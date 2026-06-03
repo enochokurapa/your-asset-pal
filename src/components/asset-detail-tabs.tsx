@@ -16,6 +16,7 @@ import { submitApproval, decideApproval } from "@/lib/approvals";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
+import { DepreciationPanel } from "@/components/depreciation-panel";
 
 function DecideDialog({
   open, status, onCancel, onConfirm,
