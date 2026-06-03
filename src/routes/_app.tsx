@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, Link, Navigate, useRouterState } from "@tansta
 import { useState } from "react";
 import { useAuth, ModuleKey } from "@/hooks/use-auth";
 import {
-  LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X, FileBarChart, Building2, History, UserCircle,
+  LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X, FileBarChart, Building2, History, UserCircle, TrendingDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ const nav: Array<{ to: string; label: string; icon: any; module?: ModuleKey; adm
   { to: "/categories", label: "Categories", icon: Tags, module: "categories" },
   { to: "/locations", label: "Locations", icon: MapPin, module: "locations" },
   { to: "/branches", label: "Branches", icon: Building2, module: "branches", adminOnly: true },
+  { to: "/depreciation", label: "Depreciation", icon: TrendingDown, module: "depreciation" },
   { to: "/reports", label: "Reports", icon: FileBarChart, module: "reports" },
   { to: "/audit", label: "Audit Trail", icon: History, module: "audit" },
   { to: "/users", label: "Users", icon: Users, module: "users", adminOnly: true },
