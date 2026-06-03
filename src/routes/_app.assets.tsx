@@ -182,6 +182,12 @@ function AssetsPage() {
       purchase_value: a.purchase_value?.toString() ?? "",
       purchase_date: a.purchase_date ?? "",
       assigned_to_name: "", department: "",
+      depreciation_method: a.depreciation_method ?? "",
+      useful_life_months: a.useful_life_months?.toString() ?? "",
+      residual_value: a.residual_value?.toString() ?? "",
+      depreciation_start_date: a.depreciation_start_date ?? "",
+      depreciation_frequency: a.depreciation_frequency ?? "monthly",
+      total_units: a.total_units?.toString() ?? "",
     });
     setOpen(true);
   };
