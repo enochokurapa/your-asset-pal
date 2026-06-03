@@ -441,6 +441,58 @@ function AssetsPage() {
                   <Input id="date" type="date" value={form.purchase_date} onChange={(e) => setForm({ ...form, purchase_date: e.target.value })} />
                 </div>
 
+                {/* Depreciation */}
+                <div className="sm:col-span-2 rounded-lg border bg-muted/20 p-3">
+                  <p className="mb-2 text-sm font-medium">Depreciation (optional)</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Method</Label>
+                      <Select value={form.depreciation_method || "none"} onValueChange={(v) => setForm({ ...form, depreciation_method: v === "none" ? "" : v })}>
+                        <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">— None —</SelectItem>
+                          <SelectItem value="straight_line">Straight line</SelectItem>
+                          <SelectItem value="reducing_balance">Reducing balance</SelectItem>
+                          <SelectItem value="units_of_production">Units of production</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Frequency</Label>
+                      <Select value={form.depreciation_frequency} onValueChange={(v) => setForm({ ...form, depreciation_frequency: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                          <SelectItem value="quarterly">Quarterly</SelectItem>
+                          <SelectItem value="annually">Annually</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Useful life (months)</Label>
+                      <Input type="number" min={1} value={form.useful_life_months}
+                        onChange={(e) => setForm({ ...form, useful_life_months: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Residual value (UGX)</Label>
+                      <Input type="number" min={0} value={form.residual_value}
+                        onChange={(e) => setForm({ ...form, residual_value: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Start date</Label>
+                      <Input type="date" value={form.depreciation_start_date}
+                        onChange={(e) => setForm({ ...form, depreciation_start_date: e.target.value })} />
+                    </div>
+                    {form.depreciation_method === "units_of_production" && (
+                      <div className="space-y-2">
+                        <Label>Total expected units</Label>
+                        <Input type="number" min={0} value={form.total_units}
+                          onChange={(e) => setForm({ ...form, total_units: e.target.value })} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Inline custodian on create */}
                 {!form.id && (
                   <div className="sm:col-span-2 rounded-lg border bg-muted/30 p-3">
