@@ -16,6 +16,7 @@ import { submitApproval, decideApproval } from "@/lib/approvals";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
+import { DepreciationPanel } from "@/components/depreciation-panel";
 
 function DecideDialog({
   open, status, onCancel, onConfirm,
@@ -67,6 +68,7 @@ export function AssetDetailTabs({ assetId, defaultTab = "custody" }: { assetId: 
         <TabsTrigger value="custody" className="flex-1">Custody</TabsTrigger>
         <TabsTrigger value="movements" className="flex-1">Movements</TabsTrigger>
         <TabsTrigger value="maintenance" className="flex-1">Maintenance</TabsTrigger>
+        <TabsTrigger value="depreciation" className="flex-1">Depreciation</TabsTrigger>
         <TabsTrigger value="attachments" className="flex-1">Files</TabsTrigger>
         <TabsTrigger value="disposal" className="flex-1">Retire/Dispose</TabsTrigger>
         <TabsTrigger value="activity" className="flex-1">Activity</TabsTrigger>
@@ -74,6 +76,7 @@ export function AssetDetailTabs({ assetId, defaultTab = "custody" }: { assetId: 
       <TabsContent value="custody"><CustodyPanel assetId={assetId} /></TabsContent>
       <TabsContent value="movements"><MovementsPanel assetId={assetId} /></TabsContent>
       <TabsContent value="maintenance"><MaintenancePanel assetId={assetId} /></TabsContent>
+      <TabsContent value="depreciation"><DepreciationPanel assetId={assetId} /></TabsContent>
       <TabsContent value="attachments"><AttachmentsPanel assetId={assetId} /></TabsContent>
       <TabsContent value="disposal"><DisposalPanel assetId={assetId} /></TabsContent>
       <TabsContent value="activity"><ActivityPanel assetId={assetId} /></TabsContent>

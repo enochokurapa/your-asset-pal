@@ -326,61 +326,103 @@ export type Database = {
       }
       assets: {
         Row: {
+          accumulated_depreciation: number
           asset_tag: string
           assigned_to: string | null
           branch_id: string | null
           category_id: string | null
           created_at: string
           created_by: string | null
+          depreciation_frequency:
+            | Database["public"]["Enums"]["depreciation_frequency"]
+            | null
+          depreciation_method:
+            | Database["public"]["Enums"]["depreciation_method"]
+            | null
+          depreciation_start_date: string | null
           description: string | null
           id: string
+          impairment_amount: number
+          last_depreciation_date: string | null
           location_id: string | null
           name: string
           previous_status: Database["public"]["Enums"]["asset_status"] | null
           purchase_date: string | null
           purchase_value: number | null
+          residual_value: number | null
           serial_number: string | null
           set_for_disposal: boolean
           status: Database["public"]["Enums"]["asset_status"]
+          total_units: number | null
+          units_consumed: number | null
           updated_at: string
+          useful_life_months: number | null
         }
         Insert: {
+          accumulated_depreciation?: number
           asset_tag: string
           assigned_to?: string | null
           branch_id?: string | null
           category_id?: string | null
           created_at?: string
           created_by?: string | null
+          depreciation_frequency?:
+            | Database["public"]["Enums"]["depreciation_frequency"]
+            | null
+          depreciation_method?:
+            | Database["public"]["Enums"]["depreciation_method"]
+            | null
+          depreciation_start_date?: string | null
           description?: string | null
           id?: string
+          impairment_amount?: number
+          last_depreciation_date?: string | null
           location_id?: string | null
           name: string
           previous_status?: Database["public"]["Enums"]["asset_status"] | null
           purchase_date?: string | null
           purchase_value?: number | null
+          residual_value?: number | null
           serial_number?: string | null
           set_for_disposal?: boolean
           status?: Database["public"]["Enums"]["asset_status"]
+          total_units?: number | null
+          units_consumed?: number | null
           updated_at?: string
+          useful_life_months?: number | null
         }
         Update: {
+          accumulated_depreciation?: number
           asset_tag?: string
           assigned_to?: string | null
           branch_id?: string | null
           category_id?: string | null
           created_at?: string
           created_by?: string | null
+          depreciation_frequency?:
+            | Database["public"]["Enums"]["depreciation_frequency"]
+            | null
+          depreciation_method?:
+            | Database["public"]["Enums"]["depreciation_method"]
+            | null
+          depreciation_start_date?: string | null
           description?: string | null
           id?: string
+          impairment_amount?: number
+          last_depreciation_date?: string | null
           location_id?: string | null
           name?: string
           previous_status?: Database["public"]["Enums"]["asset_status"] | null
           purchase_date?: string | null
           purchase_value?: number | null
+          residual_value?: number | null
           serial_number?: string | null
           set_for_disposal?: boolean
           status?: Database["public"]["Enums"]["asset_status"]
+          total_units?: number | null
+          units_consumed?: number | null
           updated_at?: string
+          useful_life_months?: number | null
         }
         Relationships: [
           {
@@ -509,6 +551,164 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      category_depreciation_defaults: {
+        Row: {
+          category_id: string
+          created_at: string
+          frequency: Database["public"]["Enums"]["depreciation_frequency"]
+          id: string
+          method: Database["public"]["Enums"]["depreciation_method"]
+          residual_percent: number
+          updated_at: string
+          useful_life_months: number
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          frequency?: Database["public"]["Enums"]["depreciation_frequency"]
+          id?: string
+          method: Database["public"]["Enums"]["depreciation_method"]
+          residual_percent?: number
+          updated_at?: string
+          useful_life_months: number
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          frequency?: Database["public"]["Enums"]["depreciation_frequency"]
+          id?: string
+          method?: Database["public"]["Enums"]["depreciation_method"]
+          residual_percent?: number
+          updated_at?: string
+          useful_life_months?: number
+        }
+        Relationships: []
+      }
+      depreciation_entries: {
+        Row: {
+          accumulated_after: number
+          asset_id: string
+          closing_value: number
+          created_at: string
+          depreciation_amount: number
+          id: string
+          method: Database["public"]["Enums"]["depreciation_method"]
+          notes: string | null
+          opening_value: number
+          period_end: string
+          period_start: string
+          run_id: string | null
+        }
+        Insert: {
+          accumulated_after: number
+          asset_id: string
+          closing_value: number
+          created_at?: string
+          depreciation_amount: number
+          id?: string
+          method: Database["public"]["Enums"]["depreciation_method"]
+          notes?: string | null
+          opening_value: number
+          period_end: string
+          period_start: string
+          run_id?: string | null
+        }
+        Update: {
+          accumulated_after?: number
+          asset_id?: string
+          closing_value?: number
+          created_at?: string
+          depreciation_amount?: number
+          id?: string
+          method?: Database["public"]["Enums"]["depreciation_method"]
+          notes?: string | null
+          opening_value?: number
+          period_end?: string
+          period_start?: string
+          run_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "depreciation_entries_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "depreciation_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      depreciation_overrides: {
+        Row: {
+          amount: number
+          asset_id: string
+          created_at: string
+          created_by: string | null
+          effective_date: string
+          id: string
+          reason: string | null
+          type: string
+        }
+        Insert: {
+          amount: number
+          asset_id: string
+          created_at?: string
+          created_by?: string | null
+          effective_date?: string
+          id?: string
+          reason?: string | null
+          type: string
+        }
+        Update: {
+          amount?: number
+          asset_id?: string
+          created_at?: string
+          created_by?: string | null
+          effective_date?: string
+          id?: string
+          reason?: string | null
+          type?: string
+        }
+        Relationships: []
+      }
+      depreciation_runs: {
+        Row: {
+          asset_count: number
+          created_at: string
+          id: string
+          notes: string | null
+          period_end: string
+          period_start: string
+          run_type: string
+          status: string
+          total_amount: number
+          triggered_by: string | null
+        }
+        Insert: {
+          asset_count?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          period_end: string
+          period_start: string
+          run_type?: string
+          status?: string
+          total_amount?: number
+          triggered_by?: string | null
+        }
+        Update: {
+          asset_count?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          period_end?: string
+          period_start?: string
+          run_type?: string
+          status?: string
+          total_amount?: number
+          triggered_by?: string | null
+        }
+        Relationships: []
       }
       locations: {
         Row: {
@@ -800,6 +1000,11 @@ export type Database = {
         | "retired"
         | "missing"
         | "disposed"
+      depreciation_frequency: "monthly" | "quarterly" | "annually"
+      depreciation_method:
+        | "straight_line"
+        | "reducing_balance"
+        | "units_of_production"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -935,6 +1140,12 @@ export const Constants = {
         "retired",
         "missing",
         "disposed",
+      ],
+      depreciation_frequency: ["monthly", "quarterly", "annually"],
+      depreciation_method: [
+        "straight_line",
+        "reducing_balance",
+        "units_of_production",
       ],
     },
   },

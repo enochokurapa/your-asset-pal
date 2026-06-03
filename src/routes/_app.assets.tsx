@@ -54,6 +54,13 @@ interface AssetForm {
   // Inline custodian (only used on create)
   assigned_to_name: string;
   department: string;
+  // Depreciation
+  depreciation_method: string;
+  useful_life_months: string;
+  residual_value: string;
+  depreciation_start_date: string;
+  depreciation_frequency: string;
+  total_units: string;
 }
 
 const empty: AssetForm = {
@@ -61,6 +68,8 @@ const empty: AssetForm = {
   category_id: null, location_id: null, branch_id: null, status: "in_storage",
   purchase_value: "", purchase_date: "",
   assigned_to_name: "", department: "",
+  depreciation_method: "", useful_life_months: "", residual_value: "",
+  depreciation_start_date: "", depreciation_frequency: "monthly", total_units: "",
 };
 
 function AssetsPage() {
@@ -173,6 +182,12 @@ function AssetsPage() {
       purchase_value: a.purchase_value?.toString() ?? "",
       purchase_date: a.purchase_date ?? "",
       assigned_to_name: "", department: "",
+      depreciation_method: a.depreciation_method ?? "",
+      useful_life_months: a.useful_life_months?.toString() ?? "",
+      residual_value: a.residual_value?.toString() ?? "",
+      depreciation_start_date: a.depreciation_start_date ?? "",
+      depreciation_frequency: a.depreciation_frequency ?? "monthly",
+      total_units: a.total_units?.toString() ?? "",
     });
     setOpen(true);
   };
@@ -233,7 +248,7 @@ function AssetsPage() {
     );
     if (dup) { setDupAsset(dup); setDupOpen(true); return; }
 
-    const payload = {
+    const payload: any = {
       asset_tag: form.asset_tag.trim(),
       serial_number: form.serial_number.trim() || null,
       name: form.name.trim(),
@@ -244,7 +259,20 @@ function AssetsPage() {
       status: form.status,
       purchase_value: form.purchase_value ? Number(form.purchase_value) : null,
       purchase_date: form.purchase_date || null,
+      depreciation_method: form.depreciation_method || null,
+      useful_life_months: form.useful_life_months ? Number(form.useful_life_months) : null,
+      residual_value: form.residual_value ? Number(form.residual_value) : 0,
+      depreciation_start_date: form.depreciation_start_date || null,
+      depreciation_frequency: form.depreciation_frequency || "monthly",
+      total_units: form.total_units ? Number(form.total_units) : null,
     };
+    // Validation: residual < cost, useful life > 0
+    if (payload.purchase_value && payload.residual_value >= payload.purchase_value) {
+      toast.error("Residual value must be less than purchase value"); return;
+    }
+    if (payload.useful_life_months !== null && payload.useful_life_months <= 0) {
+      toast.error("Useful life must be greater than 0"); return;
+    }
 
     if (form.id) {
       const { error } = await supabase.from("assets").update(payload).eq("id", form.id);
@@ -411,6 +439,58 @@ function AssetsPage() {
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="date">Purchase date</Label>
                   <Input id="date" type="date" value={form.purchase_date} onChange={(e) => setForm({ ...form, purchase_date: e.target.value })} />
+                </div>
+
+                {/* Depreciation */}
+                <div className="sm:col-span-2 rounded-lg border bg-muted/20 p-3">
+                  <p className="mb-2 text-sm font-medium">Depreciation (optional)</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Method</Label>
+                      <Select value={form.depreciation_method || "none"} onValueChange={(v) => setForm({ ...form, depreciation_method: v === "none" ? "" : v })}>
+                        <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">— None —</SelectItem>
+                          <SelectItem value="straight_line">Straight line</SelectItem>
+                          <SelectItem value="reducing_balance">Reducing balance</SelectItem>
+                          <SelectItem value="units_of_production">Units of production</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Frequency</Label>
+                      <Select value={form.depreciation_frequency} onValueChange={(v) => setForm({ ...form, depreciation_frequency: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                          <SelectItem value="quarterly">Quarterly</SelectItem>
+                          <SelectItem value="annually">Annually</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Useful life (months)</Label>
+                      <Input type="number" min={1} value={form.useful_life_months}
+                        onChange={(e) => setForm({ ...form, useful_life_months: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Residual value (UGX)</Label>
+                      <Input type="number" min={0} value={form.residual_value}
+                        onChange={(e) => setForm({ ...form, residual_value: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Start date</Label>
+                      <Input type="date" value={form.depreciation_start_date}
+                        onChange={(e) => setForm({ ...form, depreciation_start_date: e.target.value })} />
+                    </div>
+                    {form.depreciation_method === "units_of_production" && (
+                      <div className="space-y-2">
+                        <Label>Total expected units</Label>
+                        <Input type="number" min={0} value={form.total_units}
+                          onChange={(e) => setForm({ ...form, total_units: e.target.value })} />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Inline custodian on create */}
