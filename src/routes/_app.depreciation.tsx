@@ -627,11 +627,11 @@ function ReportTable({
         </div>
       </div>
       <div className="max-h-[60vh] overflow-auto">
-        <table className="w-full text-xs">
-          <thead className="sticky top-0 bg-muted text-left">
+        <table className="w-full text-xs table-auto">
+          <thead className="sticky top-0 bg-muted">
             <tr>
               {headers.map((h, i) => (
-                <th key={h} className={`px-2 py-1.5 ${isNum(i) ? "text-right" : ""}`}>{h}</th>
+                <th key={h} className={`px-2 py-1.5 ${isNum(i) ? "text-right" : "text-left"}`}>{h}</th>
               ))}
             </tr>
           </thead>
