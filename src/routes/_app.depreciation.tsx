@@ -82,8 +82,8 @@ function DepreciationPage() {
   const prevWin = useMemo(() => previousPeriodWindow(freq), [freq]);
   const [pStart, setPStart] = useState(prevWin.start);
   const [pEnd, setPEnd] = useState(prevWin.end);
-  const [scope, setScope] = useState<"all" | "single">("all");
-  const [scopeAssetId, setScopeAssetId] = useState<string>("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [assetFilter, setAssetFilter] = useState("");
 
   const openRun = () => {
     const w = previousPeriodWindow(freq);
@@ -95,20 +95,20 @@ function DepreciationPage() {
   const submitRun = async () => {
     if (!pStart || !pEnd) return toast.error("Period required");
     if (pStart >= pEnd) return toast.error("Period start must be before end");
-    if (scope === "single" && !scopeAssetId) return toast.error("Select an asset");
+    if (selectedIds.size === 0) return toast.error("Select at least one asset");
+    const single = selectedIds.size === 1;
     setRunning(true);
     try {
+      const firstId = selectedIds.values().next().value as string;
       const { data: run, error: e1 } = await supabase.from("depreciation_runs" as any).insert({
         period_start: pStart, period_end: pEnd,
-        run_type: scope === "single" ? "manual_asset" : "manual",
+        run_type: single ? "manual_asset" : "manual",
         status: "running",
-        notes: scope === "single" ? `Single asset: ${assetMap.get(scopeAssetId)?.asset_tag ?? ""}` : null,
+        notes: single ? `Single asset: ${assetMap.get(firstId)?.asset_tag ?? ""}` : `Selected: ${selectedIds.size} asset(s)`,
       }).select().single();
       if (e1 || !run) throw new Error(e1?.message ?? "Failed");
 
-      const pool = scope === "single"
-        ? (assets as any[]).filter((a) => a.id === scopeAssetId)
-        : (assets as any[]);
+      const pool = (assets as any[]).filter((a) => selectedIds.has(a.id));
 
       let total = 0; let count = 0; let skipped = 0;
       for (const a of pool) {
@@ -134,12 +134,10 @@ function DepreciationPage() {
         }).eq("id", a.id);
         total += r.depreciation; count += 1;
       }
-      const finalStatus = scope === "single" && count === 0 ? "failed" : "completed";
+      const finalStatus = count === 0 ? "failed" : "completed";
       await supabase.from("depreciation_runs" as any).update({
         status: finalStatus, total_amount: total, asset_count: count,
-        notes: scope === "single"
-          ? `Single asset: ${assetMap.get(scopeAssetId)?.asset_tag ?? ""}${count === 0 ? " — no eligible entry posted" : ""}`
-          : null,
+        notes: `${single ? `Single asset: ${assetMap.get(firstId)?.asset_tag ?? ""}` : `Selected: ${pool.length} asset(s)`}${count === 0 ? " — no eligible entry posted" : ""}`,
       }).eq("id", (run as any).id);
       if (count === 0) toast.warning(`No entries posted (${skipped} skipped)`);
       else toast.success(`Run complete · ${count} asset(s) · ${formatUGX(total)}`);
@@ -466,16 +464,16 @@ function DepreciationPage() {
               </div>
             </div>
             <div className="max-h-[60vh] overflow-auto">
-              <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-muted text-left">
+              <table className="w-full text-xs table-auto">
+                <thead className="sticky top-0 bg-muted">
                   <tr>
-                    <th className="px-2 py-1.5">When</th>
-                    <th className="px-2 py-1.5">Kind</th>
-                    <th className="px-2 py-1.5">Asset</th>
-                    <th className="px-2 py-1.5">Period / Run</th>
-                    <th className="px-2 py-1.5">Override</th>
-                    <th className="px-2 py-1.5">User</th>
-                    <th className="px-2 py-1.5">Summary</th>
+                    <th className="px-2 py-1.5 text-left">When</th>
+                    <th className="px-2 py-1.5 text-left">Kind</th>
+                    <th className="px-2 py-1.5 text-left">Asset</th>
+                    <th className="px-2 py-1.5 text-left">Period / Run</th>
+                    <th className="px-2 py-1.5 text-left">Override</th>
+                    <th className="px-2 py-1.5 text-left">User</th>
+                    <th className="px-2 py-1.5 text-left">Summary</th>
                     <th className="px-2 py-1.5 text-right">Amount</th>
                   </tr>
                 </thead>
@@ -507,16 +505,16 @@ function DepreciationPage() {
         <TabsContent value="runs">
           <Card className="p-4">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm table-auto">
                 <thead>
-                  <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-                    <th className="px-3 py-2">Period</th>
-                    <th className="px-3 py-2">Type</th>
-                    <th className="px-3 py-2">Status</th>
+                  <tr className="border-b text-xs uppercase text-muted-foreground">
+                    <th className="px-3 py-2 text-left">Period</th>
+                    <th className="px-3 py-2 text-left">Type</th>
+                    <th className="px-3 py-2 text-left">Status</th>
                     <th className="px-3 py-2 text-right">Assets</th>
                     <th className="px-3 py-2 text-right">Total</th>
-                    <th className="px-3 py-2">Notes</th>
-                    <th className="px-3 py-2">Run at</th>
+                    <th className="px-3 py-2 text-left">Notes</th>
+                    <th className="px-3 py-2 text-left">Run at</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -542,64 +540,105 @@ function DepreciationPage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={runOpen} onOpenChange={setRunOpen}>
-        <DialogContent>
+      <Dialog open={runOpen} onOpenChange={(o) => { setRunOpen(o); if (!o) { setSelectedIds(new Set()); setAssetFilter(""); } }}>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><TrendingDown className="h-5 w-5" /> Run depreciation</DialogTitle>
-            <DialogDescription>Posts depreciation for the selected period. Duplicate entries per asset/period are skipped.</DialogDescription>
+            <DialogDescription>Tick assets to include. Use "select all" to run for every eligible asset. Duplicate entries per asset/period are skipped.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-2 sm:col-span-2">
-              <Label>Scope</Label>
-              <Select value={scope} onValueChange={(v) => setScope(v as "all" | "single")}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All eligible assets</SelectItem>
-                  <SelectItem value="single">Single asset</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {scope === "single" && (
-              <div className="space-y-2 sm:col-span-2">
-                <Label>Asset</Label>
-                <Select value={scopeAssetId} onValueChange={setScopeAssetId}>
-                  <SelectTrigger><SelectValue placeholder="Choose asset…" /></SelectTrigger>
-                  <SelectContent className="max-h-72">
-                    {(assets as any[])
-                      .filter((a) => a.purchase_value && a.depreciation_method)
-                      .map((a) => (
-                        <SelectItem key={a.id} value={a.id}>{a.asset_tag} — {a.name}</SelectItem>
+          {(() => {
+            const eligible = (assets as any[]).filter((a) => a.purchase_value && a.depreciation_method);
+            const filtered = eligible.filter((a) => {
+              const q = assetFilter.toLowerCase().trim();
+              if (!q) return true;
+              return (a.asset_tag ?? "").toLowerCase().includes(q) || (a.name ?? "").toLowerCase().includes(q);
+            });
+            const allSelected = filtered.length > 0 && filtered.every((a) => selectedIds.has(a.id));
+            const toggleAll = () => {
+              const next = new Set(selectedIds);
+              if (allSelected) filtered.forEach((a) => next.delete(a.id));
+              else filtered.forEach((a) => next.add(a.id));
+              setSelectedIds(next);
+            };
+            const toggleOne = (id: string) => {
+              const next = new Set(selectedIds);
+              if (next.has(id)) next.delete(id); else next.add(id);
+              setSelectedIds(next);
+            };
+            return (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Frequency preset</Label>
+                  <Select value={freq} onValueChange={(v) => {
+                    const nf = v as DepreciationFrequency; setFreq(nf);
+                    const w = previousPeriodWindow(nf); setPStart(w.start); setPEnd(w.end);
+                  }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="monthly">Previous month</SelectItem>
+                      <SelectItem value="quarterly">Previous quarter</SelectItem>
+                      <SelectItem value="annually">Previous year</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Period start</Label>
+                  <Input type="date" value={pStart} onChange={(e) => setPStart(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Period end</Label>
+                  <Input type="date" value={pEnd} onChange={(e) => setPEnd(e.target.value)} />
+                </div>
+                <div className="space-y-2 sm:col-span-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label>Assets ({selectedIds.size} selected / {eligible.length} eligible)</Label>
+                    <Input
+                      placeholder="Filter by tag or name…"
+                      value={assetFilter}
+                      onChange={(e) => setAssetFilter(e.target.value)}
+                      className="h-8 max-w-xs"
+                    />
+                  </div>
+                  <div className="rounded-md border">
+                    <div className="flex items-center gap-2 border-b bg-muted/50 px-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={toggleAll}
+                        className="h-4 w-4"
+                        id="dep-select-all"
+                      />
+                      <label htmlFor="dep-select-all" className="text-sm font-medium cursor-pointer">
+                        {allSelected ? "Unselect all" : "Select all"} {assetFilter && `(${filtered.length} shown)`}
+                      </label>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto">
+                      {filtered.length === 0 ? (
+                        <div className="px-3 py-6 text-center text-sm text-muted-foreground">No eligible assets.</div>
+                      ) : filtered.map((a) => (
+                        <label key={a.id} className="flex items-center gap-2 border-b px-3 py-1.5 text-sm hover:bg-muted/40 cursor-pointer last:border-0">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(a.id)}
+                            onChange={() => toggleOne(a.id)}
+                            className="h-4 w-4"
+                          />
+                          <span className="font-mono text-xs">{a.asset_tag}</span>
+                          <span className="flex-1 truncate">{a.name}</span>
+                          <span className="text-xs text-muted-foreground">{a.depreciation_method}</span>
+                        </label>
                       ))}
-                  </SelectContent>
-                </Select>
+                    </div>
+                  </div>
+                </div>
               </div>
-            )}
-            <div className="space-y-2 sm:col-span-2">
-              <Label>Frequency preset</Label>
-              <Select value={freq} onValueChange={(v) => {
-                const nf = v as DepreciationFrequency; setFreq(nf);
-                const w = previousPeriodWindow(nf); setPStart(w.start); setPEnd(w.end);
-              }}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Previous month</SelectItem>
-                  <SelectItem value="quarterly">Previous quarter</SelectItem>
-                  <SelectItem value="annually">Previous year</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Period start</Label>
-              <Input type="date" value={pStart} onChange={(e) => setPStart(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Period end</Label>
-              <Input type="date" value={pEnd} onChange={(e) => setPEnd(e.target.value)} />
-            </div>
-          </div>
+            );
+          })()}
           <DialogFooter>
             <Button variant="outline" onClick={() => setRunOpen(false)}>Cancel</Button>
-            <Button onClick={submitRun} disabled={running}>{running ? "Running…" : "Run now"}</Button>
+            <Button onClick={submitRun} disabled={running || selectedIds.size === 0}>
+              {running ? "Running…" : `Run for ${selectedIds.size || 0} asset(s)`}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -627,11 +666,11 @@ function ReportTable({
         </div>
       </div>
       <div className="max-h-[60vh] overflow-auto">
-        <table className="w-full text-xs">
-          <thead className="sticky top-0 bg-muted text-left">
+        <table className="w-full text-xs table-auto">
+          <thead className="sticky top-0 bg-muted">
             <tr>
               {headers.map((h, i) => (
-                <th key={h} className={`px-2 py-1.5 ${isNum(i) ? "text-right" : ""}`}>{h}</th>
+                <th key={h} className={`px-2 py-1.5 ${isNum(i) ? "text-right" : "text-left"}`}>{h}</th>
               ))}
             </tr>
           </thead>
