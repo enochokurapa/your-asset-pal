@@ -82,8 +82,8 @@ function DepreciationPage() {
   const prevWin = useMemo(() => previousPeriodWindow(freq), [freq]);
   const [pStart, setPStart] = useState(prevWin.start);
   const [pEnd, setPEnd] = useState(prevWin.end);
-  const [scope, setScope] = useState<"all" | "single">("all");
-  const [scopeAssetId, setScopeAssetId] = useState<string>("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [assetFilter, setAssetFilter] = useState("");
 
   const openRun = () => {
     const w = previousPeriodWindow(freq);
