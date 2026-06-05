@@ -466,16 +466,16 @@ function DepreciationPage() {
               </div>
             </div>
             <div className="max-h-[60vh] overflow-auto">
-              <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-muted text-left">
+              <table className="w-full text-xs table-auto">
+                <thead className="sticky top-0 bg-muted">
                   <tr>
-                    <th className="px-2 py-1.5">When</th>
-                    <th className="px-2 py-1.5">Kind</th>
-                    <th className="px-2 py-1.5">Asset</th>
-                    <th className="px-2 py-1.5">Period / Run</th>
-                    <th className="px-2 py-1.5">Override</th>
-                    <th className="px-2 py-1.5">User</th>
-                    <th className="px-2 py-1.5">Summary</th>
+                    <th className="px-2 py-1.5 text-left">When</th>
+                    <th className="px-2 py-1.5 text-left">Kind</th>
+                    <th className="px-2 py-1.5 text-left">Asset</th>
+                    <th className="px-2 py-1.5 text-left">Period / Run</th>
+                    <th className="px-2 py-1.5 text-left">Override</th>
+                    <th className="px-2 py-1.5 text-left">User</th>
+                    <th className="px-2 py-1.5 text-left">Summary</th>
                     <th className="px-2 py-1.5 text-right">Amount</th>
                   </tr>
                 </thead>
