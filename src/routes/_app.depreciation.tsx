@@ -507,16 +507,16 @@ function DepreciationPage() {
         <TabsContent value="runs">
           <Card className="p-4">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm table-auto">
                 <thead>
-                  <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-                    <th className="px-3 py-2">Period</th>
-                    <th className="px-3 py-2">Type</th>
-                    <th className="px-3 py-2">Status</th>
+                  <tr className="border-b text-xs uppercase text-muted-foreground">
+                    <th className="px-3 py-2 text-left">Period</th>
+                    <th className="px-3 py-2 text-left">Type</th>
+                    <th className="px-3 py-2 text-left">Status</th>
                     <th className="px-3 py-2 text-right">Assets</th>
                     <th className="px-3 py-2 text-right">Total</th>
-                    <th className="px-3 py-2">Notes</th>
-                    <th className="px-3 py-2">Run at</th>
+                    <th className="px-3 py-2 text-left">Notes</th>
+                    <th className="px-3 py-2 text-left">Run at</th>
                   </tr>
                 </thead>
                 <tbody>
