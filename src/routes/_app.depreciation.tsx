@@ -95,20 +95,20 @@ function DepreciationPage() {
   const submitRun = async () => {
     if (!pStart || !pEnd) return toast.error("Period required");
     if (pStart >= pEnd) return toast.error("Period start must be before end");
-    if (scope === "single" && !scopeAssetId) return toast.error("Select an asset");
+    if (selectedIds.size === 0) return toast.error("Select at least one asset");
+    const single = selectedIds.size === 1;
     setRunning(true);
     try {
+      const firstId = selectedIds.values().next().value as string;
       const { data: run, error: e1 } = await supabase.from("depreciation_runs" as any).insert({
         period_start: pStart, period_end: pEnd,
-        run_type: scope === "single" ? "manual_asset" : "manual",
+        run_type: single ? "manual_asset" : "manual",
         status: "running",
-        notes: scope === "single" ? `Single asset: ${assetMap.get(scopeAssetId)?.asset_tag ?? ""}` : null,
+        notes: single ? `Single asset: ${assetMap.get(firstId)?.asset_tag ?? ""}` : `Selected: ${selectedIds.size} asset(s)`,
       }).select().single();
       if (e1 || !run) throw new Error(e1?.message ?? "Failed");
 
-      const pool = scope === "single"
-        ? (assets as any[]).filter((a) => a.id === scopeAssetId)
-        : (assets as any[]);
+      const pool = (assets as any[]).filter((a) => selectedIds.has(a.id));
 
       let total = 0; let count = 0; let skipped = 0;
       for (const a of pool) {
@@ -134,12 +134,10 @@ function DepreciationPage() {
         }).eq("id", a.id);
         total += r.depreciation; count += 1;
       }
-      const finalStatus = scope === "single" && count === 0 ? "failed" : "completed";
+      const finalStatus = count === 0 ? "failed" : "completed";
       await supabase.from("depreciation_runs" as any).update({
         status: finalStatus, total_amount: total, asset_count: count,
-        notes: scope === "single"
-          ? `Single asset: ${assetMap.get(scopeAssetId)?.asset_tag ?? ""}${count === 0 ? " — no eligible entry posted" : ""}`
-          : null,
+        notes: `${single ? `Single asset: ${assetMap.get(firstId)?.asset_tag ?? ""}` : `Selected: ${pool.length} asset(s)`}${count === 0 ? " — no eligible entry posted" : ""}`,
       }).eq("id", (run as any).id);
       if (count === 0) toast.warning(`No entries posted (${skipped} skipped)`);
       else toast.success(`Run complete · ${count} asset(s) · ${formatUGX(total)}`);
