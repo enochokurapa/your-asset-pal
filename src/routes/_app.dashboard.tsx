@@ -116,19 +116,23 @@ function Dashboard() {
           <Card
             key={s.label}
             onClick={() => setTile({ title: s.label, filter: s.filter })}
-            className="cursor-pointer p-5 transition hover:shadow-md hover:border-primary/40"
+            className="group cursor-pointer overflow-hidden p-5 transition hover:-translate-y-0.5 hover:shadow-lg"
+            style={{
+              borderTop: `3px solid ${s.color}`,
+              background: `linear-gradient(135deg, color-mix(in oklab, ${s.color} 8%, transparent), transparent 70%)`,
+            }}
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">{s.label}</p>
+                <p className="text-sm font-medium" style={{ color: s.color }}>{s.label}</p>
                 <p className="mt-2 text-3xl font-bold tabular-nums">{isLoading ? "—" : s.value}</p>
                 {s.subtotal !== undefined && s.subtotal > 0 && (
                   <p className="mt-1 text-xs font-medium text-muted-foreground tabular-nums">{formatUGX(s.subtotal)}</p>
                 )}
               </div>
               <div
-                className={`flex h-11 w-11 items-center justify-center rounded-xl ${s.tone}`}
-                style={s.color ? { backgroundColor: `color-mix(in oklab, ${s.color} 18%, transparent)`, color: s.color } : undefined}
+                className="flex h-11 w-11 items-center justify-center rounded-xl transition group-hover:scale-110"
+                style={{ backgroundColor: `color-mix(in oklab, ${s.color} 18%, transparent)`, color: s.color }}
               >
                 <s.icon className="h-5 w-5" />
               </div>
