@@ -84,19 +84,20 @@ function Dashboard() {
     },
   });
 
-  const stats: { label: string; value: number; icon: any; tone: string; color?: string; filter: TileFilter; subtotal?: number }[] = [
-    { label: "Total Assets", value: data?.total ?? 0, icon: Package, tone: "text-primary bg-primary/10", filter: { kind: "all" }, subtotal: data?.totalValue },
-    { label: "Active Assets", value: data?.active ?? 0, icon: CheckCircle2, tone: "text-success bg-success/10", filter: { kind: "active" }, subtotal: data?.activeValue },
-    { label: "Branches", value: data?.branchCount ?? 0, icon: Building2, tone: "text-primary bg-primary/10", filter: { kind: "all" } },
-    { label: "In Storage", value: data?.statusCounts.find((s) => s.key === "in_storage")?.value ?? 0, icon: Boxes, tone: "", color: STATUS_COLORS.in_storage, filter: { kind: "status", status: "in_storage" }, subtotal: data?.inStorageValue },
-    { label: "In Use", value: data?.inUse ?? 0, icon: CheckCircle2, tone: "", color: STATUS_COLORS.in_use, filter: { kind: "status", status: "in_use" }, subtotal: data?.inUseValue },
-    { label: "Under Repair", value: data?.repair ?? 0, icon: Wrench, tone: "", color: STATUS_COLORS.under_repair, filter: { kind: "status", status: "under_repair" } },
-    { label: "Retired", value: data?.retired ?? 0, icon: Archive, tone: "", color: STATUS_COLORS.retired, filter: { kind: "status", status: "retired" } },
-    { label: "Disposed", value: data?.disposed ?? 0, icon: Trash2, tone: "", color: STATUS_COLORS.disposed, filter: { kind: "status", status: "disposed" } },
-    { label: "Missing", value: data?.missing ?? 0, icon: AlertTriangle, tone: "", color: STATUS_COLORS.missing, filter: { kind: "status", status: "missing" } },
-    { label: "For Disposal", value: data?.forDisposal ?? 0, icon: Trash2, tone: "text-warning bg-warning/15", filter: { kind: "for_disposal" } },
-    { label: "For Retirement", value: data?.forRetirement ?? 0, icon: Archive, tone: "text-warning bg-warning/15", filter: { kind: "pending_retirement" } },
-    { label: "For Repair", value: data?.forRepair ?? 0, icon: Wrench, tone: "text-warning bg-warning/15", filter: { kind: "pending_repair" }, subtotal: data?.repairAmount },
+  // Each tile gets its own corporate accent color.
+  const stats: { label: string; value: number; icon: any; color: string; filter: TileFilter; subtotal?: number }[] = [
+    { label: "Total Assets",    value: data?.total ?? 0,       icon: Package,        color: "#1E3A8A", filter: { kind: "all" },                               subtotal: data?.totalValue },
+    { label: "Active Assets",   value: data?.active ?? 0,      icon: CheckCircle2,   color: "#047857", filter: { kind: "active" },                            subtotal: data?.activeValue },
+    { label: "Branches",        value: data?.branchCount ?? 0, icon: Building2,      color: "#7C3AED", filter: { kind: "all" } },
+    { label: "In Storage",      value: data?.statusCounts.find((s) => s.key === "in_storage")?.value ?? 0, icon: Boxes, color: "#475569", filter: { kind: "status", status: "in_storage" }, subtotal: data?.inStorageValue },
+    { label: "In Use",          value: data?.inUse ?? 0,       icon: CheckCircle2,   color: "#0E7490", filter: { kind: "status", status: "in_use" },          subtotal: data?.inUseValue },
+    { label: "Under Repair",    value: data?.repair ?? 0,      icon: Wrench,         color: "#B45309", filter: { kind: "status", status: "under_repair" } },
+    { label: "Retired",         value: data?.retired ?? 0,     icon: Archive,        color: "#52525B", filter: { kind: "status", status: "retired" } },
+    { label: "Disposed",        value: data?.disposed ?? 0,    icon: Trash2,         color: "#3F3F46", filter: { kind: "status", status: "disposed" } },
+    { label: "Missing",         value: data?.missing ?? 0,     icon: AlertTriangle,  color: "#B91C1C", filter: { kind: "status", status: "missing" } },
+    { label: "For Disposal",    value: data?.forDisposal ?? 0, icon: Trash2,         color: "#C2410C", filter: { kind: "for_disposal" } },
+    { label: "For Retirement",  value: data?.forRetirement ?? 0, icon: Archive,      color: "#A16207", filter: { kind: "pending_retirement" } },
+    { label: "For Repair",      value: data?.forRepair ?? 0,   icon: Wrench,         color: "#BE185D", filter: { kind: "pending_repair" },                    subtotal: data?.repairAmount },
   ];
 
   const [tile, setTile] = useState<{ title: string; filter: TileFilter } | null>(null);
