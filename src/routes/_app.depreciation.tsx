@@ -84,6 +84,7 @@ function DepreciationPage() {
   const [pEnd, setPEnd] = useState(prevWin.end);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [assetFilter, setAssetFilter] = useState("");
+  const [missedOnly, setMissedOnly] = useState(false);
 
   const openRun = () => {
     const w = previousPeriodWindow(freq);
