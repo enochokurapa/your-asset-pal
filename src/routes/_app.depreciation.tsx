@@ -541,14 +541,17 @@ function DepreciationPage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={runOpen} onOpenChange={(o) => { setRunOpen(o); if (!o) { setSelectedIds(new Set()); setAssetFilter(""); } }}>
+      <Dialog open={runOpen} onOpenChange={(o) => { setRunOpen(o); if (!o) { setSelectedIds(new Set()); setAssetFilter(""); setMissedOnly(false); } }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><TrendingDown className="h-5 w-5" /> Run depreciation</DialogTitle>
-            <DialogDescription>Tick assets to include. Use "select all" to run for every eligible asset. Duplicate entries per asset/period are skipped.</DialogDescription>
+            <DialogDescription>Tick assets to include, or use "Missed only" to pick up assets whose depreciation wasn't posted for this period. Duplicate entries per asset/period are skipped. Requires the "run depreciation" permission granted by the super admin.</DialogDescription>
           </DialogHeader>
           {(() => {
-            const eligible = (assets as any[]).filter((a) => a.purchase_value && a.depreciation_method);
+            const eligibleAll = (assets as any[]).filter((a) => a.purchase_value && a.depreciation_method);
+            const eligible = missedOnly
+              ? eligibleAll.filter((a) => !a.last_depreciation_date || a.last_depreciation_date < pEnd)
+              : eligibleAll;
             const filtered = eligible.filter((a) => {
               const q = assetFilter.toLowerCase().trim();
               if (!q) return true;
