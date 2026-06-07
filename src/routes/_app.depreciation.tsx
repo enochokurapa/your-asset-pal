@@ -594,14 +594,25 @@ function DepreciationPage() {
                   <Input type="date" value={pEnd} onChange={(e) => setPEnd(e.target.value)} />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <Label>Assets ({selectedIds.size} selected / {eligible.length} eligible)</Label>
-                    <Input
-                      placeholder="Filter by tag or name…"
-                      value={assetFilter}
-                      onChange={(e) => setAssetFilter(e.target.value)}
-                      className="h-8 max-w-xs"
-                    />
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Label>Assets ({selectedIds.size} selected / {eligible.length} {missedOnly ? "missed" : "eligible"})</Label>
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={missedOnly}
+                          onChange={(e) => { setMissedOnly(e.target.checked); setSelectedIds(new Set()); }}
+                          className="h-3.5 w-3.5"
+                        />
+                        Missed only
+                      </label>
+                      <Input
+                        placeholder="Filter by tag or name…"
+                        value={assetFilter}
+                        onChange={(e) => setAssetFilter(e.target.value)}
+                        className="h-8 max-w-xs"
+                      />
+                    </div>
                   </div>
                   <div className="rounded-md border">
                     <div className="flex items-center gap-2 border-b bg-muted/50 px-3 py-2">
