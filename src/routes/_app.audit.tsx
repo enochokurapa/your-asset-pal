@@ -59,6 +59,7 @@ function AuditPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [showCleared, setShowCleared] = useState(false);
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["audit-log", showCleared, from, to],
