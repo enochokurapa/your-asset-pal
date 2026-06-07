@@ -304,10 +304,18 @@ function AuditPage() {
             </Button>
           </div>
         </div>
-        <div className="mb-3 flex items-center gap-2 text-sm">
+        <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
           <Checkbox id="cleared" checked={showCleared} onCheckedChange={(v) => setShowCleared(!!v)} />
           <label htmlFor="cleared" className="cursor-pointer">Show archived entries</label>
-          <span className="ml-auto text-xs text-muted-foreground">{filtered.length} entr{filtered.length === 1 ? "y" : "ies"}</span>
+          {selectedRows.size > 0 && (
+            <Button size="sm" variant="default" className="h-7 gap-1" onClick={openCombinedPdf}>
+              <FileText className="h-3 w-3" /> View {selectedRows.size} as one PDF
+            </Button>
+          )}
+          <span className="ml-auto text-xs text-muted-foreground">
+            {selectedRows.size > 0 ? `${selectedRows.size} selected · ` : ""}
+            {filtered.length} entr{filtered.length === 1 ? "y" : "ies"}
+          </span>
         </div>
 
         {isLoading ? (
@@ -322,25 +330,33 @@ function AuditPage() {
             <table className="w-full text-xs table-auto">
               <thead className="sticky top-0 bg-muted">
                 <tr>
+                  <th className="px-2 py-1.5 text-left w-8">
+                    <Checkbox checked={allVisibleSelected} onCheckedChange={toggleAllVisible} aria-label="Select all" />
+                  </th>
                   <th className="px-2 py-1.5 text-left">When</th>
                   <th className="px-2 py-1.5 text-left">Entity</th>
                   <th className="px-2 py-1.5 text-left">Action</th>
                   <th className="px-2 py-1.5 text-left">By</th>
-                  <th className="px-2 py-1.5 text-left">Entity ID</th>
                   <th className="px-2 py-1.5 text-right">View</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((r: any) => (
                   <tr key={r.id} className={"border-t " + (r.cleared_at ? "opacity-50" : "")}>
+                    <td className="px-2 py-1">
+                      <Checkbox
+                        checked={selectedRows.has(r.id)}
+                        onCheckedChange={() => toggleRow(r.id)}
+                        aria-label="Select row"
+                      />
+                    </td>
                     <td className="px-2 py-1 whitespace-nowrap">{new Date(r.created_at).toLocaleString()}</td>
                     <td className="px-2 py-1"><Badge variant="outline" className="capitalize text-[10px]">{r.entity_type}</Badge></td>
                     <td className="px-2 py-1">{friendlyAction(r)}</td>
                     <td className="px-2 py-1">{userLabel(r.actor_user_id)}</td>
-                    <td className="px-2 py-1 font-mono text-[10px] text-muted-foreground">{r.entity_id ? String(r.entity_id).slice(0, 8) : "—"}</td>
                     <td className="px-2 py-1 text-right">
                       <Button size="sm" variant="ghost" className="h-6 gap-1 px-2" onClick={() => openDetailPdf(r)}>
-                        <Eye className="h-3 w-3" /> PDF
+                        <Eye className="h-3 w-3" /> View
                       </Button>
                     </td>
                   </tr>
