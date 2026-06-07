@@ -84,6 +84,7 @@ function DepreciationPage() {
   const [pEnd, setPEnd] = useState(prevWin.end);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [assetFilter, setAssetFilter] = useState("");
+  const [missedOnly, setMissedOnly] = useState(false);
 
   const openRun = () => {
     const w = previousPeriodWindow(freq);
@@ -540,14 +541,17 @@ function DepreciationPage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={runOpen} onOpenChange={(o) => { setRunOpen(o); if (!o) { setSelectedIds(new Set()); setAssetFilter(""); } }}>
+      <Dialog open={runOpen} onOpenChange={(o) => { setRunOpen(o); if (!o) { setSelectedIds(new Set()); setAssetFilter(""); setMissedOnly(false); } }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><TrendingDown className="h-5 w-5" /> Run depreciation</DialogTitle>
-            <DialogDescription>Tick assets to include. Use "select all" to run for every eligible asset. Duplicate entries per asset/period are skipped.</DialogDescription>
+            <DialogDescription>Tick assets to include, or use "Missed only" to pick up assets whose depreciation wasn't posted for this period. Duplicate entries per asset/period are skipped. Requires the "run depreciation" permission granted by the super admin.</DialogDescription>
           </DialogHeader>
           {(() => {
-            const eligible = (assets as any[]).filter((a) => a.purchase_value && a.depreciation_method);
+            const eligibleAll = (assets as any[]).filter((a) => a.purchase_value && a.depreciation_method);
+            const eligible = missedOnly
+              ? eligibleAll.filter((a) => !a.last_depreciation_date || a.last_depreciation_date < pEnd)
+              : eligibleAll;
             const filtered = eligible.filter((a) => {
               const q = assetFilter.toLowerCase().trim();
               if (!q) return true;
@@ -590,14 +594,25 @@ function DepreciationPage() {
                   <Input type="date" value={pEnd} onChange={(e) => setPEnd(e.target.value)} />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <Label>Assets ({selectedIds.size} selected / {eligible.length} eligible)</Label>
-                    <Input
-                      placeholder="Filter by tag or name…"
-                      value={assetFilter}
-                      onChange={(e) => setAssetFilter(e.target.value)}
-                      className="h-8 max-w-xs"
-                    />
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Label>Assets ({selectedIds.size} selected / {eligible.length} {missedOnly ? "missed" : "eligible"})</Label>
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={missedOnly}
+                          onChange={(e) => { setMissedOnly(e.target.checked); setSelectedIds(new Set()); }}
+                          className="h-3.5 w-3.5"
+                        />
+                        Missed only
+                      </label>
+                      <Input
+                        placeholder="Filter by tag or name…"
+                        value={assetFilter}
+                        onChange={(e) => setAssetFilter(e.target.value)}
+                        className="h-8 max-w-xs"
+                      />
+                    </div>
                   </div>
                   <div className="rounded-md border">
                     <div className="flex items-center gap-2 border-b bg-muted/50 px-3 py-2">

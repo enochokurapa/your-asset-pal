@@ -59,6 +59,7 @@ function AuditPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [showCleared, setShowCleared] = useState(false);
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["audit-log", showCleared, from, to],
@@ -106,17 +107,60 @@ function AuditPage() {
   if (!canView("audit")) return <Navigate to="/dashboard" />;
 
   const exportList = (kind: "xlsx" | "pdf") => {
-    const headers = ["When", "Entity", "Action", "By", "Entity ID"];
+    const headers = ["When", "Entity", "Action", "By"];
     const data = filtered.map((r) => [
       new Date(r.created_at).toLocaleString(),
       r.entity_type,
       friendlyAction(r),
       userLabel(r.actor_user_id),
-      r.entity_id ?? "—",
     ]);
     const title = "Audit trail";
     if (kind === "xlsx") exportReportXLSX(title, headers, data);
     else exportReportPDF(title, headers, data);
+  };
+
+  const flatten = (obj: any) =>
+    !obj || typeof obj !== "object"
+      ? []
+      : Object.entries(obj).map(([k, v]) => [
+          k,
+          typeof v === "object" ? JSON.stringify(v) : String(v ?? "—"),
+        ]);
+
+  const appendEntryToDoc = (doc: jsPDF, r: any, startY = 28) => {
+    autoTable(doc, {
+      startY,
+      head: [["Field", "Value"]],
+      body: [
+        ["When", new Date(r.created_at).toLocaleString()],
+        ["Entity type", r.entity_type ?? "—"],
+        ["Action", friendlyAction(r)],
+        ["Raw action", r.action ?? "—"],
+        ["Performed by", userLabel(r.actor_user_id)],
+        ["Archived", r.cleared_at ? new Date(r.cleared_at).toLocaleString() : "No"],
+      ],
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [30, 41, 59] },
+      columnStyles: { 0: { cellWidth: 50, fontStyle: "bold" } },
+    });
+    const details = r.details ?? {};
+    const before = details.before ?? null;
+    const after = details.after ?? details;
+    if (before) {
+      const y1 = (doc as any).lastAutoTable.finalY + 8;
+      doc.setFontSize(12);
+      doc.text("Before", 14, y1);
+      autoTable(doc, { startY: y1 + 4, head: [["Field", "Value"]], body: flatten(before), styles: { fontSize: 8 }, headStyles: { fillColor: [30, 41, 59] } });
+      const y2 = (doc as any).lastAutoTable.finalY + 8;
+      doc.setFontSize(12);
+      doc.text("After", 14, y2);
+      autoTable(doc, { startY: y2 + 4, head: [["Field", "Value"]], body: flatten(after), styles: { fontSize: 8 }, headStyles: { fillColor: [30, 41, 59] } });
+    } else if (after && Object.keys(after).length > 0) {
+      const y1 = (doc as any).lastAutoTable.finalY + 8;
+      doc.setFontSize(12);
+      doc.text("Payload", 14, y1);
+      autoTable(doc, { startY: y1 + 4, head: [["Field", "Value"]], body: flatten(after), styles: { fontSize: 8 }, headStyles: { fillColor: [30, 41, 59] } });
+    }
   };
 
   const openDetailPdf = (r: any) => {
@@ -125,57 +169,48 @@ function AuditPage() {
     doc.text("Audit Log Entry", 14, 16);
     doc.setFontSize(9);
     doc.text(`Generated ${new Date().toLocaleString()}`, 14, 22);
-
-    autoTable(doc, {
-      startY: 28,
-      head: [["Field", "Value"]],
-      body: [
-        ["When", new Date(r.created_at).toLocaleString()],
-        ["Entity type", r.entity_type ?? "—"],
-        ["Action", friendlyAction(r)],
-        ["Raw action", r.action ?? "—"],
-        ["Entity ID", r.entity_id ?? "—"],
-        ["Performed by", userLabel(r.actor_user_id)],
-        ["User ID", r.actor_user_id ?? "—"],
-        ["Archived", r.cleared_at ? new Date(r.cleared_at).toLocaleString() : "No"],
-      ],
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [30, 41, 59] },
-      columnStyles: { 0: { cellWidth: 50, fontStyle: "bold" } },
-    });
-
-    const details = r.details ?? {};
-    const before = details.before ?? null;
-    const after = details.after ?? details;
-    const flatten = (obj: any) => {
-      if (!obj || typeof obj !== "object") return [];
-      return Object.entries(obj).map(([k, v]) => [
-        k,
-        typeof v === "object" ? JSON.stringify(v) : String(v ?? "—"),
-      ]);
-    };
-
-    if (before) {
-      doc.addPage();
-      doc.setFontSize(14);
-      doc.text("Before", 14, 14);
-      autoTable(doc, { startY: 20, head: [["Field", "Value"]], body: flatten(before), styles: { fontSize: 8 }, headStyles: { fillColor: [30, 41, 59] } });
-      doc.setFontSize(14);
-      doc.text("After", 14, (doc as any).lastAutoTable.finalY + 10);
-      autoTable(doc, { startY: (doc as any).lastAutoTable.finalY + 16, head: [["Field", "Value"]], body: flatten(after), styles: { fontSize: 8 }, headStyles: { fillColor: [30, 41, 59] } });
-    } else if (after && Object.keys(after).length > 0) {
-      doc.addPage();
-      doc.setFontSize(14);
-      doc.text("Payload", 14, 14);
-      autoTable(doc, { startY: 20, head: [["Field", "Value"]], body: flatten(after), styles: { fontSize: 8 }, headStyles: { fillColor: [30, 41, 59] } });
-    }
-
-    const filename = `audit_${r.entity_type}_${(r.entity_id ?? r.id).slice(0, 8)}.pdf`;
-    // Open in new tab AND trigger save so user can view + download
+    appendEntryToDoc(doc, r, 28);
+    // Preview only — user can download from the viewer if they wish
     const blob = doc.output("blob");
     const url = URL.createObjectURL(blob);
     window.open(url, "_blank");
-    doc.save(filename);
+  };
+
+  const openCombinedPdf = () => {
+    const picks = filtered.filter((r: any) => selectedRows.has(r.id));
+    if (picks.length === 0) { toast.error("Select at least one entry"); return; }
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text(`Audit Log — ${picks.length} entries`, 14, 16);
+    doc.setFontSize(9);
+    doc.text(`Generated ${new Date().toLocaleString()}`, 14, 22);
+    picks.forEach((r: any, i: number) => {
+      if (i > 0) {
+        doc.addPage();
+        doc.setFontSize(14);
+        doc.text(`Entry ${i + 1} of ${picks.length}`, 14, 16);
+      } else {
+        doc.setFontSize(12);
+        doc.text(`Entry 1 of ${picks.length}`, 14, 28);
+      }
+      appendEntryToDoc(doc, r, i === 0 ? 34 : 22);
+    });
+    const blob = doc.output("blob");
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+  };
+
+  const toggleRow = (id: string) => {
+    const next = new Set(selectedRows);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelectedRows(next);
+  };
+  const allVisibleSelected = filtered.length > 0 && filtered.every((r: any) => selectedRows.has(r.id));
+  const toggleAllVisible = () => {
+    const next = new Set(selectedRows);
+    if (allVisibleSelected) filtered.forEach((r: any) => next.delete(r.id));
+    else filtered.forEach((r: any) => next.add(r.id));
+    setSelectedRows(next);
   };
 
   const clearAll = async () => {
@@ -269,10 +304,18 @@ function AuditPage() {
             </Button>
           </div>
         </div>
-        <div className="mb-3 flex items-center gap-2 text-sm">
+        <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
           <Checkbox id="cleared" checked={showCleared} onCheckedChange={(v) => setShowCleared(!!v)} />
           <label htmlFor="cleared" className="cursor-pointer">Show archived entries</label>
-          <span className="ml-auto text-xs text-muted-foreground">{filtered.length} entr{filtered.length === 1 ? "y" : "ies"}</span>
+          {selectedRows.size > 0 && (
+            <Button size="sm" variant="default" className="h-7 gap-1" onClick={openCombinedPdf}>
+              <FileText className="h-3 w-3" /> View {selectedRows.size} as one PDF
+            </Button>
+          )}
+          <span className="ml-auto text-xs text-muted-foreground">
+            {selectedRows.size > 0 ? `${selectedRows.size} selected · ` : ""}
+            {filtered.length} entr{filtered.length === 1 ? "y" : "ies"}
+          </span>
         </div>
 
         {isLoading ? (
@@ -287,25 +330,33 @@ function AuditPage() {
             <table className="w-full text-xs table-auto">
               <thead className="sticky top-0 bg-muted">
                 <tr>
+                  <th className="px-2 py-1.5 text-left w-8">
+                    <Checkbox checked={allVisibleSelected} onCheckedChange={toggleAllVisible} aria-label="Select all" />
+                  </th>
                   <th className="px-2 py-1.5 text-left">When</th>
                   <th className="px-2 py-1.5 text-left">Entity</th>
                   <th className="px-2 py-1.5 text-left">Action</th>
                   <th className="px-2 py-1.5 text-left">By</th>
-                  <th className="px-2 py-1.5 text-left">Entity ID</th>
                   <th className="px-2 py-1.5 text-right">View</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((r: any) => (
                   <tr key={r.id} className={"border-t " + (r.cleared_at ? "opacity-50" : "")}>
+                    <td className="px-2 py-1">
+                      <Checkbox
+                        checked={selectedRows.has(r.id)}
+                        onCheckedChange={() => toggleRow(r.id)}
+                        aria-label="Select row"
+                      />
+                    </td>
                     <td className="px-2 py-1 whitespace-nowrap">{new Date(r.created_at).toLocaleString()}</td>
                     <td className="px-2 py-1"><Badge variant="outline" className="capitalize text-[10px]">{r.entity_type}</Badge></td>
                     <td className="px-2 py-1">{friendlyAction(r)}</td>
                     <td className="px-2 py-1">{userLabel(r.actor_user_id)}</td>
-                    <td className="px-2 py-1 font-mono text-[10px] text-muted-foreground">{r.entity_id ? String(r.entity_id).slice(0, 8) : "—"}</td>
                     <td className="px-2 py-1 text-right">
                       <Button size="sm" variant="ghost" className="h-6 gap-1 px-2" onClick={() => openDetailPdf(r)}>
-                        <Eye className="h-3 w-3" /> PDF
+                        <Eye className="h-3 w-3" /> View
                       </Button>
                     </td>
                   </tr>
