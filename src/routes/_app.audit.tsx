@@ -183,10 +183,9 @@ function AuditPage() {
   const flatten = (obj: any) =>
     !obj || typeof obj !== "object"
       ? []
-      : Object.entries(obj).map(([k, v]) => [
-          k,
-          typeof v === "object" ? JSON.stringify(v) : String(v ?? "—"),
-        ]);
+      : Object.entries(obj)
+          .filter(([k]) => !HIDDEN_KEYS.has(k))
+          .map(([k, v]) => [prettyKey(k), resolveValue(k, v)]);
 
   const appendEntryToDoc = (doc: jsPDF, r: any, startY = 28) => {
     autoTable(doc, {
