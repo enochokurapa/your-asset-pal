@@ -75,15 +75,76 @@ function AuditPage() {
     queryKey: ["profiles-list"],
     queryFn: async () => (await supabase.from("profiles").select("id,email,full_name")).data ?? [],
   });
+  const { data: branches = [] } = useQuery({
+    queryKey: ["branches-list"],
+    queryFn: async () => (await supabase.from("branches").select("id,name,code")).data ?? [],
+  });
+  const { data: locations = [] } = useQuery({
+    queryKey: ["locations-list"],
+    queryFn: async () => (await supabase.from("locations").select("id,name")).data ?? [],
+  });
+  const { data: categories = [] } = useQuery({
+    queryKey: ["categories-list"],
+    queryFn: async () => (await supabase.from("categories").select("id,name")).data ?? [],
+  });
+  const { data: assetsList = [] } = useQuery({
+    queryKey: ["assets-list-mini"],
+    queryFn: async () => (await supabase.from("assets").select("id,name,asset_tag")).data ?? [],
+  });
   const profileMap = useMemo(
     () => Object.fromEntries(profiles.map((p: any) => [p.id, p])),
     [profiles],
   );
+  const branchMap = useMemo(() => Object.fromEntries((branches as any[]).map((b) => [b.id, b])), [branches]);
+  const locationMap = useMemo(() => Object.fromEntries((locations as any[]).map((l) => [l.id, l])), [locations]);
+  const categoryMap = useMemo(() => Object.fromEntries((categories as any[]).map((c) => [c.id, c])), [categories]);
+  const assetMap = useMemo(() => Object.fromEntries((assetsList as any[]).map((a) => [a.id, a])), [assetsList]);
+
   const userLabel = (id: string | null | undefined) => {
     if (!id) return "—";
     const p = profileMap[id as string];
     return p?.full_name || p?.email || "—";
   };
+
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
+  const resolveValue = (key: string, value: any): string => {
+    if (value === null || value === undefined || value === "") return "—";
+    if (typeof value === "object") return JSON.stringify(value);
+    const s = String(value);
+    const k = key.toLowerCase();
+    if (UUID_RE.test(s)) {
+      if (k.includes("branch")) return branchMap[s]?.name ?? "—";
+      if (k.includes("location")) return locationMap[s]?.name ?? "—";
+      if (k.includes("category")) return categoryMap[s]?.name ?? "—";
+      if (k === "asset_id" || k === "asset") {
+        const a = assetMap[s];
+        return a ? `${a.name}${a.asset_tag ? ` (${a.asset_tag})` : ""}` : "—";
+      }
+      if (
+        k.includes("user") || k.includes("_by") || k === "by" ||
+        k.includes("to_user") || k.includes("from_user") ||
+        k.includes("custodian") || k.includes("approver") ||
+        k.includes("recorded") || k.includes("triggered") ||
+        k.includes("uploaded") || k.includes("assigned") ||
+        k.includes("actor")
+      ) return userLabel(s);
+      // generic UUID — try all known maps
+      if (profileMap[s]) return userLabel(s);
+      if (branchMap[s]) return branchMap[s].name;
+      if (locationMap[s]) return locationMap[s].name;
+      if (categoryMap[s]) return categoryMap[s].name;
+      if (assetMap[s]) return assetMap[s].name;
+      return "—";
+    }
+    if (ISO_RE.test(s)) { try { return new Date(s).toLocaleString(); } catch { return s; } }
+    return s;
+  };
+
+  const HIDDEN_KEYS = new Set(["id", "updated_at"]);
+  const prettyKey = (k: string) =>
+    k.replace(/_id$/i, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
   const filtered = useMemo(() => {
     return (rows as any[]).filter((r) => {
