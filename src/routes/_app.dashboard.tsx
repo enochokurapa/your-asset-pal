@@ -23,8 +23,10 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 function Dashboard() {
+  const { canSeeBranch, branchScope } = useAuth();
+  const scopeKey = branchScope ? Array.from(branchScope).sort().join(",") : "all";
   const { data, isLoading } = useQuery({
-    queryKey: ["dashboard-stats"],
+    queryKey: ["dashboard-stats", scopeKey],
     queryFn: async () => {
       const [assets, cats, locs, branches, pending] = await Promise.all([
         supabase.from("assets").select("id,status,name,asset_tag,branch_id,set_for_disposal,purchase_value,created_at").order("created_at", { ascending: false }),
@@ -33,9 +35,10 @@ function Dashboard() {
         supabase.from("branches").select("id,name,code,is_active"),
         supabase.from("approval_requests").select("id,kind,asset_id,status,payload").eq("status", "pending"),
       ]);
-      const list = assets.data ?? [];
-      const branchList = branches.data ?? [];
-      const pendList = pending.data ?? [];
+      const list = (assets.data ?? []).filter((a: any) => canSeeBranch(a.branch_id));
+      const branchList = (branches.data ?? []).filter((b: any) => canSeeBranch(b.id));
+      const visibleAssetIds = new Set(list.map((a: any) => a.id));
+      const pendList = (pending.data ?? []).filter((p: any) => !p.asset_id || visibleAssetIds.has(p.asset_id));
 
       const pendingRet = new Set(pendList.filter((p: any) => p.kind === "retirement").map((p: any) => p.asset_id));
       const pendingRepair = new Set(pendList.filter((p: any) => p.kind === "maintenance").map((p: any) => p.asset_id));
