@@ -146,8 +146,29 @@ function AuditPage() {
   const prettyKey = (k: string) =>
     k.replace(/_id$/i, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
+  const inBranchScope = (r: any): boolean => {
+    // Resolve a branch id from the audit row when possible
+    const details = (r.details ?? {}) as any;
+    const after = details.after ?? details;
+    const before = details.before ?? {};
+    const candidateBranch =
+      after?.branch_id ?? before?.branch_id ??
+      after?.to_branch_id ?? after?.from_branch_id ??
+      before?.to_branch_id ?? before?.from_branch_id ?? null;
+    if (candidateBranch) return canSeeBranch(candidateBranch);
+    const assetId = r.entity_type === "assets" ? r.entity_id
+      : (after?.asset_id ?? before?.asset_id ?? null);
+    if (assetId) {
+      const a = assetMap[assetId];
+      if (a) return canSeeBranch(a.branch_id);
+    }
+    // Non-branch-scoped entities (e.g. categories, users) — show.
+    return true;
+  };
+
   const filtered = useMemo(() => {
     return (rows as any[]).filter((r) => {
+      if (!inBranchScope(r)) return false;
       if (entityType !== "all" && r.entity_type !== entityType) return false;
       if (action !== "all" && r.action !== action) return false;
       if (userId !== "all" && r.actor_user_id !== userId) return false;
@@ -158,7 +179,7 @@ function AuditPage() {
       }
       return true;
     });
-  }, [rows, entityType, action, userId, q, profileMap]);
+  }, [rows, entityType, action, userId, q, profileMap, assetMap, canSeeBranch]);
 
   const actionOptions = useMemo(
     () => Array.from(new Set((rows as any[]).map((r) => r.action))).sort(),
