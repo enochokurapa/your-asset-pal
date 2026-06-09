@@ -221,7 +221,7 @@ function ReportsPage() {
   );
 
   // Shared option lists
-  const branchOpts = branches.map((b: any) => ({ value: b.id, label: b.name }));
+  const branchOpts = scopedBranches.map((b: any) => ({ value: b.id, label: b.name }));
   const categoryOpts = categories.filter((c: any) => !c.parent_id).map((c: any) => ({ value: c.id, label: c.name }));
   const statusOpts = ["in_use", "in_storage", "under_repair", "retired", "missing", "disposed"]
     .map((s) => ({ value: s, label: s.replace("_", " ") }));
@@ -280,7 +280,7 @@ function ReportsPage() {
     { key: "from", label: "From date", type: "date" },
     { key: "to", label: "To date", type: "date" },
   ];
-  const movementRows = movements.filter((m: any) =>
+  const movementRows = scopedMovements.filter((m: any) =>
     (!fMove.transfer_type || (m.transfer_type ?? "internal") === fMove.transfer_type) &&
     (!fMove.from_branch_id || m.from_branch_id === fMove.from_branch_id) &&
     (!fMove.to_branch_id || m.to_branch_id === fMove.to_branch_id) &&
@@ -314,7 +314,7 @@ function ReportsPage() {
     { key: "from", label: "Assigned from", type: "date" },
     { key: "to", label: "Assigned to", type: "date" },
   ];
-  const assignRows = assignments.filter((a: any) =>
+  const assignRows = scopedAssignments.filter((a: any) =>
     (!fAssign.branch_id || a.branch_id === fAssign.branch_id) &&
     applyDate(a.assignment_date, fAssign.from, fAssign.to) &&
     (!fAssign.q || applyText(a.assigned_to_name, fAssign.q) || applyText(a.department, fAssign.q)
@@ -344,7 +344,7 @@ function ReportsPage() {
     { key: "from", label: "From date", type: "date" },
     { key: "to", label: "To date", type: "date" },
   ];
-  const disposalRows = disposals.map((d: any) => ({
+  const disposalRows = scopedDisposals.map((d: any) => ({
     tag: d.assets?.asset_tag, name: d.assets?.name,
     type: d.retirement_reason ? "Retirement" : "Disposal",
     disposal_reason: d.disposal_reason, disposal_date: d.disposal_date,
@@ -375,7 +375,7 @@ function ReportsPage() {
     { key: "from", label: "From date", type: "date" },
     { key: "to", label: "To date", type: "date" },
   ];
-  const maintenanceRows = approvals.filter((r: any) => r.kind === "maintenance").map((r: any) => {
+  const maintenanceRows = scopedApprovals.filter((r: any) => r.kind === "maintenance").map((r: any) => {
     const p = r.payload ?? {};
     const requester = profileMap[r.requested_by];
     const approver = r.approver_id ? profileMap[r.approver_id] : null;
@@ -417,7 +417,7 @@ function ReportsPage() {
     { key: "from", label: "From date", type: "date" },
     { key: "to", label: "To date", type: "date" },
   ];
-  const approvalRows = approvals.map((r: any) => {
+  const approvalRows = scopedApprovals.map((r: any) => {
     const requester = profileMap[r.requested_by];
     const approver = r.approver_id ? profileMap[r.approver_id] : null;
     return {
@@ -456,7 +456,7 @@ function ReportsPage() {
       { header: "Under repair", key: "under_repair" }, { header: "Retired", key: "retired" },
       { header: "Total value", key: "value", isCurrency: true },
     ],
-    rows: branches.map((b: any) => {
+    rows: scopedBranches.map((b: any) => {
       const list = enrichedAssets.filter((a: any) => a.branch_id === b.id);
       return {
         name: b.name, code: b.code ?? "",
@@ -485,7 +485,7 @@ function ReportsPage() {
     value: enrichedAssets.filter((a: any) => a.status === s).length,
   })).filter((d) => d.value > 0);
 
-  const branchStatusData = branches.map((b: any) => {
+  const branchStatusData = scopedBranches.map((b: any) => {
     const list = enrichedAssets.filter((a: any) => a.branch_id === b.id);
     return {
       name: b.name,
