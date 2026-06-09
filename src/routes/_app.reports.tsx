@@ -170,24 +170,55 @@ function ReportsPage() {
     return map;
   }, [assignments]);
 
-  const enrichedAssets = useMemo(() => assets.map((a: any) => {
-    const cat = a.categories;
-    const parentCat = cat?.parent_id ? catMap[cat.parent_id] : null;
-    const loc = a.locations;
-    const parentLoc = loc?.parent_id ? locMap[loc.parent_id] : null;
-    const assn = currentAssignment[a.id];
-    return {
-      ...a,
-      branch: a.branches?.name ?? "",
-      branch_code: a.branches?.code ?? "",
-      category: parentCat?.name ?? cat?.name ?? "",
-      sub_category: parentCat ? cat?.name : "",
-      location: parentLoc?.name ?? loc?.name ?? "",
-      sub_location: parentLoc ? loc?.name : "",
-      assigned_to: assn?.assigned_to_name ?? "",
-      department: assn?.department ?? "",
-    };
-  }), [assets, catMap, locMap, currentAssignment]);
+  const enrichedAssets = useMemo(() => assets
+    .filter((a: any) => canSeeBranch(a.branch_id))
+    .map((a: any) => {
+      const cat = a.categories;
+      const parentCat = cat?.parent_id ? catMap[cat.parent_id] : null;
+      const loc = a.locations;
+      const parentLoc = loc?.parent_id ? locMap[loc.parent_id] : null;
+      const assn = currentAssignment[a.id];
+      return {
+        ...a,
+        branch: a.branches?.name ?? "",
+        branch_code: a.branches?.code ?? "",
+        category: parentCat?.name ?? cat?.name ?? "",
+        sub_category: parentCat ? cat?.name : "",
+        location: parentLoc?.name ?? loc?.name ?? "",
+        sub_location: parentLoc ? loc?.name : "",
+        assigned_to: assn?.assigned_to_name ?? "",
+        department: assn?.department ?? "",
+      };
+    }), [assets, catMap, locMap, currentAssignment, canSeeBranch]);
+
+  // Restrict ancillary lists to assets the user can see
+  const visibleAssetIds = useMemo(
+    () => new Set(enrichedAssets.map((a: any) => a.id)),
+    [enrichedAssets],
+  );
+  const scopedAssignments = useMemo(
+    () => (assignments as any[]).filter((a) => visibleAssetIds.has(a.asset_id) && canSeeBranch(a.branch_id)),
+    [assignments, visibleAssetIds, canSeeBranch],
+  );
+  const scopedMovements = useMemo(
+    () => (movements as any[]).filter((m) =>
+      visibleAssetIds.has(m.asset_id) &&
+      (canSeeBranch(m.from_branch_id) || canSeeBranch(m.to_branch_id)),
+    ),
+    [movements, visibleAssetIds, canSeeBranch],
+  );
+  const scopedDisposals = useMemo(
+    () => (disposals as any[]).filter((d) => visibleAssetIds.has(d.asset_id)),
+    [disposals, visibleAssetIds],
+  );
+  const scopedApprovals = useMemo(
+    () => (approvals as any[]).filter((p) => !p.asset_id || visibleAssetIds.has(p.asset_id)),
+    [approvals, visibleAssetIds],
+  );
+  const scopedBranches = useMemo(
+    () => (branches as any[]).filter((b) => canSeeBranch(b.id)),
+    [branches, canSeeBranch],
+  );
 
   // Shared option lists
   const branchOpts = branches.map((b: any) => ({ value: b.id, label: b.name }));
