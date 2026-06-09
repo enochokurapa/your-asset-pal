@@ -49,7 +49,7 @@ const friendlyAction = (r: any) => {
 };
 
 function AuditPage() {
-  const { canView, isAdmin } = useAuth();
+  const { canView, isAdmin, canSeeBranch } = useAuth();
   const qc = useQueryClient();
 
   const [q, setQ] = useState("");
