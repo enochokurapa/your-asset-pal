@@ -31,13 +31,26 @@ function WelcomePage() {
       password: p1,
       data: { must_change_password: false },
     });
-    if (error) { setBusy(false); return toast.error(error.message); }
+    if (error) {
+      setBusy(false);
+      const msg = /different from the old/i.test(error.message)
+        ? "Please choose a password different from your temporary one."
+        : error.message;
+      return toast.error(msg);
+    }
     if (user) {
       await supabase.from("profiles").update({ must_change_password: false }).eq("id", user.id);
     }
-    setBusy(false);
-    toast.success("Password updated");
-    navigate({ to: "/dashboard" });
+    // Refresh the session so the new password takes effect, then sign in fresh.
+    try { await supabase.auth.refreshSession(); } catch { /* no-op */ }
+    toast.success("Password updated — please sign in with your new password.");
+    await supabase.auth.signOut();
+    // Hard navigation so the auth context fully resets.
+    if (typeof window !== "undefined") {
+      window.location.replace("/login");
+    } else {
+      navigate({ to: "/login" });
+    }
   };
 
   return (
