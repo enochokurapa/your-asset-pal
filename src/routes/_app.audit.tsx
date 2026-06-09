@@ -89,7 +89,7 @@ function AuditPage() {
   });
   const { data: assetsList = [] } = useQuery({
     queryKey: ["assets-list-mini"],
-    queryFn: async () => (await supabase.from("assets").select("id,name,asset_tag")).data ?? [],
+    queryFn: async () => (await supabase.from("assets").select("id,name,asset_tag,branch_id")).data ?? [],
   });
   const profileMap = useMemo(
     () => Object.fromEntries(profiles.map((p: any) => [p.id, p])),
