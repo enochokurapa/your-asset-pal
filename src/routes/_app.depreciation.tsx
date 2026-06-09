@@ -28,7 +28,7 @@ export const Route = createFileRoute("/_app/depreciation")({
 });
 
 function DepreciationPage() {
-  const { canView, canWrite, isAdmin, canDo } = useAuth();
+  const { canView, canWrite, isAdmin, canDo, canSeeBranch } = useAuth();
   if (!canView("depreciation")) return <Navigate to="/dashboard" />;
   const canRun = isAdmin || canWrite || canDo("run_depreciation");
   const qc = useQueryClient();
@@ -39,20 +39,29 @@ function DepreciationPage() {
       (await supabase.from("depreciation_runs" as any).select("*").order("period_end", { ascending: false }).limit(100)).data ?? [],
   });
 
-  const { data: assets = [] } = useQuery({
+  const { data: assetsRaw = [] } = useQuery({
     queryKey: ["dep-assets"],
     queryFn: async () =>
       (await supabase.from("assets")
         .select("*, categories(name), branches(name)")
         .order("name")).data ?? [],
   });
+  const assets = useMemo(
+    () => (assetsRaw as any[]).filter((a) => canSeeBranch(a.branch_id)),
+    [assetsRaw, canSeeBranch],
+  );
+  const visibleAssetIds = useMemo(() => new Set(assets.map((a: any) => a.id)), [assets]);
 
-  const { data: entries = [] } = useQuery({
+  const { data: entriesRaw = [] } = useQuery({
     queryKey: ["dep-entries-all"],
     queryFn: async () =>
       (await supabase.from("depreciation_entries" as any)
         .select("*").order("period_end", { ascending: false }).limit(500)).data ?? [],
   });
+  const entries = useMemo(
+    () => (entriesRaw as any[]).filter((e) => visibleAssetIds.has(e.asset_id)),
+    [entriesRaw, visibleAssetIds],
+  );
 
   const { data: overrides = [] } = useQuery({
     queryKey: ["dep-overrides-all"],
