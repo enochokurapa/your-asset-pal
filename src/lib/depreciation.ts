@@ -111,7 +111,7 @@ export function buildSchedule(a: AssetDepCfg, maxPeriods?: number): Array<{
   const startStr = a.depreciation_start_date || a.depreciation_start_date || new Date().toISOString().slice(0, 10);
   let cursor = new Date(startStr);
   let state: AssetDepCfg = { ...a };
-  for (let i = 0; i < maxPeriods; i++) {
+  for (let i = 0; i < cap; i++) {
     if (!isDepreciable(state)) break;
     const pStart = new Date(cursor);
     const pEnd = addMonths(pStart, periodMonths(freq));
