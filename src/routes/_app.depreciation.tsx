@@ -110,11 +110,12 @@ function DepreciationPage() {
     setRunning(true);
     try {
       const firstId = selectedIds.values().next().value as string;
+      const runType = missedOnly ? "missed" : single ? "manual_asset" : "manual";
       const { data: run, error: e1 } = await supabase.from("depreciation_runs" as any).insert({
         period_start: pStart, period_end: pEnd,
-        run_type: single ? "manual_asset" : "manual",
+        run_type: runType,
         status: "running",
-        notes: single ? `Single asset: ${assetMap.get(firstId)?.asset_tag ?? ""}` : `Selected: ${selectedIds.size} asset(s)`,
+        notes: single ? `Single asset: ${assetMap.get(firstId)?.asset_tag ?? ""}` : `Selected: ${selectedIds.size} asset(s)${missedOnly ? " (missed catch-up)" : ""}`,
       }).select().single();
       if (e1 || !run) throw new Error(e1?.message ?? "Failed");
 

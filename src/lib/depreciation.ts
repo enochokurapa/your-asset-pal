@@ -98,17 +98,20 @@ export function computePeriod(
 function round2(n: number) { return Math.round(n * 100) / 100; }
 
 /** Build a full forward-looking schedule from current state. */
-export function buildSchedule(a: AssetDepCfg, maxPeriods = 240): Array<{
+export function buildSchedule(a: AssetDepCfg, maxPeriods?: number): Array<{
   index: number; periodStart: string; periodEnd: string;
   opening: number; depreciation: number; accumulated: number; closing: number;
 }> {
   const rows: ReturnType<typeof buildSchedule> = [] as any;
   if (!isDepreciable(a)) return rows;
   const freq: DepreciationFrequency = (a.depreciation_frequency ?? "monthly") as DepreciationFrequency;
+  // Cap horizon to the asset's configured useful life (in periods), unless caller overrides.
+  const lifeMonths = Number(a.useful_life_months ?? 0);
+  const cap = maxPeriods ?? (lifeMonths > 0 ? Math.ceil(lifeMonths / periodMonths(freq)) : 240);
   const startStr = a.depreciation_start_date || a.depreciation_start_date || new Date().toISOString().slice(0, 10);
   let cursor = new Date(startStr);
   let state: AssetDepCfg = { ...a };
-  for (let i = 0; i < maxPeriods; i++) {
+  for (let i = 0; i < cap; i++) {
     if (!isDepreciable(state)) break;
     const pStart = new Date(cursor);
     const pEnd = addMonths(pStart, periodMonths(freq));
