@@ -23,16 +23,18 @@ export type TileFilter =
   | { kind: "pending_repair" };
 
 export function TileAssetsDialog({
-  open, onOpenChange, title, filter,
+  open, onOpenChange, title, filter, branchId,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   title: string;
   filter: TileFilter;
+  branchId?: string | null;
 }) {
   const { canSeeBranch } = useAuth();
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<any>(null);
+
 
   const { data: assets = [], isLoading } = useQuery({
     enabled: open,
