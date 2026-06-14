@@ -23,16 +23,18 @@ export type TileFilter =
   | { kind: "pending_repair" };
 
 export function TileAssetsDialog({
-  open, onOpenChange, title, filter,
+  open, onOpenChange, title, filter, branchId,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   title: string;
   filter: TileFilter;
+  branchId?: string | null;
 }) {
   const { canSeeBranch } = useAuth();
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<any>(null);
+
 
   const { data: assets = [], isLoading } = useQuery({
     enabled: open,
@@ -62,6 +64,8 @@ export function TileAssetsDialog({
   const filtered = useMemo(() => {
     const inactive = new Set(["disposed", "retired", "under_repair", "missing"]);
     let list = (assets as any[]).filter((a) => canSeeBranch(a.branch_id));
+    if (branchId) list = list.filter((a) => a.branch_id === branchId);
+
     if (filter.kind === "active") list = list.filter((a) => !inactive.has(a.status) && !a._parked);
     else if (filter.kind === "status") list = list.filter((a) => a.status === filter.status && !a._parked);
     else if (filter.kind === "for_disposal") list = list.filter((a) => a.set_for_disposal);
@@ -75,7 +79,7 @@ export function TileAssetsDialog({
       );
     }
     return list;
-  }, [assets, filter, q, canSeeBranch]);
+  }, [assets, filter, q, canSeeBranch, branchId]);
 
   const handleClose = (v: boolean) => {
     if (!v) setSelected(null);

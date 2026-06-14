@@ -9,6 +9,8 @@ import { PendingApprovalsCard } from "@/components/pending-approvals-card";
 import { TileAssetsDialog, type TileFilter } from "@/components/tile-assets-dialog";
 import { formatUGX } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: Dashboard,
@@ -26,8 +28,10 @@ const STATUS_COLORS: Record<string, string> = {
 function Dashboard() {
   const { canSeeBranch, branchScope } = useAuth();
   const scopeKey = branchScope ? Array.from(branchScope).sort().join(",") : "all";
+  const [selectedBranch, setSelectedBranch] = useState<string>("all");
   const { data, isLoading } = useQuery({
-    queryKey: ["dashboard-stats", scopeKey],
+    queryKey: ["dashboard-stats", scopeKey, selectedBranch],
+
     queryFn: async () => {
       const [assets, cats, locs, branches, pending] = await Promise.all([
         supabase.from("assets").select("id,status,name,asset_tag,branch_id,set_for_disposal,purchase_value,created_at").order("created_at", { ascending: false }),
@@ -36,19 +40,25 @@ function Dashboard() {
         supabase.from("branches").select("id,name,code,is_active"),
         supabase.from("approval_requests").select("id,kind,asset_id,status,payload").eq("status", "pending"),
       ]);
-      const list = (assets.data ?? []).filter((a: any) => canSeeBranch(a.branch_id));
+      const list = (assets.data ?? [])
+        .filter((a: any) => canSeeBranch(a.branch_id))
+        .filter((a: any) => selectedBranch === "all" || a.branch_id === selectedBranch);
       const branchList = (branches.data ?? []).filter((b: any) => canSeeBranch(b.id));
+      const branchesForFilter = branchList;
+      const visibleBranchList = selectedBranch === "all" ? branchList : branchList.filter((b: any) => b.id === selectedBranch);
       const visibleAssetIds = new Set(list.map((a: any) => a.id));
       const pendList = (pending.data ?? []).filter((p: any) => !p.asset_id || visibleAssetIds.has(p.asset_id));
+
 
       const pendingRet = new Set(pendList.filter((p: any) => p.kind === "retirement").map((p: any) => p.asset_id));
       const pendingRepair = new Set(pendList.filter((p: any) => p.kind === "maintenance").map((p: any) => p.asset_id));
       const isParked = (a: any) => a.set_for_disposal || pendingRet.has(a.id) || pendingRepair.has(a.id);
 
-      const perBranch = branchList.map((b: any) => ({
+      const perBranch = visibleBranchList.map((b: any) => ({
         ...b,
         assetCount: list.filter((a: any) => a.branch_id === b.id).length,
       }));
+
       const countStatus = (s: string) => list.filter((a: any) => a.status === s && !isParked(a)).length;
       const sumValue = (predicate: (a: any) => boolean) =>
         list.filter(predicate).reduce((acc: number, a: any) => acc + (Number(a.purchase_value) || 0), 0);
@@ -81,9 +91,11 @@ function Dashboard() {
         repairAmount,
         catCount: cats.count ?? 0,
         locCount: locs.count ?? 0,
-        branchCount: branchList.length,
+        branchCount: visibleBranchList.length,
         perBranch,
         statusCounts,
+        branchesForFilter,
+
       };
     },
   });
@@ -110,10 +122,33 @@ function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Overview of your fixed assets across all branches.</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
+            {selectedBranch === "all"
+              ? "Overview of your fixed assets across all branches."
+              : `Viewing branch: ${(data?.branchesForFilter ?? []).find((b: any) => b.id === selectedBranch)?.name ?? ""}`}
+          </p>
+        </div>
+        {(data?.branchesForFilter?.length ?? 0) > 1 && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Branch</span>
+            <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+              <SelectTrigger className="h-9 w-[220px]">
+                <SelectValue placeholder="All branches" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All branches</SelectItem>
+                {(data?.branchesForFilter ?? []).map((b: any) => (
+                  <SelectItem key={b.id} value={b.id}>{b.name}{b.code ? ` (${b.code})` : ""}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
+
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {stats.map((s) => (
@@ -150,7 +185,9 @@ function Dashboard() {
         onOpenChange={(v) => { if (!v) setTile(null); }}
         title={tile?.title ?? ""}
         filter={tile?.filter ?? { kind: "all" }}
+        branchId={selectedBranch === "all" ? null : selectedBranch}
       />
+
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="p-5">
