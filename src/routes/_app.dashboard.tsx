@@ -54,10 +54,11 @@ function Dashboard() {
       const pendingRepair = new Set(pendList.filter((p: any) => p.kind === "maintenance").map((p: any) => p.asset_id));
       const isParked = (a: any) => a.set_for_disposal || pendingRet.has(a.id) || pendingRepair.has(a.id);
 
-      const perBranch = branchList.map((b: any) => ({
+      const perBranch = visibleBranchList.map((b: any) => ({
         ...b,
         assetCount: list.filter((a: any) => a.branch_id === b.id).length,
       }));
+
       const countStatus = (s: string) => list.filter((a: any) => a.status === s && !isParked(a)).length;
       const sumValue = (predicate: (a: any) => boolean) =>
         list.filter(predicate).reduce((acc: number, a: any) => acc + (Number(a.purchase_value) || 0), 0);
