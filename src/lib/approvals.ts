@@ -37,6 +37,8 @@ export async function decideApproval(id: string, status: "approved" | "rejected"
   const { data: req, error: reqErr } = await supabase.from("approval_requests").select("*").eq("id", id).single();
   if (reqErr || !req) throw reqErr ?? new Error("Not found");
   if (req.status !== "pending") { toast.error("Already decided"); return; }
+  if (req.requested_by === u.user.id) { toast.error("You cannot approve your own request"); return; }
+
 
   // Apply effect on approval
   if (status === "approved" && req.asset_id) {
