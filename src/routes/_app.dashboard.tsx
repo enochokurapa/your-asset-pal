@@ -9,6 +9,8 @@ import { PendingApprovalsCard } from "@/components/pending-approvals-card";
 import { TileAssetsDialog, type TileFilter } from "@/components/tile-assets-dialog";
 import { formatUGX } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: Dashboard,
