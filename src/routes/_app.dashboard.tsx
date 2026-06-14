@@ -40,10 +40,15 @@ function Dashboard() {
         supabase.from("branches").select("id,name,code,is_active"),
         supabase.from("approval_requests").select("id,kind,asset_id,status,payload").eq("status", "pending"),
       ]);
-      const list = (assets.data ?? []).filter((a: any) => canSeeBranch(a.branch_id));
+      const list = (assets.data ?? [])
+        .filter((a: any) => canSeeBranch(a.branch_id))
+        .filter((a: any) => selectedBranch === "all" || a.branch_id === selectedBranch);
       const branchList = (branches.data ?? []).filter((b: any) => canSeeBranch(b.id));
+      const branchesForFilter = branchList;
+      const visibleBranchList = selectedBranch === "all" ? branchList : branchList.filter((b: any) => b.id === selectedBranch);
       const visibleAssetIds = new Set(list.map((a: any) => a.id));
       const pendList = (pending.data ?? []).filter((p: any) => !p.asset_id || visibleAssetIds.has(p.asset_id));
+
 
       const pendingRet = new Set(pendList.filter((p: any) => p.kind === "retirement").map((p: any) => p.asset_id));
       const pendingRepair = new Set(pendList.filter((p: any) => p.kind === "maintenance").map((p: any) => p.asset_id));
