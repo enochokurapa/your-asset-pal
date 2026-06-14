@@ -91,9 +91,11 @@ function Dashboard() {
         repairAmount,
         catCount: cats.count ?? 0,
         locCount: locs.count ?? 0,
-        branchCount: branchList.length,
+        branchCount: visibleBranchList.length,
         perBranch,
         statusCounts,
+        branchesForFilter,
+
       };
     },
   });
