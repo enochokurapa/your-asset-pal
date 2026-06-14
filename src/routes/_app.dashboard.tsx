@@ -185,7 +185,9 @@ function Dashboard() {
         onOpenChange={(v) => { if (!v) setTile(null); }}
         title={tile?.title ?? ""}
         filter={tile?.filter ?? { kind: "all" }}
+        branchId={selectedBranch === "all" ? null : selectedBranch}
       />
+
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="p-5">
