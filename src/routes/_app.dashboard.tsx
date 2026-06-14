@@ -28,8 +28,10 @@ const STATUS_COLORS: Record<string, string> = {
 function Dashboard() {
   const { canSeeBranch, branchScope } = useAuth();
   const scopeKey = branchScope ? Array.from(branchScope).sort().join(",") : "all";
+  const [selectedBranch, setSelectedBranch] = useState<string>("all");
   const { data, isLoading } = useQuery({
-    queryKey: ["dashboard-stats", scopeKey],
+    queryKey: ["dashboard-stats", scopeKey, selectedBranch],
+
     queryFn: async () => {
       const [assets, cats, locs, branches, pending] = await Promise.all([
         supabase.from("assets").select("id,status,name,asset_tag,branch_id,set_for_disposal,purchase_value,created_at").order("created_at", { ascending: false }),
