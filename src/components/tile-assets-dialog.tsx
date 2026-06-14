@@ -64,6 +64,8 @@ export function TileAssetsDialog({
   const filtered = useMemo(() => {
     const inactive = new Set(["disposed", "retired", "under_repair", "missing"]);
     let list = (assets as any[]).filter((a) => canSeeBranch(a.branch_id));
+    if (branchId) list = list.filter((a) => a.branch_id === branchId);
+
     if (filter.kind === "active") list = list.filter((a) => !inactive.has(a.status) && !a._parked);
     else if (filter.kind === "status") list = list.filter((a) => a.status === filter.status && !a._parked);
     else if (filter.kind === "for_disposal") list = list.filter((a) => a.set_for_disposal);
