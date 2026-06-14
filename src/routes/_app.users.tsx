@@ -272,7 +272,7 @@ function UserRow({ u, self, branchesAll, onRole, onModule, onApproval, onAction,
             </DialogHeader>
             <div className="space-y-2 py-2">
               <Label>New temporary password</Label>
-              <Input type="text" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} />
+              <Input type="password" autoComplete="new-password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} />
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setResetOpen(false)}>Cancel</Button>
