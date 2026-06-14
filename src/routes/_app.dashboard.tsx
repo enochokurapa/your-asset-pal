@@ -122,10 +122,33 @@ function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Overview of your fixed assets across all branches.</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
+            {selectedBranch === "all"
+              ? "Overview of your fixed assets across all branches."
+              : `Viewing branch: ${(data?.branchesForFilter ?? []).find((b: any) => b.id === selectedBranch)?.name ?? ""}`}
+          </p>
+        </div>
+        {(data?.branchesForFilter?.length ?? 0) > 1 && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Branch</span>
+            <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+              <SelectTrigger className="h-9 w-[220px]">
+                <SelectValue placeholder="All branches" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All branches</SelectItem>
+                {(data?.branchesForFilter ?? []).map((b: any) => (
+                  <SelectItem key={b.id} value={b.id}>{b.name}{b.code ? ` (${b.code})` : ""}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
+
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {stats.map((s) => (
