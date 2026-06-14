@@ -173,7 +173,7 @@ function UsersPage() {
             <div className="space-y-4 py-2">
               <div className="space-y-2"><Label>Full name *</Label><Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></div>
               <div className="space-y-2"><Label>Email *</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Temporary password *</Label><Input type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
+              <div className="space-y-2"><Label>Temporary password *</Label><Input type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
               <div className="space-y-2">
                 <Label>Initial role</Label>
                 <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v as AppRole })}>
