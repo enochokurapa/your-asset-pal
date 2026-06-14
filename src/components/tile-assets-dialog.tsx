@@ -79,7 +79,7 @@ export function TileAssetsDialog({
       );
     }
     return list;
-  }, [assets, filter, q, canSeeBranch]);
+  }, [assets, filter, q, canSeeBranch, branchId]);
 
   const handleClose = (v: boolean) => {
     if (!v) setSelected(null);
