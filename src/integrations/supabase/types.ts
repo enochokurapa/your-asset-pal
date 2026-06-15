@@ -710,6 +710,102 @@ export type Database = {
         }
         Relationships: []
       }
+      gate_passes: {
+        Row: {
+          approver_id: string | null
+          asset_id: string
+          attachment_url: string | null
+          branch_id: string | null
+          checked_out_at: string | null
+          checked_out_by: string | null
+          created_at: string
+          decided_at: string | null
+          decision_reason: string | null
+          destination: string
+          expected_return_date: string
+          id: string
+          pass_number: string | null
+          previous_asset_status:
+            | Database["public"]["Enums"]["asset_status"]
+            | null
+          reason: string
+          requested_by: string
+          return_condition: string | null
+          return_notes: string | null
+          returned_at: string | null
+          returned_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          approver_id?: string | null
+          asset_id: string
+          attachment_url?: string | null
+          branch_id?: string | null
+          checked_out_at?: string | null
+          checked_out_by?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decision_reason?: string | null
+          destination: string
+          expected_return_date: string
+          id?: string
+          pass_number?: string | null
+          previous_asset_status?:
+            | Database["public"]["Enums"]["asset_status"]
+            | null
+          reason: string
+          requested_by: string
+          return_condition?: string | null
+          return_notes?: string | null
+          returned_at?: string | null
+          returned_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          approver_id?: string | null
+          asset_id?: string
+          attachment_url?: string | null
+          branch_id?: string | null
+          checked_out_at?: string | null
+          checked_out_by?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decision_reason?: string | null
+          destination?: string
+          expected_return_date?: string
+          id?: string
+          pass_number?: string | null
+          previous_asset_status?:
+            | Database["public"]["Enums"]["asset_status"]
+            | null
+          reason?: string
+          requested_by?: string
+          return_condition?: string | null
+          return_notes?: string | null
+          returned_at?: string | null
+          returned_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gate_passes_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gate_passes_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           address: string | null
