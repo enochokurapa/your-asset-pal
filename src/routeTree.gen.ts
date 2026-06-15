@@ -17,6 +17,7 @@ import { Route as AppUsersRouteImport } from './routes/_app.users'
 import { Route as AppReportsRouteImport } from './routes/_app.reports'
 import { Route as AppProfileRouteImport } from './routes/_app.profile'
 import { Route as AppLocationsRouteImport } from './routes/_app.locations'
+import { Route as AppGatePassRouteImport } from './routes/_app.gate-pass'
 import { Route as AppDepreciationRouteImport } from './routes/_app.depreciation'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppCategoriesRouteImport } from './routes/_app.categories'
@@ -63,6 +64,11 @@ const AppLocationsRoute = AppLocationsRouteImport.update({
   path: '/locations',
   getParentRoute: () => AppRoute,
 } as any)
+const AppGatePassRoute = AppGatePassRouteImport.update({
+  id: '/gate-pass',
+  path: '/gate-pass',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDepreciationRoute = AppDepreciationRouteImport.update({
   id: '/depreciation',
   path: '/depreciation',
@@ -104,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/categories': typeof AppCategoriesRoute
   '/dashboard': typeof AppDashboardRoute
   '/depreciation': typeof AppDepreciationRoute
+  '/gate-pass': typeof AppGatePassRoute
   '/locations': typeof AppLocationsRoute
   '/profile': typeof AppProfileRoute
   '/reports': typeof AppReportsRoute
@@ -119,6 +126,7 @@ export interface FileRoutesByTo {
   '/categories': typeof AppCategoriesRoute
   '/dashboard': typeof AppDashboardRoute
   '/depreciation': typeof AppDepreciationRoute
+  '/gate-pass': typeof AppGatePassRoute
   '/locations': typeof AppLocationsRoute
   '/profile': typeof AppProfileRoute
   '/reports': typeof AppReportsRoute
@@ -136,6 +144,7 @@ export interface FileRoutesById {
   '/_app/categories': typeof AppCategoriesRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/depreciation': typeof AppDepreciationRoute
+  '/_app/gate-pass': typeof AppGatePassRoute
   '/_app/locations': typeof AppLocationsRoute
   '/_app/profile': typeof AppProfileRoute
   '/_app/reports': typeof AppReportsRoute
@@ -153,6 +162,7 @@ export interface FileRouteTypes {
     | '/categories'
     | '/dashboard'
     | '/depreciation'
+    | '/gate-pass'
     | '/locations'
     | '/profile'
     | '/reports'
@@ -168,6 +178,7 @@ export interface FileRouteTypes {
     | '/categories'
     | '/dashboard'
     | '/depreciation'
+    | '/gate-pass'
     | '/locations'
     | '/profile'
     | '/reports'
@@ -184,6 +195,7 @@ export interface FileRouteTypes {
     | '/_app/categories'
     | '/_app/dashboard'
     | '/_app/depreciation'
+    | '/_app/gate-pass'
     | '/_app/locations'
     | '/_app/profile'
     | '/_app/reports'
@@ -255,6 +267,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppLocationsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/gate-pass': {
+      id: '/_app/gate-pass'
+      path: '/gate-pass'
+      fullPath: '/gate-pass'
+      preLoaderRoute: typeof AppGatePassRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/depreciation': {
       id: '/_app/depreciation'
       path: '/depreciation'
@@ -307,6 +326,7 @@ interface AppRouteChildren {
   AppCategoriesRoute: typeof AppCategoriesRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppDepreciationRoute: typeof AppDepreciationRoute
+  AppGatePassRoute: typeof AppGatePassRoute
   AppLocationsRoute: typeof AppLocationsRoute
   AppProfileRoute: typeof AppProfileRoute
   AppReportsRoute: typeof AppReportsRoute
@@ -320,6 +340,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCategoriesRoute: AppCategoriesRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppDepreciationRoute: AppDepreciationRoute,
+  AppGatePassRoute: AppGatePassRoute,
   AppLocationsRoute: AppLocationsRoute,
   AppProfileRoute: AppProfileRoute,
   AppReportsRoute: AppReportsRoute,
