@@ -992,7 +992,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "manager" | "staff"
+      app_role: "admin" | "manager" | "staff" | "security"
       asset_status:
         | "in_use"
         | "in_storage"
@@ -1000,6 +1000,7 @@ export type Database = {
         | "retired"
         | "missing"
         | "disposed"
+        | "checked_out"
       depreciation_frequency: "monthly" | "quarterly" | "annually"
       depreciation_method:
         | "straight_line"
@@ -1132,7 +1133,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "manager", "staff"],
+      app_role: ["admin", "manager", "staff", "security"],
       asset_status: [
         "in_use",
         "in_storage",
@@ -1140,6 +1141,7 @@ export const Constants = {
         "retired",
         "missing",
         "disposed",
+        "checked_out",
       ],
       depreciation_frequency: ["monthly", "quarterly", "annually"],
       depreciation_method: [
