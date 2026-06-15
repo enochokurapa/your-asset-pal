@@ -29,7 +29,7 @@ export const Route = createFileRoute("/_app/users")({
   component: UsersPage,
 });
 
-const ROLES: AppRole[] = ["admin", "manager", "staff"];
+const ROLES: AppRole[] = ["admin", "manager", "staff", "security"];
 
 function UsersPage() {
   const { isAdmin, loading, user: me } = useAuth();

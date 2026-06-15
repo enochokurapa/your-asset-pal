@@ -24,6 +24,8 @@ export function NotificationBell() {
       nav({ to: "/dashboard", search: { approval: n.entity_id, action } as any });
     } else if (n.entity_type === "assets" && n.entity_id) {
       nav({ to: "/assets", search: { focus: n.entity_id } as any });
+    } else if (n.entity_type === "gate_passes") {
+      nav({ to: "/gate-pass" });
     } else {
       nav({ to: "/dashboard" });
     }

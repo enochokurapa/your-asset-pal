@@ -2,19 +2,20 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { supabase } from "@/integrations/supabase/client";
 import type { Session, User } from "@supabase/supabase-js";
 
-export type AppRole = "admin" | "manager" | "staff";
+export type AppRole = "admin" | "manager" | "staff" | "security";
 export type ModuleKey =
   | "dashboard" | "assets" | "categories" | "locations" | "branches"
-  | "users" | "reports" | "audit" | "depreciation";
+  | "users" | "reports" | "audit" | "depreciation" | "gate_pass";
 export type ApprovalKind =
   | "movement" | "retirement" | "disposal" | "reactivation" | "set_for_disposal" | "maintenance";
 export type ActionKind =
   | "add_asset" | "edit_asset" | "edit_location"
   | "initiate_movement" | "initiate_retirement" | "initiate_disposal" | "initiate_maintenance"
-  | "manage_depreciation" | "run_depreciation" | "override_depreciation";
+  | "manage_depreciation" | "run_depreciation" | "override_depreciation"
+  | "request_gate_pass" | "approve_gate_pass" | "verify_gate_pass";
 
 export const ALL_MODULES: ModuleKey[] = [
-  "dashboard", "assets", "categories", "locations", "branches", "users", "reports", "audit", "depreciation",
+  "dashboard", "assets", "categories", "locations", "branches", "users", "reports", "audit", "depreciation", "gate_pass",
 ];
 export const ALL_APPROVAL_KINDS: ApprovalKind[] = [
   "movement", "retirement", "disposal", "reactivation", "set_for_disposal", "maintenance",
@@ -23,6 +24,7 @@ export const ALL_ACTION_KINDS: ActionKind[] = [
   "add_asset", "edit_asset", "edit_location",
   "initiate_movement", "initiate_retirement", "initiate_disposal", "initiate_maintenance",
   "manage_depreciation", "run_depreciation", "override_depreciation",
+  "request_gate_pass", "approve_gate_pass", "verify_gate_pass",
 ];
 export const DEFAULT_NEW_USER_MODULES: ModuleKey[] = ["dashboard", "assets"];
 
