@@ -166,7 +166,7 @@ function Dashboard() {
         {stats.map((s) => (
           <Card
             key={s.label}
-            onClick={() => setTile({ title: s.label, filter: s.filter })}
+            onClick={() => s.navigateTo ? nav({ to: s.navigateTo }) : setTile({ title: s.label, filter: s.filter })}
             className="group cursor-pointer overflow-hidden p-5 transition hover:-translate-y-0.5 hover:shadow-lg"
             style={{
               borderTop: `3px solid ${s.color}`,
