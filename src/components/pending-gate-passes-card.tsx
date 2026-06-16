@@ -21,8 +21,8 @@ export function PendingGatePassesCard() {
         .order("created_at", { ascending: false })
         .limit(50);
       const list = (data ?? []).filter((r: any) => canSeeBranch(r.branch_id));
-      const assetIds = Array.from(new Set(list.map((r: any) => r.asset_id).filter(Boolean)));
-      const userIds = Array.from(new Set(list.map((r: any) => r.requested_by).filter(Boolean)));
+      const assetIds = Array.from(new Set(list.map((r: any) => r.asset_id).filter(Boolean))) as string[];
+      const userIds = Array.from(new Set(list.map((r: any) => r.requested_by).filter(Boolean))) as string[];
       const [{ data: assets }, { data: profs }] = await Promise.all([
         assetIds.length ? supabase.from("assets").select("id,name,asset_tag").in("id", assetIds) : Promise.resolve({ data: [] as any[] }),
         userIds.length ? supabase.from("profiles").select("id,full_name,email").in("id", userIds) : Promise.resolve({ data: [] as any[] }),
