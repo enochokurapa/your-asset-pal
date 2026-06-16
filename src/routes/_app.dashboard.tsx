@@ -76,6 +76,12 @@ function Dashboard() {
       const statusCounts = ["in_use", "in_storage", "under_repair", "retired", "missing", "disposed"].map((s) => ({
         name: s.replace("_", " "), key: s, value: countStatus(s),
       }));
+      const gpList = (gatePasses.data ?? []).filter((g: any) =>
+        canSeeBranch(g.branch_id) && (selectedBranch === "all" || g.branch_id === selectedBranch)
+      );
+      const gpPending = gpList.filter((g: any) => g.status === "pending").length;
+      const gpOutside = gpList.filter((g: any) => g.status === "approved" || g.status === "checked_out").length;
+
       return {
         total: list.length,
         totalValue: sumValue(() => true),
@@ -98,7 +104,8 @@ function Dashboard() {
         perBranch,
         statusCounts,
         branchesForFilter,
-
+        gpPending,
+        gpOutside,
       };
     },
   });
