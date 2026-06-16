@@ -111,7 +111,7 @@ function Dashboard() {
   });
 
   // Each tile gets its own corporate accent color.
-  const stats: { label: string; value: number; icon: any; color: string; filter: TileFilter; subtotal?: number }[] = [
+  const stats: { label: string; value: number; icon: any; color: string; filter: TileFilter; subtotal?: number; navigateTo?: string }[] = [
     { label: "Total Assets",    value: data?.total ?? 0,       icon: Package,        color: "#1E3A8A", filter: { kind: "all" },                               subtotal: data?.totalValue },
     { label: "Active Assets",   value: data?.active ?? 0,      icon: CheckCircle2,   color: "#047857", filter: { kind: "active" },                            subtotal: data?.activeValue },
     { label: "Branches",        value: data?.branchCount ?? 0, icon: Building2,      color: "#7C3AED", filter: { kind: "all" } },
@@ -124,6 +124,8 @@ function Dashboard() {
     { label: "For Disposal",    value: data?.forDisposal ?? 0, icon: Trash2,         color: "#C2410C", filter: { kind: "for_disposal" } },
     { label: "For Retirement",  value: data?.forRetirement ?? 0, icon: Archive,      color: "#A16207", filter: { kind: "pending_retirement" } },
     { label: "For Repair",      value: data?.forRepair ?? 0,   icon: Wrench,         color: "#BE185D", filter: { kind: "pending_repair" },                    subtotal: data?.repairAmount },
+    { label: "Out of Premises", value: data?.gpOutside ?? 0,   icon: PackageCheck,   color: "#0369A1", filter: { kind: "all" }, navigateTo: "/gate-pass" },
+    { label: "Gate Pass Pending", value: data?.gpPending ?? 0, icon: DoorOpen,       color: "#9333EA", filter: { kind: "all" }, navigateTo: "/gate-pass" },
   ];
 
   const [tile, setTile] = useState<{ title: string; filter: TileFilter } | null>(null);
