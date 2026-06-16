@@ -28,6 +28,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 function Dashboard() {
   const { canSeeBranch, branchScope } = useAuth();
+  const nav = useNavigate();
   const scopeKey = branchScope ? Array.from(branchScope).sort().join(",") : "all";
   const [selectedBranch, setSelectedBranch] = useState<string>("all");
   const { data, isLoading } = useQuery({
