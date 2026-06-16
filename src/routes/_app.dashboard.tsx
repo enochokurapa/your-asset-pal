@@ -35,12 +35,13 @@ function Dashboard() {
     queryKey: ["dashboard-stats", scopeKey, selectedBranch],
 
     queryFn: async () => {
-      const [assets, cats, locs, branches, pending] = await Promise.all([
+      const [assets, cats, locs, branches, pending, gatePasses] = await Promise.all([
         supabase.from("assets").select("id,status,name,asset_tag,branch_id,set_for_disposal,purchase_value,created_at").order("created_at", { ascending: false }),
         supabase.from("categories").select("id", { count: "exact", head: true }),
         supabase.from("locations").select("id", { count: "exact", head: true }),
         supabase.from("branches").select("id,name,code,is_active"),
         supabase.from("approval_requests").select("id,kind,asset_id,status,payload").eq("status", "pending"),
+        (supabase as any).from("gate_passes").select("id,status,branch_id,asset_id").in("status", ["pending", "approved", "checked_out"]),
       ]);
       const list = (assets.data ?? [])
         .filter((a: any) => canSeeBranch(a.branch_id))
