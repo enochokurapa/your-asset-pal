@@ -252,6 +252,8 @@ function Dashboard() {
           </div>
         </Card>
       </div>
+
+      <PendingGatePassesCard />
     </div>
   );
 }
