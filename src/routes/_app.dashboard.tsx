@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, CheckCircle2, Wrench, Archive, Tags, MapPin, Building2, AlertTriangle, Trash2, Boxes } from "lucide-react";
+import { Package, CheckCircle2, Wrench, Archive, Tags, MapPin, Building2, AlertTriangle, Trash2, Boxes, DoorOpen, PackageCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { PendingApprovalsCard } from "@/components/pending-approvals-card";
+import { PendingGatePassesCard } from "@/components/pending-gate-passes-card";
 import { TileAssetsDialog, type TileFilter } from "@/components/tile-assets-dialog";
 import { formatUGX } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
