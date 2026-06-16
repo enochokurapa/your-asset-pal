@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, CheckCircle2, Wrench, Archive, Tags, MapPin, Building2, AlertTriangle, Trash2, Boxes } from "lucide-react";
+import { Package, CheckCircle2, Wrench, Archive, Tags, MapPin, Building2, AlertTriangle, Trash2, Boxes, DoorOpen, PackageCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { PendingApprovalsCard } from "@/components/pending-approvals-card";
+import { PendingGatePassesCard } from "@/components/pending-gate-passes-card";
 import { TileAssetsDialog, type TileFilter } from "@/components/tile-assets-dialog";
 import { formatUGX } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
@@ -27,18 +28,20 @@ const STATUS_COLORS: Record<string, string> = {
 
 function Dashboard() {
   const { canSeeBranch, branchScope } = useAuth();
+  const nav = useNavigate();
   const scopeKey = branchScope ? Array.from(branchScope).sort().join(",") : "all";
   const [selectedBranch, setSelectedBranch] = useState<string>("all");
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard-stats", scopeKey, selectedBranch],
 
     queryFn: async () => {
-      const [assets, cats, locs, branches, pending] = await Promise.all([
+      const [assets, cats, locs, branches, pending, gatePasses] = await Promise.all([
         supabase.from("assets").select("id,status,name,asset_tag,branch_id,set_for_disposal,purchase_value,created_at").order("created_at", { ascending: false }),
         supabase.from("categories").select("id", { count: "exact", head: true }),
         supabase.from("locations").select("id", { count: "exact", head: true }),
         supabase.from("branches").select("id,name,code,is_active"),
         supabase.from("approval_requests").select("id,kind,asset_id,status,payload").eq("status", "pending"),
+        (supabase as any).from("gate_passes").select("id,status,branch_id,asset_id").in("status", ["pending", "approved", "checked_out"]),
       ]);
       const list = (assets.data ?? [])
         .filter((a: any) => canSeeBranch(a.branch_id))
@@ -73,6 +76,12 @@ function Dashboard() {
       const statusCounts = ["in_use", "in_storage", "under_repair", "retired", "missing", "disposed"].map((s) => ({
         name: s.replace("_", " "), key: s, value: countStatus(s),
       }));
+      const gpList = (gatePasses.data ?? []).filter((g: any) =>
+        canSeeBranch(g.branch_id) && (selectedBranch === "all" || g.branch_id === selectedBranch)
+      );
+      const gpPending = gpList.filter((g: any) => g.status === "pending").length;
+      const gpOutside = gpList.filter((g: any) => g.status === "approved" || g.status === "checked_out").length;
+
       return {
         total: list.length,
         totalValue: sumValue(() => true),
@@ -95,13 +104,14 @@ function Dashboard() {
         perBranch,
         statusCounts,
         branchesForFilter,
-
+        gpPending,
+        gpOutside,
       };
     },
   });
 
   // Each tile gets its own corporate accent color.
-  const stats: { label: string; value: number; icon: any; color: string; filter: TileFilter; subtotal?: number }[] = [
+  const stats: { label: string; value: number; icon: any; color: string; filter: TileFilter; subtotal?: number; navigateTo?: string }[] = [
     { label: "Total Assets",    value: data?.total ?? 0,       icon: Package,        color: "#1E3A8A", filter: { kind: "all" },                               subtotal: data?.totalValue },
     { label: "Active Assets",   value: data?.active ?? 0,      icon: CheckCircle2,   color: "#047857", filter: { kind: "active" },                            subtotal: data?.activeValue },
     { label: "Branches",        value: data?.branchCount ?? 0, icon: Building2,      color: "#7C3AED", filter: { kind: "all" } },
@@ -114,6 +124,8 @@ function Dashboard() {
     { label: "For Disposal",    value: data?.forDisposal ?? 0, icon: Trash2,         color: "#C2410C", filter: { kind: "for_disposal" } },
     { label: "For Retirement",  value: data?.forRetirement ?? 0, icon: Archive,      color: "#A16207", filter: { kind: "pending_retirement" } },
     { label: "For Repair",      value: data?.forRepair ?? 0,   icon: Wrench,         color: "#BE185D", filter: { kind: "pending_repair" },                    subtotal: data?.repairAmount },
+    { label: "Out of Premises", value: data?.gpOutside ?? 0,   icon: PackageCheck,   color: "#0369A1", filter: { kind: "all" }, navigateTo: "/gate-pass" },
+    { label: "Gate Pass Pending", value: data?.gpPending ?? 0, icon: DoorOpen,       color: "#9333EA", filter: { kind: "all" }, navigateTo: "/gate-pass" },
   ];
 
   const [tile, setTile] = useState<{ title: string; filter: TileFilter } | null>(null);
@@ -154,7 +166,7 @@ function Dashboard() {
         {stats.map((s) => (
           <Card
             key={s.label}
-            onClick={() => setTile({ title: s.label, filter: s.filter })}
+            onClick={() => s.navigateTo ? nav({ to: s.navigateTo }) : setTile({ title: s.label, filter: s.filter })}
             className="group cursor-pointer overflow-hidden p-5 transition hover:-translate-y-0.5 hover:shadow-lg"
             style={{
               borderTop: `3px solid ${s.color}`,
@@ -240,6 +252,8 @@ function Dashboard() {
           </div>
         </Card>
       </div>
+
+      <PendingGatePassesCard />
     </div>
   );
 }
