@@ -244,42 +244,41 @@ function AuditPage() {
     }
   };
 
-  const openDetailPdf = (r: any) => {
-    const doc = new jsPDF();
-    doc.setFontSize(16);
-    doc.text("Audit Log Entry", 14, 16);
-    doc.setFontSize(9);
-    doc.text(`Generated ${new Date().toLocaleString()}`, 14, 22);
-    appendEntryToDoc(doc, r, 28);
-    // Preview only — user can download from the viewer if they wish
+  const openDetailPdf = async (r: any) => {
+    const template = await (await import("@/lib/pdf-template")).loadTemplate();
+    const { createBrandedPdf, applyTemplateChrome } = await import("@/lib/pdf-template");
+    const { doc, startY } = createBrandedPdf({ template, title: "Audit Log Entry" });
+    appendEntryToDoc(doc, r, startY);
+    applyTemplateChrome(doc, template);
     const blob = doc.output("blob");
     const url = URL.createObjectURL(blob);
     window.open(url, "_blank");
   };
 
-  const openCombinedPdf = () => {
+  const openCombinedPdf = async () => {
     const picks = filtered.filter((r: any) => selectedRows.has(r.id));
     if (picks.length === 0) { toast.error("Select at least one entry"); return; }
-    const doc = new jsPDF();
-    doc.setFontSize(16);
-    doc.text(`Audit Log — ${picks.length} entries`, 14, 16);
-    doc.setFontSize(9);
-    doc.text(`Generated ${new Date().toLocaleString()}`, 14, 22);
+    const { loadTemplate, createBrandedPdf, applyTemplateChrome } = await import("@/lib/pdf-template");
+    const template = await loadTemplate();
+    const { doc, startY } = createBrandedPdf({ template, title: `Audit Log — ${picks.length} entries` });
     picks.forEach((r: any, i: number) => {
       if (i > 0) {
         doc.addPage();
         doc.setFontSize(14);
         doc.text(`Entry ${i + 1} of ${picks.length}`, 14, 16);
+        appendEntryToDoc(doc, r, 22);
       } else {
         doc.setFontSize(12);
-        doc.text(`Entry 1 of ${picks.length}`, 14, 28);
+        doc.text(`Entry 1 of ${picks.length}`, 14, startY);
+        appendEntryToDoc(doc, r, startY + 6);
       }
-      appendEntryToDoc(doc, r, i === 0 ? 34 : 22);
     });
+    applyTemplateChrome(doc, template);
     const blob = doc.output("blob");
     const url = URL.createObjectURL(blob);
     window.open(url, "_blank");
   };
+
 
   const toggleRow = (id: string) => {
     const next = new Set(selectedRows);
