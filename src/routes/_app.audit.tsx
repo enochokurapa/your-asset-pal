@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { History, Download, FileText, Trash2, Eye } from "lucide-react";
 import { toast } from "sonner";
-import jsPDF from "jspdf";
+import type jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { exportReportXLSX, exportReportPDF } from "@/lib/depreciation-export";
