@@ -1,7 +1,7 @@
-import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { formatUGX } from "@/lib/utils";
+import { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } from "@/lib/pdf-template";
 
 const ASSET_COLUMNS: { key: string; header: string; currency?: boolean }[] = [
   { key: "asset_tag", header: "Tag" },
@@ -51,21 +51,24 @@ export function exportAssetsXLSX(title: string, assets: any[]) {
   XLSX.writeFile(wb, `${safe(title) || "assets"}.xlsx`);
 }
 
-export function exportAssetsPDF(title: string, assets: any[]) {
-  const doc = new jsPDF({ orientation: "landscape" });
-  doc.setFontSize(14);
-  doc.text(title, 14, 14);
-  doc.setFontSize(9);
-  doc.text(`Generated ${new Date().toLocaleString()} · ${assets.length} asset(s)`, 14, 20);
+export async function exportAssetsPDF(title: string, assets: any[]) {
+  const template = await loadTemplate();
+  const { doc, startY } = createBrandedPdf({
+    template,
+    orientation: "landscape",
+    title,
+    subtitle: `${assets.length} asset(s)`,
+  });
   const rows = assets.map(normalize);
   autoTable(doc, {
-    startY: 26,
+    startY,
     head: [ASSET_COLUMNS.map((c) => c.header)],
     body: rows.map((r) => ASSET_COLUMNS.map((c) => fmt((r as any)[c.key], c.currency))),
-    styles: { fontSize: 7 },
-    headStyles: { fillColor: [30, 41, 59] },
+    styles: { fontSize: 7, font: template.font_family },
+    headStyles: { fillColor: tableHeadFill(template) },
+    margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
   });
-  doc.save(`${safe(title) || "assets"}.pdf`);
+  saveBranded(doc, template, `${safe(title) || "assets"}.pdf`);
 }
 
 function detailPairs(a: any): [string, string][] {
@@ -95,20 +98,21 @@ export function exportAssetDetailXLSX(a: any) {
   XLSX.writeFile(wb, `${safe(a.asset_tag || a.name || "asset")}.xlsx`);
 }
 
-export function exportAssetDetailPDF(a: any) {
-  const doc = new jsPDF();
-  doc.setFontSize(16);
-  doc.text(a.name ?? "Asset", 14, 16);
-  doc.setFontSize(10);
-  doc.text(`Tag: ${a.asset_tag ?? ""}`, 14, 23);
-  doc.text(`Generated ${new Date().toLocaleString()}`, 14, 29);
+export async function exportAssetDetailPDF(a: any) {
+  const template = await loadTemplate();
+  const { doc, startY } = createBrandedPdf({
+    template,
+    title: a.name ?? "Asset",
+    subtitle: `Tag: ${a.asset_tag ?? ""}`,
+  });
   autoTable(doc, {
-    startY: 34,
+    startY,
     head: [["Field", "Value"]],
     body: detailPairs(a),
-    styles: { fontSize: 9 },
-    headStyles: { fillColor: [30, 41, 59] },
+    styles: { fontSize: 9, font: template.font_family },
+    headStyles: { fillColor: tableHeadFill(template) },
     columnStyles: { 0: { cellWidth: 50, fontStyle: "bold" } },
+    margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
   });
-  doc.save(`${safe(a.asset_tag || a.name || "asset")}.pdf`);
+  saveBranded(doc, template, `${safe(a.asset_tag || a.name || "asset")}.pdf`);
 }
