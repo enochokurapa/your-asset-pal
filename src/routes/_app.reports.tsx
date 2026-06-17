@@ -10,11 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileBarChart, FileDown, FileSpreadsheet, X } from "lucide-react";
-import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { formatUGX } from "@/lib/utils";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } from "@/lib/pdf-template";
 
 export const Route = createFileRoute("/_app/reports")({
   component: ReportsPage,
@@ -34,21 +34,22 @@ function fmtCell(v: any, isCurrency?: boolean) {
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
 }
-function exportPDF(r: Report) {
-  const doc = new jsPDF({ orientation: "landscape" });
-  doc.setFontSize(14);
-  doc.text(r.title, 14, 14);
-  doc.setFontSize(9);
-  doc.text(`Generated ${new Date().toLocaleString()}`, 14, 20);
+async function exportPDF(r: Report) {
+  const template = await loadTemplate();
+  const { doc, startY } = createBrandedPdf({
+    template, orientation: "landscape", title: r.title, subtitle: `${r.rows.length} row(s)`,
+  });
   autoTable(doc, {
-    startY: 26,
+    startY,
     head: [r.columns.map((c) => c.header)],
     body: r.rows.map((row) => r.columns.map((c) => fmtCell(row[c.key], c.isCurrency))),
-    styles: { fontSize: 7 },
-    headStyles: { fillColor: [30, 41, 59] },
+    styles: { fontSize: 7, font: template.font_family },
+    headStyles: { fillColor: tableHeadFill(template) },
+    margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
   });
-  doc.save(`${r.title.replace(/\s+/g, "_")}.pdf`);
+  saveBranded(doc, template, `${r.title.replace(/\s+/g, "_")}.pdf`);
 }
+
 function exportXLSX(r: Report) {
   const data = r.rows.map((row) => Object.fromEntries(r.columns.map((c) => [c.header, fmtCell(row[c.key], c.isCurrency)])));
   const ws = XLSX.utils.json_to_sheet(data);
