@@ -5,7 +5,7 @@ import type { Session, User } from "@supabase/supabase-js";
 export type AppRole = "admin" | "manager" | "staff" | "security";
 export type ModuleKey =
   | "dashboard" | "assets" | "categories" | "locations" | "branches"
-  | "users" | "reports" | "audit" | "depreciation" | "gate_pass";
+  | "users" | "reports" | "audit" | "depreciation" | "gate_pass" | "settings";
 export type ApprovalKind =
   | "movement" | "retirement" | "disposal" | "reactivation" | "set_for_disposal" | "maintenance";
 export type ActionKind =
@@ -13,10 +13,11 @@ export type ActionKind =
   | "initiate_movement" | "initiate_retirement" | "initiate_disposal" | "initiate_maintenance"
   | "manage_depreciation" | "run_depreciation" | "override_depreciation"
   | "request_gate_pass" | "approve_gate_pass" | "verify_gate_pass"
-  | "view_gate_pass_reports" | "export_gate_pass_reports";
+  | "view_gate_pass_reports" | "export_gate_pass_reports"
+  | "manage_document_templates";
 
 export const ALL_MODULES: ModuleKey[] = [
-  "dashboard", "assets", "categories", "locations", "branches", "users", "reports", "audit", "depreciation", "gate_pass",
+  "dashboard", "assets", "categories", "locations", "branches", "users", "reports", "audit", "depreciation", "gate_pass", "settings",
 ];
 export const ALL_APPROVAL_KINDS: ApprovalKind[] = [
   "movement", "retirement", "disposal", "reactivation", "set_for_disposal", "maintenance",
@@ -27,7 +28,9 @@ export const ALL_ACTION_KINDS: ActionKind[] = [
   "manage_depreciation", "run_depreciation", "override_depreciation",
   "request_gate_pass", "approve_gate_pass", "verify_gate_pass",
   "view_gate_pass_reports", "export_gate_pass_reports",
+  "manage_document_templates",
 ];
+
 export const DEFAULT_NEW_USER_MODULES: ModuleKey[] = ["dashboard", "assets"];
 
 interface AuthCtx {

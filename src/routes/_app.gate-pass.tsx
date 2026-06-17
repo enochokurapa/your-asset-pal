@@ -14,8 +14,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Plus, FileDown, Eye, CheckCircle2, XCircle, DoorOpen, PackageCheck, FileSpreadsheet, Filter, X } from "lucide-react";
-import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+
 import * as XLSX from "xlsx";
 
 export const Route = createFileRoute("/_app/gate-pass")({
@@ -174,23 +174,27 @@ function GatePassPage() {
     XLSX.utils.book_append_sheet(wb, ws, "Gate Passes");
     XLSX.writeFile(wb, `gate-pass-report-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
-  const exportPDF = () => {
-    const doc = new jsPDF({ orientation: "landscape" });
-    doc.setFontSize(14);
-    doc.text("Gate Pass Report", 14, 14);
-    doc.setFontSize(9);
-    doc.text(`Generated ${new Date().toLocaleString()} · ${reportRows.length} record(s)`, 14, 20);
-    doc.text(`Filters: ${filterSummary}`, 14, 26);
+  const exportPDF = async () => {
+    const { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } = await import("@/lib/pdf-template");
+    const template = await loadTemplate();
+    const { doc, startY } = createBrandedPdf({
+      template,
+      orientation: "landscape",
+      title: "Gate Pass Report",
+      subtitle: `${reportRows.length} record(s) · Filters: ${filterSummary}`,
+    });
     const cols = ["Pass No.", "Asset", "Status", "Destination", "Branch", "Requested by", "Requested at", "Expected return", "Checked out at", "Returned at"];
     autoTable(doc, {
-      startY: 32,
+      startY,
       head: [cols],
       body: reportRows.map((r: any) => cols.map((c) => r[c] ?? "")),
-      styles: { fontSize: 7 },
-      headStyles: { fillColor: [30, 41, 59] },
+      styles: { fontSize: 7, font: template.font_family },
+      headStyles: { fillColor: tableHeadFill(template) },
+      margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
     });
-    doc.save(`gate-pass-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+    saveBranded(doc, template, `gate-pass-report-${new Date().toISOString().slice(0, 10)}.pdf`);
   };
+
 
   return (
     <div className="space-y-6">
@@ -617,17 +621,17 @@ function DetailDialog(props: {
     );
   };
 
-  const downloadPdf = () => {
-    const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text("GATE PASS", 105, 18, { align: "center" });
-    doc.setFontSize(11);
-    doc.text(`Pass No: ${gp.pass_number ?? "(pending approval)"}`, 105, 26, { align: "center" });
-    doc.setFontSize(9);
-    doc.text(`Generated ${new Date().toLocaleString()}`, 105, 32, { align: "center" });
+  const downloadPdf = async () => {
+    const { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } = await import("@/lib/pdf-template");
+    const template = await loadTemplate();
+    const { doc, startY, pageWidth } = createBrandedPdf({
+      template,
+      title: "GATE PASS",
+      subtitle: `Pass No: ${gp.pass_number ?? "(pending approval)"}`,
+    });
 
     autoTable(doc, {
-      startY: 40,
+      startY,
       head: [["Field", "Value"]],
       body: [
         ["Asset", props.assetLabel],
@@ -648,22 +652,28 @@ function DetailDialog(props: {
         ["Return condition", gp.return_condition ?? "—"],
         ["Return notes", gp.return_notes ?? "—"],
       ],
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [30, 41, 59] },
+      styles: { fontSize: 9, font: template.font_family },
+      headStyles: { fillColor: tableHeadFill(template) },
       columnStyles: { 0: { cellWidth: 55, fontStyle: "bold" } },
+      margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
     });
 
     const finalY = (doc as any).lastAutoTable.finalY + 20;
     doc.setFontSize(10);
-    doc.text("_________________________", 20, finalY);
-    doc.text("Requester signature", 20, finalY + 6);
-    doc.text("_________________________", 80, finalY);
-    doc.text("Approver signature", 80, finalY + 6);
-    doc.text("_________________________", 140, finalY);
-    doc.text("Security signature", 140, finalY + 6);
+    const colW = (pageWidth - template.margin_left - template.margin_right) / 3;
+    const x1 = template.margin_left;
+    const x2 = template.margin_left + colW;
+    const x3 = template.margin_left + colW * 2;
+    doc.text("_________________________", x1, finalY);
+    doc.text("Requester signature", x1, finalY + 6);
+    doc.text("_________________________", x2, finalY);
+    doc.text("Approver signature", x2, finalY + 6);
+    doc.text("_________________________", x3, finalY);
+    doc.text("Security signature", x3, finalY + 6);
 
-    doc.save(`gate-pass-${gp.pass_number ?? gp.id.slice(0, 8)}.pdf`);
+    saveBranded(doc, template, `gate-pass-${gp.pass_number ?? gp.id.slice(0, 8)}.pdf`);
   };
+
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
