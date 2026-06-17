@@ -1,7 +1,8 @@
-import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { formatUGX } from "@/lib/utils";
+import { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } from "@/lib/pdf-template";
+
 
 const safe = (s: string) => s.replace(/[^a-z0-9_-]+/gi, "_");
 
