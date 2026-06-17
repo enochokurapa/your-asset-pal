@@ -174,23 +174,27 @@ function GatePassPage() {
     XLSX.utils.book_append_sheet(wb, ws, "Gate Passes");
     XLSX.writeFile(wb, `gate-pass-report-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
-  const exportPDF = () => {
-    const doc = new jsPDF({ orientation: "landscape" });
-    doc.setFontSize(14);
-    doc.text("Gate Pass Report", 14, 14);
-    doc.setFontSize(9);
-    doc.text(`Generated ${new Date().toLocaleString()} · ${reportRows.length} record(s)`, 14, 20);
-    doc.text(`Filters: ${filterSummary}`, 14, 26);
+  const exportPDF = async () => {
+    const { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } = await import("@/lib/pdf-template");
+    const template = await loadTemplate();
+    const { doc, startY } = createBrandedPdf({
+      template,
+      orientation: "landscape",
+      title: "Gate Pass Report",
+      subtitle: `${reportRows.length} record(s) · Filters: ${filterSummary}`,
+    });
     const cols = ["Pass No.", "Asset", "Status", "Destination", "Branch", "Requested by", "Requested at", "Expected return", "Checked out at", "Returned at"];
     autoTable(doc, {
-      startY: 32,
+      startY,
       head: [cols],
       body: reportRows.map((r: any) => cols.map((c) => r[c] ?? "")),
-      styles: { fontSize: 7 },
-      headStyles: { fillColor: [30, 41, 59] },
+      styles: { fontSize: 7, font: template.font_family },
+      headStyles: { fillColor: tableHeadFill(template) },
+      margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
     });
-    doc.save(`gate-pass-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+    saveBranded(doc, template, `gate-pass-report-${new Date().toISOString().slice(0, 10)}.pdf`);
   };
+
 
   return (
     <div className="space-y-6">
