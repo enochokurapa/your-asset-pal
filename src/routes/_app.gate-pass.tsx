@@ -14,8 +14,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Plus, FileDown, Eye, CheckCircle2, XCircle, DoorOpen, PackageCheck, FileSpreadsheet, Filter, X } from "lucide-react";
-import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+
 import * as XLSX from "xlsx";
 
 export const Route = createFileRoute("/_app/gate-pass")({
