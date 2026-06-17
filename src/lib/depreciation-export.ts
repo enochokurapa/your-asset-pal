@@ -32,24 +32,22 @@ export function exportScheduleXLSX(title: string, rows: ScheduleRow[]) {
   XLSX.writeFile(wb, `${safe(title) || "depreciation"}.xlsx`);
 }
 
-export function exportSchedulePDF(title: string, rows: ScheduleRow[], subtitle?: string) {
-  const doc = new jsPDF({ orientation: "landscape" });
-  doc.setFontSize(14);
-  doc.text(title, 14, 14);
-  doc.setFontSize(9);
-  doc.text(`Generated ${new Date().toLocaleString()}${subtitle ? " · " + subtitle : ""}`, 14, 20);
+export async function exportSchedulePDF(title: string, rows: ScheduleRow[], subtitle?: string) {
+  const template = await loadTemplate();
+  const { doc, startY } = createBrandedPdf({ template, orientation: "landscape", title, subtitle });
   autoTable(doc, {
-    startY: 26,
+    startY,
     head: [["#", "Period start", "Period end", "Opening", "Depreciation", "Accumulated", "Closing"]],
     body: rows.map((r) => [
       r.index, r.periodStart, r.periodEnd,
       formatUGX(r.opening), formatUGX(r.depreciation),
       formatUGX(r.accumulated), formatUGX(r.closing),
     ]),
-    styles: { fontSize: 8 },
-    headStyles: { fillColor: [30, 41, 59] },
+    styles: { fontSize: 8, font: template.font_family },
+    headStyles: { fillColor: tableHeadFill(template) },
+    margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
   });
-  doc.save(`${safe(title) || "depreciation"}.pdf`);
+  saveBranded(doc, template, `${safe(title) || "depreciation"}.pdf`);
 }
 
 export function exportReportXLSX(title: string, headers: string[], rows: (string | number)[][]) {
@@ -60,18 +58,19 @@ export function exportReportXLSX(title: string, headers: string[], rows: (string
   XLSX.writeFile(wb, `${safe(title) || "report"}.xlsx`);
 }
 
-export function exportReportPDF(title: string, headers: string[], rows: (string | number)[][]) {
-  const doc = new jsPDF({ orientation: "landscape" });
-  doc.setFontSize(14);
-  doc.text(title, 14, 14);
-  doc.setFontSize(9);
-  doc.text(`Generated ${new Date().toLocaleString()} · ${rows.length} row(s)`, 14, 20);
+export async function exportReportPDF(title: string, headers: string[], rows: (string | number)[][]) {
+  const template = await loadTemplate();
+  const { doc, startY } = createBrandedPdf({
+    template, orientation: "landscape", title, subtitle: `${rows.length} row(s)`,
+  });
   autoTable(doc, {
-    startY: 26,
+    startY,
     head: [headers],
     body: rows.map((r) => r.map((c) => (typeof c === "number" ? formatUGX(c) : c))),
-    styles: { fontSize: 8 },
-    headStyles: { fillColor: [30, 41, 59] },
+    styles: { fontSize: 8, font: template.font_family },
+    headStyles: { fillColor: tableHeadFill(template) },
+    margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
   });
-  doc.save(`${safe(title) || "report"}.pdf`);
+  saveBranded(doc, template, `${safe(title) || "report"}.pdf`);
 }
+
