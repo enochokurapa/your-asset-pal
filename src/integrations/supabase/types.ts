@@ -710,6 +710,102 @@ export type Database = {
         }
         Relationships: []
       }
+      document_templates: {
+        Row: {
+          base_font_size: number
+          created_at: string
+          font_family: string
+          footer_show: boolean
+          footer_text: string
+          header_show: boolean
+          header_text: string
+          id: string
+          is_active: boolean
+          logo_data_url: string | null
+          logo_max_height: number
+          logo_position: string
+          margin_bottom: number
+          margin_left: number
+          margin_right: number
+          margin_top: number
+          name: string
+          organization_name: string
+          orientation: string
+          paper_size: string
+          primary_color: string
+          show_generated_at: boolean
+          show_page_numbers: boolean
+          updated_at: string
+          updated_by: string | null
+          watermark_image_data_url: string | null
+          watermark_opacity: number
+          watermark_position: string
+          watermark_text: string
+        }
+        Insert: {
+          base_font_size?: number
+          created_at?: string
+          font_family?: string
+          footer_show?: boolean
+          footer_text?: string
+          header_show?: boolean
+          header_text?: string
+          id?: string
+          is_active?: boolean
+          logo_data_url?: string | null
+          logo_max_height?: number
+          logo_position?: string
+          margin_bottom?: number
+          margin_left?: number
+          margin_right?: number
+          margin_top?: number
+          name?: string
+          organization_name?: string
+          orientation?: string
+          paper_size?: string
+          primary_color?: string
+          show_generated_at?: boolean
+          show_page_numbers?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          watermark_image_data_url?: string | null
+          watermark_opacity?: number
+          watermark_position?: string
+          watermark_text?: string
+        }
+        Update: {
+          base_font_size?: number
+          created_at?: string
+          font_family?: string
+          footer_show?: boolean
+          footer_text?: string
+          header_show?: boolean
+          header_text?: string
+          id?: string
+          is_active?: boolean
+          logo_data_url?: string | null
+          logo_max_height?: number
+          logo_position?: string
+          margin_bottom?: number
+          margin_left?: number
+          margin_right?: number
+          margin_top?: number
+          name?: string
+          organization_name?: string
+          orientation?: string
+          paper_size?: string
+          primary_color?: string
+          show_generated_at?: boolean
+          show_page_numbers?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          watermark_image_data_url?: string | null
+          watermark_opacity?: number
+          watermark_position?: string
+          watermark_text?: string
+        }
+        Relationships: []
+      }
       gate_passes: {
         Row: {
           approver_id: string | null
