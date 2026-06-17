@@ -621,17 +621,17 @@ function DetailDialog(props: {
     );
   };
 
-  const downloadPdf = () => {
-    const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text("GATE PASS", 105, 18, { align: "center" });
-    doc.setFontSize(11);
-    doc.text(`Pass No: ${gp.pass_number ?? "(pending approval)"}`, 105, 26, { align: "center" });
-    doc.setFontSize(9);
-    doc.text(`Generated ${new Date().toLocaleString()}`, 105, 32, { align: "center" });
+  const downloadPdf = async () => {
+    const { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } = await import("@/lib/pdf-template");
+    const template = await loadTemplate();
+    const { doc, startY, pageWidth } = createBrandedPdf({
+      template,
+      title: "GATE PASS",
+      subtitle: `Pass No: ${gp.pass_number ?? "(pending approval)"}`,
+    });
 
     autoTable(doc, {
-      startY: 40,
+      startY,
       head: [["Field", "Value"]],
       body: [
         ["Asset", props.assetLabel],
@@ -652,22 +652,28 @@ function DetailDialog(props: {
         ["Return condition", gp.return_condition ?? "—"],
         ["Return notes", gp.return_notes ?? "—"],
       ],
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [30, 41, 59] },
+      styles: { fontSize: 9, font: template.font_family },
+      headStyles: { fillColor: tableHeadFill(template) },
       columnStyles: { 0: { cellWidth: 55, fontStyle: "bold" } },
+      margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
     });
 
     const finalY = (doc as any).lastAutoTable.finalY + 20;
     doc.setFontSize(10);
-    doc.text("_________________________", 20, finalY);
-    doc.text("Requester signature", 20, finalY + 6);
-    doc.text("_________________________", 80, finalY);
-    doc.text("Approver signature", 80, finalY + 6);
-    doc.text("_________________________", 140, finalY);
-    doc.text("Security signature", 140, finalY + 6);
+    const colW = (pageWidth - template.margin_left - template.margin_right) / 3;
+    const x1 = template.margin_left;
+    const x2 = template.margin_left + colW;
+    const x3 = template.margin_left + colW * 2;
+    doc.text("_________________________", x1, finalY);
+    doc.text("Requester signature", x1, finalY + 6);
+    doc.text("_________________________", x2, finalY);
+    doc.text("Approver signature", x2, finalY + 6);
+    doc.text("_________________________", x3, finalY);
+    doc.text("Security signature", x3, finalY + 6);
 
-    doc.save(`gate-pass-${gp.pass_number ?? gp.id.slice(0, 8)}.pdf`);
+    saveBranded(doc, template, `gate-pass-${gp.pass_number ?? gp.id.slice(0, 8)}.pdf`);
   };
+
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
