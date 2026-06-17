@@ -39,12 +39,30 @@ function GatePassPage() {
   const isSecurity = roles.includes("security");
   const canApprove = isAdmin || isManager || canDo("approve_gate_pass");
   const canVerify = isAdmin || isManager || isSecurity || canDo("verify_gate_pass");
-  const canRequest = !!user; // any signed-in can request for their assigned items
-  // anyone with view permission can request; restricting to assigned is enforced by asset list filter below.
+  const canRequest = !!user;
+  const canViewReports = isAdmin || isManager || canDo("view_gate_pass_reports");
+  const canExportReports = isAdmin || isManager || canDo("export_gate_pass_reports");
 
   const [createOpen, setCreateOpen] = useState(false);
   const [detailGP, setDetailGP] = useState<GP | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState<null | "pdf" | "xlsx">(null);
+
+  // Filters
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [assetFilter, setAssetFilter] = useState<string>("all");
+  const [requesterFilter, setRequesterFilter] = useState<string>("all");
+  const [branchFilter, setBranchFilter] = useState<string>("all");
+  const [destinationFilter, setDestinationFilter] = useState<string>("");
+  const [dateField, setDateField] = useState<"created_at" | "expected_return_date" | "checked_out_at" | "returned_at">("created_at");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
+
+  const resetFilters = () => {
+    setStatusFilter("all"); setAssetFilter("all"); setRequesterFilter("all");
+    setBranchFilter("all"); setDestinationFilter(""); setDateField("created_at");
+    setDateFrom(""); setDateTo("");
+  };
 
   // Data
   const passesQ = useQuery({
@@ -89,10 +107,27 @@ function GatePassPage() {
   };
 
   const visiblePasses = useMemo(() => {
-    const all = (passesQ.data ?? []).filter((p: GP) => canSeeBranch(p.branch_id));
-    if (statusFilter === "all") return all;
-    return all.filter((p: GP) => p.status === statusFilter);
-  }, [passesQ.data, canSeeBranch, statusFilter]);
+    let list = (passesQ.data ?? []).filter((p: GP) => canSeeBranch(p.branch_id));
+    if (statusFilter !== "all") list = list.filter((p: GP) => p.status === statusFilter);
+    if (assetFilter !== "all") list = list.filter((p: GP) => p.asset_id === assetFilter);
+    if (requesterFilter !== "all") list = list.filter((p: GP) => p.requested_by === requesterFilter);
+    if (branchFilter !== "all") list = list.filter((p: GP) => p.branch_id === branchFilter);
+    if (destinationFilter.trim()) {
+      const q = destinationFilter.trim().toLowerCase();
+      list = list.filter((p: GP) => (p.destination ?? "").toLowerCase().includes(q));
+    }
+    if (dateFrom || dateTo) {
+      const from = dateFrom ? new Date(dateFrom).getTime() : -Infinity;
+      const to = dateTo ? new Date(dateTo).getTime() + 86400000 : Infinity;
+      list = list.filter((p: GP) => {
+        const v = p[dateField];
+        if (!v) return false;
+        const t = new Date(v).getTime();
+        return t >= from && t <= to;
+      });
+    }
+    return list;
+  }, [passesQ.data, canSeeBranch, statusFilter, assetFilter, requesterFilter, branchFilter, destinationFilter, dateField, dateFrom, dateTo]);
 
   const requestableAssets = useMemo(() => {
     const list = (assetsQ.data ?? []) as any[];
@@ -101,6 +136,61 @@ function GatePassPage() {
       !["disposed", "retired", "checked_out", "under_repair"].includes(a.status)
     );
   }, [assetsQ.data, canSeeBranch]);
+
+  // Build report rows for export/preview
+  const reportRows = useMemo(() => visiblePasses.map((p: GP) => ({
+    "Pass No.": p.pass_number ?? "—",
+    "Asset": assetLabel(p.asset_id),
+    "Status": (p.status ?? "").replace(/_/g, " "),
+    "Destination": p.destination ?? "",
+    "Reason": p.reason ?? "",
+    "Branch": branchName(p.branch_id),
+    "Requested by": userName(p.requested_by),
+    "Requested at": p.created_at ? new Date(p.created_at).toLocaleString() : "",
+    "Expected return": p.expected_return_date ?? "",
+    "Approved by": userName(p.approver_id),
+    "Decided at": p.decided_at ? new Date(p.decided_at).toLocaleString() : "",
+    "Checked out by": userName(p.checked_out_by),
+    "Checked out at": p.checked_out_at ? new Date(p.checked_out_at).toLocaleString() : "",
+    "Returned by": userName(p.returned_by),
+    "Returned at": p.returned_at ? new Date(p.returned_at).toLocaleString() : "",
+    "Return condition": p.return_condition ?? "",
+  })), [visiblePasses, assetsQ.data, branchesQ.data, profilesQ.data]);
+
+  const filterSummary = useMemo(() => {
+    const parts: string[] = [];
+    if (statusFilter !== "all") parts.push(`Status: ${statusFilter}`);
+    if (assetFilter !== "all") parts.push(`Asset: ${assetLabel(assetFilter)}`);
+    if (requesterFilter !== "all") parts.push(`Requester: ${userName(requesterFilter)}`);
+    if (branchFilter !== "all") parts.push(`Branch: ${branchName(branchFilter)}`);
+    if (destinationFilter) parts.push(`Destination~"${destinationFilter}"`);
+    if (dateFrom || dateTo) parts.push(`${dateField} ${dateFrom || "…"} → ${dateTo || "…"}`);
+    return parts.join(" · ") || "All gate passes";
+  }, [statusFilter, assetFilter, requesterFilter, branchFilter, destinationFilter, dateField, dateFrom, dateTo, assetsQ.data, branchesQ.data, profilesQ.data]);
+
+  const exportXLSX = () => {
+    const ws = XLSX.utils.json_to_sheet(reportRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Gate Passes");
+    XLSX.writeFile(wb, `gate-pass-report-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+  const exportPDF = () => {
+    const doc = new jsPDF({ orientation: "landscape" });
+    doc.setFontSize(14);
+    doc.text("Gate Pass Report", 14, 14);
+    doc.setFontSize(9);
+    doc.text(`Generated ${new Date().toLocaleString()} · ${reportRows.length} record(s)`, 14, 20);
+    doc.text(`Filters: ${filterSummary}`, 14, 26);
+    const cols = ["Pass No.", "Asset", "Status", "Destination", "Branch", "Requested by", "Requested at", "Expected return", "Checked out at", "Returned at"];
+    autoTable(doc, {
+      startY: 32,
+      head: [cols],
+      body: reportRows.map((r: any) => cols.map((c) => r[c] ?? "")),
+      styles: { fontSize: 7 },
+      headStyles: { fillColor: [30, 41, 59] },
+    });
+    doc.save(`gate-pass-report-${new Date().toISOString().slice(0, 10)}.pdf`);
+  };
 
   return (
     <div className="space-y-6">
@@ -122,11 +212,99 @@ function GatePassPage() {
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
+          <Button variant="outline" onClick={() => setShowFilters((v) => !v)}>
+            <Filter className="h-4 w-4" /> {showFilters ? "Hide filters" : "More filters"}
+          </Button>
+          {canViewReports && (
+            <>
+              <Button variant="outline" onClick={() => setPreviewOpen("pdf")}><Eye className="h-4 w-4" /> Preview PDF</Button>
+              <Button variant="outline" onClick={() => setPreviewOpen("xlsx")}><Eye className="h-4 w-4" /> Preview Excel</Button>
+            </>
+          )}
+          {canExportReports && (
+            <>
+              <Button variant="outline" onClick={exportPDF}><FileDown className="h-4 w-4" /> PDF</Button>
+              <Button variant="outline" onClick={exportXLSX}><FileSpreadsheet className="h-4 w-4" /> Excel</Button>
+            </>
+          )}
           {canRequest && (
             <Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" /> New Request</Button>
           )}
         </div>
       </div>
+
+      {showFilters && (
+        <Card>
+          <CardContent className="p-4 grid gap-3 md:grid-cols-3">
+            <div>
+              <Label className="text-xs">Asset</Label>
+              <Select value={assetFilter} onValueChange={setAssetFilter}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All assets</SelectItem>
+                  {(assetsQ.data ?? []).map((a: any) => (
+                    <SelectItem key={a.id} value={a.id}>{a.asset_tag} — {a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Requested by</Label>
+              <Select value={requesterFilter} onValueChange={setRequesterFilter}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Anyone</SelectItem>
+                  {(profilesQ.data ?? []).map((p: any) => (
+                    <SelectItem key={p.id} value={p.id}>{p.full_name || p.email}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Branch</Label>
+              <Select value={branchFilter} onValueChange={setBranchFilter}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All branches</SelectItem>
+                  {(branchesQ.data ?? []).map((b: any) => (
+                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Destination contains</Label>
+              <Input value={destinationFilter} onChange={(e) => setDestinationFilter(e.target.value)} placeholder="e.g. Kampala" />
+            </div>
+            <div>
+              <Label className="text-xs">Date field</Label>
+              <Select value={dateField} onValueChange={(v) => setDateField(v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="created_at">Requested at</SelectItem>
+                  <SelectItem value="expected_return_date">Expected return</SelectItem>
+                  <SelectItem value="checked_out_at">Checked out at</SelectItem>
+                  <SelectItem value="returned_at">Returned at</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs">From</Label>
+                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+              </div>
+              <div>
+                <Label className="text-xs">To</Label>
+                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+              </div>
+            </div>
+            <div className="md:col-span-3 flex justify-between items-center">
+              <p className="text-xs text-muted-foreground">{visiblePasses.length} record(s) · {filterSummary}</p>
+              <Button variant="ghost" size="sm" onClick={resetFilters}><X className="h-4 w-4" /> Reset</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <SummaryCards passes={visiblePasses} />
 
@@ -148,7 +326,7 @@ function GatePassPage() {
             </TableHeader>
             <TableBody>
               {visiblePasses.length === 0 && (
-                <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">No gate passes yet.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">No gate passes match your filters.</TableCell></TableRow>
               )}
               {visiblePasses.map((p: GP) => (
                 <TableRow key={p.id}>
@@ -185,6 +363,17 @@ function GatePassPage() {
         />
       )}
 
+      {previewOpen && (
+        <ReportPreviewDialog
+          mode={previewOpen}
+          rows={reportRows}
+          summary={filterSummary}
+          onClose={() => setPreviewOpen(null)}
+          onDownload={previewOpen === "pdf" ? exportPDF : exportXLSX}
+          canDownload={canExportReports}
+        />
+      )}
+
       {detailGP && (
         <DetailDialog
           gp={detailGP}
@@ -202,6 +391,45 @@ function GatePassPage() {
         />
       )}
     </div>
+  );
+}
+
+function ReportPreviewDialog({ mode, rows, summary, onClose, onDownload, canDownload }: {
+  mode: "pdf" | "xlsx"; rows: any[]; summary: string; onClose: () => void; onDownload: () => void; canDownload: boolean;
+}) {
+  const cols = rows[0] ? Object.keys(rows[0]) : [];
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-6xl">
+        <DialogHeader>
+          <DialogTitle>{mode === "pdf" ? "PDF Preview" : "Excel Preview"} — Gate Pass Report</DialogTitle>
+          <DialogDescription>{rows.length} record(s) · {summary}</DialogDescription>
+        </DialogHeader>
+        <div className="max-h-[60vh] overflow-auto border rounded-md">
+          <Table>
+            <TableHeader>
+              <TableRow>{cols.map((c) => <TableHead key={c} className="whitespace-nowrap">{c}</TableHead>)}</TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.length === 0 && (
+                <TableRow><TableCell colSpan={cols.length || 1} className="text-center py-8 text-sm text-muted-foreground">No rows.</TableCell></TableRow>
+              )}
+              {rows.map((r, i) => (
+                <TableRow key={i}>{cols.map((c) => <TableCell key={c} className="whitespace-nowrap text-xs">{r[c]}</TableCell>)}</TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Close</Button>
+          {canDownload && (
+            <Button onClick={onDownload}>
+              {mode === "pdf" ? <><FileDown className="h-4 w-4" /> Download PDF</> : <><FileSpreadsheet className="h-4 w-4" /> Download Excel</>}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
