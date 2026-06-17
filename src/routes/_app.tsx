@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, Link, Navigate, useRouterState } from "@tansta
 import { useState } from "react";
 import { useAuth, ModuleKey } from "@/hooks/use-auth";
 import {
-  LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X, FileBarChart, Building2, History, UserCircle, TrendingDown, DoorOpen,
+  LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X, FileBarChart, Building2, History, UserCircle, TrendingDown, DoorOpen, Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -23,8 +23,10 @@ const nav: Array<{ to: string; label: string; icon: any; module?: ModuleKey; adm
   { to: "/reports", label: "Reports", icon: FileBarChart, module: "reports" },
   { to: "/audit", label: "Audit Trail", icon: History, module: "audit" },
   { to: "/users", label: "Users", icon: Users, module: "users", adminOnly: true },
+  { to: "/settings", label: "Settings", icon: Settings, module: "settings" },
   { to: "/profile", label: "My profile", icon: UserCircle },
 ];
+
 
 function AppLayout() {
   const { user, loading, signOut, isAdmin, roles, canView, mustChangePassword } = useAuth();
