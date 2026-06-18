@@ -413,18 +413,31 @@ function DepreciationPage() {
               </div>
             ) : (
               <ul className="space-y-2">
-                {alerts.map((a, i) => (
-                  <li key={i} className={`flex items-start gap-3 rounded-md border p-3 text-sm ${a.severity === "error" ? "border-destructive/40 bg-destructive/5" : "border-amber-400/40 bg-amber-50/40 dark:bg-amber-900/10"}`}>
-                    {a.severity === "error"
-                      ? <AlertCircle className="mt-0.5 h-4 w-4 text-destructive" />
-                      : <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-600" />}
-                    <div className="flex-1">
-                      <p className="font-medium">{a.title}</p>
-                      <p className="text-xs text-muted-foreground">{a.detail}</p>
-                    </div>
-                    <Badge variant="outline" className="capitalize">{a.kind}</Badge>
-                  </li>
-                ))}
+                {alerts.map((a, i) => {
+                  const clickable = !!a.assetId || !!a.runId;
+                  return (
+                    <li
+                      key={i}
+                      onClick={() => {
+                        if (a.assetId) openAssetInsight(a.assetId, a.kind === "missing" ? "missed" : "general");
+                        else if (a.runId) {
+                          const r = (runs as any[]).find((x) => x.id === a.runId);
+                          if (r) openRunInsight(r);
+                        }
+                      }}
+                      className={`flex items-start gap-3 rounded-md border p-3 text-sm ${a.severity === "error" ? "border-destructive/40 bg-destructive/5" : "border-amber-400/40 bg-amber-50/40 dark:bg-amber-900/10"} ${clickable ? "cursor-pointer hover:bg-muted/40" : ""}`}
+                    >
+                      {a.severity === "error"
+                        ? <AlertCircle className="mt-0.5 h-4 w-4 text-destructive" />
+                        : <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-600" />}
+                      <div className="flex-1">
+                        <p className="font-medium">{a.title}</p>
+                        <p className="text-xs text-muted-foreground">{a.detail}</p>
+                      </div>
+                      <Badge variant="outline" className="capitalize">{a.kind}</Badge>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </Card>
