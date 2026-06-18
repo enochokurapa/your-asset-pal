@@ -22,6 +22,8 @@ import {
   type DepreciationFrequency,
 } from "@/lib/depreciation";
 import { exportReportXLSX, exportReportPDF } from "@/lib/depreciation-export";
+import { AssetInsightDialog } from "@/components/asset-insight-dialog";
+import { RunInsightDialog } from "@/components/run-insight-dialog";
 
 export const Route = createFileRoute("/_app/depreciation")({
   component: DepreciationPage,
@@ -198,26 +200,24 @@ function DepreciationPage() {
 
   // ---------- Alerts ----------
   const alerts = useMemo(() => {
-    const list: { kind: "failed" | "missing" | "residual"; severity: "warn" | "error"; title: string; detail: string }[] = [];
+    const list: { kind: "failed" | "missing" | "residual"; severity: "warn" | "error"; title: string; detail: string; assetId?: string; runId?: string }[] = [];
 
-    // Failed runs
     for (const r of (runs as any[])) {
       if (r.status === "failed") {
         list.push({
-          kind: "failed", severity: "error",
+          kind: "failed", severity: "error", runId: r.id,
           title: `Failed run · ${r.period_start} → ${r.period_end}`,
           detail: r.notes ?? "Run marked as failed.",
         });
       } else if (r.status === "running" && new Date(r.created_at).getTime() < Date.now() - 30 * 60 * 1000) {
         list.push({
-          kind: "failed", severity: "error",
+          kind: "failed", severity: "error", runId: r.id,
           title: `Stuck run · ${r.period_start} → ${r.period_end}`,
           detail: "Run started over 30 minutes ago and never completed.",
         });
       }
     }
 
-    // Missing runs: depreciable asset whose last_depreciation_date is more than one frequency-period behind today
     const today = new Date();
     for (const a of (assets as any[])) {
       if (!isDepreciable(a)) continue;
@@ -226,24 +226,23 @@ function DepreciationPage() {
       const months = periodMonths(f);
       const last = a.last_depreciation_date ? new Date(a.last_depreciation_date) : new Date(a.depreciation_start_date);
       const due = new Date(last);
-      due.setMonth(due.getMonth() + months * 2); // overdue once two periods past
+      due.setMonth(due.getMonth() + months * 2);
       if (today > due) {
         list.push({
-          kind: "missing", severity: "warn",
+          kind: "missing", severity: "warn", assetId: a.id,
           title: `Missing depreciation · ${a.asset_tag} — ${a.name}`,
           detail: `Last posted ${a.last_depreciation_date ?? "never"} (${f}).`,
         });
       }
     }
 
-    // At residual
     for (const a of (assets as any[])) {
       if (!a.purchase_value || !a.depreciation_method) continue;
       const nbv = netBookValue(a);
       const res = Number(a.residual_value ?? 0);
       if (nbv <= res + 0.01 && Number(a.accumulated_depreciation ?? 0) > 0) {
         list.push({
-          kind: "residual", severity: "warn",
+          kind: "residual", severity: "warn", assetId: a.id,
           title: `At residual · ${a.asset_tag} — ${a.name}`,
           detail: `NBV ${formatUGX(nbv)} reached residual ${formatUGX(res)}. Depreciation has stopped.`,
         });
@@ -251,6 +250,23 @@ function DepreciationPage() {
     }
     return list;
   }, [runs, assets]);
+
+  // Insight dialog state
+  const [insightAssetId, setInsightAssetId] = useState<string | null>(null);
+  const [insightFocus, setInsightFocus] = useState<"missed" | "nbv" | "accumulated" | "audit" | "general">("general");
+  const [insightOpen, setInsightOpen] = useState(false);
+  const openAssetInsight = (id: string, focus: typeof insightFocus = "general") => {
+    setInsightAssetId(id); setInsightFocus(focus); setInsightOpen(true);
+  };
+  const tagToId = useMemo(() => {
+    const m = new Map<string, string>();
+    (assets as any[]).forEach((a) => m.set(a.asset_tag, a.id));
+    return m;
+  }, [assets]);
+
+  const [insightRun, setInsightRun] = useState<any | null>(null);
+  const [runInsightOpen, setRunInsightOpen] = useState(false);
+  const openRunInsight = (r: any) => { setInsightRun(r); setRunInsightOpen(true); };
 
   // ---------- Audit ----------
   const [aAsset, setAAsset] = useState<string>("all");
@@ -368,6 +384,7 @@ function DepreciationPage() {
             headers={["Tag", "Name", "Category", "Branch", "Cost", "Accumulated", "Impairment", "NBV"]}
             numericIdx={[4, 5, 6, 7]}
             rows={reportRows.map((r) => [r.tag, r.name, r.category, r.branch, r.cost, r.accumulated, r.impairment, r.nbv])}
+            onRowClick={(r) => { const id = tagToId.get(String(r[0])); if (id) openAssetInsight(id, "nbv"); }}
           />
         </TabsContent>
         <TabsContent value="accumulated">
@@ -376,6 +393,7 @@ function DepreciationPage() {
             headers={["Tag", "Name", "Method", "Cost", "Accumulated", "% Depreciated"]}
             numericIdx={[3, 4, 5]}
             rows={reportRows.map((r) => [r.tag, r.name, r.method, r.cost, r.accumulated, `${r.pct}%`])}
+            onRowClick={(r) => { const id = tagToId.get(String(r[0])); if (id) openAssetInsight(id, "accumulated"); }}
           />
         </TabsContent>
         <TabsContent value="category">
@@ -395,18 +413,31 @@ function DepreciationPage() {
               </div>
             ) : (
               <ul className="space-y-2">
-                {alerts.map((a, i) => (
-                  <li key={i} className={`flex items-start gap-3 rounded-md border p-3 text-sm ${a.severity === "error" ? "border-destructive/40 bg-destructive/5" : "border-amber-400/40 bg-amber-50/40 dark:bg-amber-900/10"}`}>
-                    {a.severity === "error"
-                      ? <AlertCircle className="mt-0.5 h-4 w-4 text-destructive" />
-                      : <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-600" />}
-                    <div className="flex-1">
-                      <p className="font-medium">{a.title}</p>
-                      <p className="text-xs text-muted-foreground">{a.detail}</p>
-                    </div>
-                    <Badge variant="outline" className="capitalize">{a.kind}</Badge>
-                  </li>
-                ))}
+                {alerts.map((a, i) => {
+                  const clickable = !!a.assetId || !!a.runId;
+                  return (
+                    <li
+                      key={i}
+                      onClick={() => {
+                        if (a.assetId) openAssetInsight(a.assetId, a.kind === "missing" ? "missed" : "general");
+                        else if (a.runId) {
+                          const r = (runs as any[]).find((x) => x.id === a.runId);
+                          if (r) openRunInsight(r);
+                        }
+                      }}
+                      className={`flex items-start gap-3 rounded-md border p-3 text-sm ${a.severity === "error" ? "border-destructive/40 bg-destructive/5" : "border-amber-400/40 bg-amber-50/40 dark:bg-amber-900/10"} ${clickable ? "cursor-pointer hover:bg-muted/40" : ""}`}
+                    >
+                      {a.severity === "error"
+                        ? <AlertCircle className="mt-0.5 h-4 w-4 text-destructive" />
+                        : <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-600" />}
+                      <div className="flex-1">
+                        <p className="font-medium">{a.title}</p>
+                        <p className="text-xs text-muted-foreground">{a.detail}</p>
+                      </div>
+                      <Badge variant="outline" className="capitalize">{a.kind}</Badge>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </Card>
@@ -495,7 +526,14 @@ function DepreciationPage() {
                     const asset = e.asset_id ? assetMap.get(e.asset_id) : null;
                     const run = e.run_id ? (runs as any[]).find((r) => r.id === e.run_id) : null;
                     return (
-                      <tr key={i} className="border-t">
+                      <tr
+                        key={i}
+                        onClick={() => {
+                          if (e.asset_id) openAssetInsight(e.asset_id, "audit");
+                          else if (run) openRunInsight(run);
+                        }}
+                        className={`border-t ${(e.asset_id || run) ? "cursor-pointer hover:bg-muted/40" : ""}`}
+                      >
                         <td className="px-2 py-1 whitespace-nowrap">{new Date(e.when).toLocaleString()}</td>
                         <td className="px-2 py-1"><Badge variant="outline" className="capitalize">{e.kind}</Badge></td>
                         <td className="px-2 py-1">{asset ? `${asset.asset_tag} — ${asset.name}` : "—"}</td>
@@ -532,7 +570,7 @@ function DepreciationPage() {
                   {(runs as any[]).length === 0 ? (
                     <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">No runs yet.</td></tr>
                   ) : (runs as any[]).map((r) => (
-                    <tr key={r.id} className="border-b last:border-0">
+                    <tr key={r.id} onClick={() => openRunInsight(r)} className="border-b last:border-0 cursor-pointer hover:bg-muted/40">
                       <td className="px-3 py-2">{r.period_start} → {r.period_end}</td>
                       <td className="px-3 py-2 capitalize">{r.run_type.replace("_", " ")}</td>
                       <td className="px-3 py-2 capitalize">
@@ -550,6 +588,9 @@ function DepreciationPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <AssetInsightDialog assetId={insightAssetId} focus={insightFocus} open={insightOpen} onOpenChange={setInsightOpen} />
+      <RunInsightDialog run={insightRun} open={runInsightOpen} onOpenChange={setRunInsightOpen} />
 
       <Dialog open={runOpen} onOpenChange={(o) => { setRunOpen(o); if (!o) { setSelectedIds(new Set()); setAssetFilter(""); setMissedOnly(false); } }}>
         <DialogContent className="max-w-2xl">
@@ -672,9 +713,10 @@ function DepreciationPage() {
 }
 
 function ReportTable({
-  title, headers, rows, numericIdx = [],
+  title, headers, rows, numericIdx = [], onRowClick,
 }: {
   title: string; headers: string[]; rows: (string | number)[][]; numericIdx?: number[];
+  onRowClick?: (row: (string | number)[]) => void;
 }) {
   const isNum = (i: number) => numericIdx.includes(i);
   return (
@@ -703,7 +745,11 @@ function ReportTable({
             {rows.length === 0 ? (
               <tr><td colSpan={headers.length} className="px-2 py-8 text-center text-muted-foreground">No data.</td></tr>
             ) : rows.map((r, i) => (
-              <tr key={i} className="border-t">
+              <tr
+                key={i}
+                onClick={onRowClick ? () => onRowClick(r) : undefined}
+                className={`border-t ${onRowClick ? "cursor-pointer hover:bg-muted/40" : ""}`}
+              >
                 {r.map((c, j) => (
                   <td key={j} className={`px-2 py-1 ${isNum(j) ? "text-right tabular-nums" : ""}`}>
                     {isNum(j) && typeof c === "number" ? formatUGX(c) : c}

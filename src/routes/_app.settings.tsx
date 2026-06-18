@@ -18,6 +18,9 @@ import {
   loadTemplate, invalidateTemplateCache, createBrandedPdf, applyTemplateChrome, tableHeadFill,
   DEFAULT_TEMPLATE, type DocumentTemplate,
 } from "@/lib/pdf-template";
+import {
+  THEME_PRESETS, loadStoredTheme, saveStoredTheme, type StoredTheme,
+} from "@/lib/theme";
 
 export const Route = createFileRoute("/_app/settings")({
   component: SettingsPage,
@@ -97,11 +100,12 @@ function SettingsPage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Card className="p-4">
           <Tabs defaultValue="brand">
-            <TabsList className="grid grid-cols-4">
+            <TabsList className="grid grid-cols-5">
               <TabsTrigger value="brand">Branding</TabsTrigger>
               <TabsTrigger value="header">Header / Footer</TabsTrigger>
               <TabsTrigger value="watermark">Watermark</TabsTrigger>
               <TabsTrigger value="layout">Layout</TabsTrigger>
+              <TabsTrigger value="appearance">Appearance</TabsTrigger>
             </TabsList>
 
             <fieldset disabled={!canManage} className="space-y-4">
@@ -273,6 +277,10 @@ function SettingsPage() {
             </TabsContent>
 
             </fieldset>
+
+            <TabsContent value="appearance" className="space-y-4 pt-4">
+              <AppearancePanel />
+            </TabsContent>
           </Tabs>
         </Card>
 
@@ -335,4 +343,64 @@ async function generatePreview(tpl: DocumentTemplate): Promise<string> {
   });
   applyTemplateChrome(doc, tpl);
   return doc.output("bloburl") as unknown as string;
+}
+
+function AppearancePanel() {
+  const [theme, setTheme] = useState<StoredTheme>(() => loadStoredTheme());
+  const apply = (next: StoredTheme) => { setTheme(next); saveStoredTheme(next); };
+  const current = THEME_PRESETS.find((p) => p.id === theme.presetId) ?? THEME_PRESETS[0];
+  return (
+    <div className="space-y-5">
+      <div>
+        <p className="text-sm font-medium">Color theme</p>
+        <p className="text-xs text-muted-foreground">Choose a preset or pick a custom primary color. Applies instantly across the app for your account.</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {THEME_PRESETS.map((p) => {
+          const active = p.id === theme.presetId;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => apply({ presetId: p.id, primary: undefined })}
+              className={`rounded-lg border p-3 text-left transition ${active ? "ring-2 ring-primary border-primary" : "hover:bg-muted/40"}`}
+            >
+              <div className="mb-2 flex gap-1">
+                <span className="h-5 w-5 rounded" style={{ background: p.primary }} />
+                <span className="h-5 w-5 rounded" style={{ background: p.accent }} />
+                <span className="h-5 w-5 rounded" style={{ background: p.sidebar }} />
+                <span className="h-5 w-5 rounded" style={{ background: p.sidebarPrimary }} />
+              </div>
+              <p className="text-sm font-medium">{p.name}</p>
+            </button>
+          );
+        })}
+      </div>
+      <div className="space-y-2">
+        <Label>Custom primary color (overrides preset primary)</Label>
+        <div className="flex items-center gap-2">
+          <input
+            type="color"
+            value={theme.primary || current.primary}
+            onChange={(e) => apply({ presetId: theme.presetId, primary: e.target.value })}
+            className="h-9 w-12 cursor-pointer rounded border bg-transparent"
+          />
+          <Input
+            value={theme.primary || ""}
+            placeholder={current.primary}
+            onChange={(e) => apply({ presetId: theme.presetId, primary: e.target.value || undefined })}
+            className="font-mono max-w-[180px]"
+          />
+          {theme.primary && (
+            <Button variant="ghost" size="sm" onClick={() => apply({ presetId: theme.presetId, primary: undefined })}>
+              Clear
+            </Button>
+          )}
+        </div>
+      </div>
+      <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+        Your theme is saved to this browser. PDF document branding is controlled separately on the other tabs.
+      </div>
+    </div>
+  );
 }
