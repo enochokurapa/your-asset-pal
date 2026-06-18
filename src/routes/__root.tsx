@@ -9,6 +9,8 @@ import {
 } from "@tanstack/react-router";
 import { AuthProvider } from "@/hooks/use-auth";
 import { Toaster } from "@/components/ui/sonner";
+import { useEffect } from "react";
+import { applyStoredTheme } from "@/lib/theme";
 
 import appCss from "../styles.css?url";
 
@@ -85,6 +87,12 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  useEffect(() => {
+    applyStoredTheme();
+    const onChange = () => applyStoredTheme();
+    window.addEventListener("af:theme-changed", onChange);
+    return () => window.removeEventListener("af:theme-changed", onChange);
+  }, []);
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
