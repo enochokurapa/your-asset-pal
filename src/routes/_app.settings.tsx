@@ -276,6 +276,10 @@ function SettingsPage() {
               </p>
             </TabsContent>
 
+            <TabsContent value="appearance" className="space-y-4 pt-4">
+              <AppearancePanel />
+            </TabsContent>
+
             </fieldset>
           </Tabs>
         </Card>
