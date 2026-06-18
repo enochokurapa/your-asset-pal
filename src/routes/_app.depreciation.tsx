@@ -526,7 +526,14 @@ function DepreciationPage() {
                     const asset = e.asset_id ? assetMap.get(e.asset_id) : null;
                     const run = e.run_id ? (runs as any[]).find((r) => r.id === e.run_id) : null;
                     return (
-                      <tr key={i} className="border-t">
+                      <tr
+                        key={i}
+                        onClick={() => {
+                          if (e.asset_id) openAssetInsight(e.asset_id, "audit");
+                          else if (run) openRunInsight(run);
+                        }}
+                        className={`border-t ${(e.asset_id || run) ? "cursor-pointer hover:bg-muted/40" : ""}`}
+                      >
                         <td className="px-2 py-1 whitespace-nowrap">{new Date(e.when).toLocaleString()}</td>
                         <td className="px-2 py-1"><Badge variant="outline" className="capitalize">{e.kind}</Badge></td>
                         <td className="px-2 py-1">{asset ? `${asset.asset_tag} — ${asset.name}` : "—"}</td>
@@ -563,7 +570,7 @@ function DepreciationPage() {
                   {(runs as any[]).length === 0 ? (
                     <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">No runs yet.</td></tr>
                   ) : (runs as any[]).map((r) => (
-                    <tr key={r.id} className="border-b last:border-0">
+                    <tr key={r.id} onClick={() => openRunInsight(r)} className="border-b last:border-0 cursor-pointer hover:bg-muted/40">
                       <td className="px-3 py-2">{r.period_start} → {r.period_end}</td>
                       <td className="px-3 py-2 capitalize">{r.run_type.replace("_", " ")}</td>
                       <td className="px-3 py-2 capitalize">
@@ -581,6 +588,9 @@ function DepreciationPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <AssetInsightDialog assetId={insightAssetId} focus={insightFocus} open={insightOpen} onOpenChange={setInsightOpen} />
+      <RunInsightDialog run={insightRun} open={runInsightOpen} onOpenChange={setRunInsightOpen} />
 
       <Dialog open={runOpen} onOpenChange={(o) => { setRunOpen(o); if (!o) { setSelectedIds(new Set()); setAssetFilter(""); setMissedOnly(false); } }}>
         <DialogContent className="max-w-2xl">
