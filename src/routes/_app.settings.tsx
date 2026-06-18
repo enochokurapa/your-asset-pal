@@ -18,6 +18,9 @@ import {
   loadTemplate, invalidateTemplateCache, createBrandedPdf, applyTemplateChrome, tableHeadFill,
   DEFAULT_TEMPLATE, type DocumentTemplate,
 } from "@/lib/pdf-template";
+import {
+  THEME_PRESETS, loadStoredTheme, saveStoredTheme, type StoredTheme,
+} from "@/lib/theme";
 
 export const Route = createFileRoute("/_app/settings")({
   component: SettingsPage,
@@ -97,11 +100,12 @@ function SettingsPage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Card className="p-4">
           <Tabs defaultValue="brand">
-            <TabsList className="grid grid-cols-4">
+            <TabsList className="grid grid-cols-5">
               <TabsTrigger value="brand">Branding</TabsTrigger>
               <TabsTrigger value="header">Header / Footer</TabsTrigger>
               <TabsTrigger value="watermark">Watermark</TabsTrigger>
               <TabsTrigger value="layout">Layout</TabsTrigger>
+              <TabsTrigger value="appearance">Appearance</TabsTrigger>
             </TabsList>
 
             <fieldset disabled={!canManage} className="space-y-4">
