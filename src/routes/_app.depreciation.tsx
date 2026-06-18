@@ -384,6 +384,7 @@ function DepreciationPage() {
             headers={["Tag", "Name", "Category", "Branch", "Cost", "Accumulated", "Impairment", "NBV"]}
             numericIdx={[4, 5, 6, 7]}
             rows={reportRows.map((r) => [r.tag, r.name, r.category, r.branch, r.cost, r.accumulated, r.impairment, r.nbv])}
+            onRowClick={(r) => { const id = tagToId.get(String(r[0])); if (id) openAssetInsight(id, "nbv"); }}
           />
         </TabsContent>
         <TabsContent value="accumulated">
@@ -392,6 +393,7 @@ function DepreciationPage() {
             headers={["Tag", "Name", "Method", "Cost", "Accumulated", "% Depreciated"]}
             numericIdx={[3, 4, 5]}
             rows={reportRows.map((r) => [r.tag, r.name, r.method, r.cost, r.accumulated, `${r.pct}%`])}
+            onRowClick={(r) => { const id = tagToId.get(String(r[0])); if (id) openAssetInsight(id, "accumulated"); }}
           />
         </TabsContent>
         <TabsContent value="category">
