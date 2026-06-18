@@ -22,6 +22,8 @@ import {
   type DepreciationFrequency,
 } from "@/lib/depreciation";
 import { exportReportXLSX, exportReportPDF } from "@/lib/depreciation-export";
+import { AssetInsightDialog } from "@/components/asset-insight-dialog";
+import { RunInsightDialog } from "@/components/run-insight-dialog";
 
 export const Route = createFileRoute("/_app/depreciation")({
   component: DepreciationPage,
@@ -198,26 +200,24 @@ function DepreciationPage() {
 
   // ---------- Alerts ----------
   const alerts = useMemo(() => {
-    const list: { kind: "failed" | "missing" | "residual"; severity: "warn" | "error"; title: string; detail: string }[] = [];
+    const list: { kind: "failed" | "missing" | "residual"; severity: "warn" | "error"; title: string; detail: string; assetId?: string; runId?: string }[] = [];
 
-    // Failed runs
     for (const r of (runs as any[])) {
       if (r.status === "failed") {
         list.push({
-          kind: "failed", severity: "error",
+          kind: "failed", severity: "error", runId: r.id,
           title: `Failed run · ${r.period_start} → ${r.period_end}`,
           detail: r.notes ?? "Run marked as failed.",
         });
       } else if (r.status === "running" && new Date(r.created_at).getTime() < Date.now() - 30 * 60 * 1000) {
         list.push({
-          kind: "failed", severity: "error",
+          kind: "failed", severity: "error", runId: r.id,
           title: `Stuck run · ${r.period_start} → ${r.period_end}`,
           detail: "Run started over 30 minutes ago and never completed.",
         });
       }
     }
 
-    // Missing runs: depreciable asset whose last_depreciation_date is more than one frequency-period behind today
     const today = new Date();
     for (const a of (assets as any[])) {
       if (!isDepreciable(a)) continue;
@@ -226,24 +226,23 @@ function DepreciationPage() {
       const months = periodMonths(f);
       const last = a.last_depreciation_date ? new Date(a.last_depreciation_date) : new Date(a.depreciation_start_date);
       const due = new Date(last);
-      due.setMonth(due.getMonth() + months * 2); // overdue once two periods past
+      due.setMonth(due.getMonth() + months * 2);
       if (today > due) {
         list.push({
-          kind: "missing", severity: "warn",
+          kind: "missing", severity: "warn", assetId: a.id,
           title: `Missing depreciation · ${a.asset_tag} — ${a.name}`,
           detail: `Last posted ${a.last_depreciation_date ?? "never"} (${f}).`,
         });
       }
     }
 
-    // At residual
     for (const a of (assets as any[])) {
       if (!a.purchase_value || !a.depreciation_method) continue;
       const nbv = netBookValue(a);
       const res = Number(a.residual_value ?? 0);
       if (nbv <= res + 0.01 && Number(a.accumulated_depreciation ?? 0) > 0) {
         list.push({
-          kind: "residual", severity: "warn",
+          kind: "residual", severity: "warn", assetId: a.id,
           title: `At residual · ${a.asset_tag} — ${a.name}`,
           detail: `NBV ${formatUGX(nbv)} reached residual ${formatUGX(res)}. Depreciation has stopped.`,
         });
@@ -251,6 +250,23 @@ function DepreciationPage() {
     }
     return list;
   }, [runs, assets]);
+
+  // Insight dialog state
+  const [insightAssetId, setInsightAssetId] = useState<string | null>(null);
+  const [insightFocus, setInsightFocus] = useState<"missed" | "nbv" | "accumulated" | "audit" | "general">("general");
+  const [insightOpen, setInsightOpen] = useState(false);
+  const openAssetInsight = (id: string, focus: typeof insightFocus = "general") => {
+    setInsightAssetId(id); setInsightFocus(focus); setInsightOpen(true);
+  };
+  const tagToId = useMemo(() => {
+    const m = new Map<string, string>();
+    (assets as any[]).forEach((a) => m.set(a.asset_tag, a.id));
+    return m;
+  }, [assets]);
+
+  const [insightRun, setInsightRun] = useState<any | null>(null);
+  const [runInsightOpen, setRunInsightOpen] = useState(false);
+  const openRunInsight = (r: any) => { setInsightRun(r); setRunInsightOpen(true); };
 
   // ---------- Audit ----------
   const [aAsset, setAAsset] = useState<string>("all");
