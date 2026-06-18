@@ -713,9 +713,10 @@ function DepreciationPage() {
 }
 
 function ReportTable({
-  title, headers, rows, numericIdx = [],
+  title, headers, rows, numericIdx = [], onRowClick,
 }: {
   title: string; headers: string[]; rows: (string | number)[][]; numericIdx?: number[];
+  onRowClick?: (row: (string | number)[]) => void;
 }) {
   const isNum = (i: number) => numericIdx.includes(i);
   return (
@@ -744,7 +745,11 @@ function ReportTable({
             {rows.length === 0 ? (
               <tr><td colSpan={headers.length} className="px-2 py-8 text-center text-muted-foreground">No data.</td></tr>
             ) : rows.map((r, i) => (
-              <tr key={i} className="border-t">
+              <tr
+                key={i}
+                onClick={onRowClick ? () => onRowClick(r) : undefined}
+                className={`border-t ${onRowClick ? "cursor-pointer hover:bg-muted/40" : ""}`}
+              >
                 {r.map((c, j) => (
                   <td key={j} className={`px-2 py-1 ${isNum(j) ? "text-right tabular-nums" : ""}`}>
                     {isNum(j) && typeof c === "number" ? formatUGX(c) : c}
