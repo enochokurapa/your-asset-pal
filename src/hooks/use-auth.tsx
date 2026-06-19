@@ -5,7 +5,7 @@ import type { Session, User } from "@supabase/supabase-js";
 export type AppRole = "admin" | "manager" | "staff" | "security";
 export type ModuleKey =
   | "dashboard" | "assets" | "categories" | "locations" | "branches"
-  | "users" | "reports" | "audit" | "depreciation" | "gate_pass" | "settings";
+  | "users" | "reports" | "audit" | "depreciation" | "gate_pass" | "settings" | "verification";
 export type ApprovalKind =
   | "movement" | "retirement" | "disposal" | "reactivation" | "set_for_disposal" | "maintenance" | "deletion";
 export type ActionKind =
@@ -15,10 +15,11 @@ export type ActionKind =
   | "request_gate_pass" | "approve_gate_pass" | "verify_gate_pass"
   | "view_gate_pass_reports" | "export_gate_pass_reports"
   | "manage_document_templates"
-  | "request_asset_deletion" | "approve_asset_deletion";
+  | "request_asset_deletion" | "approve_asset_deletion"
+  | "perform_verification" | "view_verification_reports";
 
 export const ALL_MODULES: ModuleKey[] = [
-  "dashboard", "assets", "categories", "locations", "branches", "users", "reports", "audit", "depreciation", "gate_pass", "settings",
+  "dashboard", "assets", "categories", "locations", "branches", "users", "reports", "audit", "depreciation", "gate_pass", "verification", "settings",
 ];
 export const ALL_APPROVAL_KINDS: ApprovalKind[] = [
   "movement", "retirement", "disposal", "reactivation", "set_for_disposal", "maintenance", "deletion",
@@ -31,6 +32,7 @@ export const ALL_ACTION_KINDS: ActionKind[] = [
   "view_gate_pass_reports", "export_gate_pass_reports",
   "manage_document_templates",
   "request_asset_deletion", "approve_asset_deletion",
+  "perform_verification", "view_verification_reports",
 ];
 
 export const DEFAULT_NEW_USER_MODULES: ModuleKey[] = ["dashboard", "assets"];

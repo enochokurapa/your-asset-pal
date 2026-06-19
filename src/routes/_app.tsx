@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, Link, Navigate, useRouterState } from "@tansta
 import { useState } from "react";
 import { useAuth, ModuleKey } from "@/hooks/use-auth";
 import {
-  LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X, FileBarChart, Building2, History, UserCircle, TrendingDown, DoorOpen, Settings,
+  LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X, FileBarChart, Building2, History, UserCircle, TrendingDown, DoorOpen, Settings, ClipboardCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,7 @@ const nav: Array<{ to: string; label: string; icon: any; module?: ModuleKey; adm
   { to: "/branches", label: "Branches", icon: Building2, module: "branches", adminOnly: true },
   { to: "/depreciation", label: "Depreciation", icon: TrendingDown, module: "depreciation" },
   { to: "/gate-pass", label: "Gate Pass", icon: DoorOpen, module: "gate_pass" },
+  { to: "/verification", label: "Verification", icon: ClipboardCheck, module: "verification" },
   { to: "/reports", label: "Reports", icon: FileBarChart, module: "reports" },
   { to: "/audit", label: "Audit Trail", icon: History, module: "audit" },
   { to: "/users", label: "Users", icon: Users, module: "users", adminOnly: true },
