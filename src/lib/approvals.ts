@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-export type ApprovalKind = "movement" | "retirement" | "disposal" | "reactivation" | "update" | "set_for_disposal" | "maintenance";
+export type ApprovalKind = "movement" | "retirement" | "disposal" | "reactivation" | "update" | "set_for_disposal" | "maintenance" | "deletion";
 
 export async function submitApproval(params: {
   kind: ApprovalKind;
