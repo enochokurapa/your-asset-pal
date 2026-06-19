@@ -69,6 +69,7 @@ export function AssetDetailTabs({ assetId, defaultTab = "custody" }: { assetId: 
         <TabsTrigger value="movements" className="flex-1">Movements</TabsTrigger>
         <TabsTrigger value="maintenance" className="flex-1">Maintenance</TabsTrigger>
         <TabsTrigger value="depreciation" className="flex-1">Depreciation</TabsTrigger>
+        <TabsTrigger value="verification" className="flex-1">Verification</TabsTrigger>
         <TabsTrigger value="attachments" className="flex-1">Files</TabsTrigger>
         <TabsTrigger value="disposal" className="flex-1">Retire/Dispose</TabsTrigger>
         <TabsTrigger value="activity" className="flex-1">Activity</TabsTrigger>
@@ -77,10 +78,50 @@ export function AssetDetailTabs({ assetId, defaultTab = "custody" }: { assetId: 
       <TabsContent value="movements"><MovementsPanel assetId={assetId} /></TabsContent>
       <TabsContent value="maintenance"><MaintenancePanel assetId={assetId} /></TabsContent>
       <TabsContent value="depreciation"><DepreciationPanel assetId={assetId} /></TabsContent>
+      <TabsContent value="verification"><VerificationPanel assetId={assetId} /></TabsContent>
       <TabsContent value="attachments"><AttachmentsPanel assetId={assetId} /></TabsContent>
       <TabsContent value="disposal"><DisposalPanel assetId={assetId} /></TabsContent>
       <TabsContent value="activity"><ActivityPanel assetId={assetId} /></TabsContent>
     </Tabs>
+  );
+}
+
+function VerificationPanel({ assetId }: { assetId: string }) {
+  const { data = [] } = useQuery({
+    queryKey: ["asset-verifications", assetId],
+    queryFn: async () => (await (supabase as any).from("asset_verifications")
+      .select("*, branches(name), locations(name), profiles:verified_by(full_name,email)")
+      .eq("asset_id", assetId).order("verified_at", { ascending: false })).data ?? [],
+  });
+  if (!data.length) return <p className="text-sm text-muted-foreground">No verifications recorded yet.</p>;
+  const tone = (s: string) =>
+    s === "verified" ? "bg-success/15 text-success" :
+    s === "mismatched" ? "bg-warning/20 text-warning-foreground" :
+    "bg-destructive/15 text-destructive";
+  return (
+    <div className="space-y-2">
+      {data.map((v: any) => (
+        <div key={v.id} className="rounded-lg border p-3 text-sm">
+          <div className="flex items-center gap-2">
+            <Badge className={tone(v.status)}>{v.status.replace("_", " ")}</Badge>
+            <p className="text-xs text-muted-foreground">{new Date(v.verified_at).toLocaleString()}</p>
+            <p className="ml-auto text-xs text-muted-foreground">by {v.profiles?.full_name ?? v.profiles?.email ?? "—"}</p>
+          </div>
+          <p className="mt-1">{v.branches?.name ?? "—"}{v.locations?.name ? ` · ${v.locations.name}` : ""}{v.custodian_name ? ` · ${v.custodian_name}` : ""}{v.department ? ` · ${v.department}` : ""}{v.condition ? ` · ${v.condition}` : ""}</p>
+          {v.notes && <p className="mt-1 text-xs text-muted-foreground">{v.notes}</p>}
+          {v.changes && Object.keys(v.changes).length > 0 && (
+            <details className="mt-1 text-xs">
+              <summary className="cursor-pointer text-muted-foreground">Changes ({Object.keys(v.changes).length})</summary>
+              <ul className="mt-1 list-disc pl-5">
+                {Object.entries(v.changes as Record<string, { from: any; to: any }>).map(([k, val]) => (
+                  <li key={k}><b>{k}</b>: {String(val.from ?? "—")} → {String(val.to ?? "—")}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 
