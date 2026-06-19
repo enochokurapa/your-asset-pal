@@ -80,6 +80,7 @@ function AssetsPage() {
   const canRequestDispose = canWrite || canDo("initiate_disposal");
   const canRequestMove = canWrite || canDo("initiate_movement");
   const canRequestMaint = canWrite || canDo("initiate_maintenance");
+  const canRequestDelete = canDo("request_asset_deletion") || isAdmin;
   const qc = useQueryClient();
   const search = useSearch({ from: "/_app/assets" });
   const nav = useNavigate();
