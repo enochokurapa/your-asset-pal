@@ -302,8 +302,8 @@ function AssetsPage() {
     qc.invalidateQueries({ queryKey: ["dashboard-stats"] }); qc.invalidateQueries({ queryKey: ["tile-assets"] });
   };
 
-  const [reqKind, setReqKind] = useState<"retirement" | "disposal" | null>(null);
-  const requestRetire = (a: any, kind: "retirement" | "disposal" = "retirement") => { setRetireAsset(a); setRetireReason(""); setReqKind(kind); setRetireOpen(true); };
+  const [reqKind, setReqKind] = useState<"retirement" | "disposal" | "deletion" | null>(null);
+  const requestRetire = (a: any, kind: "retirement" | "disposal" | "deletion" = "retirement") => { setRetireAsset(a); setRetireReason(""); setReqKind(kind); setRetireOpen(true); };
   const submitRetire = async () => {
     if (!retireReason.trim()) { toast.error("Reason is required"); return; }
     try {
@@ -315,12 +315,7 @@ function AssetsPage() {
   };
 
   const removeAsset = async (a: any) => {
-    if (!confirm(`Permanently delete asset "${a.name}" (${a.asset_tag})? This also removes its history.`)) return;
-    const { error } = await supabase.from("assets").delete().eq("id", a.id);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Asset deleted");
-    qc.invalidateQueries({ queryKey: ["assets"] });
-    qc.invalidateQueries({ queryKey: ["dashboard-stats"] }); qc.invalidateQueries({ queryKey: ["tile-assets"] });
+    requestRetire(a, "deletion");
   };
 
   const [importing, setImporting] = useState(false);
