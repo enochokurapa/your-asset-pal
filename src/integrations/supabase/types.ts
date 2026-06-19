@@ -324,6 +324,79 @@ export type Database = {
           },
         ]
       }
+      asset_verifications: {
+        Row: {
+          asset_id: string
+          branch_id: string | null
+          changes: Json
+          condition: Database["public"]["Enums"]["asset_condition"] | null
+          created_at: string
+          custodian_name: string | null
+          department: string | null
+          id: string
+          location_id: string | null
+          notes: string | null
+          status: string
+          updated_at: string
+          verified_at: string
+          verified_by: string | null
+        }
+        Insert: {
+          asset_id: string
+          branch_id?: string | null
+          changes?: Json
+          condition?: Database["public"]["Enums"]["asset_condition"] | null
+          created_at?: string
+          custodian_name?: string | null
+          department?: string | null
+          id?: string
+          location_id?: string | null
+          notes?: string | null
+          status: string
+          updated_at?: string
+          verified_at?: string
+          verified_by?: string | null
+        }
+        Update: {
+          asset_id?: string
+          branch_id?: string | null
+          changes?: Json
+          condition?: Database["public"]["Enums"]["asset_condition"] | null
+          created_at?: string
+          custodian_name?: string | null
+          department?: string | null
+          id?: string
+          location_id?: string | null
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          verified_at?: string
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_verifications_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_verifications_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_verifications_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assets: {
         Row: {
           accumulated_depreciation: number
@@ -331,6 +404,7 @@ export type Database = {
           assigned_to: string | null
           branch_id: string | null
           category_id: string | null
+          condition: Database["public"]["Enums"]["asset_condition"] | null
           created_at: string
           created_by: string | null
           depreciation_frequency:
@@ -364,6 +438,7 @@ export type Database = {
           assigned_to?: string | null
           branch_id?: string | null
           category_id?: string | null
+          condition?: Database["public"]["Enums"]["asset_condition"] | null
           created_at?: string
           created_by?: string | null
           depreciation_frequency?:
@@ -397,6 +472,7 @@ export type Database = {
           assigned_to?: string | null
           branch_id?: string | null
           category_id?: string | null
+          condition?: Database["public"]["Enums"]["asset_condition"] | null
           created_at?: string
           created_by?: string | null
           depreciation_frequency?:
@@ -1201,6 +1277,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "manager" | "staff" | "security"
+      asset_condition: "mint" | "good" | "fair" | "poor" | "damaged"
       asset_status:
         | "in_use"
         | "in_storage"
@@ -1342,6 +1419,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "manager", "staff", "security"],
+      asset_condition: ["mint", "good", "fair", "poor", "damaged"],
       asset_status: [
         "in_use",
         "in_storage",

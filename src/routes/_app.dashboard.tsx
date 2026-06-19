@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Package, CheckCircle2, Wrench, Archive, Tags, MapPin, Building2, AlertTriangle, Trash2, Boxes, DoorOpen, PackageCheck } from "lucide-react";
+import { Package, CheckCircle2, Wrench, Archive, Tags, MapPin, Building2, AlertTriangle, Trash2, Boxes, DoorOpen, PackageCheck, ClipboardCheck, ClipboardX } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { PendingApprovalsCard } from "@/components/pending-approvals-card";
@@ -35,13 +35,14 @@ function Dashboard() {
     queryKey: ["dashboard-stats", scopeKey, selectedBranch],
 
     queryFn: async () => {
-      const [assets, cats, locs, branches, pending, gatePasses] = await Promise.all([
+      const [assets, cats, locs, branches, pending, gatePasses, verifs] = await Promise.all([
         supabase.from("assets").select("id,status,name,asset_tag,branch_id,set_for_disposal,purchase_value,created_at").order("created_at", { ascending: false }),
         supabase.from("categories").select("id", { count: "exact", head: true }),
         supabase.from("locations").select("id", { count: "exact", head: true }),
         supabase.from("branches").select("id,name,code,is_active"),
         supabase.from("approval_requests").select("id,kind,asset_id,status,payload").eq("status", "pending"),
         (supabase as any).from("gate_passes").select("id,status,branch_id,asset_id").in("status", ["pending", "approved", "checked_out"]),
+        (supabase as any).from("asset_verifications").select("id,asset_id,branch_id,status,verified_at"),
       ]);
       const list = (assets.data ?? [])
         .filter((a: any) => canSeeBranch(a.branch_id))
@@ -82,6 +83,24 @@ function Dashboard() {
       const gpPending = gpList.filter((g: any) => g.status === "pending").length;
       const gpOutside = gpList.filter((g: any) => g.status === "approved" || g.status === "checked_out").length;
 
+      // Verification stats — most recent verification per asset, scoped to current branch view
+      const vList = (verifs.data ?? []).filter((v: any) =>
+        canSeeBranch(v.branch_id) && (selectedBranch === "all" || v.branch_id === selectedBranch)
+      );
+      const latestPerAsset = new Map<string, any>();
+      for (const v of [...vList].sort((a: any, b: any) => new Date(a.verified_at).getTime() - new Date(b.verified_at).getTime())) {
+        if (v.asset_id) latestPerAsset.set(v.asset_id, v);
+      }
+      const verifiedIds = new Set<string>();
+      const mismatchedIds = new Set<string>();
+      latestPerAsset.forEach((v, id) => {
+        if (v.status === "verified") verifiedIds.add(id);
+        else if (v.status === "mismatched") mismatchedIds.add(id);
+      });
+      const verifiedCount = Array.from(verifiedIds).filter((id) => visibleAssetIds.has(id)).length;
+      const mismatchedCount = Array.from(mismatchedIds).filter((id) => visibleAssetIds.has(id)).length;
+      const unverifiedCount = Math.max(0, list.length - verifiedCount - mismatchedCount);
+
       return {
         total: list.length,
         totalValue: sumValue(() => true),
@@ -106,6 +125,9 @@ function Dashboard() {
         branchesForFilter,
         gpPending,
         gpOutside,
+        verifiedCount,
+        mismatchedCount,
+        unverifiedCount,
       };
     },
   });
@@ -126,6 +148,8 @@ function Dashboard() {
     { label: "For Repair",      value: data?.forRepair ?? 0,   icon: Wrench,         color: "#BE185D", filter: { kind: "pending_repair" },                    subtotal: data?.repairAmount },
     { label: "Out of Premises", value: data?.gpOutside ?? 0,   icon: PackageCheck,   color: "#0369A1", filter: { kind: "all" }, navigateTo: "/gate-pass" },
     { label: "Gate Pass Pending", value: data?.gpPending ?? 0, icon: DoorOpen,       color: "#9333EA", filter: { kind: "all" }, navigateTo: "/gate-pass" },
+    { label: "Verified Assets",   value: data?.verifiedCount ?? 0, icon: ClipboardCheck, color: "#15803D", filter: { kind: "all" }, navigateTo: "/verification" },
+    { label: "Mismatched / Unverified", value: (data?.mismatchedCount ?? 0) + (data?.unverifiedCount ?? 0), icon: ClipboardX, color: "#DC2626", filter: { kind: "all" }, navigateTo: "/verification" },
   ];
 
   const [tile, setTile] = useState<{ title: string; filter: TileFilter } | null>(null);
@@ -239,6 +263,26 @@ function Dashboard() {
           )}
         </Card>
       </div>
+
+      <Card className="p-5">
+        <h2 className="text-sm font-semibold">Verification status</h2>
+        <p className="text-xs text-muted-foreground">Latest result per asset (current branch scope).</p>
+        <div className="h-64 mt-3">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={[
+              { name: "Verified", value: data?.verifiedCount ?? 0, fill: "hsl(142 71% 45%)" },
+              { name: "Mismatched", value: data?.mismatchedCount ?? 0, fill: "hsl(38 92% 50%)" },
+              { name: "Not verified", value: data?.unverifiedCount ?? 0, fill: "hsl(0 84% 60%)" },
+            ]}>
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+              <Tooltip />
+              <Bar dataKey="value" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
+
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="md:col-span-2"><PendingApprovalsCard /></div>
