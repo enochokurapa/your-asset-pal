@@ -630,6 +630,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "depreciation_entries_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "depreciation_entries_run_id_fkey"
             columns: ["run_id"]
             isOneToOne: false
@@ -669,7 +676,15 @@ export type Database = {
           reason?: string | null
           type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "depreciation_overrides_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       depreciation_runs: {
         Row: {
@@ -1169,6 +1184,7 @@ export type Database = {
     }
     Functions: {
       can_do: { Args: { _action: string; _user_id: string }; Returns: boolean }
+      delete_asset_cascade: { Args: { _asset_id: string }; Returns: undefined }
       enqueue_approval_reminders: { Args: never; Returns: undefined }
       has_role: {
         Args: {
