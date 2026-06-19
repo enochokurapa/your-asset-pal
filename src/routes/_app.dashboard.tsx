@@ -148,6 +148,8 @@ function Dashboard() {
     { label: "For Repair",      value: data?.forRepair ?? 0,   icon: Wrench,         color: "#BE185D", filter: { kind: "pending_repair" },                    subtotal: data?.repairAmount },
     { label: "Out of Premises", value: data?.gpOutside ?? 0,   icon: PackageCheck,   color: "#0369A1", filter: { kind: "all" }, navigateTo: "/gate-pass" },
     { label: "Gate Pass Pending", value: data?.gpPending ?? 0, icon: DoorOpen,       color: "#9333EA", filter: { kind: "all" }, navigateTo: "/gate-pass" },
+    { label: "Verified Assets",   value: data?.verifiedCount ?? 0, icon: ClipboardCheck, color: "#15803D", filter: { kind: "all" }, navigateTo: "/verification" },
+    { label: "Mismatched / Unverified", value: (data?.mismatchedCount ?? 0) + (data?.unverifiedCount ?? 0), icon: ClipboardX, color: "#DC2626", filter: { kind: "all" }, navigateTo: "/verification" },
   ];
 
   const [tile, setTile] = useState<{ title: string; filter: TileFilter } | null>(null);
