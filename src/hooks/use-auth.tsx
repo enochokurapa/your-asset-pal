@@ -7,20 +7,21 @@ export type ModuleKey =
   | "dashboard" | "assets" | "categories" | "locations" | "branches"
   | "users" | "reports" | "audit" | "depreciation" | "gate_pass" | "settings";
 export type ApprovalKind =
-  | "movement" | "retirement" | "disposal" | "reactivation" | "set_for_disposal" | "maintenance";
+  | "movement" | "retirement" | "disposal" | "reactivation" | "set_for_disposal" | "maintenance" | "deletion";
 export type ActionKind =
   | "add_asset" | "edit_asset" | "edit_location"
   | "initiate_movement" | "initiate_retirement" | "initiate_disposal" | "initiate_maintenance"
   | "manage_depreciation" | "run_depreciation" | "override_depreciation"
   | "request_gate_pass" | "approve_gate_pass" | "verify_gate_pass"
   | "view_gate_pass_reports" | "export_gate_pass_reports"
-  | "manage_document_templates";
+  | "manage_document_templates"
+  | "request_asset_deletion" | "approve_asset_deletion";
 
 export const ALL_MODULES: ModuleKey[] = [
   "dashboard", "assets", "categories", "locations", "branches", "users", "reports", "audit", "depreciation", "gate_pass", "settings",
 ];
 export const ALL_APPROVAL_KINDS: ApprovalKind[] = [
-  "movement", "retirement", "disposal", "reactivation", "set_for_disposal", "maintenance",
+  "movement", "retirement", "disposal", "reactivation", "set_for_disposal", "maintenance", "deletion",
 ];
 export const ALL_ACTION_KINDS: ActionKind[] = [
   "add_asset", "edit_asset", "edit_location",
@@ -29,6 +30,7 @@ export const ALL_ACTION_KINDS: ActionKind[] = [
   "request_gate_pass", "approve_gate_pass", "verify_gate_pass",
   "view_gate_pass_reports", "export_gate_pass_reports",
   "manage_document_templates",
+  "request_asset_deletion", "approve_asset_deletion",
 ];
 
 export const DEFAULT_NEW_USER_MODULES: ModuleKey[] = ["dashboard", "assets"];

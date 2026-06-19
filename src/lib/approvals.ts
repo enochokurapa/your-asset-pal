@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-export type ApprovalKind = "movement" | "retirement" | "disposal" | "reactivation" | "update" | "set_for_disposal" | "maintenance";
+export type ApprovalKind = "movement" | "retirement" | "disposal" | "reactivation" | "update" | "set_for_disposal" | "maintenance" | "deletion";
 
 export async function submitApproval(params: {
   kind: ApprovalKind;
@@ -81,9 +81,17 @@ export async function decideApproval(id: string, status: "approved" | "rejected"
     await supabase.rpc("mark_for_disposal" as any, { _asset_id: req.asset_id, _on: false });
   }
 
+  // Record the decision FIRST. For deletion we then cascade-delete the asset
+  // (which also removes the approval_requests row, so updating after would fail).
   const { error } = await supabase.from("approval_requests").update({
     status, reason: reason ?? null, approver_id: u.user.id, decided_at: new Date().toISOString(),
   }).eq("id", id);
   if (error) throw error;
+
+  if (status === "approved" && req.kind === "deletion" && req.asset_id) {
+    const { error: delErr } = await supabase.rpc("delete_asset_cascade" as any, { _asset_id: req.asset_id });
+    if (delErr) { toast.error(delErr.message); return; }
+  }
+
   toast.success(`Request ${status}`);
 }
