@@ -634,8 +634,8 @@ function AssetsPage() {
                             )}
                           </>
                         )}
-                        {isAdmin && (
-                          <Button size="icon" variant="ghost" title="Delete asset (admin)" onClick={() => removeAsset(a)}>
+                        {canRequestDelete && (
+                          <Button size="icon" variant="ghost" title="Request deletion" onClick={() => removeAsset(a)}>
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         )}
