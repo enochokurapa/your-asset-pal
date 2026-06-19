@@ -264,6 +264,26 @@ function Dashboard() {
         </Card>
       </div>
 
+      <Card className="p-5">
+        <h2 className="text-sm font-semibold">Verification status</h2>
+        <p className="text-xs text-muted-foreground">Latest result per asset (current branch scope).</p>
+        <div className="h-64 mt-3">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={[
+              { name: "Verified", value: data?.verifiedCount ?? 0, fill: "hsl(142 71% 45%)" },
+              { name: "Mismatched", value: data?.mismatchedCount ?? 0, fill: "hsl(38 92% 50%)" },
+              { name: "Not verified", value: data?.unverifiedCount ?? 0, fill: "hsl(0 84% 60%)" },
+            ]}>
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+              <Tooltip />
+              <Bar dataKey="value" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
+
+
       <div className="grid gap-4 md:grid-cols-3">
         <div className="md:col-span-2"><PendingApprovalsCard /></div>
 
