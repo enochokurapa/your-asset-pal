@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ChevronDown, CheckCircle2, XCircle, Eye } from "lucide-react";
 import { decideApproval } from "@/lib/approvals";
 import { useAuth, ApprovalKind } from "@/hooks/use-auth";
+import { ApprovalPayloadView } from "@/components/approval-payload-view";
 
 export function PendingApprovalsCard() {
   const { canApprove, canDo, user, isAdmin } = useAuth();
