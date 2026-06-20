@@ -151,7 +151,7 @@ function VerificationPage() {
     "Department": v.department ?? "",
     "Condition": v.condition ?? "",
     "Status": v.status,
-    "Verified by": v.profiles?.full_name ?? v.profiles?.email ?? "—",
+    "Verified by": profileMap[v.verified_by]?.full_name ?? profileMap[v.verified_by]?.email ?? "—",
     "Notes": v.notes ?? "",
     "Changes": v.changes && Object.keys(v.changes).length ? JSON.stringify(v.changes) : "",
   }));
