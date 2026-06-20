@@ -279,7 +279,11 @@ function VerificationPage() {
               {filtered.length === 0 ? (
                 <tr><td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">No verifications match the filters.</td></tr>
               ) : filtered.map((v: any) => (
-                <tr key={v.id} className="border-t">
+                <tr
+                  key={v.id}
+                  className="border-t cursor-pointer hover:bg-muted/40"
+                  onClick={() => setCompare(v)}
+                >
                   <td className="px-3 py-2 whitespace-nowrap">{new Date(v.verified_at).toLocaleString()}</td>
                   <td className="px-3 py-2">
                     <p className="font-medium">{v.assets?.name ?? "—"}</p>
@@ -289,7 +293,7 @@ function VerificationPage() {
                   <td className="px-3 py-2">{v.custodian_name ?? "—"}{v.department ? ` · ${v.department}` : ""}</td>
                   <td className="px-3 py-2 capitalize">{v.condition ?? "—"}</td>
                   <td className="px-3 py-2"><Badge className={STATUS_TONE[v.status as VStatus]}>{v.status.replace("_"," ")}</Badge></td>
-                  <td className="px-3 py-2 text-xs">{v.profiles?.full_name ?? v.profiles?.email ?? "—"}</td>
+                  <td className="px-3 py-2 text-xs">{profileMap[v.verified_by]?.full_name ?? profileMap[v.verified_by]?.email ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -298,6 +302,16 @@ function VerificationPage() {
       </Card>
 
       <ScannerDialog open={scanOpen} onOpenChange={setScanOpen} onScan={(t) => lookup(t)} />
+
+      {compare && (
+        <CompareDialog
+          open={!!compare}
+          onOpenChange={(o) => { if (!o) setCompare(null); }}
+          current={compare}
+          allVerifs={verifs as any[]}
+          profileMap={profileMap}
+        />
+      )}
 
       {activeAsset && (
         <VerifyDialog
