@@ -56,8 +56,9 @@ function AuditPage() {
   const { canView, isAdmin, canSeeBranch } = useAuth();
   const qc = useQueryClient();
 
-  const [q, setQ] = useState("");
-  const [entityType, setEntityType] = useState("all");
+  const search = Route.useSearch();
+  const [q, setQ] = useState(search.q ?? "");
+  const [entityType, setEntityType] = useState(search.entity ?? "all");
   const [action, setAction] = useState("all");
   const [userId, setUserId] = useState("all");
   const [from, setFrom] = useState("");
