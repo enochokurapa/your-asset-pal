@@ -19,6 +19,10 @@ import { exportReportXLSX, exportReportPDF } from "@/lib/depreciation-export";
 
 export const Route = createFileRoute("/_app/audit")({
   component: AuditPage,
+  validateSearch: (s: Record<string, unknown>) => ({
+    q: typeof s.q === "string" ? s.q : undefined,
+    entity: typeof s.entity === "string" ? s.entity : undefined,
+  }),
 });
 
 const friendlyAction = (r: any) => {
