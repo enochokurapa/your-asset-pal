@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -15,7 +15,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScannerDialog } from "@/components/scanner-dialog";
 import { toast } from "sonner";
-import { ClipboardCheck, ScanLine, Search, Download, FileText, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { ClipboardCheck, ScanLine, Search, Download, FileText, AlertTriangle, CheckCircle2, XCircle, GitCompare, ExternalLink, ArrowRight } from "lucide-react";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } from "@/lib/pdf-template";
@@ -67,16 +67,29 @@ function VerificationPage() {
     queryFn: async () => (await supabase.from("locations").select("id,name").order("name")).data ?? [],
   });
 
+  // Profiles map (verified_by FK targets auth.users, not profiles — fetch separately)
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["profiles-verif"],
+    queryFn: async () => (await supabase.from("profiles").select("id,email,full_name")).data ?? [],
+  });
+  const profileMap = useMemo(
+    () => Object.fromEntries((profiles as any[]).map((p) => [p.id, p])),
+    [profiles],
+  );
+
   // History
   const { data: verifs = [] } = useQuery({
     queryKey: ["verifications", branchScope ? Array.from(branchScope).sort().join(",") : "all"],
     queryFn: async () => {
-      const { data } = await (supabase as any).from("asset_verifications")
-        .select("*, assets(id,name,asset_tag,serial_number), branches(name), locations(name), profiles:verified_by(full_name,email)")
+      const { data, error } = await (supabase as any).from("asset_verifications")
+        .select("*, assets(id,name,asset_tag,serial_number), branches(name), locations(name)")
         .order("verified_at", { ascending: false });
+      if (error) { toast.error(error.message); return []; }
       return (data ?? []).filter((v: any) => canSeeBranch(v.branch_id));
     },
   });
+
+  const [compare, setCompare] = useState<any>(null);
 
   const filtered = useMemo(() => verifs.filter((v: any) => {
     if (statusFilter !== "all" && v.status !== statusFilter) return false;
@@ -138,7 +151,7 @@ function VerificationPage() {
     "Department": v.department ?? "",
     "Condition": v.condition ?? "",
     "Status": v.status,
-    "Verified by": v.profiles?.full_name ?? v.profiles?.email ?? "—",
+    "Verified by": profileMap[v.verified_by]?.full_name ?? profileMap[v.verified_by]?.email ?? "—",
     "Notes": v.notes ?? "",
     "Changes": v.changes && Object.keys(v.changes).length ? JSON.stringify(v.changes) : "",
   }));
@@ -266,7 +279,11 @@ function VerificationPage() {
               {filtered.length === 0 ? (
                 <tr><td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">No verifications match the filters.</td></tr>
               ) : filtered.map((v: any) => (
-                <tr key={v.id} className="border-t">
+                <tr
+                  key={v.id}
+                  className="border-t cursor-pointer hover:bg-muted/40"
+                  onClick={() => setCompare(v)}
+                >
                   <td className="px-3 py-2 whitespace-nowrap">{new Date(v.verified_at).toLocaleString()}</td>
                   <td className="px-3 py-2">
                     <p className="font-medium">{v.assets?.name ?? "—"}</p>
@@ -276,7 +293,7 @@ function VerificationPage() {
                   <td className="px-3 py-2">{v.custodian_name ?? "—"}{v.department ? ` · ${v.department}` : ""}</td>
                   <td className="px-3 py-2 capitalize">{v.condition ?? "—"}</td>
                   <td className="px-3 py-2"><Badge className={STATUS_TONE[v.status as VStatus]}>{v.status.replace("_"," ")}</Badge></td>
-                  <td className="px-3 py-2 text-xs">{v.profiles?.full_name ?? v.profiles?.email ?? "—"}</td>
+                  <td className="px-3 py-2 text-xs">{profileMap[v.verified_by]?.full_name ?? profileMap[v.verified_by]?.email ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -285,6 +302,16 @@ function VerificationPage() {
       </Card>
 
       <ScannerDialog open={scanOpen} onOpenChange={setScanOpen} onScan={(t) => lookup(t)} />
+
+      {compare && (
+        <CompareDialog
+          open={!!compare}
+          onOpenChange={(o) => { if (!o) setCompare(null); }}
+          current={compare}
+          allVerifs={verifs as any[]}
+          profileMap={profileMap}
+        />
+      )}
 
       {activeAsset && (
         <VerifyDialog
@@ -447,6 +474,160 @@ function VerifyDialog({
           <Button variant="destructive" onClick={() => save("not_found")} disabled={saving}><XCircle className="mr-1 h-4 w-4" />Not found</Button>
           <Button variant="secondary" onClick={() => save("mismatched")} disabled={saving}><AlertTriangle className="mr-1 h-4 w-4" />Mismatched</Button>
           <Button onClick={() => save("verified")} disabled={saving}><CheckCircle2 className="mr-1 h-4 w-4" />Verified</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ---------- Comparison view ---------- */
+
+const FIELD_LABELS: Record<string, string> = {
+  name: "Name",
+  description: "Description",
+  location_id: "Location",
+  branch_id: "Branch",
+  condition: "Condition",
+  custodian: "Custodian",
+  department: "Department",
+};
+
+function CompareDialog({
+  open, onOpenChange, current, allVerifs, profileMap,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  current: any;
+  allVerifs: any[];
+  profileMap: Record<string, any>;
+}) {
+  const assetId = current.asset_id;
+  // Previous verification for the same asset
+  const previous = useMemo(() => {
+    const list = (allVerifs as any[])
+      .filter((v) => v.asset_id === assetId && new Date(v.verified_at) < new Date(current.verified_at))
+      .sort((a, b) => new Date(b.verified_at).getTime() - new Date(a.verified_at).getTime());
+    return list[0] ?? null;
+  }, [allVerifs, assetId, current.verified_at]);
+
+  const snapshot = (v: any | null) => ({
+    name: v?.assets?.name ?? null,
+    description: null, // not stored on snapshot
+    location_id: v?.locations?.name ?? null,
+    branch_id: v?.branches?.name ?? null,
+    condition: v?.condition ?? null,
+    custodian: v?.custodian_name ?? null,
+    department: v?.department ?? null,
+  });
+
+  // For the previous side: if there is no previous verification, derive from current.changes "from"
+  const prevSnap = previous ? snapshot(previous) : (() => {
+    const s = snapshot(current);
+    const ch = (current.changes ?? {}) as Record<string, { from: any; to: any }>;
+    Object.entries(ch).forEach(([k, val]) => {
+      const key = k === "location_id" || k === "branch_id" ? k : k;
+      (s as any)[key] = val.from ?? null;
+    });
+    return s;
+  })();
+  const curSnap = snapshot(current);
+
+  const rows = Object.keys(FIELD_LABELS).map((k) => ({
+    key: k,
+    label: FIELD_LABELS[k],
+    from: (prevSnap as any)[k],
+    to: (curSnap as any)[k],
+    changed: String((prevSnap as any)[k] ?? "") !== String((curSnap as any)[k] ?? ""),
+  }));
+  const changedRows = rows.filter((r) => r.changed);
+
+  const verifier = profileMap[current.verified_by]?.full_name ?? profileMap[current.verified_by]?.email ?? "—";
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <GitCompare className="h-5 w-5" /> Verification comparison · {current.assets?.asset_tag ?? ""}
+          </DialogTitle>
+          <DialogDescription>
+            {previous
+              ? `Comparing this verification against the previous one on ${new Date(previous.verified_at).toLocaleString()}.`
+              : "No earlier verification on file — showing this verification's recorded changes against the register at the time."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-3 sm:grid-cols-3 text-sm">
+          <div className="rounded-md border p-3">
+            <p className="text-xs text-muted-foreground">Asset</p>
+            <p className="font-medium">{current.assets?.name ?? "—"}</p>
+            <p className="text-xs text-muted-foreground">{current.assets?.asset_tag} {current.assets?.serial_number ? `· SN ${current.assets.serial_number}` : ""}</p>
+          </div>
+          <div className="rounded-md border p-3">
+            <p className="text-xs text-muted-foreground">This verification</p>
+            <p className="font-medium">{new Date(current.verified_at).toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground">By {verifier}</p>
+          </div>
+          <div className="rounded-md border p-3">
+            <p className="text-xs text-muted-foreground">Outcome</p>
+            <Badge className={STATUS_TONE[current.status as VStatus]}>{current.status.replace("_"," ")}</Badge>
+            <p className="text-xs text-muted-foreground mt-1">{changedRows.length} field(s) changed</p>
+          </div>
+        </div>
+
+        <div className="rounded-md border overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50">
+              <tr className="text-left">
+                <th className="px-3 py-2 w-40">Field</th>
+                <th className="px-3 py-2">Previous</th>
+                <th className="px-3 py-2 w-10"></th>
+                <th className="px-3 py-2">Current</th>
+                <th className="px-3 py-2 w-32">Audit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.key} className={`border-t ${r.changed ? "bg-warning/5" : ""}`}>
+                  <td className="px-3 py-2 font-medium">{r.label}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{r.from == null || r.from === "" ? "—" : String(r.from)}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{r.changed ? <ArrowRight className="h-4 w-4" /> : ""}</td>
+                  <td className={`px-3 py-2 ${r.changed ? "font-semibold text-warning-foreground" : ""}`}>
+                    {r.to == null || r.to === "" ? "—" : String(r.to)}
+                  </td>
+                  <td className="px-3 py-2">
+                    {r.changed ? (
+                      <Link
+                        to="/audit"
+                        search={{ q: assetId, entity: "assets" } as any}
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                      >
+                        Trail <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {current.notes && (
+          <div className="rounded-md border p-3 text-sm">
+            <p className="text-xs text-muted-foreground mb-1">Verifier notes</p>
+            <p>{current.notes}</p>
+          </div>
+        )}
+
+        <DialogFooter className="flex-wrap gap-2">
+          <Link
+            to="/audit"
+            search={{ q: assetId, entity: "assets" } as any}
+            className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+          >
+            Open full audit trail for this asset <ExternalLink className="h-3 w-3" />
+          </Link>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
