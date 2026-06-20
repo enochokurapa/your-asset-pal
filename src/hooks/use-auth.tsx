@@ -34,6 +34,7 @@ export const ALL_ACTION_KINDS: ActionKind[] = [
   "manage_document_templates",
   "request_asset_deletion", "approve_asset_deletion",
   "perform_verification", "view_verification_reports",
+  "approve_own_request",
 ];
 
 export const DEFAULT_NEW_USER_MODULES: ModuleKey[] = ["dashboard", "assets"];
