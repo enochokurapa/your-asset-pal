@@ -179,8 +179,10 @@ export function PendingApprovalsCard() {
               )}
               {detail.payload && Object.keys(detail.payload).length > 0 && (
                 <div>
-                  <p className="text-xs uppercase text-muted-foreground">Details</p>
-                  <pre className="mt-1 max-h-64 overflow-auto rounded-md bg-muted p-3 text-xs">{JSON.stringify(detail.payload, null, 2)}</pre>
+                  <p className="text-xs uppercase text-muted-foreground mb-2">Details</p>
+                  <div className="rounded-md border bg-card p-3">
+                    <ApprovalPayloadView payload={detail.payload} />
+                  </div>
                 </div>
               )}
             </div>
