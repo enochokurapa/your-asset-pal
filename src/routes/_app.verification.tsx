@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -15,7 +15,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScannerDialog } from "@/components/scanner-dialog";
 import { toast } from "sonner";
-import { ClipboardCheck, ScanLine, Search, Download, FileText, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { ClipboardCheck, ScanLine, Search, Download, FileText, AlertTriangle, CheckCircle2, XCircle, GitCompare, ExternalLink, ArrowRight } from "lucide-react";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } from "@/lib/pdf-template";
