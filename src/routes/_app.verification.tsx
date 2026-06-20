@@ -67,16 +67,29 @@ function VerificationPage() {
     queryFn: async () => (await supabase.from("locations").select("id,name").order("name")).data ?? [],
   });
 
+  // Profiles map (verified_by FK targets auth.users, not profiles — fetch separately)
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["profiles-verif"],
+    queryFn: async () => (await supabase.from("profiles").select("id,email,full_name")).data ?? [],
+  });
+  const profileMap = useMemo(
+    () => Object.fromEntries((profiles as any[]).map((p) => [p.id, p])),
+    [profiles],
+  );
+
   // History
   const { data: verifs = [] } = useQuery({
     queryKey: ["verifications", branchScope ? Array.from(branchScope).sort().join(",") : "all"],
     queryFn: async () => {
-      const { data } = await (supabase as any).from("asset_verifications")
-        .select("*, assets(id,name,asset_tag,serial_number), branches(name), locations(name), profiles:verified_by(full_name,email)")
+      const { data, error } = await (supabase as any).from("asset_verifications")
+        .select("*, assets(id,name,asset_tag,serial_number), branches(name), locations(name)")
         .order("verified_at", { ascending: false });
+      if (error) { toast.error(error.message); return []; }
       return (data ?? []).filter((v: any) => canSeeBranch(v.branch_id));
     },
   });
+
+  const [compare, setCompare] = useState<any>(null);
 
   const filtered = useMemo(() => verifs.filter((v: any) => {
     if (statusFilter !== "all" && v.status !== statusFilter) return false;
