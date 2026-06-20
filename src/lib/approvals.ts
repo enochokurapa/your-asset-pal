@@ -37,7 +37,15 @@ export async function decideApproval(id: string, status: "approved" | "rejected"
   const { data: req, error: reqErr } = await supabase.from("approval_requests").select("*").eq("id", id).single();
   if (reqErr || !req) throw reqErr ?? new Error("Not found");
   if (req.status !== "pending") { toast.error("Already decided"); return; }
-  if (req.requested_by === u.user.id) { toast.error("You cannot approve your own request"); return; }
+  if (req.requested_by === u.user.id) {
+    const [{ data: roleRows }, { data: rightRows }] = await Promise.all([
+      supabase.from("user_roles").select("role").eq("user_id", u.user.id),
+      supabase.from("user_action_rights").select("action_kind").eq("user_id", u.user.id).eq("action_kind", "approve_own_request"),
+    ]);
+    const isAdmin = (roleRows ?? []).some((r: any) => r.role === "admin");
+    const canApproveOwn = isAdmin || ((rightRows ?? []).length > 0);
+    if (!canApproveOwn) { toast.error("You cannot approve your own request"); return; }
+  }
 
 
   // Apply effect on approval

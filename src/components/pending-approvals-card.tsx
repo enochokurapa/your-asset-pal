@@ -15,9 +15,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { ChevronDown, CheckCircle2, XCircle, Eye } from "lucide-react";
 import { decideApproval } from "@/lib/approvals";
 import { useAuth, ApprovalKind } from "@/hooks/use-auth";
+import { ApprovalPayloadView } from "@/components/approval-payload-view";
 
 export function PendingApprovalsCard() {
-  const { canApprove, user, isAdmin } = useAuth();
+  const { canApprove, canDo, user, isAdmin } = useAuth();
   const qc = useQueryClient();
   const nav = useNavigate();
   const location = useLocation();
@@ -72,7 +73,7 @@ export function PendingApprovalsCard() {
       if (cancelled) return;
       const isPending = row.status === "pending";
       if (isPending && (action === "approve" || action === "reject")) {
-        const allowed = canApprove(row.kind) && (isAdmin || row.requested_by !== user?.id);
+        const allowed = canApprove(row.kind) && (isAdmin || row.requested_by !== user?.id || canDo("approve_own_request"));
         if (allowed) {
           setDecideReason("");
           setDecideOpen({ id: row.id, status: action === "approve" ? "approved" : "rejected" });
@@ -115,7 +116,7 @@ export function PendingApprovalsCard() {
         {rows.map((r: any) => {
           const kind = r.kind as ApprovalKind;
           const isOwn = r.requested_by === user?.id;
-          const allowed = canApprove(kind) && (isAdmin || !isOwn);
+          const allowed = canApprove(kind) && (isAdmin || !isOwn || canDo("approve_own_request"));
           return (
             <div key={r.id} className="flex items-center justify-between py-3">
               <div className="min-w-0">
@@ -146,7 +147,7 @@ export function PendingApprovalsCard() {
                   </DropdownMenuItem>
                   {!allowed && (
                     <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-                      {isOwn ? "Only admins can decide their own request" : "You don't have rights to approve this kind"}
+                      {isOwn ? "You need the 'Approve own request' right" : "You don't have rights to approve this kind"}
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
@@ -178,8 +179,10 @@ export function PendingApprovalsCard() {
               )}
               {detail.payload && Object.keys(detail.payload).length > 0 && (
                 <div>
-                  <p className="text-xs uppercase text-muted-foreground">Details</p>
-                  <pre className="mt-1 max-h-64 overflow-auto rounded-md bg-muted p-3 text-xs">{JSON.stringify(detail.payload, null, 2)}</pre>
+                  <p className="text-xs uppercase text-muted-foreground mb-2">Details</p>
+                  <div className="rounded-md border bg-card p-3">
+                    <ApprovalPayloadView payload={detail.payload} />
+                  </div>
                 </div>
               )}
             </div>

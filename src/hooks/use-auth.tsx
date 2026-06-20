@@ -16,7 +16,8 @@ export type ActionKind =
   | "view_gate_pass_reports" | "export_gate_pass_reports"
   | "manage_document_templates"
   | "request_asset_deletion" | "approve_asset_deletion"
-  | "perform_verification" | "view_verification_reports";
+  | "perform_verification" | "view_verification_reports"
+  | "approve_own_request";
 
 export const ALL_MODULES: ModuleKey[] = [
   "dashboard", "assets", "categories", "locations", "branches", "users", "reports", "audit", "depreciation", "gate_pass", "verification", "settings",
@@ -33,6 +34,7 @@ export const ALL_ACTION_KINDS: ActionKind[] = [
   "manage_document_templates",
   "request_asset_deletion", "approve_asset_deletion",
   "perform_verification", "view_verification_reports",
+  "approve_own_request",
 ];
 
 export const DEFAULT_NEW_USER_MODULES: ModuleKey[] = ["dashboard", "assets"];
