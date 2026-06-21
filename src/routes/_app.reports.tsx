@@ -10,14 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileBarChart, FileDown, FileSpreadsheet, X } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { formatUGX } from "@/lib/utils";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } from "@/lib/pdf-template";
 import { fmtDateEAT, fmtDateTimeEAT } from "@/lib/time";
-import { AuditTrailView } from "@/components/audit-trail-view";
+
 
 export const Route = createFileRoute("/_app/reports")({
   component: ReportsPage,
@@ -189,14 +189,6 @@ function ReportsPage() {
       .select("*, assets(asset_tag,name), branches(name)")
       .order("created_at", { ascending: false })).data ?? [],
   });
-  const { data: auditRowsRaw = [] } = useQuery({
-    queryKey: ["report-audit-log"],
-    queryFn: async () => (await supabase.from("audit_log")
-      .select("*")
-      .is("cleared_at", null)
-      .order("created_at", { ascending: false })
-      .limit(2000)).data ?? [],
-  });
   const userLabel = (id: string | null | undefined) => {
     if (!id) return "";
     const p = profileMap[id];
@@ -282,13 +274,6 @@ function ReportsPage() {
     () => (gatePasses as any[]).filter((g) => visibleAssetIds.has(g.asset_id) && canSeeBranch(g.branch_id)),
     [gatePasses, visibleAssetIds, canSeeBranch],
   );
-  const scopedAuditRows = useMemo(
-    () => (auditRowsRaw as any[]).filter((r) => {
-      const assetId = r.entity_type === "assets" ? r.entity_id : (r.details?.asset_id ?? r.details?.after?.asset_id ?? r.details?.before?.asset_id);
-      return !assetId || visibleAssetIds.has(assetId);
-    }),
-    [auditRowsRaw, visibleAssetIds],
-  );
   const scopedBranches = useMemo(
     () => (branches as any[]).filter((b) => canSeeBranch(b.id)),
     [branches, canSeeBranch],
@@ -306,20 +291,6 @@ function ReportsPage() {
   const priorityOpts = ["low", "normal", "high", "urgent"].map((p) => ({ value: p, label: p }));
   const verificationStatusOpts = ["verified", "mismatched", "not_found"].map((s) => ({ value: s, label: s.replace(/_/g, " ") }));
   const gatePassStatusOpts = ["pending", "approved", "rejected", "checked_out", "returned", "cancelled"].map((s) => ({ value: s, label: s.replace(/_/g, " ") }));
-  const auditActivityOpts = [
-    { value: "created", label: "Asset created (data capture)" },
-    { value: "updated", label: "Asset details updated" },
-    { value: "moved", label: "Asset moved / transferred" },
-    { value: "assigned", label: "Asset assigned" },
-    { value: "verified", label: "Asset verified" },
-    { value: "maintenance", label: "Maintenance" },
-    { value: "depreciated", label: "Depreciation run" },
-    { value: "requisition", label: "Requisition raised" },
-    { value: "approval", label: "Approval decision" },
-    { value: "gate_pass", label: "Gate pass activity" },
-    { value: "retired", label: "Asset retired" },
-    { value: "disposed", label: "Asset disposed" },
-  ];
 
   /* ----------- Filters state per tab ----------- */
   const [fRegister, setFRegister] = useState<Record<string, string>>({});
@@ -331,9 +302,6 @@ function ReportsPage() {
   const [fVerification, setFVerification] = useState<Record<string, string>>({});
   const [fDepreciation, setFDepreciation] = useState<Record<string, string>>({});
   const [fGatePass, setFGatePass] = useState<Record<string, string>>({});
-  const [fAudit, setFAudit] = useState<Record<string, string>>({});
-  const [auditSelectedAssets, setAuditSelectedAssets] = useState<Set<string>>(new Set());
-  const [auditAssetQuery, setAuditAssetQuery] = useState("");
 
   /* ----------- Register ----------- */
   const registerDefs: FilterDef[] = [
