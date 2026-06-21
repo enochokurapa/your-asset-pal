@@ -15,6 +15,7 @@ import * as XLSX from "xlsx";
 import { formatUGX } from "@/lib/utils";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } from "@/lib/pdf-template";
+import { fmtDateEAT, fmtDateTimeEAT } from "@/lib/time";
 
 export const Route = createFileRoute("/_app/reports")({
   component: ReportsPage,
@@ -161,6 +162,37 @@ function ReportsPage() {
     queryFn: async () => (await supabase.from("profiles").select("id,email,full_name")).data ?? [],
   });
   const profileMap = useMemo(() => Object.fromEntries(profiles.map((p: any) => [p.id, p])), [profiles]);
+  const { data: verifications = [] } = useQuery({
+    queryKey: ["report-verifications"],
+    queryFn: async () => (await (supabase as any).from("asset_verifications")
+      .select("*, assets(asset_tag,name,serial_number), branches(name), locations(name)")
+      .order("verified_at", { ascending: false })).data ?? [],
+  });
+  const { data: depreciationEntries = [] } = useQuery({
+    queryKey: ["report-depreciation-entries"],
+    queryFn: async () => (await supabase.from("depreciation_entries" as any)
+      .select("*, assets(asset_tag,name,branch_id,branches(name)), depreciation_runs(period_start,period_end,run_type,status,triggered_by)")
+      .order("period_end", { ascending: false })).data ?? [],
+  });
+  const { data: gatePasses = [] } = useQuery({
+    queryKey: ["report-gate-passes"],
+    queryFn: async () => (await (supabase as any).from("gate_passes")
+      .select("*, assets(asset_tag,name), branches(name)")
+      .order("created_at", { ascending: false })).data ?? [],
+  });
+  const { data: auditRowsRaw = [] } = useQuery({
+    queryKey: ["report-audit-log"],
+    queryFn: async () => (await supabase.from("audit_log")
+      .select("*")
+      .is("cleared_at", null)
+      .order("created_at", { ascending: false })
+      .limit(2000)).data ?? [],
+  });
+  const userLabel = (id: string | null | undefined) => {
+    if (!id) return "";
+    const p = profileMap[id];
+    return p?.full_name || p?.email || "";
+  };
 
   const catMap = useMemo(() => Object.fromEntries(categories.map((c: any) => [c.id, c])), [categories]);
   const locMap = useMemo(() => Object.fromEntries(locationsAll.map((l: any) => [l.id, l])), [locationsAll]);
