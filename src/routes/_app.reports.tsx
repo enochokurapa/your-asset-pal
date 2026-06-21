@@ -574,6 +574,137 @@ function ReportsPage() {
     rows: approvalRows,
   };
 
+  /* ----------- Verification ----------- */
+  const verificationDefs: FilterDef[] = [
+    { key: "q", label: "Search (tag/asset/custodian)", type: "text" },
+    { key: "branch_id", label: "Branch", type: "select", options: branchOpts },
+    { key: "status", label: "Status", type: "select", options: verificationStatusOpts },
+    { key: "from", label: "Verified from", type: "date" },
+    { key: "to", label: "Verified to", type: "date" },
+  ];
+  const verificationRows = scopedVerifications.map((v: any) => ({
+    tag: v.assets?.asset_tag ?? "", name: v.assets?.name ?? "", serial_number: v.assets?.serial_number ?? "",
+    branch: v.branches?.name ?? "", location: v.locations?.name ?? "",
+    custodian_name: v.custodian_name ?? "", department: v.department ?? "",
+    condition: v.condition ?? "", status: v.status ?? "",
+    verified_by: userLabel(v.verified_by), verified_at: v.verified_at,
+    notes: v.notes ?? "", changes: v.changes && Object.keys(v.changes).length ? JSON.stringify(v.changes) : "",
+    _branch_id: v.branch_id,
+  })).filter((v: any) =>
+    (!fVerification.branch_id || v._branch_id === fVerification.branch_id) &&
+    (!fVerification.status || v.status === fVerification.status) &&
+    applyDate(v.verified_at, fVerification.from, fVerification.to) &&
+    (!fVerification.q || applyText(v.tag, fVerification.q) || applyText(v.name, fVerification.q) || applyText(v.serial_number, fVerification.q) || applyText(v.custodian_name, fVerification.q)),
+  );
+  const verificationReport: Report = {
+    title: "Fixed Asset Verification Report",
+    columns: [
+      { header: "Tag", key: "tag" }, { header: "Asset", key: "name" }, { header: "Serial #", key: "serial_number" },
+      { header: "Branch", key: "branch" }, { header: "Location", key: "location" },
+      { header: "Custodian", key: "custodian_name" }, { header: "Department", key: "department" },
+      { header: "Condition", key: "condition" }, { header: "Status", key: "status" },
+      { header: "Verified by", key: "verified_by" }, { header: "Verified at", key: "verified_at", isDateTime: true },
+      { header: "Notes", key: "notes" }, { header: "Changes", key: "changes" },
+    ],
+    rows: verificationRows,
+  };
+
+  /* ----------- Depreciation ----------- */
+  const depreciationDefs: FilterDef[] = [
+    { key: "q", label: "Search (tag/asset)", type: "text" },
+    { key: "branch_id", label: "Branch", type: "select", options: branchOpts },
+    { key: "from", label: "Period from", type: "date" },
+    { key: "to", label: "Period to", type: "date" },
+  ];
+  const depreciationRows = scopedDepreciationEntries.map((e: any) => ({
+    tag: e.assets?.asset_tag ?? "", name: e.assets?.name ?? "", branch: e.assets?.branches?.name ?? "",
+    period_start: e.period_start, period_end: e.period_end, method: e.method,
+    opening_value: e.opening_value, depreciation_amount: e.depreciation_amount,
+    accumulated_after: e.accumulated_after, closing_value: e.closing_value,
+    run_type: e.depreciation_runs?.run_type ?? "", run_status: e.depreciation_runs?.status ?? "",
+    triggered_by: userLabel(e.depreciation_runs?.triggered_by), created_at: e.created_at,
+    _branch_id: e.assets?.branch_id,
+  })).filter((e: any) =>
+    (!fDepreciation.branch_id || e._branch_id === fDepreciation.branch_id) &&
+    applyDate(e.period_end, fDepreciation.from, fDepreciation.to) &&
+    (!fDepreciation.q || applyText(e.tag, fDepreciation.q) || applyText(e.name, fDepreciation.q)),
+  );
+  const depreciationReport: Report = {
+    title: "Depreciation Entries Report",
+    columns: [
+      { header: "Tag", key: "tag" }, { header: "Asset", key: "name" }, { header: "Branch", key: "branch" },
+      { header: "Period start", key: "period_start", isDate: true }, { header: "Period end", key: "period_end", isDate: true },
+      { header: "Method", key: "method" }, { header: "Opening", key: "opening_value", isCurrency: true },
+      { header: "Depreciation", key: "depreciation_amount", isCurrency: true },
+      { header: "Accumulated", key: "accumulated_after", isCurrency: true }, { header: "NBV", key: "closing_value", isCurrency: true },
+      { header: "Run type", key: "run_type" }, { header: "Run status", key: "run_status" },
+      { header: "Triggered by", key: "triggered_by" }, { header: "Recorded", key: "created_at", isDateTime: true },
+    ],
+    rows: depreciationRows,
+  };
+
+  /* ----------- Gate passes ----------- */
+  const gatePassDefs: FilterDef[] = [
+    { key: "q", label: "Search (pass/asset/destination)", type: "text" },
+    { key: "branch_id", label: "Branch", type: "select", options: branchOpts },
+    { key: "status", label: "Status", type: "select", options: gatePassStatusOpts },
+    { key: "from", label: "Requested from", type: "date" },
+    { key: "to", label: "Requested to", type: "date" },
+  ];
+  const gatePassRows = scopedGatePasses.map((g: any) => ({
+    pass_number: g.pass_number ?? "", tag: g.assets?.asset_tag ?? "", name: g.assets?.name ?? "",
+    branch: g.branches?.name ?? "", status: g.status ?? "", destination: g.destination ?? "",
+    reason: g.reason ?? "", requested_by: userLabel(g.requested_by), created_at: g.created_at,
+    approver: userLabel(g.approver_id), decided_at: g.decided_at,
+    checked_out_by: userLabel(g.checked_out_by), checked_out_at: g.checked_out_at,
+    returned_by: userLabel(g.returned_by), returned_at: g.returned_at,
+    _branch_id: g.branch_id,
+  })).filter((g: any) =>
+    (!fGatePass.branch_id || g._branch_id === fGatePass.branch_id) &&
+    (!fGatePass.status || g.status === fGatePass.status) &&
+    applyDate(g.created_at, fGatePass.from, fGatePass.to) &&
+    (!fGatePass.q || applyText(g.pass_number, fGatePass.q) || applyText(g.tag, fGatePass.q) || applyText(g.name, fGatePass.q) || applyText(g.destination, fGatePass.q)),
+  );
+  const gatePassReport: Report = {
+    title: "Gate Pass Report",
+    columns: [
+      { header: "Pass #", key: "pass_number" }, { header: "Tag", key: "tag" }, { header: "Asset", key: "name" },
+      { header: "Branch", key: "branch" }, { header: "Status", key: "status" }, { header: "Destination", key: "destination" },
+      { header: "Reason", key: "reason" }, { header: "Requested by", key: "requested_by" }, { header: "Requested", key: "created_at", isDateTime: true },
+      { header: "Approver", key: "approver" }, { header: "Decided", key: "decided_at", isDateTime: true },
+      { header: "Checked out by", key: "checked_out_by" }, { header: "Checked out", key: "checked_out_at", isDateTime: true },
+      { header: "Returned by", key: "returned_by" }, { header: "Returned", key: "returned_at", isDateTime: true },
+    ],
+    rows: gatePassRows,
+  };
+
+  /* ----------- Audit trail ----------- */
+  const auditDefs: FilterDef[] = [
+    { key: "q", label: "Search (entity/action/user)", type: "text" },
+    { key: "entity_type", label: "Entity", type: "select", options: auditEntityOpts },
+    { key: "from", label: "From date", type: "date" },
+    { key: "to", label: "To date", type: "date" },
+  ];
+  const auditRows = scopedAuditRows.map((r: any) => ({
+    entity_type: r.entity_type?.replace(/_/g, " ") ?? "", action: r.action?.replace(/_/g, " ") ?? "",
+    actor: userLabel(r.actor_user_id), created_at: r.created_at,
+    entity_id: r.entity_id ?? "", details: r.details ? JSON.stringify(r.details) : "",
+    _entity_type: r.entity_type,
+  })).filter((r: any) =>
+    (!fAudit.entity_type || r._entity_type === fAudit.entity_type) &&
+    applyDate(r.created_at, fAudit.from, fAudit.to) &&
+    (!fAudit.q || applyText(r.entity_type, fAudit.q) || applyText(r.action, fAudit.q) || applyText(r.actor, fAudit.q) || applyText(r.details, fAudit.q)),
+  );
+  const auditReport: Report = {
+    title: "Audit Trail Report",
+    columns: [
+      { header: "Date", key: "created_at", isDateTime: true }, { header: "Entity", key: "entity_type" },
+      { header: "Action", key: "action" }, { header: "User", key: "actor" },
+      { header: "Record", key: "entity_id" }, { header: "Details", key: "details" },
+    ],
+    rows: auditRows,
+  };
+
   /* ----------- Branch / Dept / Condition (unchanged aggregates) ----------- */
   const branchReport: Report = {
     title: "Branch Report",
