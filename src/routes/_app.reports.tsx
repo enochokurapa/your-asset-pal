@@ -248,6 +248,25 @@ function ReportsPage() {
     () => (approvals as any[]).filter((p) => !p.asset_id || visibleAssetIds.has(p.asset_id)),
     [approvals, visibleAssetIds],
   );
+  const scopedVerifications = useMemo(
+    () => (verifications as any[]).filter((v) => visibleAssetIds.has(v.asset_id) && canSeeBranch(v.branch_id)),
+    [verifications, visibleAssetIds, canSeeBranch],
+  );
+  const scopedDepreciationEntries = useMemo(
+    () => (depreciationEntries as any[]).filter((e) => visibleAssetIds.has(e.asset_id) && canSeeBranch(e.assets?.branch_id)),
+    [depreciationEntries, visibleAssetIds, canSeeBranch],
+  );
+  const scopedGatePasses = useMemo(
+    () => (gatePasses as any[]).filter((g) => visibleAssetIds.has(g.asset_id) && canSeeBranch(g.branch_id)),
+    [gatePasses, visibleAssetIds, canSeeBranch],
+  );
+  const scopedAuditRows = useMemo(
+    () => (auditRowsRaw as any[]).filter((r) => {
+      const assetId = r.entity_type === "assets" ? r.entity_id : (r.details?.asset_id ?? r.details?.after?.asset_id ?? r.details?.before?.asset_id);
+      return !assetId || visibleAssetIds.has(assetId);
+    }),
+    [auditRowsRaw, visibleAssetIds],
+  );
   const scopedBranches = useMemo(
     () => (branches as any[]).filter((b) => canSeeBranch(b.id)),
     [branches, canSeeBranch],
@@ -263,6 +282,10 @@ function ReportsPage() {
     .map((k) => ({ value: k, label: k.replace(/_/g, " ") }));
   const approvalStatusOpts = ["pending", "approved", "rejected"].map((s) => ({ value: s, label: s }));
   const priorityOpts = ["low", "normal", "high", "urgent"].map((p) => ({ value: p, label: p }));
+  const verificationStatusOpts = ["verified", "mismatched", "not_found"].map((s) => ({ value: s, label: s.replace(/_/g, " ") }));
+  const gatePassStatusOpts = ["pending", "approved", "rejected", "checked_out", "returned", "cancelled"].map((s) => ({ value: s, label: s.replace(/_/g, " ") }));
+  const auditEntityOpts = ["assets", "asset_movements", "asset_disposals", "asset_assignments", "approval_requests", "asset_verifications", "gate_passes", "depreciation_entries"]
+    .map((s) => ({ value: s, label: s.replace(/_/g, " ") }));
 
   /* ----------- Filters state per tab ----------- */
   const [fRegister, setFRegister] = useState<Record<string, string>>({});
@@ -271,6 +294,10 @@ function ReportsPage() {
   const [fDisposal, setFDisposal] = useState<Record<string, string>>({});
   const [fMaint, setFMaint] = useState<Record<string, string>>({});
   const [fApprov, setFApprov] = useState<Record<string, string>>({});
+  const [fVerification, setFVerification] = useState<Record<string, string>>({});
+  const [fDepreciation, setFDepreciation] = useState<Record<string, string>>({});
+  const [fGatePass, setFGatePass] = useState<Record<string, string>>({});
+  const [fAudit, setFAudit] = useState<Record<string, string>>({});
 
   /* ----------- Register ----------- */
   const registerDefs: FilterDef[] = [
