@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-export type ApprovalKind = "movement" | "retirement" | "disposal" | "reactivation" | "update" | "set_for_disposal" | "maintenance" | "deletion";
+export type ApprovalKind = "movement" | "retirement" | "disposal" | "reactivation" | "update" | "set_for_disposal" | "maintenance" | "deletion" | "attachment_deletion";
 
 export async function submitApproval(params: {
   kind: ApprovalKind;
@@ -99,6 +99,17 @@ export async function decideApproval(id: string, status: "approved" | "rejected"
   if (status === "approved" && req.kind === "deletion" && req.asset_id) {
     const { error: delErr } = await supabase.rpc("delete_asset_cascade" as any, { _asset_id: req.asset_id });
     if (delErr) { toast.error(delErr.message); return; }
+  }
+
+  // Attachment deletion: remove storage object + DB row.
+  if (status === "approved" && req.kind === "attachment_deletion" && req.payload) {
+    const p = req.payload as any;
+    if (p.storage_path) {
+      await supabase.storage.from("asset-files").remove([p.storage_path]);
+    }
+    if (p.attachment_id) {
+      await supabase.from("asset_attachments").delete().eq("id", p.attachment_id);
+    }
   }
 
   toast.success(`Request ${status}`);
