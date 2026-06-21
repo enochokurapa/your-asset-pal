@@ -17,6 +17,7 @@ import { formatUGX } from "@/lib/utils";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } from "@/lib/pdf-template";
 import { fmtDateEAT, fmtDateTimeEAT } from "@/lib/time";
+import { AuditTrailView } from "@/components/audit-trail-view";
 
 export const Route = createFileRoute("/_app/reports")({
   component: ReportsPage,
