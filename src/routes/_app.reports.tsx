@@ -177,7 +177,7 @@ function ReportsPage() {
   const { data: depreciationEntries = [] } = useQuery({
     queryKey: ["report-depreciation-entries"],
     queryFn: async () => (await supabase.from("depreciation_entries" as any)
-      .select("*, assets(asset_tag,name,branch_id,branches(name)), depreciation_runs(period_start,period_end,run_type,status,triggered_by)")
+      .select("*, assets(asset_tag,name,branch_id), depreciation_runs(period_start,period_end,run_type,status,triggered_by)")
       .order("period_end", { ascending: false })).data ?? [],
   });
   const { data: gatePasses = [] } = useQuery({
@@ -617,7 +617,7 @@ function ReportsPage() {
     { key: "to", label: "Period to", type: "date" },
   ];
   const depreciationRows = scopedDepreciationEntries.map((e: any) => ({
-    tag: e.assets?.asset_tag ?? "", name: e.assets?.name ?? "", branch: e.assets?.branches?.name ?? "",
+    tag: e.assets?.asset_tag ?? "", name: e.assets?.name ?? "", branch: branchById(e.assets?.branch_id)?.name ?? "",
     period_start: e.period_start, period_end: e.period_end, method: e.method,
     opening_value: e.opening_value, depreciation_amount: e.depreciation_amount,
     accumulated_after: e.accumulated_after, closing_value: e.closing_value,
