@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileBarChart, FileDown, FileSpreadsheet, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { formatUGX } from "@/lib/utils";
@@ -318,6 +319,8 @@ function ReportsPage() {
   const [fDepreciation, setFDepreciation] = useState<Record<string, string>>({});
   const [fGatePass, setFGatePass] = useState<Record<string, string>>({});
   const [fAudit, setFAudit] = useState<Record<string, string>>({});
+  const [auditSelectedAssets, setAuditSelectedAssets] = useState<Set<string>>(new Set());
+  const [auditAssetQuery, setAuditAssetQuery] = useState("");
 
   /* ----------- Register ----------- */
   const registerDefs: FilterDef[] = [
@@ -778,50 +781,114 @@ function ReportsPage() {
 
   // Resolve the asset referenced by an audit row (works for assets, approval_requests,
   // movements, disposals, verifications, gate passes, assignments).
-  const recordLabel = (r: any): string => {
-    const d = r?.details ?? {};
-    const candidateId: string | undefined =
-      r.entity_type === "assets"
-        ? r.entity_id
-        : d.asset_id ?? d.after?.asset_id ?? d.before?.asset_id;
-    const a = candidateId ? allAssetMap[candidateId] : undefined;
-    if (a) {
-      const base = `${a.asset_tag ?? ""} — ${a.name ?? ""}`.replace(/^ — | — $/g, "").trim();
-      if (r.entity_type === "approval_requests") {
-        return `${base} (current status: ${(a.status ?? "unknown").replace(/_/g, " ")})`;
-      }
-      return base || "—";
-    }
-    if (r.entity_id) return labelForId(r.entity_type ?? "", r.entity_id);
-    return "";
-  };
-
   const auditDefs: FilterDef[] = [
-    { key: "q", label: "Search (entity/action/user)", type: "text" },
+    { key: "q", label: "Search (activity/user/details)", type: "text" },
     { key: "entity_type", label: "Entity", type: "select", options: auditEntityOpts },
     { key: "from", label: "From date", type: "date" },
     { key: "to", label: "To date", type: "date" },
   ];
-  const auditRows = scopedAuditRows.map((r: any) => ({
-    entity_type: r.entity_type?.replace(/_/g, " ") ?? "",
-    action: r.action?.replace(/_/g, " ") ?? "",
-    actor: userLabel(r.actor_user_id), created_at: r.created_at,
-    entity_id: recordLabel(r),
-    details: detailsToLines(r.details),
-    _entity_type: r.entity_type,
-  })).filter((r: any) =>
-    (!fAudit.entity_type || r._entity_type === fAudit.entity_type) &&
-    applyDate(r.created_at, fAudit.from, fAudit.to) &&
-    (!fAudit.q || applyText(r.entity_type, fAudit.q) || applyText(r.action, fAudit.q) || applyText(r.actor, fAudit.q) || applyText((r.details as string[]).join(" "), fAudit.q)),
-  );
+
+  // Group all audit rows by their referenced asset, ordered chronologically (oldest first).
+  const auditByAsset = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    for (const r of scopedAuditRows as any[]) {
+      const aid = r.entity_type === "assets"
+        ? r.entity_id
+        : (r.details?.asset_id ?? r.details?.after?.asset_id ?? r.details?.before?.asset_id);
+      if (!aid) continue;
+      (map[aid] ??= []).push(r);
+    }
+    for (const k of Object.keys(map)) {
+      map[k].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+    }
+    return map;
+  }, [scopedAuditRows]);
+
+  // Assets available for the audit picker — only those with at least one audit row.
+  const auditAssetChoices = useMemo(() => {
+    return (enrichedAssets as any[])
+      .filter((a) => (auditByAsset[a.id]?.length ?? 0) > 0)
+      .filter((a) => {
+        if (!auditAssetQuery) return true;
+        const q = auditAssetQuery.toLowerCase();
+        return (a.asset_tag ?? "").toLowerCase().includes(q)
+          || (a.name ?? "").toLowerCase().includes(q)
+          || (a.serial_number ?? "").toLowerCase().includes(q);
+      })
+      .sort((a, b) => String(a.asset_tag ?? "").localeCompare(String(b.asset_tag ?? "")));
+  }, [enrichedAssets, auditByAsset, auditAssetQuery]);
+
+  const activityLabel = (r: any): string => {
+    const entity = humanizeKey(r.entity_type ?? "record");
+    const action = humanizeKey(r.action ?? "");
+    return `${entity} ${action}`.trim();
+  };
+
+  const auditRows = useMemo(() => {
+    const ids = Array.from(auditSelectedAssets);
+    const out: any[] = [];
+    for (const id of ids) {
+      const a = allAssetMap[id];
+      if (!a) continue;
+      const assetLabel = `${a.asset_tag ?? ""} — ${a.name ?? ""}`.replace(/^ — | — $/g, "").trim() || "Asset";
+      const list = (auditByAsset[id] ?? []).filter((r) =>
+        (!fAudit.entity_type || r.entity_type === fAudit.entity_type) &&
+        applyDate(r.created_at, fAudit.from, fAudit.to),
+      );
+      list.forEach((r, idx) => {
+        out.push({
+          asset: assetLabel,
+          seq: idx + 1,
+          activity: activityLabel(r),
+          actor: userLabel(r.actor_user_id),
+          created_at: r.created_at,
+          details: detailsToLines(r.details),
+        });
+      });
+    }
+    return out.filter((r) =>
+      !fAudit.q
+      || applyText(r.asset, fAudit.q)
+      || applyText(r.activity, fAudit.q)
+      || applyText(r.actor, fAudit.q)
+      || applyText((r.details as string[]).join(" "), fAudit.q),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auditSelectedAssets, auditByAsset, allAssetMap, fAudit, profileMap]);
+
   const auditReport: Report = {
     title: "Audit Trail Report",
     columns: [
-      { header: "Date", key: "created_at", isDateTime: true }, { header: "Entity", key: "entity_type" },
-      { header: "Action", key: "action" }, { header: "User", key: "actor" },
-      { header: "Record", key: "entity_id" }, { header: "Details", key: "details", isMultiline: true },
+      { header: "Asset", key: "asset" },
+      { header: "#", key: "seq" },
+      { header: "Activity", key: "activity" },
+      { header: "By", key: "actor" },
+      { header: "Date & time", key: "created_at", isDateTime: true },
+      { header: "Details", key: "details", isMultiline: true },
     ],
     rows: auditRows,
+  };
+
+  const allAuditAssetsSelected = auditAssetChoices.length > 0
+    && auditAssetChoices.every((a: any) => auditSelectedAssets.has(a.id));
+  const toggleAuditAsset = (id: string) => {
+    setAuditSelectedAssets((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleAllAuditAssets = () => {
+    setAuditSelectedAssets((prev) => {
+      if (allAuditAssetsSelected) {
+        const next = new Set(prev);
+        auditAssetChoices.forEach((a: any) => next.delete(a.id));
+        return next;
+      }
+      const next = new Set(prev);
+      auditAssetChoices.forEach((a: any) => next.add(a.id));
+      return next;
+    });
   };
 
 
@@ -937,9 +1004,56 @@ function ReportsPage() {
           <FilterBar defs={gatePassDefs} values={fGatePass} onChange={setFGatePass} />
           <ReportTable r={gatePassReport} />
         </TabsContent>
-        <TabsContent value="audit" className="mt-4">
+        <TabsContent value="audit" className="mt-4 space-y-3">
+          <Card className="p-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="audit-select-all"
+                  checked={allAuditAssetsSelected}
+                  onCheckedChange={toggleAllAuditAssets}
+                />
+                <Label htmlFor="audit-select-all" className="text-sm font-medium cursor-pointer">
+                  Select all ({auditAssetChoices.length})
+                </Label>
+                <span className="ml-3 text-xs text-muted-foreground">
+                  {auditSelectedAssets.size} selected
+                </span>
+              </div>
+              <Input
+                placeholder="Search assets (tag / name / serial)"
+                value={auditAssetQuery}
+                onChange={(e) => setAuditAssetQuery(e.target.value)}
+                className="h-8 w-64 text-xs"
+              />
+            </div>
+            <div className="max-h-56 overflow-y-auto rounded border p-2 grid gap-1 sm:grid-cols-2 md:grid-cols-3">
+              {auditAssetChoices.length === 0 ? (
+                <p className="text-xs text-muted-foreground col-span-full py-3 text-center">
+                  No assets with audit activity match your search.
+                </p>
+              ) : auditAssetChoices.map((a: any) => (
+                <label key={a.id} className="flex items-center gap-2 rounded px-2 py-1 hover:bg-muted/50 cursor-pointer text-sm">
+                  <Checkbox
+                    checked={auditSelectedAssets.has(a.id)}
+                    onCheckedChange={() => toggleAuditAsset(a.id)}
+                  />
+                  <span className="truncate">
+                    <span className="font-medium">{a.asset_tag}</span>
+                    {a.name ? <span className="text-muted-foreground"> — {a.name}</span> : null}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </Card>
           <FilterBar defs={auditDefs} values={fAudit} onChange={setFAudit} />
-          <ReportTable r={auditReport} />
+          {auditSelectedAssets.size === 0 ? (
+            <Card className="p-8 text-center text-sm text-muted-foreground">
+              Tick one or more assets above to view their audit trail.
+            </Card>
+          ) : (
+            <ReportTable r={auditReport} />
+          )}
         </TabsContent>
         <TabsContent value="branch" className="mt-4"><ReportTable r={branchReport} /></TabsContent>
         <TabsContent value="department" className="mt-4"><ReportTable r={departmentReport} /></TabsContent>
