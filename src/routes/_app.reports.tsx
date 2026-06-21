@@ -17,6 +17,7 @@ import { formatUGX } from "@/lib/utils";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } from "@/lib/pdf-template";
 import { fmtDateEAT, fmtDateTimeEAT } from "@/lib/time";
+import { AuditTrailView } from "@/components/audit-trail-view";
 
 export const Route = createFileRoute("/_app/reports")({
   component: ReportsPage,
@@ -1066,56 +1067,8 @@ function ReportsPage() {
           <FilterBar defs={gatePassDefs} values={fGatePass} onChange={setFGatePass} />
           <ReportTable r={gatePassReport} />
         </TabsContent>
-        <TabsContent value="audit" className="mt-4 space-y-3">
-          <Card className="p-3">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="audit-select-all"
-                  checked={allAuditAssetsSelected}
-                  onCheckedChange={toggleAllAuditAssets}
-                />
-                <Label htmlFor="audit-select-all" className="text-sm font-medium cursor-pointer">
-                  Select all ({auditAssetChoices.length})
-                </Label>
-                <span className="ml-3 text-xs text-muted-foreground">
-                  {auditSelectedAssets.size} selected
-                </span>
-              </div>
-              <Input
-                placeholder="Search assets (tag / name / serial)"
-                value={auditAssetQuery}
-                onChange={(e) => setAuditAssetQuery(e.target.value)}
-                className="h-8 w-64 text-xs"
-              />
-            </div>
-            <div className="max-h-56 overflow-y-auto rounded border p-2 grid gap-1 sm:grid-cols-2 md:grid-cols-3">
-              {auditAssetChoices.length === 0 ? (
-                <p className="text-xs text-muted-foreground col-span-full py-3 text-center">
-                  No assets with audit activity match your search.
-                </p>
-              ) : auditAssetChoices.map((a: any) => (
-                <label key={a.id} className="flex items-center gap-2 rounded px-2 py-1 hover:bg-muted/50 cursor-pointer text-sm">
-                  <Checkbox
-                    checked={auditSelectedAssets.has(a.id)}
-                    onCheckedChange={() => toggleAuditAsset(a.id)}
-                  />
-                  <span className="truncate">
-                    <span className="font-medium">{a.asset_tag}</span>
-                    {a.name ? <span className="text-muted-foreground"> — {a.name}</span> : null}
-                  </span>
-                </label>
-              ))}
-            </div>
-          </Card>
-          <FilterBar defs={auditDefs} values={fAudit} onChange={setFAudit} />
-          {auditSelectedAssets.size === 0 ? (
-            <Card className="p-8 text-center text-sm text-muted-foreground">
-              Tick one or more assets above to view their audit trail.
-            </Card>
-          ) : (
-            <ReportTable r={auditReport} />
-          )}
+        <TabsContent value="audit" className="mt-4">
+          <AuditTrailView showHeader={false} />
         </TabsContent>
         <TabsContent value="branch" className="mt-4"><ReportTable r={branchReport} /></TabsContent>
         <TabsContent value="department" className="mt-4"><ReportTable r={departmentReport} /></TabsContent>
