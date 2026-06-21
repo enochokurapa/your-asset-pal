@@ -376,10 +376,11 @@ function ReportsPage() {
   }));
   const approvalMovementRows = scopedApprovals.filter((r: any) => r.kind === "movement").map((r: any) => {
     const p = r.payload ?? {};
+    const asset = assetFor(r.asset_id);
     const requester = profileMap[r.requested_by];
     const approver = r.approver_id ? profileMap[r.approver_id] : null;
     return {
-      tag: r.assets?.asset_tag, name: r.assets?.name,
+      tag: asset?.asset_tag, name: asset?.name,
       from_loc: locById(p.from_location_id)?.name ?? "",
       to_loc: locById(p.to_location_id)?.name ?? "",
       from_branch: branchById(p.from_branch_id)?.name ?? "",
@@ -467,10 +468,11 @@ function ReportsPage() {
     .filter((r: any) => r.kind === "disposal" || r.kind === "retirement")
     .map((r: any) => {
       const p = r.payload ?? {};
+      const asset = assetFor(r.asset_id);
       const requester = profileMap[r.requested_by];
       const approver = r.approver_id ? profileMap[r.approver_id] : null;
       return {
-        tag: r.assets?.asset_tag, name: r.assets?.name,
+        tag: asset?.asset_tag, name: asset?.name,
         type: r.kind === "retirement" ? "Retirement" : "Disposal",
         disposal_reason: r.reason ?? "",
         disposal_date: p.date ?? String(r.created_at).slice(0, 10),
@@ -510,10 +512,11 @@ function ReportsPage() {
   ];
   const maintenanceRows = scopedApprovals.filter((r: any) => r.kind === "maintenance").map((r: any) => {
     const p = r.payload ?? {};
+    const asset = assetFor(r.asset_id);
     const requester = profileMap[r.requested_by];
     const approver = r.approver_id ? profileMap[r.approver_id] : null;
     return {
-      tag: r.assets?.asset_tag, name: r.assets?.name,
+      tag: asset?.asset_tag, name: asset?.name,
       issue: r.reason ?? "", priority: p.priority ?? "",
       scheduled_for: p.scheduled_for ?? "", estimated_cost: p.estimated_cost ?? null,
       notes: p.notes ?? "", status: r.status ?? "pending",
@@ -551,11 +554,12 @@ function ReportsPage() {
     { key: "to", label: "To date", type: "date" },
   ];
   const approvalRows = scopedApprovals.map((r: any) => {
+    const asset = assetFor(r.asset_id);
     const requester = profileMap[r.requested_by];
     const approver = r.approver_id ? profileMap[r.approver_id] : null;
     return {
       kind: r.kind, status: r.status,
-      tag: r.assets?.asset_tag, name: r.assets?.name,
+      tag: asset?.asset_tag, name: asset?.name,
       reason: r.reason ?? "",
       requested_by: requester?.full_name ?? requester?.email ?? "",
       approver: approver?.full_name ?? approver?.email ?? "",
