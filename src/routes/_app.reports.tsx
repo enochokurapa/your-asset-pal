@@ -160,7 +160,7 @@ function ReportsPage() {
   const { data: approvals = [] } = useQuery({
     queryKey: ["report-approvals"],
     queryFn: async () => (await supabase.from("approval_requests")
-      .select("*, assets(asset_tag, name)")
+      .select("*")
       .order("created_at", { ascending: false })).data ?? [],
   });
   const { data: profiles = [] } = useQuery({
@@ -230,6 +230,16 @@ function ReportsPage() {
       };
     }), [assets, catMap, locMap, currentAssignment, canSeeBranch]);
 
+  const assetMap = useMemo(
+    () => Object.fromEntries(enrichedAssets.map((a: any) => [a.id, a])),
+    [enrichedAssets],
+  );
+  const allAssetMap = useMemo(
+    () => Object.fromEntries((assets as any[]).map((a: any) => [a.id, a])),
+    [assets],
+  );
+  const assetFor = (assetId: string | null | undefined) => (assetId ? assetMap[assetId] : null);
+
   // Restrict ancillary lists to assets the user can see
   const visibleAssetIds = useMemo(
     () => new Set(enrichedAssets.map((a: any) => a.id)),
@@ -251,8 +261,11 @@ function ReportsPage() {
     [disposals, visibleAssetIds],
   );
   const scopedApprovals = useMemo(
-    () => (approvals as any[]).filter((p) => !p.asset_id || visibleAssetIds.has(p.asset_id)),
-    [approvals, visibleAssetIds],
+    () => (approvals as any[]).filter((p) => {
+      const rawAsset = p.asset_id ? allAssetMap[p.asset_id] : null;
+      return !p.asset_id || !rawAsset || canSeeBranch(rawAsset.branch_id);
+    }),
+    [approvals, allAssetMap, canSeeBranch],
   );
   const scopedVerifications = useMemo(
     () => (verifications as any[]).filter((v) => visibleAssetIds.has(v.asset_id) && canSeeBranch(v.branch_id)),
@@ -284,7 +297,7 @@ function ReportsPage() {
   const statusOpts = ["in_use", "in_storage", "under_repair", "retired", "missing", "disposed"]
     .map((s) => ({ value: s, label: s.replace("_", " ") }));
   const movementTypeOpts = [{ value: "internal", label: "Internal" }, { value: "external", label: "External" }];
-  const approvalKindOpts = ["movement", "retirement", "disposal", "maintenance", "reactivation", "set_for_disposal"]
+  const approvalKindOpts = ["movement", "retirement", "disposal", "maintenance", "reactivation", "set_for_disposal", "deletion", "attachment_deletion"]
     .map((k) => ({ value: k, label: k.replace(/_/g, " ") }));
   const approvalStatusOpts = ["pending", "approved", "rejected"].map((s) => ({ value: s, label: s }));
   const priorityOpts = ["low", "normal", "high", "urgent"].map((p) => ({ value: p, label: p }));
@@ -356,6 +369,7 @@ function ReportsPage() {
   // just because an approval was decided without a separate movement row.
   const branchById = (id: string | null | undefined) => (id ? branches.find((b: any) => b.id === id) : null);
   const locById = (id: string | null | undefined) => (id ? locationsAll.find((l: any) => l.id === id) : null);
+  const uniqueNames = (names: Array<string | null | undefined>) => Array.from(new Set(names.filter(Boolean) as string[])).join(" / ");
 
   const recordedMovementRows = scopedMovements.map((m: any) => ({
     tag: m.assets?.asset_tag, name: m.assets?.name,
@@ -370,10 +384,11 @@ function ReportsPage() {
   }));
   const approvalMovementRows = scopedApprovals.filter((r: any) => r.kind === "movement").map((r: any) => {
     const p = r.payload ?? {};
+    const asset = assetFor(r.asset_id);
     const requester = profileMap[r.requested_by];
     const approver = r.approver_id ? profileMap[r.approver_id] : null;
     return {
-      tag: r.assets?.asset_tag, name: r.assets?.name,
+      tag: asset?.asset_tag, name: asset?.name,
       from_loc: locById(p.from_location_id)?.name ?? "",
       to_loc: locById(p.to_location_id)?.name ?? "",
       from_branch: branchById(p.from_branch_id)?.name ?? "",
@@ -461,10 +476,12 @@ function ReportsPage() {
     .filter((r: any) => r.kind === "disposal" || r.kind === "retirement")
     .map((r: any) => {
       const p = r.payload ?? {};
+      const asset = assetFor(r.asset_id);
       const requester = profileMap[r.requested_by];
       const approver = r.approver_id ? profileMap[r.approver_id] : null;
       return {
-        tag: r.assets?.asset_tag, name: r.assets?.name,
+        tag: asset?.asset_tag, name: asset?.name,
+        branch: asset?.branch ?? "", location: asset?.location ?? "",
         type: r.kind === "retirement" ? "Retirement" : "Disposal",
         disposal_reason: r.reason ?? "",
         disposal_date: p.date ?? String(r.created_at).slice(0, 10),
@@ -485,6 +502,7 @@ function ReportsPage() {
     title: "Retirement & Disposal Report",
     columns: [
       { header: "Tag", key: "tag" }, { header: "Asset", key: "name" },
+      { header: "Branch", key: "branch" }, { header: "Location", key: "location" },
       { header: "Type", key: "type" }, { header: "Reason", key: "disposal_reason" },
       { header: "Date", key: "disposal_date" }, { header: "Value", key: "disposal_value", isCurrency: true },
       { header: "Status", key: "status" },
@@ -502,12 +520,15 @@ function ReportsPage() {
     { key: "from", label: "From date", type: "date" },
     { key: "to", label: "To date", type: "date" },
   ];
-  const maintenanceRows = scopedApprovals.filter((r: any) => r.kind === "maintenance").map((r: any) => {
+  const maintenanceRows = scopedApprovals.filter((r: any) => r.kind === "maintenance" || r.kind === "reactivation").map((r: any) => {
     const p = r.payload ?? {};
+    const asset = assetFor(r.asset_id);
     const requester = profileMap[r.requested_by];
     const approver = r.approver_id ? profileMap[r.approver_id] : null;
     return {
-      tag: r.assets?.asset_tag, name: r.assets?.name,
+      tag: asset?.asset_tag, name: asset?.name,
+      branch: asset?.branch ?? "", location: asset?.location ?? "",
+      type: r.kind === "reactivation" ? "Return from repair" : "Maintenance",
       issue: r.reason ?? "", priority: p.priority ?? "",
       scheduled_for: p.scheduled_for ?? "", estimated_cost: p.estimated_cost ?? null,
       notes: p.notes ?? "", status: r.status ?? "pending",
@@ -526,7 +547,8 @@ function ReportsPage() {
     title: "Maintenance Requisitions",
     columns: [
       { header: "Tag", key: "tag" }, { header: "Asset", key: "name" },
-      { header: "Issue", key: "issue" }, { header: "Priority", key: "priority" },
+      { header: "Branch", key: "branch" }, { header: "Location", key: "location" },
+      { header: "Type", key: "type" }, { header: "Issue", key: "issue" }, { header: "Priority", key: "priority" },
       { header: "Scheduled", key: "scheduled_for" },
       { header: "Est. cost", key: "estimated_cost", isCurrency: true },
       { header: "Status", key: "status" }, { header: "Requested by", key: "requested_by" },
@@ -545,11 +567,15 @@ function ReportsPage() {
     { key: "to", label: "To date", type: "date" },
   ];
   const approvalRows = scopedApprovals.map((r: any) => {
+    const asset = assetFor(r.asset_id);
+    const p = r.payload ?? {};
     const requester = profileMap[r.requested_by];
     const approver = r.approver_id ? profileMap[r.approver_id] : null;
     return {
       kind: r.kind, status: r.status,
-      tag: r.assets?.asset_tag, name: r.assets?.name,
+      tag: asset?.asset_tag, name: asset?.name,
+      branch: uniqueNames([asset?.branch, branchById(p.from_branch_id)?.name, branchById(p.to_branch_id)?.name, branchById(p.branch_id)?.name]),
+      location: uniqueNames([asset?.location, locById(p.from_location_id)?.name, locById(p.to_location_id)?.name, locById(p.location_id)?.name]),
       reason: r.reason ?? "",
       requested_by: requester?.full_name ?? requester?.email ?? "",
       approver: approver?.full_name ?? approver?.email ?? "",
@@ -567,6 +593,7 @@ function ReportsPage() {
     columns: [
       { header: "Kind", key: "kind" }, { header: "Status", key: "status" },
       { header: "Tag", key: "tag" }, { header: "Asset", key: "name" },
+      { header: "Branch", key: "branch" }, { header: "Location", key: "location" },
       { header: "Reason", key: "reason" }, { header: "Requested by", key: "requested_by" },
       { header: "Approver", key: "approver" }, { header: "Requested", key: "created_at" },
       { header: "Decided", key: "decided_at" },
@@ -765,7 +792,7 @@ function ReportsPage() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="flex w-full flex-wrap">
+        <TabsList className="flex !h-auto min-h-9 w-full flex-wrap justify-start gap-1">
           <TabsTrigger value="register">Register</TabsTrigger>
           <TabsTrigger value="movements">Movements</TabsTrigger>
           <TabsTrigger value="assigned">Assigned</TabsTrigger>
@@ -781,50 +808,50 @@ function ReportsPage() {
           <TabsTrigger value="condition">Condition</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="register">
+        <TabsContent value="register" className="mt-4">
           <FilterBar defs={registerDefs} values={fRegister} onChange={setFRegister} />
           <ReportTable r={register} />
         </TabsContent>
-        <TabsContent value="movements">
+        <TabsContent value="movements" className="mt-4">
           <FilterBar defs={movementDefs} values={fMove} onChange={setFMove} />
           <ReportTable r={movementReport} />
         </TabsContent>
-        <TabsContent value="assigned">
+        <TabsContent value="assigned" className="mt-4">
           <FilterBar defs={assignDefs} values={fAssign} onChange={setFAssign} />
           <ReportTable r={assignedReport} />
         </TabsContent>
-        <TabsContent value="disposals">
+        <TabsContent value="disposals" className="mt-4">
           <FilterBar defs={disposalDefs} values={fDisposal} onChange={setFDisposal} />
           <ReportTable r={disposalReport} />
         </TabsContent>
-        <TabsContent value="maintenance">
+        <TabsContent value="maintenance" className="mt-4">
           <FilterBar defs={maintenanceDefs} values={fMaint} onChange={setFMaint} />
           <ReportTable r={maintenanceReport} />
         </TabsContent>
-        <TabsContent value="approvals">
+        <TabsContent value="approvals" className="mt-4">
           <FilterBar defs={approvalDefs} values={fApprov} onChange={setFApprov} />
           <ReportTable r={approvalReport} />
         </TabsContent>
-        <TabsContent value="verification">
+        <TabsContent value="verification" className="mt-4">
           <FilterBar defs={verificationDefs} values={fVerification} onChange={setFVerification} />
           <ReportTable r={verificationReport} />
         </TabsContent>
-        <TabsContent value="depreciation">
+        <TabsContent value="depreciation" className="mt-4">
           <FilterBar defs={depreciationDefs} values={fDepreciation} onChange={setFDepreciation} />
           <ReportTable r={depreciationReport} />
         </TabsContent>
-        <TabsContent value="gate-pass">
+        <TabsContent value="gate-pass" className="mt-4">
           <FilterBar defs={gatePassDefs} values={fGatePass} onChange={setFGatePass} />
           <ReportTable r={gatePassReport} />
         </TabsContent>
-        <TabsContent value="audit">
+        <TabsContent value="audit" className="mt-4">
           <FilterBar defs={auditDefs} values={fAudit} onChange={setFAudit} />
           <ReportTable r={auditReport} />
         </TabsContent>
-        <TabsContent value="branch"><ReportTable r={branchReport} /></TabsContent>
-        <TabsContent value="department"><ReportTable r={departmentReport} /></TabsContent>
+        <TabsContent value="branch" className="mt-4"><ReportTable r={branchReport} /></TabsContent>
+        <TabsContent value="department" className="mt-4"><ReportTable r={departmentReport} /></TabsContent>
 
-        <TabsContent value="condition">
+        <TabsContent value="condition" className="mt-4">
           <Card className="p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-semibold">Asset Condition Report</h2>
