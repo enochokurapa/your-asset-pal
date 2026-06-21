@@ -319,6 +319,8 @@ function ReportsPage() {
   const [fDepreciation, setFDepreciation] = useState<Record<string, string>>({});
   const [fGatePass, setFGatePass] = useState<Record<string, string>>({});
   const [fAudit, setFAudit] = useState<Record<string, string>>({});
+  const [auditSelectedAssets, setAuditSelectedAssets] = useState<Set<string>>(new Set());
+  const [auditAssetQuery, setAuditAssetQuery] = useState("");
 
   /* ----------- Register ----------- */
   const registerDefs: FilterDef[] = [
