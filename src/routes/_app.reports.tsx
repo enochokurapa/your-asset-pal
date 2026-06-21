@@ -306,9 +306,17 @@ function ReportsPage() {
   const verificationStatusOpts = ["verified", "mismatched", "not_found"].map((s) => ({ value: s, label: s.replace(/_/g, " ") }));
   const gatePassStatusOpts = ["pending", "approved", "rejected", "checked_out", "returned", "cancelled"].map((s) => ({ value: s, label: s.replace(/_/g, " ") }));
   const auditActivityOpts = [
-    { value: "created", label: "Asset created" },
+    { value: "created", label: "Asset created (data capture)" },
+    { value: "updated", label: "Asset details updated" },
     { value: "moved", label: "Asset moved / transferred" },
+    { value: "assigned", label: "Asset assigned" },
+    { value: "verified", label: "Asset verified" },
+    { value: "maintenance", label: "Maintenance" },
     { value: "depreciated", label: "Depreciation run" },
+    { value: "requisition", label: "Requisition raised" },
+    { value: "approval", label: "Approval decision" },
+    { value: "gate_pass", label: "Gate pass activity" },
+    { value: "retired", label: "Asset retired" },
     { value: "disposed", label: "Asset disposed" },
   ];
 
