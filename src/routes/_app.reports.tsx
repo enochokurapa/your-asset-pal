@@ -305,8 +305,12 @@ function ReportsPage() {
   const priorityOpts = ["low", "normal", "high", "urgent"].map((p) => ({ value: p, label: p }));
   const verificationStatusOpts = ["verified", "mismatched", "not_found"].map((s) => ({ value: s, label: s.replace(/_/g, " ") }));
   const gatePassStatusOpts = ["pending", "approved", "rejected", "checked_out", "returned", "cancelled"].map((s) => ({ value: s, label: s.replace(/_/g, " ") }));
-  const auditEntityOpts = ["assets", "asset_movements", "asset_disposals", "asset_assignments", "approval_requests", "asset_verifications", "gate_passes", "depreciation_entries"]
-    .map((s) => ({ value: s, label: s.replace(/_/g, " ") }));
+  const auditActivityOpts = [
+    { value: "created", label: "Asset created" },
+    { value: "moved", label: "Asset moved / transferred" },
+    { value: "depreciated", label: "Depreciation run" },
+    { value: "disposed", label: "Asset disposed" },
+  ];
 
   /* ----------- Filters state per tab ----------- */
   const [fRegister, setFRegister] = useState<Record<string, string>>({});
