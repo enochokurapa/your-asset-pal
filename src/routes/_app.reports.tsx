@@ -278,23 +278,59 @@ function ReportsPage() {
     { key: "transfer_type", label: "Type", type: "select", options: movementTypeOpts },
     { key: "from_branch_id", label: "From branch", type: "select", options: branchOpts },
     { key: "to_branch_id", label: "To branch", type: "select", options: branchOpts },
+    { key: "status", label: "Status", type: "select", options: [
+      { value: "recorded", label: "Recorded" },
+      ...approvalStatusOpts,
+    ] },
     { key: "from", label: "From date", type: "date" },
     { key: "to", label: "To date", type: "date" },
   ];
-  const movementRows = scopedMovements.filter((m: any) =>
-    (!fMove.transfer_type || (m.transfer_type ?? "internal") === fMove.transfer_type) &&
-    (!fMove.from_branch_id || m.from_branch_id === fMove.from_branch_id) &&
-    (!fMove.to_branch_id || m.to_branch_id === fMove.to_branch_id) &&
-    applyDate(m.moved_at, fMove.from, fMove.to) &&
-    (!fMove.q || applyText(m.assets?.asset_tag, fMove.q) || applyText(m.assets?.name, fMove.q) || applyText(m.reason, fMove.q)),
-  ).map((m: any) => ({
+
+  // Build a unified movement list combining executed movements + every movement
+  // approval request (pending/approved/rejected) so reports never appear empty
+  // just because an approval was decided without a separate movement row.
+  const branchById = (id: string | null | undefined) => (id ? branches.find((b: any) => b.id === id) : null);
+  const locById = (id: string | null | undefined) => (id ? locationsAll.find((l: any) => l.id === id) : null);
+
+  const recordedMovementRows = scopedMovements.map((m: any) => ({
     tag: m.assets?.asset_tag, name: m.assets?.name,
     from_loc: m.from?.name ?? "", to_loc: m.to?.name ?? "",
     from_branch: m.fromBranch?.name ?? "", to_branch: m.toBranch?.name ?? "",
     from_user: m.from_user ?? "", to_user: m.to_user ?? "",
     transfer_type: m.transfer_type ?? "internal",
     moved_at: m.moved_at, reason: m.reason ?? "",
+    status: "recorded",
+    requested_by: "", approver: "",
+    _from_branch_id: m.from_branch_id, _to_branch_id: m.to_branch_id,
   }));
+  const approvalMovementRows = scopedApprovals.filter((r: any) => r.kind === "movement").map((r: any) => {
+    const p = r.payload ?? {};
+    const requester = profileMap[r.requested_by];
+    const approver = r.approver_id ? profileMap[r.approver_id] : null;
+    return {
+      tag: r.assets?.asset_tag, name: r.assets?.name,
+      from_loc: locById(p.from_location_id)?.name ?? "",
+      to_loc: locById(p.to_location_id)?.name ?? "",
+      from_branch: branchById(p.from_branch_id)?.name ?? "",
+      to_branch: branchById(p.to_branch_id)?.name ?? "",
+      from_user: p.from_user ?? "", to_user: p.to_user ?? "",
+      transfer_type: p.transfer_type ?? "internal",
+      moved_at: p.moved_at ?? String(r.created_at).slice(0, 10),
+      reason: r.reason ?? p.reason ?? "",
+      status: r.status ?? "pending",
+      requested_by: requester?.full_name ?? requester?.email ?? "",
+      approver: approver?.full_name ?? approver?.email ?? "",
+      _from_branch_id: p.from_branch_id, _to_branch_id: p.to_branch_id,
+    };
+  });
+  const movementRows = [...recordedMovementRows, ...approvalMovementRows].filter((m: any) =>
+    (!fMove.transfer_type || (m.transfer_type ?? "internal") === fMove.transfer_type) &&
+    (!fMove.from_branch_id || m._from_branch_id === fMove.from_branch_id) &&
+    (!fMove.to_branch_id || m._to_branch_id === fMove.to_branch_id) &&
+    (!fMove.status || m.status === fMove.status) &&
+    applyDate(m.moved_at, fMove.from, fMove.to) &&
+    (!fMove.q || applyText(m.tag, fMove.q) || applyText(m.name, fMove.q) || applyText(m.reason, fMove.q)),
+  );
   const movementReport: Report = {
     title: "Asset Movement Report",
     columns: [
@@ -303,6 +339,8 @@ function ReportsPage() {
       { header: "From branch", key: "from_branch" }, { header: "To branch", key: "to_branch" },
       { header: "From person", key: "from_user" }, { header: "To person", key: "to_user" },
       { header: "Type", key: "transfer_type" }, { header: "Date", key: "moved_at" },
+      { header: "Status", key: "status" }, { header: "Requested by", key: "requested_by" },
+      { header: "Approver", key: "approver" },
       { header: "Reason", key: "reason" },
     ],
     rows: movementRows,
@@ -341,17 +379,38 @@ function ReportsPage() {
   const disposalDefs: FilterDef[] = [
     { key: "q", label: "Search (tag/asset/reason)", type: "text" },
     { key: "type", label: "Type", type: "select", options: [{ value: "Retirement", label: "Retirement" }, { value: "Disposal", label: "Disposal" }] },
-    { key: "status", label: "Status", type: "select", options: [{ value: "pending", label: "Pending" }, { value: "approved", label: "Approved" }, { value: "rejected", label: "Rejected" }] },
+    { key: "status", label: "Status", type: "select", options: [{ value: "pending", label: "Pending" }, { value: "approved", label: "Approved" }, { value: "rejected", label: "Rejected" }, { value: "recorded", label: "Recorded" }] },
     { key: "from", label: "From date", type: "date" },
     { key: "to", label: "To date", type: "date" },
   ];
-  const disposalRows = scopedDisposals.map((d: any) => ({
+  const recordedDisposalRows = scopedDisposals.map((d: any) => ({
     tag: d.assets?.asset_tag, name: d.assets?.name,
     type: d.retirement_reason ? "Retirement" : "Disposal",
-    disposal_reason: d.disposal_reason, disposal_date: d.disposal_date,
-    disposal_value: d.disposal_value, status: d.status ?? "pending",
+    disposal_reason: d.disposal_reason ?? d.retirement_reason ?? "",
+    disposal_date: d.disposal_date,
+    disposal_value: d.disposal_value, status: d.status ?? "recorded",
     approval_notes: d.approval_notes ?? "",
-  })).filter((r: any) =>
+    requested_by: "", approver: "",
+  }));
+  const approvalDisposalRows = scopedApprovals
+    .filter((r: any) => r.kind === "disposal" || r.kind === "retirement")
+    .map((r: any) => {
+      const p = r.payload ?? {};
+      const requester = profileMap[r.requested_by];
+      const approver = r.approver_id ? profileMap[r.approver_id] : null;
+      return {
+        tag: r.assets?.asset_tag, name: r.assets?.name,
+        type: r.kind === "retirement" ? "Retirement" : "Disposal",
+        disposal_reason: r.reason ?? "",
+        disposal_date: p.date ?? String(r.created_at).slice(0, 10),
+        disposal_value: p.disposal_value ?? null,
+        status: r.status ?? "pending",
+        approval_notes: p.notes ?? "",
+        requested_by: requester?.full_name ?? requester?.email ?? "",
+        approver: approver?.full_name ?? approver?.email ?? "",
+      };
+    });
+  const disposalRows = [...recordedDisposalRows, ...approvalDisposalRows].filter((r: any) =>
     (!fDisposal.type || r.type === fDisposal.type) &&
     (!fDisposal.status || r.status === fDisposal.status) &&
     applyDate(r.disposal_date, fDisposal.from, fDisposal.to) &&
@@ -363,7 +422,9 @@ function ReportsPage() {
       { header: "Tag", key: "tag" }, { header: "Asset", key: "name" },
       { header: "Type", key: "type" }, { header: "Reason", key: "disposal_reason" },
       { header: "Date", key: "disposal_date" }, { header: "Value", key: "disposal_value", isCurrency: true },
-      { header: "Status", key: "status" }, { header: "Approval notes", key: "approval_notes" },
+      { header: "Status", key: "status" },
+      { header: "Requested by", key: "requested_by" }, { header: "Approver", key: "approver" },
+      { header: "Notes", key: "approval_notes" },
     ],
     rows: disposalRows,
   };

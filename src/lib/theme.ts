@@ -4,10 +4,10 @@
 export interface ThemePreset {
   id: string;
   name: string;
-  primary: string;       // hex
-  accent: string;        // hex
-  sidebar: string;       // hex (dark)
-  sidebarPrimary: string;// hex
+  primary: string;
+  accent: string;
+  sidebar: string;
+  sidebarPrimary: string;
 }
 
 export const THEME_PRESETS: ThemePreset[] = [
@@ -19,11 +19,48 @@ export const THEME_PRESETS: ThemePreset[] = [
   { id: "gold",    name: "Royal Gold",      primary: "#b8860b", accent: "#f5d98e", sidebar: "#2b2415", sidebarPrimary: "#e0b34a" },
 ];
 
+export interface FontOption {
+  id: string;
+  name: string;
+  /** CSS font-family value used on :root */
+  stack: string;
+}
+
+// All loaded via Google Fonts <link> in src/routes/__root.tsx so they
+// render correctly across the app, exports, and PDFs.
+export const FONT_OPTIONS: FontOption[] = [
+  { id: "system",     name: "System default",  stack: "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" },
+  { id: "inter",      name: "Inter",           stack: "'Inter', sans-serif" },
+  { id: "roboto",     name: "Roboto",          stack: "'Roboto', sans-serif" },
+  { id: "open-sans",  name: "Open Sans",       stack: "'Open Sans', sans-serif" },
+  { id: "lato",       name: "Lato",            stack: "'Lato', sans-serif" },
+  { id: "poppins",    name: "Poppins",         stack: "'Poppins', sans-serif" },
+  { id: "nunito",     name: "Nunito",          stack: "'Nunito', sans-serif" },
+  { id: "montserrat", name: "Montserrat",      stack: "'Montserrat', sans-serif" },
+  { id: "raleway",    name: "Raleway",         stack: "'Raleway', sans-serif" },
+  { id: "work-sans",  name: "Work Sans",       stack: "'Work Sans', sans-serif" },
+  { id: "dm-sans",    name: "DM Sans",         stack: "'DM Sans', sans-serif" },
+  { id: "manrope",    name: "Manrope",         stack: "'Manrope', sans-serif" },
+  { id: "outfit",     name: "Outfit",          stack: "'Outfit', sans-serif" },
+  { id: "figtree",    name: "Figtree",         stack: "'Figtree', sans-serif" },
+  { id: "plus-jakarta", name: "Plus Jakarta Sans", stack: "'Plus Jakarta Sans', sans-serif" },
+  { id: "ibm-plex",   name: "IBM Plex Sans",   stack: "'IBM Plex Sans', sans-serif" },
+  { id: "source-sans",name: "Source Sans 3",   stack: "'Source Sans 3', sans-serif" },
+  { id: "noto-sans",  name: "Noto Sans",       stack: "'Noto Sans', sans-serif" },
+  { id: "rubik",      name: "Rubik",           stack: "'Rubik', sans-serif" },
+  { id: "karla",      name: "Karla",           stack: "'Karla', sans-serif" },
+  { id: "merriweather", name: "Merriweather (serif)", stack: "'Merriweather', serif" },
+  { id: "playfair",   name: "Playfair Display (serif)", stack: "'Playfair Display', serif" },
+  { id: "lora",       name: "Lora (serif)",    stack: "'Lora', serif" },
+  { id: "jetbrains",  name: "JetBrains Mono (mono)", stack: "'JetBrains Mono', monospace" },
+];
+
 const STORAGE_KEY = "af.theme";
 
 export interface StoredTheme {
   presetId: string;
-  primary?: string; // optional custom override
+  primary?: string;
+  fontId?: string;
 }
 
 export function loadStoredTheme(): StoredTheme {
@@ -52,4 +89,7 @@ export function applyStoredTheme(t: StoredTheme = loadStoredTheme()) {
   root.setProperty("--sidebar", preset.sidebar);
   root.setProperty("--sidebar-primary", preset.sidebarPrimary);
   root.setProperty("--sidebar-ring", preset.sidebarPrimary);
+  const font = FONT_OPTIONS.find((f) => f.id === t.fontId) ?? FONT_OPTIONS[0];
+  root.setProperty("--font-sans", font.stack);
+  document.documentElement.style.fontFamily = font.stack;
 }

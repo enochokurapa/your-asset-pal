@@ -19,6 +19,7 @@ export interface AssetDepCfg {
   depreciation_method: DepreciationMethod | null | undefined;
   depreciation_frequency: DepreciationFrequency | null | undefined;
   depreciation_start_date: string | null | undefined; // ISO date
+  last_depreciation_date?: string | null;             // ISO date of most-recent posted period end
   total_units?: number | null;
   units_consumed?: number | null;
   accumulated_depreciation?: number | null;
@@ -105,11 +106,21 @@ export function buildSchedule(a: AssetDepCfg, maxPeriods?: number): Array<{
   const rows: ReturnType<typeof buildSchedule> = [] as any;
   if (!isDepreciable(a)) return rows;
   const freq: DepreciationFrequency = (a.depreciation_frequency ?? "monthly") as DepreciationFrequency;
-  // Cap horizon to the asset's configured useful life (in periods), unless caller overrides.
+  // Cap horizon to the asset's remaining life (in periods), unless caller overrides.
   const lifeMonths = Number(a.useful_life_months ?? 0);
   const cap = maxPeriods ?? (lifeMonths > 0 ? Math.ceil(lifeMonths / periodMonths(freq)) : 240);
-  const startStr = a.depreciation_start_date || a.depreciation_start_date || new Date().toISOString().slice(0, 10);
-  let cursor = new Date(startStr);
+
+  // Start the forward schedule at the period AFTER the last posted period.
+  // Without this, the schedule re-uses the original purchase date as period 1
+  // while opening with today's NBV, producing wildly wrong forecasts.
+  let cursor: Date;
+  if (a.last_depreciation_date) {
+    cursor = new Date(a.last_depreciation_date);
+    cursor.setDate(cursor.getDate() + 1);
+  } else {
+    cursor = new Date(a.depreciation_start_date || new Date().toISOString().slice(0, 10));
+  }
+
   let state: AssetDepCfg = { ...a };
   for (let i = 0; i < cap; i++) {
     if (!isDepreciable(state)) break;

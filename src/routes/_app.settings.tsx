@@ -19,7 +19,7 @@ import {
   DEFAULT_TEMPLATE, type DocumentTemplate,
 } from "@/lib/pdf-template";
 import {
-  THEME_PRESETS, loadStoredTheme, saveStoredTheme, type StoredTheme,
+  THEME_PRESETS, FONT_OPTIONS, loadStoredTheme, saveStoredTheme, type StoredTheme,
 } from "@/lib/theme";
 
 export const Route = createFileRoute("/_app/settings")({
@@ -396,6 +396,24 @@ function AppearancePanel() {
               Clear
             </Button>
           )}
+        </div>
+      </div>
+      <div className="space-y-2 border-t pt-4">
+        <p className="text-sm font-medium">App font</p>
+        <p className="text-xs text-muted-foreground">Pick a typeface for the app interface. Loaded from Google Fonts.</p>
+        <Select value={theme.fontId ?? "system"} onValueChange={(v) => apply({ ...theme, fontId: v })}>
+          <SelectTrigger className="max-w-sm"><SelectValue /></SelectTrigger>
+          <SelectContent className="max-h-80">
+            {FONT_OPTIONS.map((f) => (
+              <SelectItem key={f.id} value={f.id}>
+                <span style={{ fontFamily: f.stack }}>{f.name}</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="rounded-md border bg-card p-3" style={{ fontFamily: (FONT_OPTIONS.find((f) => f.id === (theme.fontId ?? "system")) ?? FONT_OPTIONS[0]).stack }}>
+          <p className="text-lg font-semibold">The quick brown fox jumps over the lazy dog.</p>
+          <p className="text-sm text-muted-foreground">0123456789 — Sample heading and body in the selected font.</p>
         </div>
       </div>
       <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
