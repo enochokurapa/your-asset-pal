@@ -800,31 +800,113 @@ function ReportsPage() {
   };
 
   const auditDefs: FilterDef[] = [
-    { key: "q", label: "Search (entity/action/user)", type: "text" },
+    { key: "q", label: "Search (activity/user/details)", type: "text" },
     { key: "entity_type", label: "Entity", type: "select", options: auditEntityOpts },
     { key: "from", label: "From date", type: "date" },
     { key: "to", label: "To date", type: "date" },
   ];
-  const auditRows = scopedAuditRows.map((r: any) => ({
-    entity_type: r.entity_type?.replace(/_/g, " ") ?? "",
-    action: r.action?.replace(/_/g, " ") ?? "",
-    actor: userLabel(r.actor_user_id), created_at: r.created_at,
-    entity_id: recordLabel(r),
-    details: detailsToLines(r.details),
-    _entity_type: r.entity_type,
-  })).filter((r: any) =>
-    (!fAudit.entity_type || r._entity_type === fAudit.entity_type) &&
-    applyDate(r.created_at, fAudit.from, fAudit.to) &&
-    (!fAudit.q || applyText(r.entity_type, fAudit.q) || applyText(r.action, fAudit.q) || applyText(r.actor, fAudit.q) || applyText((r.details as string[]).join(" "), fAudit.q)),
-  );
+
+  // Group all audit rows by their referenced asset, ordered chronologically (oldest first).
+  const auditByAsset = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    for (const r of scopedAuditRows as any[]) {
+      const aid = r.entity_type === "assets"
+        ? r.entity_id
+        : (r.details?.asset_id ?? r.details?.after?.asset_id ?? r.details?.before?.asset_id);
+      if (!aid) continue;
+      (map[aid] ??= []).push(r);
+    }
+    for (const k of Object.keys(map)) {
+      map[k].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+    }
+    return map;
+  }, [scopedAuditRows]);
+
+  // Assets available for the audit picker — only those with at least one audit row.
+  const auditAssetChoices = useMemo(() => {
+    return (enrichedAssets as any[])
+      .filter((a) => (auditByAsset[a.id]?.length ?? 0) > 0)
+      .filter((a) => {
+        if (!auditAssetQuery) return true;
+        const q = auditAssetQuery.toLowerCase();
+        return (a.asset_tag ?? "").toLowerCase().includes(q)
+          || (a.name ?? "").toLowerCase().includes(q)
+          || (a.serial_number ?? "").toLowerCase().includes(q);
+      })
+      .sort((a, b) => String(a.asset_tag ?? "").localeCompare(String(b.asset_tag ?? "")));
+  }, [enrichedAssets, auditByAsset, auditAssetQuery]);
+
+  const activityLabel = (r: any): string => {
+    const entity = humanizeKey(r.entity_type ?? "record");
+    const action = humanizeKey(r.action ?? "");
+    return `${entity} ${action}`.trim();
+  };
+
+  const auditRows = useMemo(() => {
+    const ids = Array.from(auditSelectedAssets);
+    const out: any[] = [];
+    for (const id of ids) {
+      const a = allAssetMap[id];
+      if (!a) continue;
+      const assetLabel = `${a.asset_tag ?? ""} — ${a.name ?? ""}`.replace(/^ — | — $/g, "").trim() || "Asset";
+      const list = (auditByAsset[id] ?? []).filter((r) =>
+        (!fAudit.entity_type || r.entity_type === fAudit.entity_type) &&
+        applyDate(r.created_at, fAudit.from, fAudit.to),
+      );
+      list.forEach((r, idx) => {
+        out.push({
+          asset: assetLabel,
+          seq: idx + 1,
+          activity: activityLabel(r),
+          actor: userLabel(r.actor_user_id),
+          created_at: r.created_at,
+          details: detailsToLines(r.details),
+        });
+      });
+    }
+    return out.filter((r) =>
+      !fAudit.q
+      || applyText(r.asset, fAudit.q)
+      || applyText(r.activity, fAudit.q)
+      || applyText(r.actor, fAudit.q)
+      || applyText((r.details as string[]).join(" "), fAudit.q),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auditSelectedAssets, auditByAsset, allAssetMap, fAudit, profileMap]);
+
   const auditReport: Report = {
     title: "Audit Trail Report",
     columns: [
-      { header: "Date", key: "created_at", isDateTime: true }, { header: "Entity", key: "entity_type" },
-      { header: "Action", key: "action" }, { header: "User", key: "actor" },
-      { header: "Record", key: "entity_id" }, { header: "Details", key: "details", isMultiline: true },
+      { header: "Asset", key: "asset" },
+      { header: "#", key: "seq" },
+      { header: "Activity", key: "activity" },
+      { header: "By", key: "actor" },
+      { header: "Date & time", key: "created_at", isDateTime: true },
+      { header: "Details", key: "details", isMultiline: true },
     ],
     rows: auditRows,
+  };
+
+  const allAuditAssetsSelected = auditAssetChoices.length > 0
+    && auditAssetChoices.every((a: any) => auditSelectedAssets.has(a.id));
+  const toggleAuditAsset = (id: string) => {
+    setAuditSelectedAssets((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const toggleAllAuditAssets = () => {
+    setAuditSelectedAssets((prev) => {
+      if (allAuditAssetsSelected) {
+        const next = new Set(prev);
+        auditAssetChoices.forEach((a: any) => next.delete(a.id));
+        return next;
+      }
+      const next = new Set(prev);
+      auditAssetChoices.forEach((a: any) => next.add(a.id));
+      return next;
+    });
   };
 
 
