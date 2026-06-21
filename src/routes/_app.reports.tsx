@@ -10,14 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileBarChart, FileDown, FileSpreadsheet, X } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { formatUGX } from "@/lib/utils";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } from "@/lib/pdf-template";
 import { fmtDateEAT, fmtDateTimeEAT } from "@/lib/time";
-import { AuditTrailView } from "@/components/audit-trail-view";
+
 
 export const Route = createFileRoute("/_app/reports")({
   component: ReportsPage,
@@ -189,14 +189,6 @@ function ReportsPage() {
       .select("*, assets(asset_tag,name), branches(name)")
       .order("created_at", { ascending: false })).data ?? [],
   });
-  const { data: auditRowsRaw = [] } = useQuery({
-    queryKey: ["report-audit-log"],
-    queryFn: async () => (await supabase.from("audit_log")
-      .select("*")
-      .is("cleared_at", null)
-      .order("created_at", { ascending: false })
-      .limit(2000)).data ?? [],
-  });
   const userLabel = (id: string | null | undefined) => {
     if (!id) return "";
     const p = profileMap[id];
@@ -282,13 +274,6 @@ function ReportsPage() {
     () => (gatePasses as any[]).filter((g) => visibleAssetIds.has(g.asset_id) && canSeeBranch(g.branch_id)),
     [gatePasses, visibleAssetIds, canSeeBranch],
   );
-  const scopedAuditRows = useMemo(
-    () => (auditRowsRaw as any[]).filter((r) => {
-      const assetId = r.entity_type === "assets" ? r.entity_id : (r.details?.asset_id ?? r.details?.after?.asset_id ?? r.details?.before?.asset_id);
-      return !assetId || visibleAssetIds.has(assetId);
-    }),
-    [auditRowsRaw, visibleAssetIds],
-  );
   const scopedBranches = useMemo(
     () => (branches as any[]).filter((b) => canSeeBranch(b.id)),
     [branches, canSeeBranch],
@@ -306,20 +291,6 @@ function ReportsPage() {
   const priorityOpts = ["low", "normal", "high", "urgent"].map((p) => ({ value: p, label: p }));
   const verificationStatusOpts = ["verified", "mismatched", "not_found"].map((s) => ({ value: s, label: s.replace(/_/g, " ") }));
   const gatePassStatusOpts = ["pending", "approved", "rejected", "checked_out", "returned", "cancelled"].map((s) => ({ value: s, label: s.replace(/_/g, " ") }));
-  const auditActivityOpts = [
-    { value: "created", label: "Asset created (data capture)" },
-    { value: "updated", label: "Asset details updated" },
-    { value: "moved", label: "Asset moved / transferred" },
-    { value: "assigned", label: "Asset assigned" },
-    { value: "verified", label: "Asset verified" },
-    { value: "maintenance", label: "Maintenance" },
-    { value: "depreciated", label: "Depreciation run" },
-    { value: "requisition", label: "Requisition raised" },
-    { value: "approval", label: "Approval decision" },
-    { value: "gate_pass", label: "Gate pass activity" },
-    { value: "retired", label: "Asset retired" },
-    { value: "disposed", label: "Asset disposed" },
-  ];
 
   /* ----------- Filters state per tab ----------- */
   const [fRegister, setFRegister] = useState<Record<string, string>>({});
@@ -331,9 +302,6 @@ function ReportsPage() {
   const [fVerification, setFVerification] = useState<Record<string, string>>({});
   const [fDepreciation, setFDepreciation] = useState<Record<string, string>>({});
   const [fGatePass, setFGatePass] = useState<Record<string, string>>({});
-  const [fAudit, setFAudit] = useState<Record<string, string>>({});
-  const [auditSelectedAssets, setAuditSelectedAssets] = useState<Set<string>>(new Set());
-  const [auditAssetQuery, setAuditAssetQuery] = useState("");
 
   /* ----------- Register ----------- */
   const registerDefs: FilterDef[] = [
@@ -722,237 +690,6 @@ function ReportsPage() {
     rows: gatePassRows,
   };
 
-  /* ----------- Audit trail ----------- */
-  const branchMap = Object.fromEntries((branches as any[]).map((b: any) => [b.id, b]));
-  const locationMap = Object.fromEntries((locationsAll as any[]).map((l: any) => [l.id, l]));
-
-  const humanizeKey = (k: string) =>
-    k.replace(/_id$/i, "").replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
-
-  const labelForId = (key: string, id: string): string => {
-    const k = (key || "").toLowerCase();
-    // Try asset lookup first whenever the key/entity hints at an asset
-    if (k.includes("asset") && !k.includes("assignment") && !k.includes("movement") && !k.includes("disposal") && !k.includes("verification")) {
-      const a = allAssetMap[id];
-      if (a) return `${a.asset_tag ?? ""} ${a.name ?? ""}`.trim() || id;
-    } else if (k === "assets") {
-      const a = allAssetMap[id];
-      if (a) return `${a.asset_tag ?? ""} ${a.name ?? ""}`.trim() || id;
-    }
-    if (k.includes("branch")) { const b = branchMap[id]; if (b) return b.name; }
-    if (k.includes("location")) { const l = locationMap[id]; if (l) return l.name; }
-    if (k.includes("category")) { const c = catMap[id]; if (c) return c.name; }
-    if (k.includes("user") || k.includes("actor") || k.includes("by") || k.includes("approver") || k.includes("requester") || k.includes("requested") || k.includes("decided") || k === "profiles") {
-      const u = userLabel(id); if (u) return u;
-    }
-    // Fallback: short record reference like "Approval Request #20a96cbe"
-    const label = humanizeKey(k.replace(/s$/, ""));
-    const short = id.length >= 8 ? id.slice(0, 8) : id;
-    return `${label} #${short}`;
-  };
-
-
-  const isUuid = (v: any) => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-
-  const valueToText = (key: string, val: any): string => {
-    if (val === null || val === undefined || val === "") return "—";
-    if (typeof val === "boolean") return val ? "Yes" : "No";
-    if (typeof val === "number") return String(val);
-    if (Array.isArray(val)) return val.map((v) => valueToText(key, v)).join(", ");
-    if (typeof val === "object") {
-      return Object.entries(val)
-        .map(([k, v]) => `${humanizeKey(k)}: ${valueToText(k, v)}`)
-        .join("; ");
-    }
-    const s = String(val);
-    if (isUuid(s)) return labelForId(key, s);
-    if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return fmtDateTimeEAT(s);
-    return s;
-  };
-
-  const detailsToLines = (details: any): string[] => {
-    if (!details) return [];
-    if (typeof details === "string") return [details];
-    if (typeof details !== "object") return [String(details)];
-    const skip = new Set(["id", "created_at", "updated_at", "asset_id"]);
-    const lines: string[] = [];
-    for (const [k, v] of Object.entries(details)) {
-      if (skip.has(k)) continue;
-      if (v === null || v === undefined || v === "") continue;
-      if ((k === "before" || k === "after" || k === "changes") && typeof v === "object" && v) {
-        for (const [kk, vv] of Object.entries(v as any)) {
-          if (skip.has(kk)) continue;
-          if (vv === null || vv === undefined || vv === "") continue;
-          lines.push(`${humanizeKey(k)} ${humanizeKey(kk)}: ${valueToText(kk, vv)}`);
-        }
-        continue;
-      }
-      lines.push(`${humanizeKey(k)}: ${valueToText(k, v)}`);
-    }
-    return lines;
-  };
-
-  // Classify an audit row into a tracked activity. Returns null to skip.
-  const classifyActivity = (r: any): { code: string; label: string } | null => {
-    const entity = String(r.entity_type ?? "");
-    const action = String(r.action ?? "").toLowerCase();
-    const after = r.details?.after ?? r.details ?? {};
-    const before = r.details?.before ?? {};
-    const prettyKind = (k: any) => String(k ?? "").replace(/_/g, " ");
-
-    if (entity === "assets") {
-      if (action === "created") return { code: "created", label: "Asset created (data capture)" };
-      if (action === "retired") return { code: "retired", label: "Asset retired" };
-      if (action === "updated") return { code: "updated", label: "Asset details updated" };
-    }
-    if (entity === "asset_movements" && action === "created") {
-      const t = after?.movement_type ? ` (${prettyKind(after.movement_type)})` : "";
-      return { code: "moved", label: `Asset moved / transferred${t}` };
-    }
-    if (entity === "asset_assignments" && action === "created") {
-      return { code: "assigned", label: "Asset assigned" };
-    }
-    if (entity === "asset_verifications" && action === "created") {
-      const s = after?.status ? `: ${prettyKind(after.status)}` : "";
-      return { code: "verified", label: `Asset verified${s}` };
-    }
-    if (entity === "asset_disposals") {
-      if (action === "created") return { code: "disposed", label: "Disposal requested" };
-      if (action === "disposal_approved") return { code: "disposed", label: "Disposal approved" };
-      if (action === "disposal_completed") return { code: "disposed", label: "Asset disposed" };
-      if (action === "disposal_rejected") return { code: "disposed", label: "Disposal rejected" };
-    }
-    if ((entity === "depreciation_entries" || entity === "depreciation_runs") && action === "created") {
-      return { code: "depreciated", label: "Depreciation run" };
-    }
-    if (entity === "approval_requests") {
-      const kind = prettyKind(after?.kind ?? before?.kind);
-      if (action === "created") {
-        if (kind === "maintenance") return { code: "maintenance", label: "Maintenance requested" };
-        return { code: "requisition", label: `Requisition raised: ${kind}` };
-      }
-      if (action === "updated") {
-        const oldStatus = before?.status;
-        const newStatus = after?.status;
-        if (oldStatus !== newStatus && newStatus) {
-          return { code: "approval", label: `${kind} ${newStatus}` };
-        }
-      }
-    }
-    if (entity === "gate_passes") {
-      if (action === "created") return { code: "gate_pass", label: "Gate pass requested" };
-      if (action === "updated") {
-        const oldStatus = before?.status;
-        const newStatus = after?.status;
-        if (oldStatus !== newStatus && newStatus) {
-          return { code: "gate_pass", label: `Gate pass ${prettyKind(newStatus)}` };
-        }
-      }
-    }
-    return null;
-  };
-
-  const auditDefs: FilterDef[] = [
-    { key: "q", label: "Search (activity/user)", type: "text" },
-    { key: "activity", label: "Activity", type: "select", options: auditActivityOpts },
-    { key: "from", label: "From date", type: "date" },
-    { key: "to", label: "To date", type: "date" },
-  ];
-
-  // Group tracked activities by asset, ordered chronologically (oldest first).
-  const auditByAsset = useMemo(() => {
-    const map: Record<string, any[]> = {};
-    for (const r of scopedAuditRows as any[]) {
-      const cls = classifyActivity(r);
-      if (!cls) continue;
-      const aid = r.entity_type === "assets"
-        ? r.entity_id
-        : (r.details?.asset_id ?? r.details?.after?.asset_id ?? r.details?.before?.asset_id);
-      if (!aid) continue;
-      (map[aid] ??= []).push({ ...r, _activityCode: cls.code, _activityLabel: cls.label });
-    }
-    for (const k of Object.keys(map)) {
-      map[k].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
-    }
-    return map;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scopedAuditRows]);
-
-  // Assets available for the audit picker — only those with at least one tracked activity.
-  const auditAssetChoices = useMemo(() => {
-    return (enrichedAssets as any[])
-      .filter((a) => (auditByAsset[a.id]?.length ?? 0) > 0)
-      .filter((a) => {
-        if (!auditAssetQuery) return true;
-        const q = auditAssetQuery.toLowerCase();
-        return (a.asset_tag ?? "").toLowerCase().includes(q)
-          || (a.name ?? "").toLowerCase().includes(q)
-          || (a.serial_number ?? "").toLowerCase().includes(q);
-      })
-      .sort((a, b) => String(a.asset_tag ?? "").localeCompare(String(b.asset_tag ?? "")));
-  }, [enrichedAssets, auditByAsset, auditAssetQuery]);
-
-  const auditRows = useMemo(() => {
-    const ids = Array.from(auditSelectedAssets);
-    const out: any[] = [];
-    for (const id of ids) {
-      const a = allAssetMap[id];
-      if (!a) continue;
-      const assetLabel = `${a.asset_tag ?? ""} — ${a.name ?? ""}`.replace(/^ — | — $/g, "").trim() || "Asset";
-      const list = (auditByAsset[id] ?? []).filter((r) =>
-        (!fAudit.activity || r._activityCode === fAudit.activity) &&
-        applyDate(r.created_at, fAudit.from, fAudit.to),
-      );
-      list.forEach((r, idx) => {
-        out.push({
-          asset: assetLabel,
-          activity: `Activity ${idx + 1}: ${r._activityLabel}`,
-          actor: userLabel(r.actor_user_id),
-          created_at: r.created_at,
-        });
-      });
-    }
-    return out.filter((r) =>
-      !fAudit.q
-      || applyText(r.asset, fAudit.q)
-      || applyText(r.activity, fAudit.q)
-      || applyText(r.actor, fAudit.q),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auditSelectedAssets, auditByAsset, allAssetMap, fAudit, profileMap]);
-
-  const auditReport: Report = {
-    title: "Audit Trail Report",
-    columns: [
-      { header: "Asset", key: "asset" },
-      { header: "Activity", key: "activity" },
-      { header: "By", key: "actor" },
-      { header: "Date & time", key: "created_at", isDateTime: true },
-    ],
-    rows: auditRows,
-  };
-
-  const allAuditAssetsSelected = auditAssetChoices.length > 0
-    && auditAssetChoices.every((a: any) => auditSelectedAssets.has(a.id));
-  const toggleAuditAsset = (id: string) => {
-    setAuditSelectedAssets((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-  const toggleAllAuditAssets = () => {
-    setAuditSelectedAssets((prev) => {
-      if (allAuditAssetsSelected) {
-        const next = new Set(prev);
-        auditAssetChoices.forEach((a: any) => next.delete(a.id));
-        return next;
-      }
-      const next = new Set(prev);
-      auditAssetChoices.forEach((a: any) => next.add(a.id));
-      return next;
-    });
-  };
 
 
   /* ----------- Branch / Dept / Condition (unchanged aggregates) ----------- */
@@ -1025,7 +762,7 @@ function ReportsPage() {
           <TabsTrigger value="verification">Verification</TabsTrigger>
           <TabsTrigger value="depreciation">Depreciation</TabsTrigger>
           <TabsTrigger value="gate-pass">Gate Passes</TabsTrigger>
-          <TabsTrigger value="audit">Audit</TabsTrigger>
+          
           <TabsTrigger value="branch">Branch</TabsTrigger>
           <TabsTrigger value="department">Department</TabsTrigger>
           <TabsTrigger value="condition">Condition</TabsTrigger>
@@ -1066,9 +803,6 @@ function ReportsPage() {
         <TabsContent value="gate-pass" className="mt-4">
           <FilterBar defs={gatePassDefs} values={fGatePass} onChange={setFGatePass} />
           <ReportTable r={gatePassReport} />
-        </TabsContent>
-        <TabsContent value="audit" className="mt-4">
-          <AuditTrailView showHeader={false} />
         </TabsContent>
         <TabsContent value="branch" className="mt-4"><ReportTable r={branchReport} /></TabsContent>
         <TabsContent value="department" className="mt-4"><ReportTable r={departmentReport} /></TabsContent>
