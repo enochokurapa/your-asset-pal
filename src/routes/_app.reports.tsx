@@ -781,24 +781,6 @@ function ReportsPage() {
 
   // Resolve the asset referenced by an audit row (works for assets, approval_requests,
   // movements, disposals, verifications, gate passes, assignments).
-  const recordLabel = (r: any): string => {
-    const d = r?.details ?? {};
-    const candidateId: string | undefined =
-      r.entity_type === "assets"
-        ? r.entity_id
-        : d.asset_id ?? d.after?.asset_id ?? d.before?.asset_id;
-    const a = candidateId ? allAssetMap[candidateId] : undefined;
-    if (a) {
-      const base = `${a.asset_tag ?? ""} — ${a.name ?? ""}`.replace(/^ — | — $/g, "").trim();
-      if (r.entity_type === "approval_requests") {
-        return `${base} (current status: ${(a.status ?? "unknown").replace(/_/g, " ")})`;
-      }
-      return base || "—";
-    }
-    if (r.entity_id) return labelForId(r.entity_type ?? "", r.entity_id);
-    return "";
-  };
-
   const auditDefs: FilterDef[] = [
     { key: "q", label: "Search (activity/user/details)", type: "text" },
     { key: "entity_type", label: "Entity", type: "select", options: auditEntityOpts },
