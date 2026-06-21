@@ -1022,10 +1022,24 @@ function ReportTable({ r }: { r: Report }) {
             </thead>
             <tbody>
               {r.rows.map((row, i) => (
-                <tr key={i} className="border-b last:border-0">
-                  {r.columns.map((c) => (
-                    <td key={c.key} className="px-3 py-2">{fmtColumn(row, c)}</td>
-                  ))}
+                <tr key={i} className="border-b last:border-0 align-top">
+                  {r.columns.map((c) => {
+                    const v = row[c.key];
+                    if (c.isMultiline && Array.isArray(v)) {
+                      return (
+                        <td key={c.key} className="px-3 py-2 min-w-[16rem]">
+                          {v.length === 0 ? "" : (
+                            <ul className="space-y-1 list-disc pl-4">
+                              {v.map((line: string, j: number) => (
+                                <li key={j} className="leading-snug">{line}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </td>
+                      );
+                    }
+                    return <td key={c.key} className="px-3 py-2">{fmtColumn(row, c)}</td>;
+                  })}
                 </tr>
               ))}
             </tbody>
