@@ -43,6 +43,25 @@ const friendlyAction = (r: any) => {
   return a.replace(/_/g, " ");
 };
 
+const friendlyEntity = (t: string | null | undefined) => {
+  switch (t) {
+    case "assets": return "Asset";
+    case "asset_movements": return "Asset movement";
+    case "asset_assignments": return "Custodian assignment";
+    case "asset_disposals": return "Disposal / retirement";
+    case "approval_requests": return "Approval request";
+    case "branches": return "Branch";
+    case "locations": return "Location";
+    case "categories": return "Category";
+    case "profiles": return "User profile";
+    case "depreciation_runs": return "Depreciation run";
+    case "audit_log": return "Audit entry";
+    default:
+      if (!t) return "—";
+      return t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+};
+
 export type AuditTrailViewProps = {
   initialQ?: string;
   initialEntity?: string;
