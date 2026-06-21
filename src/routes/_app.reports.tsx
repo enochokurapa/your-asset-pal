@@ -21,7 +21,7 @@ export const Route = createFileRoute("/_app/reports")({
   component: ReportsPage,
 });
 
-type Column = { header: string; key: string; isCurrency?: boolean };
+type Column = { header: string; key: string; isCurrency?: boolean; isDate?: boolean; isDateTime?: boolean };
 type Report = { title: string; columns: Column[]; rows: any[] };
 
 const CHART_COLORS = [
@@ -35,6 +35,12 @@ function fmtCell(v: any, isCurrency?: boolean) {
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
 }
+function fmtColumn(row: any, c: Column) {
+  const v = row[c.key];
+  if (c.isDateTime) return fmtDateTimeEAT(v);
+  if (c.isDate) return fmtDateEAT(v);
+  return fmtCell(v, c.isCurrency);
+}
 async function exportPDF(r: Report) {
   const template = await loadTemplate();
   const { doc, startY } = createBrandedPdf({
@@ -43,7 +49,7 @@ async function exportPDF(r: Report) {
   autoTable(doc, {
     startY,
     head: [r.columns.map((c) => c.header)],
-    body: r.rows.map((row) => r.columns.map((c) => fmtCell(row[c.key], c.isCurrency))),
+    body: r.rows.map((row) => r.columns.map((c) => fmtColumn(row, c))),
     styles: { fontSize: 7, font: template.font_family },
     headStyles: { fillColor: tableHeadFill(template) },
     margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
@@ -52,7 +58,7 @@ async function exportPDF(r: Report) {
 }
 
 function exportXLSX(r: Report) {
-  const data = r.rows.map((row) => Object.fromEntries(r.columns.map((c) => [c.header, fmtCell(row[c.key], c.isCurrency)])));
+  const data = r.rows.map((row) => Object.fromEntries(r.columns.map((c) => [c.header, fmtColumn(row, c)])));
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, r.title.slice(0, 30));
