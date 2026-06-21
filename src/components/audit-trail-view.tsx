@@ -280,7 +280,7 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
   const openDetailPdf = async (r: any) => {
     const template = await (await import("@/lib/pdf-template")).loadTemplate();
     const { createBrandedPdf, applyTemplateChrome } = await import("@/lib/pdf-template");
-    const { doc, startY } = createBrandedPdf({ template, title: "Audit Log Entry" });
+    const { doc, startY } = createBrandedPdf({ template, orientation: "landscape", title: "Audit Log Entry" });
     appendEntryToDoc(doc, r, startY);
     applyTemplateChrome(doc, template);
     const blob = doc.output("blob");
