@@ -791,19 +791,62 @@ function ReportsPage() {
     return lines;
   };
 
-  // Classify an audit row into one of the four tracked activities:
-  // created | moved | depreciated | disposed. Returns null to skip the row.
+  // Classify an audit row into a tracked activity. Returns null to skip.
   const classifyActivity = (r: any): { code: string; label: string } | null => {
     const entity = String(r.entity_type ?? "");
     const action = String(r.action ?? "").toLowerCase();
-    if (entity === "assets" && action === "created") return { code: "created", label: "Asset created" };
-    if (entity === "asset_movements" && action === "created") return { code: "moved", label: "Asset moved / transferred" };
+    const after = r.details?.after ?? r.details ?? {};
+    const before = r.details?.before ?? {};
+    const prettyKind = (k: any) => String(k ?? "").replace(/_/g, " ");
+
+    if (entity === "assets") {
+      if (action === "created") return { code: "created", label: "Asset created (data capture)" };
+      if (action === "retired") return { code: "retired", label: "Asset retired" };
+      if (action === "updated") return { code: "updated", label: "Asset details updated" };
+    }
+    if (entity === "asset_movements" && action === "created") {
+      const t = after?.movement_type ? ` (${prettyKind(after.movement_type)})` : "";
+      return { code: "moved", label: `Asset moved / transferred${t}` };
+    }
+    if (entity === "asset_assignments" && action === "created") {
+      return { code: "assigned", label: "Asset assigned" };
+    }
+    if (entity === "asset_verifications" && action === "created") {
+      const s = after?.status ? `: ${prettyKind(after.status)}` : "";
+      return { code: "verified", label: `Asset verified${s}` };
+    }
     if (entity === "asset_disposals") {
-      if (action === "disposal_approved" || action === "disposal_completed") return { code: "disposed", label: "Asset disposed" };
       if (action === "created") return { code: "disposed", label: "Disposal requested" };
+      if (action === "disposal_approved") return { code: "disposed", label: "Disposal approved" };
+      if (action === "disposal_completed") return { code: "disposed", label: "Asset disposed" };
+      if (action === "disposal_rejected") return { code: "disposed", label: "Disposal rejected" };
     }
     if ((entity === "depreciation_entries" || entity === "depreciation_runs") && action === "created") {
       return { code: "depreciated", label: "Depreciation run" };
+    }
+    if (entity === "approval_requests") {
+      const kind = prettyKind(after?.kind ?? before?.kind);
+      if (action === "created") {
+        if (kind === "maintenance") return { code: "maintenance", label: "Maintenance requested" };
+        return { code: "requisition", label: `Requisition raised: ${kind}` };
+      }
+      if (action === "updated") {
+        const oldStatus = before?.status;
+        const newStatus = after?.status;
+        if (oldStatus !== newStatus && newStatus) {
+          return { code: "approval", label: `${kind} ${newStatus}` };
+        }
+      }
+    }
+    if (entity === "gate_passes") {
+      if (action === "created") return { code: "gate_pass", label: "Gate pass requested" };
+      if (action === "updated") {
+        const oldStatus = before?.status;
+        const newStatus = after?.status;
+        if (oldStatus !== newStatus && newStatus) {
+          return { code: "gate_pass", label: `Gate pass ${prettyKind(newStatus)}` };
+        }
+      }
     }
     return null;
   };
