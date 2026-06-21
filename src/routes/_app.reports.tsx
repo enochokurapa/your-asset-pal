@@ -706,6 +706,67 @@ function ReportsPage() {
   };
 
   /* ----------- Audit trail ----------- */
+  const branchMap = Object.fromEntries((branches as any[]).map((b: any) => [b.id, b]));
+  const locationMap = Object.fromEntries((locationsAll as any[]).map((l: any) => [l.id, l]));
+
+  const humanizeKey = (k: string) =>
+    k.replace(/_id$/i, "").replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+
+  const labelForId = (key: string, id: string): string => {
+    const k = (key || "").toLowerCase();
+    if (k.includes("asset")) {
+      const a = allAssetMap[id];
+      if (a) return `${a.asset_tag ?? ""} ${a.name ?? ""}`.trim() || id;
+    }
+    if (k.includes("branch")) return branchMap[id]?.name ?? id;
+    if (k.includes("location")) return locationMap[id]?.name ?? id;
+    if (k.includes("category")) return catMap[id]?.name ?? id;
+    if (k.includes("user") || k.includes("actor") || k.includes("by") || k.includes("approver") || k.includes("requester") || k.includes("requested") || k.includes("decided")) {
+      return userLabel(id) || id;
+    }
+    return id;
+  };
+
+  const isUuid = (v: any) => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+  const valueToText = (key: string, val: any): string => {
+    if (val === null || val === undefined || val === "") return "—";
+    if (typeof val === "boolean") return val ? "Yes" : "No";
+    if (typeof val === "number") return String(val);
+    if (Array.isArray(val)) return val.map((v) => valueToText(key, v)).join(", ");
+    if (typeof val === "object") {
+      return Object.entries(val)
+        .map(([k, v]) => `${humanizeKey(k)}: ${valueToText(k, v)}`)
+        .join("; ");
+    }
+    const s = String(val);
+    if (isUuid(s)) return labelForId(key, s);
+    if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return fmtDateTimeEAT(s);
+    return s;
+  };
+
+  const detailsToText = (details: any): string => {
+    if (!details) return "";
+    if (typeof details === "string") return details;
+    if (typeof details !== "object") return String(details);
+    const skip = new Set(["id", "created_at", "updated_at"]);
+    const parts: string[] = [];
+    for (const [k, v] of Object.entries(details)) {
+      if (skip.has(k)) continue;
+      if (v === null || v === undefined || v === "") continue;
+      if ((k === "before" || k === "after" || k === "changes") && typeof v === "object" && v) {
+        const inner = Object.entries(v as any)
+          .filter(([, vv]) => vv !== null && vv !== undefined && vv !== "")
+          .map(([kk, vv]) => `${humanizeKey(kk)}: ${valueToText(kk, vv)}`)
+          .join("; ");
+        if (inner) parts.push(`${humanizeKey(k)} — ${inner}`);
+        continue;
+      }
+      parts.push(`${humanizeKey(k)}: ${valueToText(k, v)}`);
+    }
+    return parts.join(" | ");
+  };
+
   const auditDefs: FilterDef[] = [
     { key: "q", label: "Search (entity/action/user)", type: "text" },
     { key: "entity_type", label: "Entity", type: "select", options: auditEntityOpts },
@@ -713,9 +774,11 @@ function ReportsPage() {
     { key: "to", label: "To date", type: "date" },
   ];
   const auditRows = scopedAuditRows.map((r: any) => ({
-    entity_type: r.entity_type?.replace(/_/g, " ") ?? "", action: r.action?.replace(/_/g, " ") ?? "",
+    entity_type: r.entity_type?.replace(/_/g, " ") ?? "",
+    action: r.action?.replace(/_/g, " ") ?? "",
     actor: userLabel(r.actor_user_id), created_at: r.created_at,
-    entity_id: r.entity_id ?? "", details: r.details ? JSON.stringify(r.details) : "",
+    entity_id: r.entity_id ? labelForId(r.entity_type ?? "", r.entity_id) : "",
+    details: detailsToText(r.details),
     _entity_type: r.entity_type,
   })).filter((r: any) =>
     (!fAudit.entity_type || r._entity_type === fAudit.entity_type) &&
