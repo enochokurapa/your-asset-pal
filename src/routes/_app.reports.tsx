@@ -510,13 +510,14 @@ function ReportsPage() {
     { key: "from", label: "From date", type: "date" },
     { key: "to", label: "To date", type: "date" },
   ];
-  const maintenanceRows = scopedApprovals.filter((r: any) => r.kind === "maintenance").map((r: any) => {
+  const maintenanceRows = scopedApprovals.filter((r: any) => r.kind === "maintenance" || r.kind === "reactivation").map((r: any) => {
     const p = r.payload ?? {};
     const asset = assetFor(r.asset_id);
     const requester = profileMap[r.requested_by];
     const approver = r.approver_id ? profileMap[r.approver_id] : null;
     return {
       tag: asset?.asset_tag, name: asset?.name,
+      type: r.kind === "reactivation" ? "Return from repair" : "Maintenance",
       issue: r.reason ?? "", priority: p.priority ?? "",
       scheduled_for: p.scheduled_for ?? "", estimated_cost: p.estimated_cost ?? null,
       notes: p.notes ?? "", status: r.status ?? "pending",
@@ -535,7 +536,7 @@ function ReportsPage() {
     title: "Maintenance Requisitions",
     columns: [
       { header: "Tag", key: "tag" }, { header: "Asset", key: "name" },
-      { header: "Issue", key: "issue" }, { header: "Priority", key: "priority" },
+      { header: "Type", key: "type" }, { header: "Issue", key: "issue" }, { header: "Priority", key: "priority" },
       { header: "Scheduled", key: "scheduled_for" },
       { header: "Est. cost", key: "estimated_cost", isCurrency: true },
       { header: "Status", key: "status" }, { header: "Requested by", key: "requested_by" },
@@ -815,26 +816,26 @@ function ReportsPage() {
           <FilterBar defs={approvalDefs} values={fApprov} onChange={setFApprov} />
           <ReportTable r={approvalReport} />
         </TabsContent>
-        <TabsContent value="verification">
+        <TabsContent value="verification" className="mt-4">
           <FilterBar defs={verificationDefs} values={fVerification} onChange={setFVerification} />
           <ReportTable r={verificationReport} />
         </TabsContent>
-        <TabsContent value="depreciation">
+        <TabsContent value="depreciation" className="mt-4">
           <FilterBar defs={depreciationDefs} values={fDepreciation} onChange={setFDepreciation} />
           <ReportTable r={depreciationReport} />
         </TabsContent>
-        <TabsContent value="gate-pass">
+        <TabsContent value="gate-pass" className="mt-4">
           <FilterBar defs={gatePassDefs} values={fGatePass} onChange={setFGatePass} />
           <ReportTable r={gatePassReport} />
         </TabsContent>
-        <TabsContent value="audit">
+        <TabsContent value="audit" className="mt-4">
           <FilterBar defs={auditDefs} values={fAudit} onChange={setFAudit} />
           <ReportTable r={auditReport} />
         </TabsContent>
-        <TabsContent value="branch"><ReportTable r={branchReport} /></TabsContent>
-        <TabsContent value="department"><ReportTable r={departmentReport} /></TabsContent>
+        <TabsContent value="branch" className="mt-4"><ReportTable r={branchReport} /></TabsContent>
+        <TabsContent value="department" className="mt-4"><ReportTable r={departmentReport} /></TabsContent>
 
-        <TabsContent value="condition">
+        <TabsContent value="condition" className="mt-4">
           <Card className="p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-semibold">Asset Condition Report</h2>
