@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Download, Upload, FileText, Check, X, History, Send } from "lucide-react";
+import { Plus, Trash2, Download, Upload, FileText, Check, X, History, Send, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { formatUGX } from "@/lib/utils";
@@ -17,6 +17,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import { DepreciationPanel } from "@/components/depreciation-panel";
+import { fmtDateTimeEAT } from "@/lib/time";
 
 function DecideDialog({
   open, status, onCancel, onConfirm,
@@ -321,10 +322,16 @@ function MovementsPanel({ assetId }: { assetId: string }) {
 
 /* ---------- Attachments ---------- */
 function AttachmentsPanel({ assetId }: { assetId: string }) {
-  const { canWrite, user } = useAuth();
+  const { canWrite, canDo, user, isAdmin } = useAuth();
   const qc = useQueryClient();
   const [kind, setKind] = useState("invoice");
   const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState<{ url: string; name: string; mime: string } | null>(null);
+  const [deleteFor, setDeleteFor] = useState<any>(null);
+  const [deleteReason, setDeleteReason] = useState("");
+
+  const canRequestDelete = isAdmin || canDo("request_attachment_deletion");
+
   const { data = [] } = useQuery({
     queryKey: ["asset-attachments", assetId],
     queryFn: async () => (await supabase.from("asset_attachments").select("*")
@@ -344,11 +351,43 @@ function AttachmentsPanel({ assetId }: { assetId: string }) {
     toast.success("File uploaded");
     qc.invalidateQueries({ queryKey: ["asset-attachments", assetId] });
   };
-  const download = async (path: string, name: string) => {
-    const { data, error } = await supabase.storage.from("asset-files").createSignedUrl(path, 60);
-    if (error || !data) { toast.error(error?.message ?? "Failed"); return; }
-    const a = document.createElement("a"); a.href = data.signedUrl; a.download = name; a.target = "_blank"; a.click();
+  const signedUrl = async (path: string) => {
+    const { data, error } = await supabase.storage.from("asset-files").createSignedUrl(path, 300);
+    if (error || !data) { toast.error(error?.message ?? "Failed"); return null; }
+    return data.signedUrl;
   };
+  const download = async (path: string, name: string) => {
+    const url = await signedUrl(path); if (!url) return;
+    const a = document.createElement("a"); a.href = url; a.download = name; a.target = "_blank"; a.click();
+  };
+  const openPreview = async (r: any) => {
+    const url = await signedUrl(r.storage_path); if (!url) return;
+    setPreview({ url, name: r.file_name, mime: r.mime_type ?? "" });
+  };
+  const requestDeletion = async () => {
+    if (!deleteFor) return;
+    if (!deleteReason.trim()) { toast.error("Reason required"); return; }
+    try {
+      await submitApproval({
+        kind: "attachment_deletion",
+        assetId,
+        reason: deleteReason.trim(),
+        payload: {
+          attachment_id: deleteFor.id,
+          storage_path: deleteFor.storage_path,
+          file_name: deleteFor.file_name,
+          kind: deleteFor.kind,
+        },
+      });
+      setDeleteFor(null); setDeleteReason("");
+      qc.invalidateQueries({ queryKey: ["pending-approvals"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+  };
+
+  const isImage = (m: string) => m.startsWith("image/");
+  const isPdf = (m: string) => m === "application/pdf";
+
   return (
     <div className="space-y-3">
       {canWrite && (
@@ -375,13 +414,72 @@ function AttachmentsPanel({ assetId }: { assetId: string }) {
                 <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <div className="min-w-0">
                   <p className="truncate font-medium">{r.file_name}</p>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{r.kind}</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{r.kind} · {fmtDateTimeEAT(r.created_at)}</p>
                 </div>
               </div>
-              <Button size="icon" variant="ghost" onClick={() => download(r.storage_path, r.file_name)}><Download className="h-4 w-4" /></Button>
+              <div className="flex items-center gap-1">
+                <Button size="icon" variant="ghost" title="Preview" onClick={() => openPreview(r)}><Eye className="h-4 w-4" /></Button>
+                <Button size="icon" variant="ghost" title="Download" onClick={() => download(r.storage_path, r.file_name)}><Download className="h-4 w-4" /></Button>
+                {canRequestDelete && (
+                  <Button size="icon" variant="ghost" title="Request deletion" onClick={() => { setDeleteReason(""); setDeleteFor(r); }}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                )}
+              </div>
             </div>
           ))}
       </div>
+
+      {/* Preview dialog */}
+      <Dialog open={!!preview} onOpenChange={(o) => !o && setPreview(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="truncate">{preview?.name}</DialogTitle>
+            <DialogDescription>Preview · signed link expires in 5 minutes</DialogDescription>
+          </DialogHeader>
+          {preview && (
+            <div className="h-[70vh] w-full overflow-auto rounded border bg-muted/20">
+              {isImage(preview.mime) ? (
+                <img src={preview.url} alt={preview.name} className="mx-auto h-full w-auto object-contain" />
+              ) : isPdf(preview.mime) || /\.pdf$/i.test(preview.name) ? (
+                <iframe src={preview.url} title={preview.name} className="h-full w-full" />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground">
+                  <FileText className="h-10 w-10" />
+                  <p>Preview is not supported for this file type.</p>
+                  <a className="text-primary underline" href={preview.url} target="_blank" rel="noreferrer">Open in new tab</a>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreview(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete-with-approval dialog */}
+      <Dialog open={!!deleteFor} onOpenChange={(o) => !o && setDeleteFor(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request document deletion</DialogTitle>
+            <DialogDescription>
+              The file <strong>{deleteFor?.file_name}</strong> will be permanently removed once an authorised user approves the request.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Reason *</Label>
+            <Textarea rows={3} value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)}
+              placeholder="e.g. Uploaded by mistake / superseded / wrong asset" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteFor(null)}>Cancel</Button>
+            <Button variant="destructive" disabled={!deleteReason.trim()} onClick={requestDeletion}>
+              <Send className="mr-1 h-4 w-4" />Submit for approval
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
