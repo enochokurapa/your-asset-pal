@@ -714,18 +714,26 @@ function ReportsPage() {
 
   const labelForId = (key: string, id: string): string => {
     const k = (key || "").toLowerCase();
-    if (k.includes("asset")) {
+    // Try asset lookup first whenever the key/entity hints at an asset
+    if (k.includes("asset") && !k.includes("assignment") && !k.includes("movement") && !k.includes("disposal") && !k.includes("verification")) {
+      const a = allAssetMap[id];
+      if (a) return `${a.asset_tag ?? ""} ${a.name ?? ""}`.trim() || id;
+    } else if (k === "assets") {
       const a = allAssetMap[id];
       if (a) return `${a.asset_tag ?? ""} ${a.name ?? ""}`.trim() || id;
     }
-    if (k.includes("branch")) return branchMap[id]?.name ?? id;
-    if (k.includes("location")) return locationMap[id]?.name ?? id;
-    if (k.includes("category")) return catMap[id]?.name ?? id;
-    if (k.includes("user") || k.includes("actor") || k.includes("by") || k.includes("approver") || k.includes("requester") || k.includes("requested") || k.includes("decided")) {
-      return userLabel(id) || id;
+    if (k.includes("branch")) { const b = branchMap[id]; if (b) return b.name; }
+    if (k.includes("location")) { const l = locationMap[id]; if (l) return l.name; }
+    if (k.includes("category")) { const c = catMap[id]; if (c) return c.name; }
+    if (k.includes("user") || k.includes("actor") || k.includes("by") || k.includes("approver") || k.includes("requester") || k.includes("requested") || k.includes("decided") || k === "profiles") {
+      const u = userLabel(id); if (u) return u;
     }
-    return id;
+    // Fallback: short record reference like "Approval Request #20a96cbe"
+    const label = humanizeKey(k.replace(/s$/, ""));
+    const short = id.length >= 8 ? id.slice(0, 8) : id;
+    return `${label} #${short}`;
   };
+
 
   const isUuid = (v: any) => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 
