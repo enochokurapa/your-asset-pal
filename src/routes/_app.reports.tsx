@@ -257,8 +257,11 @@ function ReportsPage() {
     [disposals, visibleAssetIds],
   );
   const scopedApprovals = useMemo(
-    () => (approvals as any[]).filter((p) => !p.asset_id || visibleAssetIds.has(p.asset_id)),
-    [approvals, visibleAssetIds],
+    () => (approvals as any[]).filter((p) => {
+      const asset = assetFor(p.asset_id);
+      return !p.asset_id || !asset || canSeeBranch(asset.branch_id);
+    }),
+    [approvals, assetMap, canSeeBranch],
   );
   const scopedVerifications = useMemo(
     () => (verifications as any[]).filter((v) => visibleAssetIds.has(v.asset_id) && canSeeBranch(v.branch_id)),
