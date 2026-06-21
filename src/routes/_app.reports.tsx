@@ -305,8 +305,12 @@ function ReportsPage() {
   const priorityOpts = ["low", "normal", "high", "urgent"].map((p) => ({ value: p, label: p }));
   const verificationStatusOpts = ["verified", "mismatched", "not_found"].map((s) => ({ value: s, label: s.replace(/_/g, " ") }));
   const gatePassStatusOpts = ["pending", "approved", "rejected", "checked_out", "returned", "cancelled"].map((s) => ({ value: s, label: s.replace(/_/g, " ") }));
-  const auditEntityOpts = ["assets", "asset_movements", "asset_disposals", "asset_assignments", "approval_requests", "asset_verifications", "gate_passes", "depreciation_entries"]
-    .map((s) => ({ value: s, label: s.replace(/_/g, " ") }));
+  const auditActivityOpts = [
+    { value: "created", label: "Asset created" },
+    { value: "moved", label: "Asset moved / transferred" },
+    { value: "depreciated", label: "Depreciation run" },
+    { value: "disposed", label: "Asset disposed" },
+  ];
 
   /* ----------- Filters state per tab ----------- */
   const [fRegister, setFRegister] = useState<Record<string, string>>({});
@@ -779,32 +783,50 @@ function ReportsPage() {
     return lines;
   };
 
-  // Resolve the asset referenced by an audit row (works for assets, approval_requests,
-  // movements, disposals, verifications, gate passes, assignments).
+  // Classify an audit row into one of the four tracked activities:
+  // created | moved | depreciated | disposed. Returns null to skip the row.
+  const classifyActivity = (r: any): { code: string; label: string } | null => {
+    const entity = String(r.entity_type ?? "");
+    const action = String(r.action ?? "").toLowerCase();
+    if (entity === "assets" && action === "created") return { code: "created", label: "Asset created" };
+    if (entity === "asset_movements" && action === "created") return { code: "moved", label: "Asset moved / transferred" };
+    if (entity === "asset_disposals") {
+      if (action === "disposal_approved" || action === "disposal_completed") return { code: "disposed", label: "Asset disposed" };
+      if (action === "created") return { code: "disposed", label: "Disposal requested" };
+    }
+    if ((entity === "depreciation_entries" || entity === "depreciation_runs") && action === "created") {
+      return { code: "depreciated", label: "Depreciation run" };
+    }
+    return null;
+  };
+
   const auditDefs: FilterDef[] = [
-    { key: "q", label: "Search (activity/user/details)", type: "text" },
-    { key: "entity_type", label: "Entity", type: "select", options: auditEntityOpts },
+    { key: "q", label: "Search (activity/user)", type: "text" },
+    { key: "activity", label: "Activity", type: "select", options: auditActivityOpts },
     { key: "from", label: "From date", type: "date" },
     { key: "to", label: "To date", type: "date" },
   ];
 
-  // Group all audit rows by their referenced asset, ordered chronologically (oldest first).
+  // Group tracked activities by asset, ordered chronologically (oldest first).
   const auditByAsset = useMemo(() => {
     const map: Record<string, any[]> = {};
     for (const r of scopedAuditRows as any[]) {
+      const cls = classifyActivity(r);
+      if (!cls) continue;
       const aid = r.entity_type === "assets"
         ? r.entity_id
         : (r.details?.asset_id ?? r.details?.after?.asset_id ?? r.details?.before?.asset_id);
       if (!aid) continue;
-      (map[aid] ??= []).push(r);
+      (map[aid] ??= []).push({ ...r, _activityCode: cls.code, _activityLabel: cls.label });
     }
     for (const k of Object.keys(map)) {
       map[k].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
     }
     return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopedAuditRows]);
 
-  // Assets available for the audit picker — only those with at least one audit row.
+  // Assets available for the audit picker — only those with at least one tracked activity.
   const auditAssetChoices = useMemo(() => {
     return (enrichedAssets as any[])
       .filter((a) => (auditByAsset[a.id]?.length ?? 0) > 0)
@@ -818,12 +840,6 @@ function ReportsPage() {
       .sort((a, b) => String(a.asset_tag ?? "").localeCompare(String(b.asset_tag ?? "")));
   }, [enrichedAssets, auditByAsset, auditAssetQuery]);
 
-  const activityLabel = (r: any): string => {
-    const entity = humanizeKey(r.entity_type ?? "record");
-    const action = humanizeKey(r.action ?? "");
-    return `${entity} ${action}`.trim();
-  };
-
   const auditRows = useMemo(() => {
     const ids = Array.from(auditSelectedAssets);
     const out: any[] = [];
@@ -832,17 +848,16 @@ function ReportsPage() {
       if (!a) continue;
       const assetLabel = `${a.asset_tag ?? ""} — ${a.name ?? ""}`.replace(/^ — | — $/g, "").trim() || "Asset";
       const list = (auditByAsset[id] ?? []).filter((r) =>
-        (!fAudit.entity_type || r.entity_type === fAudit.entity_type) &&
+        (!fAudit.activity || r._activityCode === fAudit.activity) &&
         applyDate(r.created_at, fAudit.from, fAudit.to),
       );
       list.forEach((r, idx) => {
         out.push({
           asset: assetLabel,
           seq: idx + 1,
-          activity: activityLabel(r),
+          activity: r._activityLabel,
           actor: userLabel(r.actor_user_id),
           created_at: r.created_at,
-          details: detailsToLines(r.details),
         });
       });
     }
@@ -850,8 +865,7 @@ function ReportsPage() {
       !fAudit.q
       || applyText(r.asset, fAudit.q)
       || applyText(r.activity, fAudit.q)
-      || applyText(r.actor, fAudit.q)
-      || applyText((r.details as string[]).join(" "), fAudit.q),
+      || applyText(r.actor, fAudit.q),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auditSelectedAssets, auditByAsset, allAssetMap, fAudit, profileMap]);
@@ -864,7 +878,6 @@ function ReportsPage() {
       { header: "Activity", key: "activity" },
       { header: "By", key: "actor" },
       { header: "Date & time", key: "created_at", isDateTime: true },
-      { header: "Details", key: "details", isMultiline: true },
     ],
     rows: auditRows,
   };
