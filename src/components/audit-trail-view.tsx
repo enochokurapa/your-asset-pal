@@ -293,7 +293,7 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
     if (picks.length === 0) { toast.error("Select at least one entry"); return; }
     const { loadTemplate, createBrandedPdf, applyTemplateChrome } = await import("@/lib/pdf-template");
     const template = await loadTemplate();
-    const { doc, startY } = createBrandedPdf({ template, title: `Audit Log — ${picks.length} entries` });
+    const { doc, startY } = createBrandedPdf({ template, orientation: "landscape", title: `Audit Log — ${picks.length} entries` });
     picks.forEach((r: any, i: number) => {
       if (i > 0) {
         doc.addPage();
