@@ -135,12 +135,19 @@ export function PendingApprovalsCard() {
 
   const handleDecide = async (id: string, status: "approved" | "rejected", reason?: string) => {
     try {
-      await decideApproval(id, status, reason);
-      qc.invalidateQueries({ queryKey: ["pending-approvals"] });
-      qc.invalidateQueries({ queryKey: ["dashboard-stats"] }); qc.invalidateQueries({ queryKey: ["tile-assets"] });
-      qc.invalidateQueries({ queryKey: ["assets"] });
-      qc.invalidateQueries({ queryKey: ["asset-detail"] });
-      qc.invalidateQueries({ queryKey: ["asset-attachments"] });
+      const decided = await decideApproval(id, status, reason);
+      if (!decided) return;
+      qc.setQueriesData({ queryKey: ["pending-approvals"] }, (old: any) => Array.isArray(old) ? old.filter((r: any) => r.id !== id) : old);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["pending-approvals"] }),
+        qc.refetchQueries({ queryKey: ["pending-approvals"], type: "active" }),
+        qc.invalidateQueries({ queryKey: ["dashboard-stats"] }),
+        qc.refetchQueries({ queryKey: ["dashboard-stats"], type: "active" }),
+        qc.invalidateQueries({ queryKey: ["tile-assets"] }),
+        qc.invalidateQueries({ queryKey: ["assets"] }),
+        qc.invalidateQueries({ queryKey: ["asset-detail"] }),
+        qc.invalidateQueries({ queryKey: ["asset-attachments"] }),
+      ]);
     } catch (e: any) { console.error(e); }
   };
 

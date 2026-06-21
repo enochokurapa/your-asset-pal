@@ -15,12 +15,13 @@ import * as XLSX from "xlsx";
 import { formatUGX } from "@/lib/utils";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } from "@/lib/pdf-template";
+import { fmtDateEAT, fmtDateTimeEAT } from "@/lib/time";
 
 export const Route = createFileRoute("/_app/reports")({
   component: ReportsPage,
 });
 
-type Column = { header: string; key: string; isCurrency?: boolean };
+type Column = { header: string; key: string; isCurrency?: boolean; isDate?: boolean; isDateTime?: boolean };
 type Report = { title: string; columns: Column[]; rows: any[] };
 
 const CHART_COLORS = [
@@ -34,6 +35,12 @@ function fmtCell(v: any, isCurrency?: boolean) {
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
 }
+function fmtColumn(row: any, c: Column) {
+  const v = row[c.key];
+  if (c.isDateTime) return fmtDateTimeEAT(v);
+  if (c.isDate) return fmtDateEAT(v);
+  return fmtCell(v, c.isCurrency);
+}
 async function exportPDF(r: Report) {
   const template = await loadTemplate();
   const { doc, startY } = createBrandedPdf({
@@ -42,7 +49,7 @@ async function exportPDF(r: Report) {
   autoTable(doc, {
     startY,
     head: [r.columns.map((c) => c.header)],
-    body: r.rows.map((row) => r.columns.map((c) => fmtCell(row[c.key], c.isCurrency))),
+    body: r.rows.map((row) => r.columns.map((c) => fmtColumn(row, c))),
     styles: { fontSize: 7, font: template.font_family },
     headStyles: { fillColor: tableHeadFill(template) },
     margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
@@ -51,7 +58,7 @@ async function exportPDF(r: Report) {
 }
 
 function exportXLSX(r: Report) {
-  const data = r.rows.map((row) => Object.fromEntries(r.columns.map((c) => [c.header, fmtCell(row[c.key], c.isCurrency)])));
+  const data = r.rows.map((row) => Object.fromEntries(r.columns.map((c) => [c.header, fmtColumn(row, c)])));
   const ws = XLSX.utils.json_to_sheet(data);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, r.title.slice(0, 30));
@@ -161,6 +168,37 @@ function ReportsPage() {
     queryFn: async () => (await supabase.from("profiles").select("id,email,full_name")).data ?? [],
   });
   const profileMap = useMemo(() => Object.fromEntries(profiles.map((p: any) => [p.id, p])), [profiles]);
+  const { data: verifications = [] } = useQuery({
+    queryKey: ["report-verifications"],
+    queryFn: async () => (await (supabase as any).from("asset_verifications")
+      .select("*, assets(asset_tag,name,serial_number), branches(name), locations(name)")
+      .order("verified_at", { ascending: false })).data ?? [],
+  });
+  const { data: depreciationEntries = [] } = useQuery({
+    queryKey: ["report-depreciation-entries"],
+    queryFn: async () => (await supabase.from("depreciation_entries" as any)
+      .select("*, assets(asset_tag,name,branch_id), depreciation_runs(period_start,period_end,run_type,status,triggered_by)")
+      .order("period_end", { ascending: false })).data ?? [],
+  });
+  const { data: gatePasses = [] } = useQuery({
+    queryKey: ["report-gate-passes"],
+    queryFn: async () => (await (supabase as any).from("gate_passes")
+      .select("*, assets(asset_tag,name), branches(name)")
+      .order("created_at", { ascending: false })).data ?? [],
+  });
+  const { data: auditRowsRaw = [] } = useQuery({
+    queryKey: ["report-audit-log"],
+    queryFn: async () => (await supabase.from("audit_log")
+      .select("*")
+      .is("cleared_at", null)
+      .order("created_at", { ascending: false })
+      .limit(2000)).data ?? [],
+  });
+  const userLabel = (id: string | null | undefined) => {
+    if (!id) return "";
+    const p = profileMap[id];
+    return p?.full_name || p?.email || "";
+  };
 
   const catMap = useMemo(() => Object.fromEntries(categories.map((c: any) => [c.id, c])), [categories]);
   const locMap = useMemo(() => Object.fromEntries(locationsAll.map((l: any) => [l.id, l])), [locationsAll]);
@@ -216,6 +254,25 @@ function ReportsPage() {
     () => (approvals as any[]).filter((p) => !p.asset_id || visibleAssetIds.has(p.asset_id)),
     [approvals, visibleAssetIds],
   );
+  const scopedVerifications = useMemo(
+    () => (verifications as any[]).filter((v) => visibleAssetIds.has(v.asset_id) && canSeeBranch(v.branch_id)),
+    [verifications, visibleAssetIds, canSeeBranch],
+  );
+  const scopedDepreciationEntries = useMemo(
+    () => (depreciationEntries as any[]).filter((e) => visibleAssetIds.has(e.asset_id) && canSeeBranch(e.assets?.branch_id)),
+    [depreciationEntries, visibleAssetIds, canSeeBranch],
+  );
+  const scopedGatePasses = useMemo(
+    () => (gatePasses as any[]).filter((g) => visibleAssetIds.has(g.asset_id) && canSeeBranch(g.branch_id)),
+    [gatePasses, visibleAssetIds, canSeeBranch],
+  );
+  const scopedAuditRows = useMemo(
+    () => (auditRowsRaw as any[]).filter((r) => {
+      const assetId = r.entity_type === "assets" ? r.entity_id : (r.details?.asset_id ?? r.details?.after?.asset_id ?? r.details?.before?.asset_id);
+      return !assetId || visibleAssetIds.has(assetId);
+    }),
+    [auditRowsRaw, visibleAssetIds],
+  );
   const scopedBranches = useMemo(
     () => (branches as any[]).filter((b) => canSeeBranch(b.id)),
     [branches, canSeeBranch],
@@ -231,6 +288,10 @@ function ReportsPage() {
     .map((k) => ({ value: k, label: k.replace(/_/g, " ") }));
   const approvalStatusOpts = ["pending", "approved", "rejected"].map((s) => ({ value: s, label: s }));
   const priorityOpts = ["low", "normal", "high", "urgent"].map((p) => ({ value: p, label: p }));
+  const verificationStatusOpts = ["verified", "mismatched", "not_found"].map((s) => ({ value: s, label: s.replace(/_/g, " ") }));
+  const gatePassStatusOpts = ["pending", "approved", "rejected", "checked_out", "returned", "cancelled"].map((s) => ({ value: s, label: s.replace(/_/g, " ") }));
+  const auditEntityOpts = ["assets", "asset_movements", "asset_disposals", "asset_assignments", "approval_requests", "asset_verifications", "gate_passes", "depreciation_entries"]
+    .map((s) => ({ value: s, label: s.replace(/_/g, " ") }));
 
   /* ----------- Filters state per tab ----------- */
   const [fRegister, setFRegister] = useState<Record<string, string>>({});
@@ -239,6 +300,10 @@ function ReportsPage() {
   const [fDisposal, setFDisposal] = useState<Record<string, string>>({});
   const [fMaint, setFMaint] = useState<Record<string, string>>({});
   const [fApprov, setFApprov] = useState<Record<string, string>>({});
+  const [fVerification, setFVerification] = useState<Record<string, string>>({});
+  const [fDepreciation, setFDepreciation] = useState<Record<string, string>>({});
+  const [fGatePass, setFGatePass] = useState<Record<string, string>>({});
+  const [fAudit, setFAudit] = useState<Record<string, string>>({});
 
   /* ----------- Register ----------- */
   const registerDefs: FilterDef[] = [
@@ -509,6 +574,137 @@ function ReportsPage() {
     rows: approvalRows,
   };
 
+  /* ----------- Verification ----------- */
+  const verificationDefs: FilterDef[] = [
+    { key: "q", label: "Search (tag/asset/custodian)", type: "text" },
+    { key: "branch_id", label: "Branch", type: "select", options: branchOpts },
+    { key: "status", label: "Status", type: "select", options: verificationStatusOpts },
+    { key: "from", label: "Verified from", type: "date" },
+    { key: "to", label: "Verified to", type: "date" },
+  ];
+  const verificationRows = scopedVerifications.map((v: any) => ({
+    tag: v.assets?.asset_tag ?? "", name: v.assets?.name ?? "", serial_number: v.assets?.serial_number ?? "",
+    branch: v.branches?.name ?? "", location: v.locations?.name ?? "",
+    custodian_name: v.custodian_name ?? "", department: v.department ?? "",
+    condition: v.condition ?? "", status: v.status ?? "",
+    verified_by: userLabel(v.verified_by), verified_at: v.verified_at,
+    notes: v.notes ?? "", changes: v.changes && Object.keys(v.changes).length ? JSON.stringify(v.changes) : "",
+    _branch_id: v.branch_id,
+  })).filter((v: any) =>
+    (!fVerification.branch_id || v._branch_id === fVerification.branch_id) &&
+    (!fVerification.status || v.status === fVerification.status) &&
+    applyDate(v.verified_at, fVerification.from, fVerification.to) &&
+    (!fVerification.q || applyText(v.tag, fVerification.q) || applyText(v.name, fVerification.q) || applyText(v.serial_number, fVerification.q) || applyText(v.custodian_name, fVerification.q)),
+  );
+  const verificationReport: Report = {
+    title: "Fixed Asset Verification Report",
+    columns: [
+      { header: "Tag", key: "tag" }, { header: "Asset", key: "name" }, { header: "Serial #", key: "serial_number" },
+      { header: "Branch", key: "branch" }, { header: "Location", key: "location" },
+      { header: "Custodian", key: "custodian_name" }, { header: "Department", key: "department" },
+      { header: "Condition", key: "condition" }, { header: "Status", key: "status" },
+      { header: "Verified by", key: "verified_by" }, { header: "Verified at", key: "verified_at", isDateTime: true },
+      { header: "Notes", key: "notes" }, { header: "Changes", key: "changes" },
+    ],
+    rows: verificationRows,
+  };
+
+  /* ----------- Depreciation ----------- */
+  const depreciationDefs: FilterDef[] = [
+    { key: "q", label: "Search (tag/asset)", type: "text" },
+    { key: "branch_id", label: "Branch", type: "select", options: branchOpts },
+    { key: "from", label: "Period from", type: "date" },
+    { key: "to", label: "Period to", type: "date" },
+  ];
+  const depreciationRows = scopedDepreciationEntries.map((e: any) => ({
+    tag: e.assets?.asset_tag ?? "", name: e.assets?.name ?? "", branch: branchById(e.assets?.branch_id)?.name ?? "",
+    period_start: e.period_start, period_end: e.period_end, method: e.method,
+    opening_value: e.opening_value, depreciation_amount: e.depreciation_amount,
+    accumulated_after: e.accumulated_after, closing_value: e.closing_value,
+    run_type: e.depreciation_runs?.run_type ?? "", run_status: e.depreciation_runs?.status ?? "",
+    triggered_by: userLabel(e.depreciation_runs?.triggered_by), created_at: e.created_at,
+    _branch_id: e.assets?.branch_id,
+  })).filter((e: any) =>
+    (!fDepreciation.branch_id || e._branch_id === fDepreciation.branch_id) &&
+    applyDate(e.period_end, fDepreciation.from, fDepreciation.to) &&
+    (!fDepreciation.q || applyText(e.tag, fDepreciation.q) || applyText(e.name, fDepreciation.q)),
+  );
+  const depreciationReport: Report = {
+    title: "Depreciation Entries Report",
+    columns: [
+      { header: "Tag", key: "tag" }, { header: "Asset", key: "name" }, { header: "Branch", key: "branch" },
+      { header: "Period start", key: "period_start", isDate: true }, { header: "Period end", key: "period_end", isDate: true },
+      { header: "Method", key: "method" }, { header: "Opening", key: "opening_value", isCurrency: true },
+      { header: "Depreciation", key: "depreciation_amount", isCurrency: true },
+      { header: "Accumulated", key: "accumulated_after", isCurrency: true }, { header: "NBV", key: "closing_value", isCurrency: true },
+      { header: "Run type", key: "run_type" }, { header: "Run status", key: "run_status" },
+      { header: "Triggered by", key: "triggered_by" }, { header: "Recorded", key: "created_at", isDateTime: true },
+    ],
+    rows: depreciationRows,
+  };
+
+  /* ----------- Gate passes ----------- */
+  const gatePassDefs: FilterDef[] = [
+    { key: "q", label: "Search (pass/asset/destination)", type: "text" },
+    { key: "branch_id", label: "Branch", type: "select", options: branchOpts },
+    { key: "status", label: "Status", type: "select", options: gatePassStatusOpts },
+    { key: "from", label: "Requested from", type: "date" },
+    { key: "to", label: "Requested to", type: "date" },
+  ];
+  const gatePassRows = scopedGatePasses.map((g: any) => ({
+    pass_number: g.pass_number ?? "", tag: g.assets?.asset_tag ?? "", name: g.assets?.name ?? "",
+    branch: g.branches?.name ?? "", status: g.status ?? "", destination: g.destination ?? "",
+    reason: g.reason ?? "", requested_by: userLabel(g.requested_by), created_at: g.created_at,
+    approver: userLabel(g.approver_id), decided_at: g.decided_at,
+    checked_out_by: userLabel(g.checked_out_by), checked_out_at: g.checked_out_at,
+    returned_by: userLabel(g.returned_by), returned_at: g.returned_at,
+    _branch_id: g.branch_id,
+  })).filter((g: any) =>
+    (!fGatePass.branch_id || g._branch_id === fGatePass.branch_id) &&
+    (!fGatePass.status || g.status === fGatePass.status) &&
+    applyDate(g.created_at, fGatePass.from, fGatePass.to) &&
+    (!fGatePass.q || applyText(g.pass_number, fGatePass.q) || applyText(g.tag, fGatePass.q) || applyText(g.name, fGatePass.q) || applyText(g.destination, fGatePass.q)),
+  );
+  const gatePassReport: Report = {
+    title: "Gate Pass Report",
+    columns: [
+      { header: "Pass #", key: "pass_number" }, { header: "Tag", key: "tag" }, { header: "Asset", key: "name" },
+      { header: "Branch", key: "branch" }, { header: "Status", key: "status" }, { header: "Destination", key: "destination" },
+      { header: "Reason", key: "reason" }, { header: "Requested by", key: "requested_by" }, { header: "Requested", key: "created_at", isDateTime: true },
+      { header: "Approver", key: "approver" }, { header: "Decided", key: "decided_at", isDateTime: true },
+      { header: "Checked out by", key: "checked_out_by" }, { header: "Checked out", key: "checked_out_at", isDateTime: true },
+      { header: "Returned by", key: "returned_by" }, { header: "Returned", key: "returned_at", isDateTime: true },
+    ],
+    rows: gatePassRows,
+  };
+
+  /* ----------- Audit trail ----------- */
+  const auditDefs: FilterDef[] = [
+    { key: "q", label: "Search (entity/action/user)", type: "text" },
+    { key: "entity_type", label: "Entity", type: "select", options: auditEntityOpts },
+    { key: "from", label: "From date", type: "date" },
+    { key: "to", label: "To date", type: "date" },
+  ];
+  const auditRows = scopedAuditRows.map((r: any) => ({
+    entity_type: r.entity_type?.replace(/_/g, " ") ?? "", action: r.action?.replace(/_/g, " ") ?? "",
+    actor: userLabel(r.actor_user_id), created_at: r.created_at,
+    entity_id: r.entity_id ?? "", details: r.details ? JSON.stringify(r.details) : "",
+    _entity_type: r.entity_type,
+  })).filter((r: any) =>
+    (!fAudit.entity_type || r._entity_type === fAudit.entity_type) &&
+    applyDate(r.created_at, fAudit.from, fAudit.to) &&
+    (!fAudit.q || applyText(r.entity_type, fAudit.q) || applyText(r.action, fAudit.q) || applyText(r.actor, fAudit.q) || applyText(r.details, fAudit.q)),
+  );
+  const auditReport: Report = {
+    title: "Audit Trail Report",
+    columns: [
+      { header: "Date", key: "created_at", isDateTime: true }, { header: "Entity", key: "entity_type" },
+      { header: "Action", key: "action" }, { header: "User", key: "actor" },
+      { header: "Record", key: "entity_id" }, { header: "Details", key: "details" },
+    ],
+    rows: auditRows,
+  };
+
   /* ----------- Branch / Dept / Condition (unchanged aggregates) ----------- */
   const branchReport: Report = {
     title: "Branch Report",
@@ -576,6 +772,10 @@ function ReportsPage() {
           <TabsTrigger value="disposals">Retire/Dispose</TabsTrigger>
           <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
           <TabsTrigger value="approvals">Approvals</TabsTrigger>
+          <TabsTrigger value="verification">Verification</TabsTrigger>
+          <TabsTrigger value="depreciation">Depreciation</TabsTrigger>
+          <TabsTrigger value="gate-pass">Gate Passes</TabsTrigger>
+          <TabsTrigger value="audit">Audit</TabsTrigger>
           <TabsTrigger value="branch">Branch</TabsTrigger>
           <TabsTrigger value="department">Department</TabsTrigger>
           <TabsTrigger value="condition">Condition</TabsTrigger>
@@ -604,6 +804,22 @@ function ReportsPage() {
         <TabsContent value="approvals">
           <FilterBar defs={approvalDefs} values={fApprov} onChange={setFApprov} />
           <ReportTable r={approvalReport} />
+        </TabsContent>
+        <TabsContent value="verification">
+          <FilterBar defs={verificationDefs} values={fVerification} onChange={setFVerification} />
+          <ReportTable r={verificationReport} />
+        </TabsContent>
+        <TabsContent value="depreciation">
+          <FilterBar defs={depreciationDefs} values={fDepreciation} onChange={setFDepreciation} />
+          <ReportTable r={depreciationReport} />
+        </TabsContent>
+        <TabsContent value="gate-pass">
+          <FilterBar defs={gatePassDefs} values={fGatePass} onChange={setFGatePass} />
+          <ReportTable r={gatePassReport} />
+        </TabsContent>
+        <TabsContent value="audit">
+          <FilterBar defs={auditDefs} values={fAudit} onChange={setFAudit} />
+          <ReportTable r={auditReport} />
         </TabsContent>
         <TabsContent value="branch"><ReportTable r={branchReport} /></TabsContent>
         <TabsContent value="department"><ReportTable r={departmentReport} /></TabsContent>
@@ -688,7 +904,7 @@ function ReportTable({ r }: { r: Report }) {
               {r.rows.map((row, i) => (
                 <tr key={i} className="border-b last:border-0">
                   {r.columns.map((c) => (
-                    <td key={c.key} className="px-3 py-2">{fmtCell(row[c.key], c.isCurrency)}</td>
+                    <td key={c.key} className="px-3 py-2">{fmtColumn(row, c)}</td>
                   ))}
                 </tr>
               ))}
