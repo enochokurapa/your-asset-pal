@@ -21,7 +21,7 @@ export const Route = createFileRoute("/_app/reports")({
   component: ReportsPage,
 });
 
-type Column = { header: string; key: string; isCurrency?: boolean; isDate?: boolean; isDateTime?: boolean };
+type Column = { header: string; key: string; isCurrency?: boolean; isDate?: boolean; isDateTime?: boolean; isMultiline?: boolean };
 type Report = { title: string; columns: Column[]; rows: any[] };
 
 const CHART_COLORS = [
