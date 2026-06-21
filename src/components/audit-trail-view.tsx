@@ -224,38 +224,56 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
           .map(([k, v]) => [prettyKey(k), resolveValue(k, v)]);
 
   const appendEntryToDoc = (doc: jsPDF, r: any, startY = 28) => {
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 14;
+    const tableWidth = pageWidth - margin * 2;
+    const labelWidth = 55;
+    const valueWidth = tableWidth - labelWidth;
+    const commonColumnStyles = {
+      0: { cellWidth: labelWidth, fontStyle: "bold" as const },
+      1: { cellWidth: valueWidth },
+    };
     autoTable(doc, {
       startY,
       head: [["Field", "Value"]],
       body: [
         ["When", new Date(r.created_at).toLocaleString()],
-        ["Entity type", r.entity_type ?? "—"],
-        ["Action", friendlyAction(r)],
-        ["Raw action", r.action ?? "—"],
+        ["Record type", friendlyEntity(r.entity_type)],
+        ["Activity", friendlyAction(r)],
         ["Performed by", userLabel(r.actor_user_id)],
         ["Archived", r.cleared_at ? new Date(r.cleared_at).toLocaleString() : "No"],
       ],
-      styles: { fontSize: 9 },
+      styles: { fontSize: 9, overflow: "linebreak", cellWidth: "wrap" },
       headStyles: { fillColor: [30, 41, 59] },
-      columnStyles: { 0: { cellWidth: 50, fontStyle: "bold" } },
+      columnStyles: commonColumnStyles,
+      margin: { left: margin, right: margin },
+      tableWidth,
     });
     const details = r.details ?? {};
     const before = details.before ?? null;
     const after = details.after ?? details;
+    const detailTableOpts = {
+      head: [["Field", "Value"]] as any,
+      styles: { fontSize: 8, overflow: "linebreak" as const, cellWidth: "wrap" as const },
+      headStyles: { fillColor: [30, 41, 59] as any },
+      columnStyles: commonColumnStyles,
+      margin: { left: margin, right: margin },
+      tableWidth,
+    };
     if (before) {
       const y1 = (doc as any).lastAutoTable.finalY + 8;
       doc.setFontSize(12);
-      doc.text("Before", 14, y1);
-      autoTable(doc, { startY: y1 + 4, head: [["Field", "Value"]], body: flatten(before), styles: { fontSize: 8 }, headStyles: { fillColor: [30, 41, 59] } });
+      doc.text("Before", margin, y1);
+      autoTable(doc, { startY: y1 + 4, body: flatten(before), ...detailTableOpts });
       const y2 = (doc as any).lastAutoTable.finalY + 8;
       doc.setFontSize(12);
-      doc.text("After", 14, y2);
-      autoTable(doc, { startY: y2 + 4, head: [["Field", "Value"]], body: flatten(after), styles: { fontSize: 8 }, headStyles: { fillColor: [30, 41, 59] } });
+      doc.text("After", margin, y2);
+      autoTable(doc, { startY: y2 + 4, body: flatten(after), ...detailTableOpts });
     } else if (after && Object.keys(after).length > 0) {
       const y1 = (doc as any).lastAutoTable.finalY + 8;
       doc.setFontSize(12);
-      doc.text("Payload", 14, y1);
-      autoTable(doc, { startY: y1 + 4, head: [["Field", "Value"]], body: flatten(after), styles: { fontSize: 8 }, headStyles: { fillColor: [30, 41, 59] } });
+      doc.text("Details", margin, y1);
+      autoTable(doc, { startY: y1 + 4, body: flatten(after), ...detailTableOpts });
     }
   };
 
