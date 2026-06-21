@@ -772,6 +772,10 @@ function ReportsPage() {
           <TabsTrigger value="disposals">Retire/Dispose</TabsTrigger>
           <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
           <TabsTrigger value="approvals">Approvals</TabsTrigger>
+          <TabsTrigger value="verification">Verification</TabsTrigger>
+          <TabsTrigger value="depreciation">Depreciation</TabsTrigger>
+          <TabsTrigger value="gate-pass">Gate Passes</TabsTrigger>
+          <TabsTrigger value="audit">Audit</TabsTrigger>
           <TabsTrigger value="branch">Branch</TabsTrigger>
           <TabsTrigger value="department">Department</TabsTrigger>
           <TabsTrigger value="condition">Condition</TabsTrigger>
@@ -800,6 +804,22 @@ function ReportsPage() {
         <TabsContent value="approvals">
           <FilterBar defs={approvalDefs} values={fApprov} onChange={setFApprov} />
           <ReportTable r={approvalReport} />
+        </TabsContent>
+        <TabsContent value="verification">
+          <FilterBar defs={verificationDefs} values={fVerification} onChange={setFVerification} />
+          <ReportTable r={verificationReport} />
+        </TabsContent>
+        <TabsContent value="depreciation">
+          <FilterBar defs={depreciationDefs} values={fDepreciation} onChange={setFDepreciation} />
+          <ReportTable r={depreciationReport} />
+        </TabsContent>
+        <TabsContent value="gate-pass">
+          <FilterBar defs={gatePassDefs} values={fGatePass} onChange={setFGatePass} />
+          <ReportTable r={gatePassReport} />
+        </TabsContent>
+        <TabsContent value="audit">
+          <FilterBar defs={auditDefs} values={fAudit} onChange={setFAudit} />
+          <ReportTable r={auditReport} />
         </TabsContent>
         <TabsContent value="branch"><ReportTable r={branchReport} /></TabsContent>
         <TabsContent value="department"><ReportTable r={departmentReport} /></TabsContent>
@@ -884,7 +904,7 @@ function ReportTable({ r }: { r: Report }) {
               {r.rows.map((row, i) => (
                 <tr key={i} className="border-b last:border-0">
                   {r.columns.map((c) => (
-                    <td key={c.key} className="px-3 py-2">{fmtCell(row[c.key], c.isCurrency)}</td>
+                    <td key={c.key} className="px-3 py-2">{fmtColumn(row, c)}</td>
                   ))}
                 </tr>
               ))}
