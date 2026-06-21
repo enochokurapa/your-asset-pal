@@ -905,8 +905,7 @@ function ReportsPage() {
       list.forEach((r, idx) => {
         out.push({
           asset: assetLabel,
-          seq: idx + 1,
-          activity: r._activityLabel,
+          activity: `Activity ${idx + 1}: ${r._activityLabel}`,
           actor: userLabel(r.actor_user_id),
           created_at: r.created_at,
         });
@@ -925,7 +924,6 @@ function ReportsPage() {
     title: "Audit Trail Report",
     columns: [
       { header: "Asset", key: "asset" },
-      { header: "#", key: "seq" },
       { header: "Activity", key: "activity" },
       { header: "By", key: "actor" },
       { header: "Date & time", key: "created_at", isDateTime: true },
