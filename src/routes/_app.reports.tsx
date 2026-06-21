@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileBarChart, FileDown, FileSpreadsheet, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { formatUGX } from "@/lib/utils";
