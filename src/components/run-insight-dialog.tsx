@@ -87,7 +87,35 @@ export function RunInsightDialog({
               <Tile label="Assets" value={String(run.asset_count ?? 0)} />
               <Tile label="Total" value={formatUGX(run.total_amount)} highlight />
             </div>
-            {run.notes && <p className="text-xs text-muted-foreground">{run.notes}</p>}
+
+            {(run.status === "failed" || run.status === "running") && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
+                <p className="text-sm font-semibold text-destructive">
+                  {run.status === "failed" ? "Why this run failed" : "Run appears stuck"}
+                </p>
+                <p className="mt-1 text-xs">
+                  {run.notes && run.notes.trim().length > 0
+                    ? run.notes
+                    : run.status === "failed"
+                      ? "Run was marked failed but no reason was recorded."
+                      : "Run started but never completed."}
+                </p>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  <p className="font-medium">Common causes:</p>
+                  <ul className="ml-4 list-disc space-y-0.5">
+                    <li>None of the selected assets are depreciable (missing method, useful life, or purchase value).</li>
+                    <li>All selected assets already had an entry posted for this period (duplicates skipped).</li>
+                    <li>Selected assets have reached residual value — no depreciation left to post.</li>
+                    <li>Depreciation start date is after the run's period end.</li>
+                    {run.status === "running" && <li>The browser tab was closed before the run finished.</li>}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {run.status !== "failed" && run.status !== "running" && run.notes && (
+              <p className="text-xs text-muted-foreground">{run.notes}</p>
+            )}
 
             <div>
               <p className="mb-2 text-sm font-semibold">Entries posted ({entries.length})</p>
