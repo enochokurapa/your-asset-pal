@@ -234,6 +234,10 @@ function ReportsPage() {
     () => Object.fromEntries(enrichedAssets.map((a: any) => [a.id, a])),
     [enrichedAssets],
   );
+  const allAssetMap = useMemo(
+    () => Object.fromEntries((assets as any[]).map((a: any) => [a.id, a])),
+    [assets],
+  );
   const assetFor = (assetId: string | null | undefined) => (assetId ? assetMap[assetId] : null);
 
   // Restrict ancillary lists to assets the user can see
@@ -258,10 +262,10 @@ function ReportsPage() {
   );
   const scopedApprovals = useMemo(
     () => (approvals as any[]).filter((p) => {
-      const asset = assetFor(p.asset_id);
-      return !p.asset_id || !asset || canSeeBranch(asset.branch_id);
+      const rawAsset = p.asset_id ? allAssetMap[p.asset_id] : null;
+      return !p.asset_id || !rawAsset || canSeeBranch(rawAsset.branch_id);
     }),
-    [approvals, assetMap, canSeeBranch],
+    [approvals, allAssetMap, canSeeBranch],
   );
   const scopedVerifications = useMemo(
     () => (verifications as any[]).filter((v) => visibleAssetIds.has(v.asset_id) && canSeeBranch(v.branch_id)),
