@@ -775,7 +775,7 @@ function ReportsPage() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="flex w-full flex-wrap">
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
           <TabsTrigger value="register">Register</TabsTrigger>
           <TabsTrigger value="movements">Movements</TabsTrigger>
           <TabsTrigger value="assigned">Assigned</TabsTrigger>
@@ -791,27 +791,27 @@ function ReportsPage() {
           <TabsTrigger value="condition">Condition</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="register">
+        <TabsContent value="register" className="mt-4">
           <FilterBar defs={registerDefs} values={fRegister} onChange={setFRegister} />
           <ReportTable r={register} />
         </TabsContent>
-        <TabsContent value="movements">
+        <TabsContent value="movements" className="mt-4">
           <FilterBar defs={movementDefs} values={fMove} onChange={setFMove} />
           <ReportTable r={movementReport} />
         </TabsContent>
-        <TabsContent value="assigned">
+        <TabsContent value="assigned" className="mt-4">
           <FilterBar defs={assignDefs} values={fAssign} onChange={setFAssign} />
           <ReportTable r={assignedReport} />
         </TabsContent>
-        <TabsContent value="disposals">
+        <TabsContent value="disposals" className="mt-4">
           <FilterBar defs={disposalDefs} values={fDisposal} onChange={setFDisposal} />
           <ReportTable r={disposalReport} />
         </TabsContent>
-        <TabsContent value="maintenance">
+        <TabsContent value="maintenance" className="mt-4">
           <FilterBar defs={maintenanceDefs} values={fMaint} onChange={setFMaint} />
           <ReportTable r={maintenanceReport} />
         </TabsContent>
-        <TabsContent value="approvals">
+        <TabsContent value="approvals" className="mt-4">
           <FilterBar defs={approvalDefs} values={fApprov} onChange={setFApprov} />
           <ReportTable r={approvalReport} />
         </TabsContent>
