@@ -39,6 +39,7 @@ function fmtColumn(row: any, c: Column) {
   const v = row[c.key];
   if (c.isDateTime) return fmtDateTimeEAT(v);
   if (c.isDate) return fmtDateEAT(v);
+  if (c.isMultiline && Array.isArray(v)) return v.join("\n");
   return fmtCell(v, c.isCurrency);
 }
 async function exportPDF(r: Report) {
