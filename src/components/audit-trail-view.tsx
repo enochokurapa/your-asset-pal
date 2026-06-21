@@ -204,10 +204,10 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
   );
 
   const exportList = (kind: "xlsx" | "pdf") => {
-    const headers = ["When", "Entity", "Action", "By"];
+    const headers = ["When", "Record type", "Activity", "Performed by"];
     const data = filtered.map((r) => [
       new Date(r.created_at).toLocaleString(),
-      r.entity_type,
+      friendlyEntity(r.entity_type),
       friendlyAction(r),
       userLabel(r.actor_user_id),
     ]);
