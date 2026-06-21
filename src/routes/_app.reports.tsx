@@ -365,6 +365,7 @@ function ReportsPage() {
   // just because an approval was decided without a separate movement row.
   const branchById = (id: string | null | undefined) => (id ? branches.find((b: any) => b.id === id) : null);
   const locById = (id: string | null | undefined) => (id ? locationsAll.find((l: any) => l.id === id) : null);
+  const uniqueNames = (names: Array<string | null | undefined>) => Array.from(new Set(names.filter(Boolean) as string[])).join(" / ");
 
   const recordedMovementRows = scopedMovements.map((m: any) => ({
     tag: m.assets?.asset_tag, name: m.assets?.name,
@@ -476,6 +477,7 @@ function ReportsPage() {
       const approver = r.approver_id ? profileMap[r.approver_id] : null;
       return {
         tag: asset?.asset_tag, name: asset?.name,
+        branch: asset?.branch ?? "", location: asset?.location ?? "",
         type: r.kind === "retirement" ? "Retirement" : "Disposal",
         disposal_reason: r.reason ?? "",
         disposal_date: p.date ?? String(r.created_at).slice(0, 10),
@@ -496,6 +498,7 @@ function ReportsPage() {
     title: "Retirement & Disposal Report",
     columns: [
       { header: "Tag", key: "tag" }, { header: "Asset", key: "name" },
+      { header: "Branch", key: "branch" }, { header: "Location", key: "location" },
       { header: "Type", key: "type" }, { header: "Reason", key: "disposal_reason" },
       { header: "Date", key: "disposal_date" }, { header: "Value", key: "disposal_value", isCurrency: true },
       { header: "Status", key: "status" },
@@ -520,6 +523,7 @@ function ReportsPage() {
     const approver = r.approver_id ? profileMap[r.approver_id] : null;
     return {
       tag: asset?.asset_tag, name: asset?.name,
+      branch: asset?.branch ?? "", location: asset?.location ?? "",
       type: r.kind === "reactivation" ? "Return from repair" : "Maintenance",
       issue: r.reason ?? "", priority: p.priority ?? "",
       scheduled_for: p.scheduled_for ?? "", estimated_cost: p.estimated_cost ?? null,
@@ -539,6 +543,7 @@ function ReportsPage() {
     title: "Maintenance Requisitions",
     columns: [
       { header: "Tag", key: "tag" }, { header: "Asset", key: "name" },
+      { header: "Branch", key: "branch" }, { header: "Location", key: "location" },
       { header: "Type", key: "type" }, { header: "Issue", key: "issue" }, { header: "Priority", key: "priority" },
       { header: "Scheduled", key: "scheduled_for" },
       { header: "Est. cost", key: "estimated_cost", isCurrency: true },
@@ -559,11 +564,14 @@ function ReportsPage() {
   ];
   const approvalRows = scopedApprovals.map((r: any) => {
     const asset = assetFor(r.asset_id);
+    const p = r.payload ?? {};
     const requester = profileMap[r.requested_by];
     const approver = r.approver_id ? profileMap[r.approver_id] : null;
     return {
       kind: r.kind, status: r.status,
       tag: asset?.asset_tag, name: asset?.name,
+      branch: uniqueNames([asset?.branch, branchById(p.from_branch_id)?.name, branchById(p.to_branch_id)?.name, branchById(p.branch_id)?.name]),
+      location: uniqueNames([asset?.location, locById(p.from_location_id)?.name, locById(p.to_location_id)?.name, locById(p.location_id)?.name]),
       reason: r.reason ?? "",
       requested_by: requester?.full_name ?? requester?.email ?? "",
       approver: approver?.full_name ?? approver?.email ?? "",
@@ -581,6 +589,7 @@ function ReportsPage() {
     columns: [
       { header: "Kind", key: "kind" }, { header: "Status", key: "status" },
       { header: "Tag", key: "tag" }, { header: "Asset", key: "name" },
+      { header: "Branch", key: "branch" }, { header: "Location", key: "location" },
       { header: "Reason", key: "reason" }, { header: "Requested by", key: "requested_by" },
       { header: "Approver", key: "approver" }, { header: "Requested", key: "created_at" },
       { header: "Decided", key: "decided_at" },
