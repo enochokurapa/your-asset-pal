@@ -21,7 +21,7 @@ export const Route = createFileRoute("/_app/reports")({
   component: ReportsPage,
 });
 
-type Column = { header: string; key: string; isCurrency?: boolean; isDate?: boolean; isDateTime?: boolean };
+type Column = { header: string; key: string; isCurrency?: boolean; isDate?: boolean; isDateTime?: boolean; isMultiline?: boolean };
 type Report = { title: string; columns: Column[]; rows: any[] };
 
 const CHART_COLORS = [
@@ -39,6 +39,7 @@ function fmtColumn(row: any, c: Column) {
   const v = row[c.key];
   if (c.isDateTime) return fmtDateTimeEAT(v);
   if (c.isDate) return fmtDateEAT(v);
+  if (c.isMultiline && Array.isArray(v)) return v.join("\n");
   return fmtCell(v, c.isCurrency);
 }
 async function exportPDF(r: Report) {
@@ -753,26 +754,46 @@ function ReportsPage() {
     return s;
   };
 
-  const detailsToText = (details: any): string => {
-    if (!details) return "";
-    if (typeof details === "string") return details;
-    if (typeof details !== "object") return String(details);
-    const skip = new Set(["id", "created_at", "updated_at"]);
-    const parts: string[] = [];
+  const detailsToLines = (details: any): string[] => {
+    if (!details) return [];
+    if (typeof details === "string") return [details];
+    if (typeof details !== "object") return [String(details)];
+    const skip = new Set(["id", "created_at", "updated_at", "asset_id"]);
+    const lines: string[] = [];
     for (const [k, v] of Object.entries(details)) {
       if (skip.has(k)) continue;
       if (v === null || v === undefined || v === "") continue;
       if ((k === "before" || k === "after" || k === "changes") && typeof v === "object" && v) {
-        const inner = Object.entries(v as any)
-          .filter(([, vv]) => vv !== null && vv !== undefined && vv !== "")
-          .map(([kk, vv]) => `${humanizeKey(kk)}: ${valueToText(kk, vv)}`)
-          .join("; ");
-        if (inner) parts.push(`${humanizeKey(k)} — ${inner}`);
+        for (const [kk, vv] of Object.entries(v as any)) {
+          if (skip.has(kk)) continue;
+          if (vv === null || vv === undefined || vv === "") continue;
+          lines.push(`${humanizeKey(k)} ${humanizeKey(kk)}: ${valueToText(kk, vv)}`);
+        }
         continue;
       }
-      parts.push(`${humanizeKey(k)}: ${valueToText(k, v)}`);
+      lines.push(`${humanizeKey(k)}: ${valueToText(k, v)}`);
     }
-    return parts.join(" | ");
+    return lines;
+  };
+
+  // Resolve the asset referenced by an audit row (works for assets, approval_requests,
+  // movements, disposals, verifications, gate passes, assignments).
+  const recordLabel = (r: any): string => {
+    const d = r?.details ?? {};
+    const candidateId: string | undefined =
+      r.entity_type === "assets"
+        ? r.entity_id
+        : d.asset_id ?? d.after?.asset_id ?? d.before?.asset_id;
+    const a = candidateId ? allAssetMap[candidateId] : undefined;
+    if (a) {
+      const base = `${a.asset_tag ?? ""} — ${a.name ?? ""}`.replace(/^ — | — $/g, "").trim();
+      if (r.entity_type === "approval_requests") {
+        return `${base} (current status: ${(a.status ?? "unknown").replace(/_/g, " ")})`;
+      }
+      return base || "—";
+    }
+    if (r.entity_id) return labelForId(r.entity_type ?? "", r.entity_id);
+    return "";
   };
 
   const auditDefs: FilterDef[] = [
@@ -785,23 +806,24 @@ function ReportsPage() {
     entity_type: r.entity_type?.replace(/_/g, " ") ?? "",
     action: r.action?.replace(/_/g, " ") ?? "",
     actor: userLabel(r.actor_user_id), created_at: r.created_at,
-    entity_id: r.entity_id ? labelForId(r.entity_type ?? "", r.entity_id) : "",
-    details: detailsToText(r.details),
+    entity_id: recordLabel(r),
+    details: detailsToLines(r.details),
     _entity_type: r.entity_type,
   })).filter((r: any) =>
     (!fAudit.entity_type || r._entity_type === fAudit.entity_type) &&
     applyDate(r.created_at, fAudit.from, fAudit.to) &&
-    (!fAudit.q || applyText(r.entity_type, fAudit.q) || applyText(r.action, fAudit.q) || applyText(r.actor, fAudit.q) || applyText(r.details, fAudit.q)),
+    (!fAudit.q || applyText(r.entity_type, fAudit.q) || applyText(r.action, fAudit.q) || applyText(r.actor, fAudit.q) || applyText((r.details as string[]).join(" "), fAudit.q)),
   );
   const auditReport: Report = {
     title: "Audit Trail Report",
     columns: [
       { header: "Date", key: "created_at", isDateTime: true }, { header: "Entity", key: "entity_type" },
       { header: "Action", key: "action" }, { header: "User", key: "actor" },
-      { header: "Record", key: "entity_id" }, { header: "Details", key: "details" },
+      { header: "Record", key: "entity_id" }, { header: "Details", key: "details", isMultiline: true },
     ],
     rows: auditRows,
   };
+
 
   /* ----------- Branch / Dept / Condition (unchanged aggregates) ----------- */
   const branchReport: Report = {
@@ -1000,10 +1022,24 @@ function ReportTable({ r }: { r: Report }) {
             </thead>
             <tbody>
               {r.rows.map((row, i) => (
-                <tr key={i} className="border-b last:border-0">
-                  {r.columns.map((c) => (
-                    <td key={c.key} className="px-3 py-2">{fmtColumn(row, c)}</td>
-                  ))}
+                <tr key={i} className="border-b last:border-0 align-top">
+                  {r.columns.map((c) => {
+                    const v = row[c.key];
+                    if (c.isMultiline && Array.isArray(v)) {
+                      return (
+                        <td key={c.key} className="px-3 py-2 min-w-[16rem]">
+                          {v.length === 0 ? "" : (
+                            <ul className="space-y-1 list-disc pl-4">
+                              {v.map((line: string, j: number) => (
+                                <li key={j} className="leading-snug">{line}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </td>
+                      );
+                    }
+                    return <td key={c.key} className="px-3 py-2">{fmtColumn(row, c)}</td>;
+                  })}
                 </tr>
               ))}
             </tbody>
