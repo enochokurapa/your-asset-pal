@@ -160,7 +160,7 @@ function ReportsPage() {
   const { data: approvals = [] } = useQuery({
     queryKey: ["report-approvals"],
     queryFn: async () => (await supabase.from("approval_requests")
-      .select("*, assets(asset_tag, name)")
+      .select("*")
       .order("created_at", { ascending: false })).data ?? [],
   });
   const { data: profiles = [] } = useQuery({
@@ -230,6 +230,12 @@ function ReportsPage() {
       };
     }), [assets, catMap, locMap, currentAssignment, canSeeBranch]);
 
+  const assetMap = useMemo(
+    () => Object.fromEntries(enrichedAssets.map((a: any) => [a.id, a])),
+    [enrichedAssets],
+  );
+  const assetFor = (assetId: string | null | undefined) => (assetId ? assetMap[assetId] : null);
+
   // Restrict ancillary lists to assets the user can see
   const visibleAssetIds = useMemo(
     () => new Set(enrichedAssets.map((a: any) => a.id)),
@@ -284,7 +290,7 @@ function ReportsPage() {
   const statusOpts = ["in_use", "in_storage", "under_repair", "retired", "missing", "disposed"]
     .map((s) => ({ value: s, label: s.replace("_", " ") }));
   const movementTypeOpts = [{ value: "internal", label: "Internal" }, { value: "external", label: "External" }];
-  const approvalKindOpts = ["movement", "retirement", "disposal", "maintenance", "reactivation", "set_for_disposal"]
+  const approvalKindOpts = ["movement", "retirement", "disposal", "maintenance", "reactivation", "set_for_disposal", "deletion", "attachment_deletion"]
     .map((k) => ({ value: k, label: k.replace(/_/g, " ") }));
   const approvalStatusOpts = ["pending", "approved", "rejected"].map((s) => ({ value: s, label: s }));
   const priorityOpts = ["low", "normal", "high", "urgent"].map((p) => ({ value: p, label: p }));
