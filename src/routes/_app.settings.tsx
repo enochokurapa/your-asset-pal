@@ -283,7 +283,12 @@ function SettingsPage() {
             <TabsContent value="appearance" className="space-y-4 pt-4">
               <AppearancePanel />
             </TabsContent>
+
+            <TabsContent value="guides" className="space-y-4 pt-4">
+              <UserGuidesPanel />
+            </TabsContent>
           </Tabs>
+
         </Card>
 
         <Card className="flex h-[800px] flex-col p-3">
