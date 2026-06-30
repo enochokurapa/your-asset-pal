@@ -110,6 +110,13 @@ function DepreciationPage() {
     if (selectedIds.size === 0) return toast.error("Select at least one asset");
     const single = selectedIds.size === 1;
     setRunning(true);
+    let runId: string | null = null;
+    const logStep = async (step: string, status: "info" | "success" | "warning" | "error", message?: string, asset_id?: string | null) => {
+      if (!runId) return;
+      try {
+        await supabase.from("depreciation_run_logs" as any).insert({ run_id: runId, step, status, message: message ?? null, asset_id: asset_id ?? null });
+      } catch { /* non-fatal */ }
+    };
     try {
       const firstId = selectedIds.values().next().value as string;
       const runType = missedOnly ? "missed" : single ? "manual_asset" : "manual";
@@ -119,20 +126,23 @@ function DepreciationPage() {
         status: "running",
         notes: single ? `Single asset: ${assetMap.get(firstId)?.asset_tag ?? ""}` : `Selected: ${selectedIds.size} asset(s)${missedOnly ? " (missed catch-up)" : ""}`,
       }).select().single();
-      if (e1 || !run) throw new Error(e1?.message ?? "Failed");
+      if (e1 || !run) throw new Error(e1?.message ?? "Failed to create run record");
+      runId = (run as any).id;
+      await logStep("init", "info", `Run created for ${pStart} → ${pEnd} · ${selectedIds.size} asset(s) selected`);
 
       const pool = (assets as any[]).filter((a) => selectedIds.has(a.id));
+      await logStep("prepare", "info", `Validating ${pool.length} asset(s) for depreciation eligibility`);
 
       let total = 0; let count = 0; let skipped = 0;
       for (const a of pool) {
-        if (!isDepreciable(a)) { skipped++; continue; }
+        if (!isDepreciable(a)) { skipped++; await logStep("skip", "warning", `Not depreciable (missing method, useful life, or purchase value)`, a.id); continue; }
         const { data: dup } = await supabase.from("depreciation_entries" as any)
           .select("id").eq("asset_id", a.id).eq("period_end", pEnd).maybeSingle();
-        if (dup) { skipped++; continue; }
+        if (dup) { skipped++; await logStep("skip", "warning", `Entry already posted for ${pEnd}`, a.id); continue; }
         const r = computePeriod(a);
-        if (r.depreciation <= 0) { skipped++; continue; }
+        if (r.depreciation <= 0) { skipped++; await logStep("skip", "warning", `Computed depreciation is zero (asset may have reached residual)`, a.id); continue; }
         const { error: e2 } = await supabase.from("depreciation_entries" as any).insert({
-          run_id: (run as any).id, asset_id: a.id,
+          run_id: runId, asset_id: a.id,
           period_start: pStart, period_end: pEnd,
           method: a.depreciation_method,
           opening_value: r.opening,
@@ -140,18 +150,25 @@ function DepreciationPage() {
           accumulated_after: r.accumulated,
           closing_value: r.closing,
         });
-        if (e2) continue;
+        if (e2) { await logStep("post", "error", `Insert failed: ${e2.message}`, a.id); continue; }
         await supabase.from("assets").update({
           accumulated_depreciation: r.accumulated,
           last_depreciation_date: pEnd,
         }).eq("id", a.id);
+        await logStep("post", "success", `Posted ${formatUGX(r.depreciation)} · NBV ${formatUGX(r.closing)}`, a.id);
         total += r.depreciation; count += 1;
       }
       const finalStatus = count === 0 ? "failed" : "completed";
+      const finalNote = `${single ? `Single asset: ${assetMap.get(firstId)?.asset_tag ?? ""}` : `Selected: ${pool.length} asset(s)`}${count === 0 ? " — no eligible entry posted" : ""}`;
+      const failReason = count === 0
+        ? `No entries posted. ${skipped} asset(s) skipped — none were eligible (already posted, at residual, or missing depreciation config).`
+        : null;
       await supabase.from("depreciation_runs" as any).update({
         status: finalStatus, total_amount: total, asset_count: count,
-        notes: `${single ? `Single asset: ${assetMap.get(firstId)?.asset_tag ?? ""}` : `Selected: ${pool.length} asset(s)`}${count === 0 ? " — no eligible entry posted" : ""}`,
-      }).eq("id", (run as any).id);
+        notes: finalNote,
+        error_message: failReason,
+      }).eq("id", runId);
+      await logStep("finalize", count === 0 ? "error" : "success", `${count} posted · ${skipped} skipped · total ${formatUGX(total)}`);
       if (count === 0) toast.warning(`No entries posted (${skipped} skipped)`);
       else toast.success(`Run complete · ${count} asset(s) · ${formatUGX(total)}`);
       setRunOpen(false);
@@ -161,11 +178,22 @@ function DepreciationPage() {
       qc.invalidateQueries({ queryKey: ["assets"] });
       qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
     } catch (e: any) {
-      toast.error(e?.message ?? "Run failed");
+      const msg = e?.message ?? "Run failed";
+      const stack = e?.stack ?? null;
+      if (runId) {
+        await supabase.from("depreciation_runs" as any).update({
+          status: "failed",
+          error_message: msg,
+          error_stack: stack,
+        }).eq("id", runId);
+        await logStep("error", "error", msg);
+      }
+      toast.error(msg);
     } finally {
       setRunning(false);
     }
   };
+
 
   // ---------- Reports ----------
   const reportRows = useMemo(() => (assets as any[])
@@ -199,7 +227,14 @@ function DepreciationPage() {
   }, [reportRows]);
 
   // ---------- Alerts ----------
+  const [alertKind, setAlertKind] = useState<string>("all");
+  const [alertAsset, setAlertAsset] = useState<string>("all");
+  const [alertFrom, setAlertFrom] = useState<string>("");
+  const [alertTo, setAlertTo] = useState<string>("");
+  const [alertReason, setAlertReason] = useState<string>("");
+
   const alerts = useMemo(() => {
+
     const list: { kind: "failed" | "missing" | "residual"; severity: "warn" | "error"; title: string; detail: string; assetId?: string; runId?: string }[] = [];
 
     for (const r of (runs as any[])) {
@@ -250,6 +285,32 @@ function DepreciationPage() {
     }
     return list;
   }, [runs, assets]);
+
+  const filteredAlerts = useMemo(() => {
+    const fromT = alertFrom ? new Date(alertFrom).getTime() : null;
+    const toT = alertTo ? new Date(alertTo).getTime() + 24 * 60 * 60 * 1000 : null;
+    const q = alertReason.trim().toLowerCase();
+    return alerts.filter((a) => {
+      if (alertKind !== "all" && a.kind !== alertKind) return false;
+      if (alertAsset !== "all" && a.assetId !== alertAsset) return false;
+      if (fromT || toT) {
+        let when: number | null = null;
+        if (a.runId) {
+          const r = (runs as any[]).find((x) => x.id === a.runId);
+          if (r) when = +new Date(r.created_at);
+        } else if (a.assetId) {
+          const asset = (assets as any[]).find((x) => x.id === a.assetId);
+          if (asset?.last_depreciation_date) when = +new Date(asset.last_depreciation_date);
+        }
+        if (when == null) return false;
+        if (fromT && when < fromT) return false;
+        if (toT && when > toT) return false;
+      }
+      if (q && !`${a.title} ${a.detail}`.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [alerts, alertKind, alertAsset, alertFrom, alertTo, alertReason, runs, assets]);
+
 
   // Insight dialog state
   const [insightAssetId, setInsightAssetId] = useState<string | null>(null);
@@ -367,7 +428,7 @@ function DepreciationPage() {
       </div>
 
       <Tabs defaultValue="nbv">
-        <TabsList className="flex-wrap">
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:flex sm:w-auto sm:flex-wrap">
           <TabsTrigger value="nbv">NBV report</TabsTrigger>
           <TabsTrigger value="accumulated">Accumulated</TabsTrigger>
           <TabsTrigger value="category">By category</TabsTrigger>
@@ -377,6 +438,7 @@ function DepreciationPage() {
           <TabsTrigger value="audit">Audit log</TabsTrigger>
           <TabsTrigger value="runs">Runs history</TabsTrigger>
         </TabsList>
+
 
         <TabsContent value="nbv">
           <ReportTable
@@ -406,23 +468,67 @@ function DepreciationPage() {
         </TabsContent>
 
         <TabsContent value="alerts">
-          <Card className="p-4">
-            {alerts.length === 0 ? (
+          <Card className="p-4 space-y-3">
+            {/* Filters */}
+            <div className="grid gap-2 sm:grid-cols-5">
+              <div className="space-y-1">
+                <Label className="text-xs">Kind</Label>
+                <Select value={alertKind} onValueChange={setAlertKind}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All kinds</SelectItem>
+                    <SelectItem value="failed">Failed / stuck runs</SelectItem>
+                    <SelectItem value="missing">Missing runs</SelectItem>
+                    <SelectItem value="residual">At residual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Asset</Label>
+                <Select value={alertAsset} onValueChange={setAlertAsset}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    <SelectItem value="all">All assets</SelectItem>
+                    {(assets as any[]).map((a) => (
+                      <SelectItem key={a.id} value={a.id}>{a.asset_tag} — {a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">From</Label>
+                <Input type="date" className="h-9" value={alertFrom} onChange={(e) => setAlertFrom(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">To</Label>
+                <Input type="date" className="h-9" value={alertTo} onChange={(e) => setAlertTo(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Reason / search</Label>
+                <Input className="h-9" placeholder="Search reason or title…" value={alertReason} onChange={(e) => setAlertReason(e.target.value)} />
+              </div>
+            </div>
+
+            {filteredAlerts.length === 0 ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" /> All clear — no missing runs, no failures, no assets at residual.
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                {alerts.length === 0
+                  ? "All clear — no missing runs, no failures, no assets at residual."
+                  : "No alerts match the current filters."}
               </div>
             ) : (
               <ul className="space-y-2">
-                {alerts.map((a, i) => {
+                {filteredAlerts.map((a, i) => {
                   const clickable = !!a.assetId || !!a.runId;
                   return (
                     <li
                       key={i}
                       onClick={() => {
-                        if (a.assetId) openAssetInsight(a.assetId, a.kind === "missing" ? "missed" : "general");
-                        else if (a.runId) {
+                        if (a.runId) {
                           const r = (runs as any[]).find((x) => x.id === a.runId);
                           if (r) openRunInsight(r);
+                        } else if (a.assetId) {
+                          openAssetInsight(a.assetId, a.kind === "missing" ? "missed" : "general");
                         }
                       }}
                       className={`flex items-start gap-3 rounded-md border p-3 text-sm ${a.severity === "error" ? "border-destructive/40 bg-destructive/5" : "border-amber-400/40 bg-amber-50/40 dark:bg-amber-900/10"} ${clickable ? "cursor-pointer hover:bg-muted/40" : ""}`}
@@ -442,6 +548,7 @@ function DepreciationPage() {
             )}
           </Card>
         </TabsContent>
+
 
         <TabsContent value="audit">
           <Card className="p-4">

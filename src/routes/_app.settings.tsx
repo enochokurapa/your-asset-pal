@@ -100,13 +100,15 @@ function SettingsPage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Card className="p-4">
           <Tabs defaultValue="brand">
-            <TabsList className="grid grid-cols-5">
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-6">
               <TabsTrigger value="brand">Branding</TabsTrigger>
               <TabsTrigger value="header">Header / Footer</TabsTrigger>
               <TabsTrigger value="watermark">Watermark</TabsTrigger>
               <TabsTrigger value="layout">Layout</TabsTrigger>
               <TabsTrigger value="appearance">Appearance</TabsTrigger>
+              <TabsTrigger value="guides">User guides</TabsTrigger>
             </TabsList>
+
 
             <fieldset disabled={!canManage} className="space-y-4">
 
@@ -281,7 +283,12 @@ function SettingsPage() {
             <TabsContent value="appearance" className="space-y-4 pt-4">
               <AppearancePanel />
             </TabsContent>
+
+            <TabsContent value="guides" className="space-y-4 pt-4">
+              <UserGuidesPanel />
+            </TabsContent>
           </Tabs>
+
         </Card>
 
         <Card className="flex h-[800px] flex-col p-3">
@@ -422,3 +429,248 @@ function AppearancePanel() {
     </div>
   );
 }
+
+// ---------------- User Guides ----------------
+
+type GuideSection = { heading: string; body: string[] };
+type GuideModule = {
+  id: string;
+  name: string;
+  description: string;
+  sections: GuideSection[];
+};
+
+const USER_GUIDES: GuideModule[] = [
+  {
+    id: "getting-started",
+    name: "Getting Started",
+    description: "First-time orientation, sign-in, navigation, and where to find things.",
+    sections: [
+      { heading: "Signing in", body: [
+        "Open the system URL provided by your administrator.",
+        "Enter your email and password and click Sign in. If you have forgotten your password, use the Reset link.",
+        "On first sign-in, complete your profile (full name, phone, branch) from the user menu in the top-right corner.",
+      ]},
+      { heading: "Navigating modules", body: [
+        "Use the left sidebar to switch between modules: Dashboard, Assets, Movements, Maintenance, Depreciation, Verification, Reports, Settings.",
+        "Only modules you have permission to see will appear. Ask an administrator if a module is missing.",
+        "The bell icon in the top bar shows in-app notifications for approvals, gate passes, and depreciation alerts.",
+      ]},
+      { heading: "Dashboard tiles", body: [
+        "Tiles summarize totals (asset count, NBV, gate passes out, pending approvals). Click a tile to drill into its module.",
+        "The Pending approvals card lists items waiting on you; click View details to act on them.",
+      ]},
+    ],
+  },
+  {
+    id: "assets",
+    name: "Asset Register",
+    description: "Adding, editing, tagging, and viewing the history of fixed assets.",
+    sections: [
+      { heading: "Adding an asset", body: [
+        "Go to Assets → New asset.",
+        "Fill in tag, name, category, branch, location, purchase date, purchase value, and depreciation method.",
+        "Attach invoices or photos under the Attachments tab after saving.",
+      ]},
+      { heading: "Editing an asset", body: [
+        "Click any asset row to open its detail view, then use the Edit button.",
+        "Changes are recorded in the audit trail and visible on the Verification tab.",
+      ]},
+      { heading: "Deleting an asset", body: [
+        "Click the trash icon. A deletion request is created and must be approved by a user with approve_asset_deletion permission. State a reason; an approver will review and approve or reject.",
+      ]},
+    ],
+  },
+  {
+    id: "movements",
+    name: "Movements & Transfers",
+    description: "Requesting and approving asset moves between branches/locations.",
+    sections: [
+      { heading: "Raising a movement request", body: [
+        "Open the asset, click Move/Transfer.",
+        "Pick the destination branch and location, add a reason, and submit.",
+        "The request appears in Pending approvals for authorized reviewers.",
+      ]},
+      { heading: "Approval", body: [
+        "Open the request from the dashboard or the Approvals queue.",
+        "Review details (resolved to branch/location/asset names) and Approve or Reject with a comment.",
+        "Approved moves immediately update the asset's branch/location and write to the audit trail.",
+      ]},
+    ],
+  },
+  {
+    id: "gate-pass",
+    name: "Gate Pass Management",
+    description: "Permission to take assets outside the organization premises.",
+    sections: [
+      { heading: "Requesting a gate pass", body: [
+        "Go to Gate Pass → New request.",
+        "Pick the asset, give a reason, destination, expected return date, and optional attachment.",
+        "Submit. The status starts as Pending until an authorized user approves.",
+      ]},
+      { heading: "Approval & checkout", body: [
+        "An authorized reviewer Approves or Rejects. On approval a unique Gate Pass Number is generated.",
+        "Security personnel verify the printed pass at the gate; the asset status becomes Checked out.",
+      ]},
+      { heading: "Returning the asset", body: [
+        "On return, the custodian marks the pass Returned and verifies the asset condition.",
+        "Asset status reverts to Available/In Custody. The full timeline is in the audit trail.",
+      ]},
+    ],
+  },
+  {
+    id: "depreciation",
+    name: "Depreciation",
+    description: "Running depreciation, viewing NBV, handling missed and failed runs.",
+    sections: [
+      { heading: "Running depreciation", body: [
+        "Go to Depreciation → Run depreciation.",
+        "Pick a frequency (monthly/quarterly/annually) — the previous period is pre-filled.",
+        "Tick assets to include, or use Missed only to catch up assets that were skipped.",
+        "Click Run for N asset(s). The system posts entries and updates accumulated depreciation.",
+      ]},
+      { heading: "Alerts & failed runs", body: [
+        "The Alerts tab lists failed/stuck runs, missing periods, and assets at residual.",
+        "Use the filters (kind, asset, date range, search) to narrow the list.",
+        "Click any failed-run alert to open the run dialog. It shows the failure reason, full stack trace (when available) and the step-by-step Run logs.",
+        "You also receive in-app notifications when a run fails — click the notification to jump straight to the failure.",
+      ]},
+      { heading: "NBV & reports", body: [
+        "NBV report, Accumulated, and By category tabs offer downloadable Excel/PDF reports.",
+        "Click any asset row to open its insights dialog (history, missed periods, forecast).",
+      ]},
+    ],
+  },
+  {
+    id: "verification",
+    name: "Fixed Asset Verification",
+    description: "Physically verifying assets, recording condition and custodian changes.",
+    sections: [
+      { heading: "Starting a verification round", body: [
+        "Go to Verification, choose a branch.",
+        "Scan or search assets one by one.",
+      ]},
+      { heading: "Recording results", body: [
+        "Edit condition, custodian, and location as needed; save.",
+        "The Verification activity report shows what changed; use the Compare dialog for a side-by-side diff with the previous verification.",
+        "Changed fields link directly to the audit trail.",
+      ]},
+    ],
+  },
+  {
+    id: "reports",
+    name: "Reports",
+    description: "Generating, previewing, and exporting all system reports.",
+    sections: [
+      { heading: "Available reports", body: [
+        "Register, Movements, Retire/Dispose, Maintenance, Approvals, Verification, Depreciation, Gate Passes — each on its own tab.",
+        "Apply filters at the top (branch, category, date range) before exporting.",
+      ]},
+      { heading: "Exporting", body: [
+        "Each report has Excel and PDF download buttons. Use Preview to review before saving.",
+        "Exports use the company branding configured under Settings → Document Template.",
+      ]},
+    ],
+  },
+  {
+    id: "approvals",
+    name: "Approvals & Requisitions",
+    description: "Reviewing and acting on pending requests across the system.",
+    sections: [
+      { heading: "Where they appear", body: [
+        "Pending requests appear on the Dashboard Pending approvals card and counts in the top-bar bell.",
+        "When you Approve or Reject, the item disappears immediately and counters update.",
+      ]},
+      { heading: "Self-approval", body: [
+        "Admins can approve their own requests. Other users need the approve_own_request right.",
+      ]},
+    ],
+  },
+  {
+    id: "settings",
+    name: "Settings & Branding",
+    description: "Configuring document branding, theme, fonts, and downloading these guides.",
+    sections: [
+      { heading: "Document Template", body: [
+        "Customize logo, header/footer, watermark, layout, paper size — preview updates live.",
+        "Click Save changes to apply across all PDFs generated by the system.",
+      ]},
+      { heading: "Appearance (theme & font)", body: [
+        "Pick a color preset or set a custom primary color; choose an interface font from the curated list.",
+        "Theme is saved to your browser only — it does not affect other users.",
+      ]},
+      { heading: "User guides", body: [
+        "This tab. Click Download PDF next to any module to get a printable how-to guide for that module, or download the full guide for the whole system.",
+      ]},
+    ],
+  },
+];
+
+function UserGuidesPanel() {
+  const downloadGuide = async (modules: GuideModule[], filename: string, title: string) => {
+    const template = await loadTemplate();
+    const { doc, startY, pageWidth, pageHeight, template: t } = createBrandedPdf({
+      template, title, subtitle: "User guide",
+    });
+    let y = startY;
+    const left = t.margin_left;
+    const right = pageWidth - t.margin_right;
+    const wrap = (text: string, size: number, bold = false) => {
+      doc.setFont(t.font_family, bold ? "bold" : "normal");
+      doc.setFontSize(size);
+      const lines = doc.splitTextToSize(text, right - left);
+      lines.forEach((ln: string) => {
+        if (y > pageHeight - t.margin_bottom - 6) { doc.addPage(); y = t.margin_top; }
+        doc.text(ln, left, y);
+        y += size * 0.5 + 1.2;
+      });
+    };
+    for (const m of modules) {
+      if (y > pageHeight - t.margin_bottom - 30) { doc.addPage(); y = t.margin_top; }
+      y += 2;
+      wrap(m.name, 14, true);
+      wrap(m.description, 9);
+      y += 1;
+      for (const s of m.sections) {
+        y += 1;
+        wrap(s.heading, 11, true);
+        s.body.forEach((p, i) => wrap(`${i + 1}. ${p}`, 9));
+      }
+      y += 4;
+    }
+    applyTemplateChrome(doc, t);
+    doc.save(filename);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium">How to use the system</p>
+          <p className="text-xs text-muted-foreground">Download a concise PDF guide for any module, or the full guide.</p>
+        </div>
+        <Button onClick={() => downloadGuide(USER_GUIDES, "user-guide-full.pdf", "System User Guide")}>
+          Download full guide (PDF)
+        </Button>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {USER_GUIDES.map((m) => (
+          <Card key={m.id} className="flex items-start justify-between gap-3 p-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">{m.name}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{m.description}</p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => downloadGuide([m], `user-guide-${m.id}.pdf`, `${m.name} — User Guide`)}
+            >
+              PDF
+            </Button>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+

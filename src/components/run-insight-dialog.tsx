@@ -4,10 +4,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { FileText } from "lucide-react";
+import { FileText, CheckCircle2, AlertTriangle, AlertCircle, Info } from "lucide-react";
 import autoTable from "jspdf-autotable";
 import { formatUGX } from "@/lib/utils";
+import { fmtDateTimeEAT } from "@/lib/time";
 import {
   loadTemplate, createBrandedPdf, saveBranded, tableHeadFill,
 } from "@/lib/pdf-template";
@@ -29,6 +29,16 @@ export function RunInsightDialog({
         .order("period_end", { ascending: true })).data ?? [],
   });
 
+  const { data: logs = [] } = useQuery({
+    enabled: !!run && open,
+    queryKey: ["run-insight-logs", run?.id],
+    queryFn: async () =>
+      (await supabase.from("depreciation_run_logs" as any)
+        .select("*, assets:asset_id(asset_tag,name)")
+        .eq("run_id", run.id)
+        .order("created_at", { ascending: true })).data ?? [],
+  });
+
   const downloadPdf = async () => {
     if (!run) return;
     const template = await loadTemplate();
@@ -47,12 +57,37 @@ export function RunInsightDialog({
         ["Asset count", String(run.asset_count ?? 0)],
         ["Total", formatUGX(run.total_amount)],
         ["Notes", run.notes ?? "—"],
-        ["Run at", new Date(run.created_at).toLocaleString()],
+        ["Error message", run.error_message ?? "—"],
+        ["Run at", fmtDateTimeEAT(run.created_at)],
       ],
       styles: { fontSize: 9, font: template.font_family },
       headStyles: { fillColor: tableHeadFill(template) },
       margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
     });
+    if (run.error_stack) {
+      autoTable(doc, {
+        head: [["Stack trace"]],
+        body: [[String(run.error_stack)]],
+        styles: { fontSize: 7, font: "courier" },
+        headStyles: { fillColor: tableHeadFill(template) },
+        margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
+      });
+    }
+    if ((logs as any[]).length > 0) {
+      autoTable(doc, {
+        head: [["Time", "Step", "Status", "Asset", "Message"]],
+        body: (logs as any[]).map((l) => [
+          fmtDateTimeEAT(l.created_at),
+          l.step,
+          l.status,
+          l.assets ? `${l.assets.asset_tag} — ${l.assets.name}` : "—",
+          l.message ?? "—",
+        ]),
+        styles: { fontSize: 8, font: template.font_family },
+        headStyles: { fillColor: tableHeadFill(template) },
+        margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
+      });
+    }
     autoTable(doc, {
       head: [["Tag", "Asset", "Opening", "Depreciation", "Accumulated", "Closing"]],
       body: (entries as any[]).map((e) => [
@@ -68,6 +103,13 @@ export function RunInsightDialog({
       margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
     });
     saveBranded(doc, template, `run-${run.period_end}.pdf`);
+  };
+
+  const statusIcon = (s: string) => {
+    if (s === "success") return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />;
+    if (s === "warning") return <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />;
+    if (s === "error") return <AlertCircle className="h-3.5 w-3.5 text-destructive" />;
+    return <Info className="h-3.5 w-3.5 text-muted-foreground" />;
   };
 
   return (
@@ -89,18 +131,28 @@ export function RunInsightDialog({
             </div>
 
             {(run.status === "failed" || run.status === "running") && (
-              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
+              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-2">
                 <p className="text-sm font-semibold text-destructive">
                   {run.status === "failed" ? "Why this run failed" : "Run appears stuck"}
                 </p>
-                <p className="mt-1 text-xs">
-                  {run.notes && run.notes.trim().length > 0
-                    ? run.notes
-                    : run.status === "failed"
-                      ? "Run was marked failed but no reason was recorded."
-                      : "Run started but never completed."}
+                <p className="text-xs">
+                  {run.error_message && String(run.error_message).trim().length > 0
+                    ? run.error_message
+                    : run.notes && run.notes.trim().length > 0
+                      ? run.notes
+                      : run.status === "failed"
+                        ? "Run was marked failed but no reason was recorded."
+                        : "Run started but never completed."}
                 </p>
-                <div className="mt-2 text-xs text-muted-foreground">
+                {run.error_stack && (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-xs font-medium text-destructive">Show stack trace</summary>
+                    <pre className="mt-1 max-h-48 overflow-auto rounded bg-background p-2 text-[10px] leading-tight whitespace-pre-wrap break-all">
+{String(run.error_stack)}
+                    </pre>
+                  </details>
+                )}
+                <div className="text-xs text-muted-foreground">
                   <p className="font-medium">Common causes:</p>
                   <ul className="ml-4 list-disc space-y-0.5">
                     <li>None of the selected assets are depreciable (missing method, useful life, or purchase value).</li>
@@ -116,6 +168,30 @@ export function RunInsightDialog({
             {run.status !== "failed" && run.status !== "running" && run.notes && (
               <p className="text-xs text-muted-foreground">{run.notes}</p>
             )}
+
+            {/* Run logs */}
+            <div>
+              <p className="mb-2 text-sm font-semibold">Run logs ({(logs as any[]).length})</p>
+              <div className="max-h-72 overflow-auto rounded border">
+                {(logs as any[]).length === 0 ? (
+                  <p className="px-3 py-6 text-center text-xs text-muted-foreground">No step-by-step logs were captured for this run.</p>
+                ) : (
+                  <ul className="divide-y">
+                    {(logs as any[]).map((l) => (
+                      <li key={l.id} className="flex items-start gap-2 px-3 py-2 text-xs">
+                        <div className="mt-0.5">{statusIcon(l.status)}</div>
+                        <div className="w-32 shrink-0 text-muted-foreground tabular-nums">{fmtDateTimeEAT(l.created_at)}</div>
+                        <div className="w-24 shrink-0 font-medium capitalize">{l.step}</div>
+                        <div className="flex-1">
+                          {l.assets && <span className="mr-1 font-mono text-[10px] text-muted-foreground">[{l.assets.asset_tag}]</span>}
+                          {l.message ?? "—"}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
 
             <div>
               <p className="mb-2 text-sm font-semibold">Entries posted ({entries.length})</p>

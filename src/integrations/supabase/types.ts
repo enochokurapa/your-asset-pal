@@ -762,10 +762,50 @@ export type Database = {
           },
         ]
       }
+      depreciation_run_logs: {
+        Row: {
+          asset_id: string | null
+          created_at: string
+          id: string
+          message: string | null
+          run_id: string
+          status: string
+          step: string
+        }
+        Insert: {
+          asset_id?: string | null
+          created_at?: string
+          id?: string
+          message?: string | null
+          run_id: string
+          status: string
+          step: string
+        }
+        Update: {
+          asset_id?: string | null
+          created_at?: string
+          id?: string
+          message?: string | null
+          run_id?: string
+          status?: string
+          step?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "depreciation_run_logs_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "depreciation_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       depreciation_runs: {
         Row: {
           asset_count: number
           created_at: string
+          error_message: string | null
+          error_stack: string | null
           id: string
           notes: string | null
           period_end: string
@@ -778,6 +818,8 @@ export type Database = {
         Insert: {
           asset_count?: number
           created_at?: string
+          error_message?: string | null
+          error_stack?: string | null
           id?: string
           notes?: string | null
           period_end: string
@@ -790,6 +832,8 @@ export type Database = {
         Update: {
           asset_count?: number
           created_at?: string
+          error_message?: string | null
+          error_stack?: string | null
           id?: string
           notes?: string | null
           period_end?: string
