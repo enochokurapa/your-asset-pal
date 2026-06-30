@@ -435,23 +435,67 @@ function DepreciationPage() {
         </TabsContent>
 
         <TabsContent value="alerts">
-          <Card className="p-4">
-            {alerts.length === 0 ? (
+          <Card className="p-4 space-y-3">
+            {/* Filters */}
+            <div className="grid gap-2 sm:grid-cols-5">
+              <div className="space-y-1">
+                <Label className="text-xs">Kind</Label>
+                <Select value={alertKind} onValueChange={setAlertKind}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All kinds</SelectItem>
+                    <SelectItem value="failed">Failed / stuck runs</SelectItem>
+                    <SelectItem value="missing">Missing runs</SelectItem>
+                    <SelectItem value="residual">At residual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Asset</Label>
+                <Select value={alertAsset} onValueChange={setAlertAsset}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    <SelectItem value="all">All assets</SelectItem>
+                    {(assets as any[]).map((a) => (
+                      <SelectItem key={a.id} value={a.id}>{a.asset_tag} — {a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">From</Label>
+                <Input type="date" className="h-9" value={alertFrom} onChange={(e) => setAlertFrom(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">To</Label>
+                <Input type="date" className="h-9" value={alertTo} onChange={(e) => setAlertTo(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Reason / search</Label>
+                <Input className="h-9" placeholder="Search reason or title…" value={alertReason} onChange={(e) => setAlertReason(e.target.value)} />
+              </div>
+            </div>
+
+            {filteredAlerts.length === 0 ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" /> All clear — no missing runs, no failures, no assets at residual.
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                {alerts.length === 0
+                  ? "All clear — no missing runs, no failures, no assets at residual."
+                  : "No alerts match the current filters."}
               </div>
             ) : (
               <ul className="space-y-2">
-                {alerts.map((a, i) => {
+                {filteredAlerts.map((a, i) => {
                   const clickable = !!a.assetId || !!a.runId;
                   return (
                     <li
                       key={i}
                       onClick={() => {
-                        if (a.assetId) openAssetInsight(a.assetId, a.kind === "missing" ? "missed" : "general");
-                        else if (a.runId) {
+                        if (a.runId) {
                           const r = (runs as any[]).find((x) => x.id === a.runId);
                           if (r) openRunInsight(r);
+                        } else if (a.assetId) {
+                          openAssetInsight(a.assetId, a.kind === "missing" ? "missed" : "general");
                         }
                       }}
                       className={`flex items-start gap-3 rounded-md border p-3 text-sm ${a.severity === "error" ? "border-destructive/40 bg-destructive/5" : "border-amber-400/40 bg-amber-50/40 dark:bg-amber-900/10"} ${clickable ? "cursor-pointer hover:bg-muted/40" : ""}`}
@@ -471,6 +515,7 @@ function DepreciationPage() {
             )}
           </Card>
         </TabsContent>
+
 
         <TabsContent value="audit">
           <Card className="p-4">
