@@ -110,6 +110,13 @@ function DepreciationPage() {
     if (selectedIds.size === 0) return toast.error("Select at least one asset");
     const single = selectedIds.size === 1;
     setRunning(true);
+    let runId: string | null = null;
+    const logStep = async (step: string, status: "info" | "success" | "warning" | "error", message?: string, asset_id?: string | null) => {
+      if (!runId) return;
+      try {
+        await supabase.from("depreciation_run_logs" as any).insert({ run_id: runId, step, status, message: message ?? null, asset_id: asset_id ?? null });
+      } catch { /* non-fatal */ }
+    };
     try {
       const firstId = selectedIds.values().next().value as string;
       const runType = missedOnly ? "missed" : single ? "manual_asset" : "manual";
@@ -119,20 +126,23 @@ function DepreciationPage() {
         status: "running",
         notes: single ? `Single asset: ${assetMap.get(firstId)?.asset_tag ?? ""}` : `Selected: ${selectedIds.size} asset(s)${missedOnly ? " (missed catch-up)" : ""}`,
       }).select().single();
-      if (e1 || !run) throw new Error(e1?.message ?? "Failed");
+      if (e1 || !run) throw new Error(e1?.message ?? "Failed to create run record");
+      runId = (run as any).id;
+      await logStep("init", "info", `Run created for ${pStart} → ${pEnd} · ${selectedIds.size} asset(s) selected`);
 
       const pool = (assets as any[]).filter((a) => selectedIds.has(a.id));
+      await logStep("prepare", "info", `Validating ${pool.length} asset(s) for depreciation eligibility`);
 
       let total = 0; let count = 0; let skipped = 0;
       for (const a of pool) {
-        if (!isDepreciable(a)) { skipped++; continue; }
+        if (!isDepreciable(a)) { skipped++; await logStep("skip", "warning", `Not depreciable (missing method, useful life, or purchase value)`, a.id); continue; }
         const { data: dup } = await supabase.from("depreciation_entries" as any)
           .select("id").eq("asset_id", a.id).eq("period_end", pEnd).maybeSingle();
-        if (dup) { skipped++; continue; }
+        if (dup) { skipped++; await logStep("skip", "warning", `Entry already posted for ${pEnd}`, a.id); continue; }
         const r = computePeriod(a);
-        if (r.depreciation <= 0) { skipped++; continue; }
+        if (r.depreciation <= 0) { skipped++; await logStep("skip", "warning", `Computed depreciation is zero (asset may have reached residual)`, a.id); continue; }
         const { error: e2 } = await supabase.from("depreciation_entries" as any).insert({
-          run_id: (run as any).id, asset_id: a.id,
+          run_id: runId, asset_id: a.id,
           period_start: pStart, period_end: pEnd,
           method: a.depreciation_method,
           opening_value: r.opening,
@@ -140,18 +150,25 @@ function DepreciationPage() {
           accumulated_after: r.accumulated,
           closing_value: r.closing,
         });
-        if (e2) continue;
+        if (e2) { await logStep("post", "error", `Insert failed: ${e2.message}`, a.id); continue; }
         await supabase.from("assets").update({
           accumulated_depreciation: r.accumulated,
           last_depreciation_date: pEnd,
         }).eq("id", a.id);
+        await logStep("post", "success", `Posted ${formatUGX(r.depreciation)} · NBV ${formatUGX(r.closing)}`, a.id);
         total += r.depreciation; count += 1;
       }
       const finalStatus = count === 0 ? "failed" : "completed";
+      const finalNote = `${single ? `Single asset: ${assetMap.get(firstId)?.asset_tag ?? ""}` : `Selected: ${pool.length} asset(s)`}${count === 0 ? " — no eligible entry posted" : ""}`;
+      const failReason = count === 0
+        ? `No entries posted. ${skipped} asset(s) skipped — none were eligible (already posted, at residual, or missing depreciation config).`
+        : null;
       await supabase.from("depreciation_runs" as any).update({
         status: finalStatus, total_amount: total, asset_count: count,
-        notes: `${single ? `Single asset: ${assetMap.get(firstId)?.asset_tag ?? ""}` : `Selected: ${pool.length} asset(s)`}${count === 0 ? " — no eligible entry posted" : ""}`,
-      }).eq("id", (run as any).id);
+        notes: finalNote,
+        error_message: failReason,
+      }).eq("id", runId);
+      await logStep("finalize", count === 0 ? "error" : "success", `${count} posted · ${skipped} skipped · total ${formatUGX(total)}`);
       if (count === 0) toast.warning(`No entries posted (${skipped} skipped)`);
       else toast.success(`Run complete · ${count} asset(s) · ${formatUGX(total)}`);
       setRunOpen(false);
@@ -161,11 +178,22 @@ function DepreciationPage() {
       qc.invalidateQueries({ queryKey: ["assets"] });
       qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
     } catch (e: any) {
-      toast.error(e?.message ?? "Run failed");
+      const msg = e?.message ?? "Run failed";
+      const stack = e?.stack ?? null;
+      if (runId) {
+        await supabase.from("depreciation_runs" as any).update({
+          status: "failed",
+          error_message: msg,
+          error_stack: stack,
+        }).eq("id", runId);
+        await logStep("error", "error", msg);
+      }
+      toast.error(msg);
     } finally {
       setRunning(false);
     }
   };
+
 
   // ---------- Reports ----------
   const reportRows = useMemo(() => (assets as any[])
