@@ -227,7 +227,14 @@ function DepreciationPage() {
   }, [reportRows]);
 
   // ---------- Alerts ----------
+  const [alertKind, setAlertKind] = useState<string>("all");
+  const [alertAsset, setAlertAsset] = useState<string>("all");
+  const [alertFrom, setAlertFrom] = useState<string>("");
+  const [alertTo, setAlertTo] = useState<string>("");
+  const [alertReason, setAlertReason] = useState<string>("");
+
   const alerts = useMemo(() => {
+
     const list: { kind: "failed" | "missing" | "residual"; severity: "warn" | "error"; title: string; detail: string; assetId?: string; runId?: string }[] = [];
 
     for (const r of (runs as any[])) {
