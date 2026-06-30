@@ -286,6 +286,32 @@ function DepreciationPage() {
     return list;
   }, [runs, assets]);
 
+  const filteredAlerts = useMemo(() => {
+    const fromT = alertFrom ? new Date(alertFrom).getTime() : null;
+    const toT = alertTo ? new Date(alertTo).getTime() + 24 * 60 * 60 * 1000 : null;
+    const q = alertReason.trim().toLowerCase();
+    return alerts.filter((a) => {
+      if (alertKind !== "all" && a.kind !== alertKind) return false;
+      if (alertAsset !== "all" && a.assetId !== alertAsset) return false;
+      if (fromT || toT) {
+        let when: number | null = null;
+        if (a.runId) {
+          const r = (runs as any[]).find((x) => x.id === a.runId);
+          if (r) when = +new Date(r.created_at);
+        } else if (a.assetId) {
+          const asset = (assets as any[]).find((x) => x.id === a.assetId);
+          if (asset?.last_depreciation_date) when = +new Date(asset.last_depreciation_date);
+        }
+        if (when == null) return false;
+        if (fromT && when < fromT) return false;
+        if (toT && when > toT) return false;
+      }
+      if (q && !`${a.title} ${a.detail}`.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [alerts, alertKind, alertAsset, alertFrom, alertTo, alertReason, runs, assets]);
+
+
   // Insight dialog state
   const [insightAssetId, setInsightAssetId] = useState<string | null>(null);
   const [insightFocus, setInsightFocus] = useState<"missed" | "nbv" | "accumulated" | "audit" | "general">("general");
