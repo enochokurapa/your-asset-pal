@@ -753,7 +753,7 @@ function ReportsPage() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="flex !h-auto min-h-9 w-full flex-wrap justify-start gap-1">
+        <TabsList>
           <TabsTrigger value="register">Register</TabsTrigger>
           <TabsTrigger value="movements">Movements</TabsTrigger>
           <TabsTrigger value="assigned">Assigned</TabsTrigger>
