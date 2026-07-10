@@ -66,7 +66,7 @@ const ATTACH_KINDS = [
 export function AssetDetailTabs({ assetId, defaultTab = "custody" }: { assetId: string; defaultTab?: string }) {
   return (
     <Tabs defaultValue={defaultTab} className="mt-2">
-      <TabsList className="w-full flex-wrap">
+      <TabsList>
         <TabsTrigger value="custody" className="flex-1">Custody</TabsTrigger>
         <TabsTrigger value="movements" className="flex-1">Movements</TabsTrigger>
         <TabsTrigger value="maintenance" className="flex-1">Maintenance</TabsTrigger>
