@@ -429,7 +429,7 @@ function DepreciationPage() {
       </div>
 
       <Tabs defaultValue="nbv">
-        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:flex sm:w-auto sm:flex-wrap">
+        <TabsList>
           <TabsTrigger value="nbv">NBV report</TabsTrigger>
           <TabsTrigger value="accumulated">Accumulated</TabsTrigger>
           <TabsTrigger value="category">By category</TabsTrigger>
