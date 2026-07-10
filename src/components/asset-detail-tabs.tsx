@@ -67,14 +67,14 @@ export function AssetDetailTabs({ assetId, defaultTab = "custody" }: { assetId: 
   return (
     <Tabs defaultValue={defaultTab} className="mt-2">
       <TabsList>
-        <TabsTrigger value="custody" className="flex-1">Custody</TabsTrigger>
-        <TabsTrigger value="movements" className="flex-1">Movements</TabsTrigger>
-        <TabsTrigger value="maintenance" className="flex-1">Maintenance</TabsTrigger>
-        <TabsTrigger value="depreciation" className="flex-1">Depreciation</TabsTrigger>
-        <TabsTrigger value="verification" className="flex-1">Verification</TabsTrigger>
-        <TabsTrigger value="attachments" className="flex-1">Files</TabsTrigger>
-        <TabsTrigger value="disposal" className="flex-1">Retire/Dispose</TabsTrigger>
-        <TabsTrigger value="activity" className="flex-1">Activity</TabsTrigger>
+        <TabsTrigger value="custody">Custody</TabsTrigger>
+        <TabsTrigger value="movements">Movements</TabsTrigger>
+        <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
+        <TabsTrigger value="depreciation">Depreciation</TabsTrigger>
+        <TabsTrigger value="verification">Verification</TabsTrigger>
+        <TabsTrigger value="attachments">Files</TabsTrigger>
+        <TabsTrigger value="disposal">Retire/Dispose</TabsTrigger>
+        <TabsTrigger value="activity">Activity</TabsTrigger>
       </TabsList>
       <TabsContent value="custody"><CustodyPanel assetId={assetId} /></TabsContent>
       <TabsContent value="movements"><MovementsPanel assetId={assetId} /></TabsContent>
