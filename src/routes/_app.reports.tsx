@@ -8,7 +8,8 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { ResponsiveTabsList as TabsList, ResponsiveTabsTrigger as TabsTrigger } from "@/components/ui/responsive-tabs";
 import { FileBarChart, FileDown, FileSpreadsheet, X } from "lucide-react";
 
 import autoTable from "jspdf-autotable";
@@ -752,7 +753,7 @@ function ReportsPage() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="flex !h-auto min-h-9 w-full flex-wrap justify-start gap-1">
+        <TabsList>
           <TabsTrigger value="register">Register</TabsTrigger>
           <TabsTrigger value="movements">Movements</TabsTrigger>
           <TabsTrigger value="assigned">Assigned</TabsTrigger>

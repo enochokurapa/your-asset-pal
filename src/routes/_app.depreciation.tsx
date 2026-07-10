@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { ResponsiveTabsList as TabsList, ResponsiveTabsTrigger as TabsTrigger } from "@/components/ui/responsive-tabs";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Play, Download, FileText, TrendingDown, AlertTriangle, AlertCircle, CheckCircle2 } from "lucide-react";
@@ -428,7 +429,7 @@ function DepreciationPage() {
       </div>
 
       <Tabs defaultValue="nbv">
-        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:flex sm:w-auto sm:flex-wrap">
+        <TabsList>
           <TabsTrigger value="nbv">NBV report</TabsTrigger>
           <TabsTrigger value="accumulated">Accumulated</TabsTrigger>
           <TabsTrigger value="category">By category</TabsTrigger>

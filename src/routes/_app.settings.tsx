@@ -10,7 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { ResponsiveTabsList as TabsList, ResponsiveTabsTrigger as TabsTrigger } from "@/components/ui/responsive-tabs";
 import { Settings as SettingsIcon, Upload, X, RefreshCw, Save } from "lucide-react";
 import { toast } from "sonner";
 import autoTable from "jspdf-autotable";
@@ -100,7 +101,7 @@ function SettingsPage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Card className="p-4">
           <Tabs defaultValue="brand">
-            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-6">
+            <TabsList>
               <TabsTrigger value="brand">Branding</TabsTrigger>
               <TabsTrigger value="header">Header / Footer</TabsTrigger>
               <TabsTrigger value="watermark">Watermark</TabsTrigger>

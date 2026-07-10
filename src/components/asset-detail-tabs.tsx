@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { ResponsiveTabsList as TabsList, ResponsiveTabsTrigger as TabsTrigger } from "@/components/ui/responsive-tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Download, Upload, FileText, Check, X, History, Send, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -65,15 +66,15 @@ const ATTACH_KINDS = [
 export function AssetDetailTabs({ assetId, defaultTab = "custody" }: { assetId: string; defaultTab?: string }) {
   return (
     <Tabs defaultValue={defaultTab} className="mt-2">
-      <TabsList className="w-full flex-wrap">
-        <TabsTrigger value="custody" className="flex-1">Custody</TabsTrigger>
-        <TabsTrigger value="movements" className="flex-1">Movements</TabsTrigger>
-        <TabsTrigger value="maintenance" className="flex-1">Maintenance</TabsTrigger>
-        <TabsTrigger value="depreciation" className="flex-1">Depreciation</TabsTrigger>
-        <TabsTrigger value="verification" className="flex-1">Verification</TabsTrigger>
-        <TabsTrigger value="attachments" className="flex-1">Files</TabsTrigger>
-        <TabsTrigger value="disposal" className="flex-1">Retire/Dispose</TabsTrigger>
-        <TabsTrigger value="activity" className="flex-1">Activity</TabsTrigger>
+      <TabsList>
+        <TabsTrigger value="custody">Custody</TabsTrigger>
+        <TabsTrigger value="movements">Movements</TabsTrigger>
+        <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
+        <TabsTrigger value="depreciation">Depreciation</TabsTrigger>
+        <TabsTrigger value="verification">Verification</TabsTrigger>
+        <TabsTrigger value="attachments">Files</TabsTrigger>
+        <TabsTrigger value="disposal">Retire/Dispose</TabsTrigger>
+        <TabsTrigger value="activity">Activity</TabsTrigger>
       </TabsList>
       <TabsContent value="custody"><CustodyPanel assetId={assetId} /></TabsContent>
       <TabsContent value="movements"><MovementsPanel assetId={assetId} /></TabsContent>
