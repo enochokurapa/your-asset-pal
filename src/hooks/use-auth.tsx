@@ -38,6 +38,7 @@ export const ALL_ACTION_KINDS: ActionKind[] = [
   "request_attachment_deletion", "approve_attachment_deletion",
   "perform_verification", "view_verification_reports",
   "approve_own_request",
+  "manage_audit_log",
 ];
 
 export const DEFAULT_NEW_USER_MODULES: ModuleKey[] = ["dashboard", "assets"];
