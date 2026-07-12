@@ -69,7 +69,8 @@ export type AuditTrailViewProps = {
 };
 
 export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: AuditTrailViewProps) {
-  const { isAdmin, canSeeBranch } = useAuth();
+  const { isAdmin, canDo, canSeeBranch } = useAuth();
+  const canManageAudit = isAdmin || canDo("manage_audit_log");
   const qc = useQueryClient();
 
   const [q, setQ] = useState(initialQ ?? "");
