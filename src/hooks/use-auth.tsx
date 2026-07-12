@@ -18,7 +18,8 @@ export type ActionKind =
   | "request_asset_deletion" | "approve_asset_deletion"
   | "request_attachment_deletion" | "approve_attachment_deletion"
   | "perform_verification" | "view_verification_reports"
-  | "approve_own_request";
+  | "approve_own_request"
+  | "manage_audit_log";
 
 export const ALL_MODULES: ModuleKey[] = [
   "dashboard", "assets", "categories", "locations", "branches", "users", "reports", "audit", "depreciation", "gate_pass", "verification", "settings",
