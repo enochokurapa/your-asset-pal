@@ -335,6 +335,28 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
     qc.invalidateQueries({ queryKey: ["audit-log"] });
   };
 
+  const deleteVisible = async () => {
+    const ids = filtered.map((r: any) => r.id);
+    if (ids.length === 0) { toast.error("Nothing to delete"); return; }
+    if (!confirm(`Permanently delete ${ids.length} visible audit ${ids.length === 1 ? "entry" : "entries"}? This cannot be undone.`)) return;
+    const { error } = await supabase.from("audit_log").delete().in("id", ids);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Deleted ${ids.length} entries`);
+    setSelectedRows(new Set());
+    qc.invalidateQueries({ queryKey: ["audit-log"] });
+  };
+
+  const deleteSelected = async () => {
+    const ids = Array.from(selectedRows);
+    if (ids.length === 0) { toast.error("Select at least one entry"); return; }
+    if (!confirm(`Permanently delete ${ids.length} selected audit ${ids.length === 1 ? "entry" : "entries"}? This cannot be undone.`)) return;
+    const { error } = await supabase.from("audit_log").delete().in("id", ids);
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Deleted ${ids.length} entries`);
+    setSelectedRows(new Set());
+    qc.invalidateQueries({ queryKey: ["audit-log"] });
+  };
+
   return (
     <div className="space-y-6">
       {showHeader && (
@@ -343,11 +365,16 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
             <h1 className="text-2xl font-bold tracking-tight">Audit Trail</h1>
             <p className="text-sm text-muted-foreground">Every create, update, approval, and retirement action across the system.</p>
           </div>
-          <div className="flex gap-2">
-            {isAdmin && (
-              <Button variant="outline" onClick={clearAll} className="gap-2">
-                <Trash2 className="h-4 w-4" /> Archive visible
-              </Button>
+          <div className="flex flex-wrap gap-2">
+            {canManageAudit && (
+              <>
+                <Button variant="outline" onClick={clearAll} className="gap-2">
+                  <History className="h-4 w-4" /> Archive visible
+                </Button>
+                <Button variant="destructive" onClick={deleteVisible} className="gap-2">
+                  <Trash2 className="h-4 w-4" /> Delete visible
+                </Button>
+              </>
             )}
           </div>
         </div>
