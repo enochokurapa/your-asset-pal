@@ -454,6 +454,11 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
               <FileText className="h-3 w-3" /> View {selectedRows.size} as one PDF
             </Button>
           )}
+          {selectedRows.size > 0 && canManageAudit && (
+            <Button size="sm" variant="destructive" className="h-7 gap-1" onClick={deleteSelected}>
+              <Trash2 className="h-3 w-3" /> Delete {selectedRows.size}
+            </Button>
+          )}
           <span className="ml-auto text-xs text-muted-foreground">
             {selectedRows.size > 0 ? `${selectedRows.size} selected · ` : ""}
             {filtered.length} entr{filtered.length === 1 ? "y" : "ies"}
