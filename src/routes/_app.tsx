@@ -2,11 +2,12 @@ import { createFileRoute, Outlet, Link, Navigate, useRouterState } from "@tansta
 import { useState } from "react";
 import { useAuth, ModuleKey } from "@/hooks/use-auth";
 import {
-  LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X, FileBarChart, Building2, History, UserCircle, TrendingDown, DoorOpen, Settings, ClipboardCheck,
+  LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X, FileBarChart, Building2, History, UserCircle, TrendingDown, DoorOpen, Settings, ClipboardCheck, Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { NotificationBell } from "@/components/notification-bell";
+import { triggerInstallPrompt } from "@/components/install-pwa-prompt";
 
 export const Route = createFileRoute("/_app")({
   component: AppLayout,
@@ -110,6 +111,12 @@ function AppLayout() {
             </p>
           </div>
           <button
+            onClick={triggerInstallPrompt}
+            className="mb-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          >
+            <Download className="h-4 w-4 text-primary" /> Install App
+          </button>
+          <button
             onClick={signOut}
             className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           >
@@ -128,6 +135,15 @@ function AppLayout() {
           <div className="hidden text-sm text-muted-foreground sm:block">
             {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 rounded-lg border-primary/20 bg-primary/5 text-xs font-semibold text-primary hover:bg-primary/10"
+            onClick={triggerInstallPrompt}
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Install App</span>
+          </Button>
           <NotificationBell />
         </header>
         <main className="flex-1 px-4 py-6 md:px-8 md:py-8">

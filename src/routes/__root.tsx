@@ -11,6 +11,7 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { Toaster } from "@/components/ui/sonner";
 import { useEffect } from "react";
 import { applyStoredTheme } from "@/lib/theme";
+import { InstallPwaPrompt } from "@/components/install-pwa-prompt";
 
 import appCss from "../styles.css?url";
 
@@ -104,6 +105,7 @@ function RootComponent() {
       <AuthProvider>
         <Outlet />
         <Toaster richColors position="top-right" />
+        <InstallPwaPrompt />
       </AuthProvider>
     </QueryClientProvider>
   );
