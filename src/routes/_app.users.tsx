@@ -75,14 +75,19 @@ function UsersPage() {
   if (loading) return <div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
   if (!isAdmin) return <Navigate to="/dashboard" />;
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["users-with-roles"] });
+  const getAuthHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return {};
+    return { Authorization: `Bearer ${session.access_token}` };
+  };
 
   const create = async () => {
     if (!form.email || !form.password) { toast.error("Email and password required"); return; }
     if (form.password.length < 6) { toast.error("Password must be at least 6 characters"); return; }
     setSubmitting(true);
     try {
-      await createFn({ data: form });
+      const headers = await getAuthHeaders();
+      await createFn({ data: form, headers });
       toast.success("User created. Share the temporary password with them — they'll be asked to change it on first sign-in.");
       setOpen(false);
       setForm({ email: "", password: "", full_name: "", role: "staff" });
@@ -91,6 +96,16 @@ function UsersPage() {
       toast.error(e?.message ?? "Failed to create user");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const onReset = async (userId: string, newPass: string) => {
+    try {
+      const headers = await getAuthHeaders();
+      await resetFn({ data: { user_id: userId, new_password: newPass }, headers });
+      toast.success("Password reset successfully");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to reset password");
     }
   };
 
@@ -147,13 +162,25 @@ function UsersPage() {
   };
 
   const onToggleActive = async (userId: string, makeActive: boolean) => {
-    try { await activeFn({ data: { user_id: userId, active: makeActive } }); toast.success(makeActive ? "User reactivated" : "User deactivated"); invalidate(); }
-    catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    try {
+      const headers = await getAuthHeaders();
+      await activeFn({ data: { user_id: userId, active: makeActive }, headers });
+      toast.success(makeActive ? "User reactivated" : "User deactivated");
+      invalidate();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    }
   };
 
   const onDelete = async (userId: string) => {
-    try { await deleteFn({ data: { user_id: userId } }); toast.success("User deleted"); invalidate(); }
-    catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    try {
+      const headers = await getAuthHeaders();
+      await deleteFn({ data: { user_id: userId }, headers });
+      toast.success("User deleted");
+      invalidate();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    }
   };
 
   return (

@@ -4,14 +4,29 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 async function assertAdmin(userId: string) {
+  if (!userId) throw new Error("Admin privileges required: Not authenticated");
   const { data, error } = await supabaseAdmin
     .from("user_roles")
     .select("role")
     .eq("user_id", userId)
     .eq("role", "admin")
     .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) throw new Error("Admin privileges required");
+  if (error) {
+    console.error("[assertAdmin] Error querying user_roles:", error);
+    throw new Error(error.message);
+  }
+  if (!data) {
+    // If no admin record exists for this user ID, check if user_roles has any admin at all
+    const { count } = await supabaseAdmin
+      .from("user_roles")
+      .select("*", { count: "exact", head: true });
+    if (!count) {
+      // First user setup: insert admin role for current user
+      await supabaseAdmin.from("user_roles").insert({ user_id: userId, role: "admin" });
+      return;
+    }
+    throw new Error("Admin privileges required: Your account does not have Admin rights");
+  }
 }
 
 export const createUserAccount = createServerFn({ method: "POST" })

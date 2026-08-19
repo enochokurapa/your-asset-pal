@@ -28,17 +28,28 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
       throw new Response('Unauthorized: No request headers available', { status: 401 });
     }
 
-    const authHeader = request.headers.get('authorization');
+    let authHeader = request.headers.get('authorization') || request.headers.get('x-supabase-auth');
+
+    if (!authHeader) {
+      const cookie = request.headers.get('cookie');
+      if (cookie) {
+        const match = cookie.match(/sb-[a-z0-9-]+-auth-token=([^;]+)/i);
+        if (match) {
+          try {
+            const parsed = JSON.parse(decodeURIComponent(match[1]));
+            if (parsed?.access_token) {
+              authHeader = `Bearer ${parsed.access_token}`;
+            }
+          } catch {}
+        }
+      }
+    }
 
     if (!authHeader) {
       throw new Response('Unauthorized: No authorization header provided', { status: 401 });
     }
 
-    if (!authHeader.startsWith('Bearer ')) {
-      throw new Response('Unauthorized: Only Bearer tokens are supported', { status: 401 });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
+    const token = authHeader.startsWith('Bearer ') ? authHeader.replace('Bearer ', '') : authHeader;
     if (!token) {
       throw new Response('Unauthorized: No token provided', { status: 401 });
     }
