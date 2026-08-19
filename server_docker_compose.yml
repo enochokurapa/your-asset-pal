@@ -1,0 +1,80 @@
+version: "3.8"
+
+services:
+  ams-db:
+    image: postgres:15-alpine
+    container_name: ams-db
+    restart: always
+    environment:
+      POSTGRES_DB: ams
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: super-secret-postgres-password
+    volumes:
+      - ams-db-data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    networks:
+      - coolify
+
+  ams-auth:
+    image: supabase/gotrue:v2.158.1
+    container_name: ams-auth
+    restart: always
+    depends_on:
+      - ams-db
+    environment:
+      GOTRUE_API_HOST: "0.0.0.0"
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: "https://ams.owltechsolutionsltd.com/auth/v1"
+      GOTRUE_API_EXTERNAL_URL: "https://ams.owltechsolutionsltd.com/auth/v1"
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:super-secret-postgres-password@ams-db:5432/ams?sslmode=disable
+      GOTRUE_SITE_URL: https://ams.owltechsolutionsltd.com
+      GOTRUE_URI_ALLOW_LIST: "*"
+      GOTRUE_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_DISABLE_SIGNUP: "false"
+    networks:
+      - coolify
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ams-auth-https.rule=Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/auth/v1`)"
+      - "traefik.http.routers.ams-auth-https.entrypoints=https"
+      - "traefik.http.routers.ams-auth-https.tls=true"
+      - "traefik.http.routers.ams-auth-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.ams-auth-https.priority=10000"
+      - "traefik.http.routers.ams-auth-https.service=ams-auth-svc"
+      - "traefik.http.services.ams-auth-svc.loadbalancer.server.port=9999"
+
+  ams-rest:
+    image: postgrest/postgrest:v12.2.0
+    container_name: ams-rest
+    restart: always
+    depends_on:
+      - ams-db
+    environment:
+      PGRST_DB_URI: postgres://authenticator:super-secret-postgres-password@ams-db:5432/ams
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+    networks:
+      - coolify
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ams-rest-https.rule=Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/rest/v1`)"
+      - "traefik.http.routers.ams-rest-https.entrypoints=https"
+      - "traefik.http.routers.ams-rest-https.tls=true"
+      - "traefik.http.routers.ams-rest-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.ams-rest-https.priority=10000"
+      - "traefik.http.routers.ams-rest-https.service=ams-rest-svc"
+      - "traefik.http.services.ams-rest-svc.loadbalancer.server.port=3000"
+
+networks:
+  coolify:
+    external: true
+
+volumes:
+  ams-db-data:

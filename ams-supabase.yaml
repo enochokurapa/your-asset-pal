@@ -1,0 +1,43 @@
+http:
+  routers:
+    ams-auth-https:
+      rule: "Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/auth`)"
+      service: "ams-auth-service"
+      entryPoints:
+        - "https"
+      tls:
+        certResolver: "letsencrypt"
+      priority: 10000
+
+    ams-rest-https:
+      rule: "Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/rest`)"
+      service: "ams-rest-service"
+      entryPoints:
+        - "https"
+      tls:
+        certResolver: "letsencrypt"
+      priority: 10000
+
+    ams-auth-http:
+      rule: "Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/auth`)"
+      service: "ams-auth-service"
+      entryPoints:
+        - "http"
+      priority: 10000
+
+    ams-rest-http:
+      rule: "Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/rest`)"
+      service: "ams-rest-service"
+      entryPoints:
+        - "http"
+      priority: 10000
+
+  services:
+    ams-auth-service:
+      loadBalancer:
+        servers:
+          - url: "http://ams-auth:9999"
+    ams-rest-service:
+      loadBalancer:
+        servers:
+          - url: "http://ams-rest:3000"
