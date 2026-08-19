@@ -41,12 +41,15 @@ services:
       - coolify
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=coolify"
       - "traefik.http.routers.ams-auth-https.rule=Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/auth/v1`)"
       - "traefik.http.routers.ams-auth-https.entrypoints=https"
       - "traefik.http.routers.ams-auth-https.tls=true"
       - "traefik.http.routers.ams-auth-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.ams-auth-https.priority=10000"
       - "traefik.http.routers.ams-auth-https.service=ams-auth-svc"
+      - "traefik.http.routers.ams-auth-https.middlewares=ams-auth-strip@docker"
+      - "traefik.http.middlewares.ams-auth-strip.stripprefix.prefixes=/auth/v1"
       - "traefik.http.services.ams-auth-svc.loadbalancer.server.port=9999"
 
   ams-rest:
@@ -64,12 +67,15 @@ services:
       - coolify
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=coolify"
       - "traefik.http.routers.ams-rest-https.rule=Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/rest/v1`)"
       - "traefik.http.routers.ams-rest-https.entrypoints=https"
       - "traefik.http.routers.ams-rest-https.tls=true"
       - "traefik.http.routers.ams-rest-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.ams-rest-https.priority=10000"
       - "traefik.http.routers.ams-rest-https.service=ams-rest-svc"
+      - "traefik.http.routers.ams-rest-https.middlewares=ams-rest-strip@docker"
+      - "traefik.http.middlewares.ams-rest-strip.stripprefix.prefixes=/rest/v1"
       - "traefik.http.services.ams-rest-svc.loadbalancer.server.port=3000"
 
 networks:
@@ -78,3 +84,4 @@ networks:
 
 volumes:
   ams-db-data:
+
