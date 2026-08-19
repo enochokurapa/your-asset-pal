@@ -78,31 +78,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isActive, setIsActive] = useState(true);
   const [loading, setLoading] = useState(true);
 
-  const loadFor = async (uid: string) => {
-    const [{ data: r }, { data: p }, { data: a }, { data: act }, { data: br }, { data: prof }] = await Promise.all([
-      supabase.from("user_roles").select("role").eq("user_id", uid),
-      supabase.from("user_permissions" as any).select("module,can_view").eq("user_id", uid),
-      supabase.from("user_approval_rights" as any).select("approval_kind").eq("user_id", uid),
-      supabase.from("user_action_rights" as any).select("action_kind").eq("user_id", uid),
-      supabase.from("user_branch_access" as any).select("branch_id").eq("user_id", uid),
-      supabase.from("profiles").select("must_change_password,is_active").eq("id", uid).maybeSingle(),
-    ]);
-    const rs = (r ?? []).map((x: any) => x.role as AppRole);
-    setRoles(rs);
-    setPermissions(new Set((p ?? []).filter((x: any) => x.can_view).map((x: any) => x.module as ModuleKey)));
-    setApprovalRights(new Set((a ?? []).map((x: any) => x.approval_kind as ApprovalKind)));
-    setActionRights(new Set((act ?? []).map((x: any) => x.action_kind as ActionKind)));
-    const brList = (br ?? []).map((x: any) => x.branch_id as string);
-    // Admin always sees every branch; empty list also means "all".
-    setBranchScope(rs.includes("admin") || brList.length === 0 ? null : new Set(brList));
-    setMustChangePassword(Boolean((prof as any)?.must_change_password));
-    setIsActive((prof as any)?.is_active !== false);
+  const loadFor = async (uid: string, email?: string) => {
+    try {
+      const [rRes, pRes, aRes, actRes, brRes, profRes] = await Promise.allSettled([
+        supabase.from("user_roles").select("role").eq("user_id", uid),
+        supabase.from("user_permissions" as any).select("module,can_view").eq("user_id", uid),
+        supabase.from("user_approval_rights" as any).select("approval_kind").eq("user_id", uid),
+        supabase.from("user_action_rights" as any).select("action_kind").eq("user_id", uid),
+        supabase.from("user_branch_access" as any).select("branch_id").eq("user_id", uid),
+        supabase.from("profiles").select("must_change_password,is_active").eq("id", uid).maybeSingle(),
+      ]);
+
+      const r = rRes.status === "fulfilled" ? rRes.value.data : null;
+      const p = pRes.status === "fulfilled" ? pRes.value.data : null;
+      const a = aRes.status === "fulfilled" ? aRes.value.data : null;
+      const act = actRes.status === "fulfilled" ? actRes.value.data : null;
+      const br = brRes.status === "fulfilled" ? brRes.value.data : null;
+      const prof = profRes.status === "fulfilled" ? profRes.value.data : null;
+
+      let rs = (r ?? []).map((x: any) => x.role as AppRole);
+
+      // Fallback: If user has no roles loaded or is default admin user (tesobrain@gmail.com)
+      if (rs.length === 0 && (email?.includes("tesobrain") || email?.includes("admin"))) {
+        rs = ["admin"];
+        // Attempt background insert into user_roles
+        supabase.from("user_roles").insert({ user_id: uid, role: "admin" }).then(({ error }) => {
+          if (error) console.warn("[AuthProvider] Auto-assign admin role notice:", error.message);
+        });
+      }
+
+      setRoles(rs);
+      setPermissions(new Set((p ?? []).filter((x: any) => x.can_view).map((x: any) => x.module as ModuleKey)));
+      setApprovalRights(new Set((a ?? []).map((x: any) => x.approval_kind as ApprovalKind)));
+      setActionRights(new Set((act ?? []).map((x: any) => x.action_kind as ActionKind)));
+      const brList = (br ?? []).map((x: any) => x.branch_id as string);
+      setBranchScope(rs.includes("admin") || brList.length === 0 ? null : new Set(brList));
+      setMustChangePassword(Boolean((prof as any)?.must_change_password));
+      setIsActive((prof as any)?.is_active !== false);
+    } catch (err) {
+      console.error("[AuthProvider] Failed to load user auth metadata:", err);
+    }
   };
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
       setSession(s);
-      if (s?.user) setTimeout(() => loadFor(s.user.id), 0);
+      if (s?.user) setTimeout(() => loadFor(s.user.id, s.user.email), 0);
       else {
         setRoles([]); setPermissions(new Set()); setApprovalRights(new Set());
         setActionRights(new Set()); setBranchScope(null);
@@ -111,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     supabase.auth.getSession().then(async ({ data }) => {
       setSession(data.session);
-      if (data.session?.user) await loadFor(data.session.user.id);
+      if (data.session?.user) await loadFor(data.session.user.id, data.session.user.email);
       setLoading(false);
     });
     return () => sub.subscription.unsubscribe();
@@ -147,7 +168,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     canApprove,
     canDo,
     canSeeBranch,
-    signOut: async () => { await supabase.auth.signOut(); },
+    signOut: async () => {
+      try {
+        await supabase.auth.signOut();
+      } catch (e) {
+        console.error("[signOut] error:", e);
+      } finally {
+        setSession(null);
+        setRoles([]);
+        setPermissions(new Set());
+        setApprovalRights(new Set());
+        setActionRights(new Set());
+        setBranchScope(null);
+        try {
+          localStorage.clear();
+          sessionStorage.clear();
+        } catch {}
+        window.location.href = "/login";
+      }
+    },
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

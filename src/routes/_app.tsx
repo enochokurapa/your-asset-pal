@@ -80,7 +80,7 @@ function AppLayout() {
           </button>
         </div>
 
-        <nav className="flex-1 space-y-1 p-3">
+        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
           {visibleNav.map((item) => {
             const active = pathname.startsWith(item.to);
             const Icon = item.icon;
@@ -145,6 +145,9 @@ function AppLayout() {
             <span className="hidden sm:inline">Install App</span>
           </Button>
           <NotificationBell />
+          <Button variant="ghost" size="icon" title="Sign out" onClick={signOut} aria-label="Sign out">
+            <LogOut className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+          </Button>
         </header>
         <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
           <Outlet />
