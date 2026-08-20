@@ -11,7 +11,7 @@ services:
       POSTGRES_PASSWORD: super-secret-postgres-password
     volumes:
       - ams-db-data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./complete_init.sql:/docker-entrypoint-initdb.d/01-init.sql
     networks:
       - coolify
 
@@ -42,15 +42,22 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=coolify"
+      # StripPrefix middleware: GoTrue listens at root, so strip /auth/v1 before forwarding
+      - "traefik.http.middlewares.ams-auth-strip.stripprefix.prefixes=/auth/v1"
       - "traefik.http.routers.ams-auth-https.rule=Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/auth/v1`)"
       - "traefik.http.routers.ams-auth-https.entrypoints=https"
       - "traefik.http.routers.ams-auth-https.tls=true"
       - "traefik.http.routers.ams-auth-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.ams-auth-https.priority=10000"
-      - "traefik.http.routers.ams-auth-https.service=ams-auth-svc"
       - "traefik.http.routers.ams-auth-https.middlewares=ams-auth-strip@docker"
-      - "traefik.http.middlewares.ams-auth-strip.stripprefix.prefixes=/auth/v1"
+      - "traefik.http.routers.ams-auth-https.service=ams-auth-svc"
       - "traefik.http.services.ams-auth-svc.loadbalancer.server.port=9999"
+      # HTTP router
+      - "traefik.http.routers.ams-auth-http.rule=Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/auth/v1`)"
+      - "traefik.http.routers.ams-auth-http.entrypoints=http"
+      - "traefik.http.routers.ams-auth-http.priority=10000"
+      - "traefik.http.routers.ams-auth-http.middlewares=ams-auth-strip@docker"
+      - "traefik.http.routers.ams-auth-http.service=ams-auth-svc"
 
   ams-rest:
     image: postgrest/postgrest:v12.2.0
@@ -68,15 +75,22 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=coolify"
+      # StripPrefix middleware: PostgREST listens at root, so strip /rest/v1 before forwarding
+      - "traefik.http.middlewares.ams-rest-strip.stripprefix.prefixes=/rest/v1"
       - "traefik.http.routers.ams-rest-https.rule=Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/rest/v1`)"
       - "traefik.http.routers.ams-rest-https.entrypoints=https"
       - "traefik.http.routers.ams-rest-https.tls=true"
       - "traefik.http.routers.ams-rest-https.tls.certresolver=letsencrypt"
       - "traefik.http.routers.ams-rest-https.priority=10000"
-      - "traefik.http.routers.ams-rest-https.service=ams-rest-svc"
       - "traefik.http.routers.ams-rest-https.middlewares=ams-rest-strip@docker"
-      - "traefik.http.middlewares.ams-rest-strip.stripprefix.prefixes=/rest/v1"
+      - "traefik.http.routers.ams-rest-https.service=ams-rest-svc"
       - "traefik.http.services.ams-rest-svc.loadbalancer.server.port=3000"
+      # HTTP router
+      - "traefik.http.routers.ams-rest-http.rule=Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/rest/v1`)"
+      - "traefik.http.routers.ams-rest-http.entrypoints=http"
+      - "traefik.http.routers.ams-rest-http.priority=10000"
+      - "traefik.http.routers.ams-rest-http.middlewares=ams-rest-strip@docker"
+      - "traefik.http.routers.ams-rest-http.service=ams-rest-svc"
 
 networks:
   coolify:
@@ -84,4 +98,3 @@ networks:
 
 volumes:
   ams-db-data:
-
