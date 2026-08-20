@@ -1,36 +1,54 @@
 http:
   routers:
     ams-auth-https:
-      rule: "Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/auth`)"
+      rule: "Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/auth/v1`)"
       service: "ams-auth-service"
       entryPoints:
         - "https"
       tls:
         certResolver: "letsencrypt"
       priority: 10000
+      middlewares:
+        - "ams-auth-strip"
 
     ams-rest-https:
-      rule: "Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/rest`)"
+      rule: "Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/rest/v1`)"
       service: "ams-rest-service"
       entryPoints:
         - "https"
       tls:
         certResolver: "letsencrypt"
       priority: 10000
+      middlewares:
+        - "ams-rest-strip"
 
     ams-auth-http:
-      rule: "Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/auth`)"
+      rule: "Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/auth/v1`)"
       service: "ams-auth-service"
       entryPoints:
         - "http"
       priority: 10000
+      middlewares:
+        - "ams-auth-strip"
 
     ams-rest-http:
-      rule: "Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/rest`)"
+      rule: "Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/rest/v1`)"
       service: "ams-rest-service"
       entryPoints:
         - "http"
       priority: 10000
+      middlewares:
+        - "ams-rest-strip"
+
+  middlewares:
+    ams-auth-strip:
+      stripPrefix:
+        prefixes:
+          - "/auth/v1"
+    ams-rest-strip:
+      stripPrefix:
+        prefixes:
+          - "/rest/v1"
 
   services:
     ams-auth-service:
