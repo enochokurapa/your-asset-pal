@@ -35,6 +35,7 @@ LANGUAGE sql STABLE
 AS $$
   SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
 $$;
+ALTER FUNCTION auth.uid() OWNER TO supabase_auth_admin;
 
 CREATE OR REPLACE FUNCTION auth.role()
 RETURNS text
@@ -42,6 +43,7 @@ LANGUAGE sql STABLE
 AS $$
   SELECT nullif(current_setting('request.jwt.claim.role', true), '')::text;
 $$;
+ALTER FUNCTION auth.role() OWNER TO supabase_auth_admin;
 
 CREATE OR REPLACE FUNCTION auth.jwt()
 RETURNS jsonb
@@ -49,6 +51,7 @@ LANGUAGE sql STABLE
 AS $$
   SELECT nullif(current_setting('request.jwt.claims', true), '')::jsonb;
 $$;
+ALTER FUNCTION auth.jwt() OWNER TO supabase_auth_admin;
 
 GRANT ALL ON SCHEMA public TO postgres, supabase_auth_admin;
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
