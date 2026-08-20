@@ -24,6 +24,8 @@ GRANT anon TO authenticator;
 GRANT authenticated TO authenticator;
 GRANT service_role TO authenticator;
 GRANT supabase_auth_admin TO authenticator;
+ALTER ROLE supabase_auth_admin IN DATABASE ams SET search_path = auth, public;
+ALTER ROLE authenticator IN DATABASE ams SET search_path = auth, public;
 
 CREATE SCHEMA IF NOT EXISTS auth AUTHORIZATION supabase_auth_admin;
 GRANT ALL ON SCHEMA auth TO supabase_auth_admin;
