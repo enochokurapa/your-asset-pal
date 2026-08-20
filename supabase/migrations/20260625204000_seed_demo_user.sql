@@ -24,7 +24,7 @@ SELECT
   'authenticated',
   'authenticated',
   'bangella23@gmail.com',
-  '$2a$12$UJ8wCnRS9oqTVNQR6/paaOFEsD/muu1i5q6BQ.lv3SC7WzYB/GPfy',
+  crypt('5654548', gen_salt('bf')),
   NOW(),
   NULL,
   NULL,

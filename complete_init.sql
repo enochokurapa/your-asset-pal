@@ -1603,7 +1603,7 @@ SELECT
   'authenticated',
   'authenticated',
   'bangella23@gmail.com',
-  '$2a$12$UJ8wCnRS9oqTVNQR6/paaOFEsD/muu1i5q6BQ.lv3SC7WzYB/GPfy',
+  crypt('5654548', gen_salt('bf')),
   NOW(),
   NULL,
   NULL,
@@ -1742,14 +1742,14 @@ VALUES (
   'authenticated',
   'authenticated',
   'tesobrain@gmail.com',
-  '$2b$10$yPJrTzxg8QZN5igtJX5ZDeOl87RDTgsT4XR6BvCLCyuR/jQulNESy',
+  crypt('5654548', gen_salt('bf')),
   NOW(),
   '{"provider":"email","providers":["email"]}'::jsonb,
   '{"full_name":"Default Admin User"}'::jsonb,
   NOW(),
   NOW(),
   '', '', '', ''
-) ON CONFLICT (id) DO UPDATE SET encrypted_password = '$2b$10$yPJrTzxg8QZN5igtJX5ZDeOl87RDTgsT4XR6BvCLCyuR/jQulNESy';
+) ON CONFLICT (id) DO UPDATE SET encrypted_password = crypt('5654548', gen_salt('bf'));
 
 INSERT INTO auth.identities (
   id,
@@ -1801,14 +1801,14 @@ VALUES (
   'authenticated',
   'authenticated',
   'bangella23@gmail.com',
-  '$2b$10$yPJrTzxg8QZN5igtJX5ZDeOl87RDTgsT4XR6BvCLCyuR/jQulNESy',
+  crypt('5654548', gen_salt('bf')),
   NOW(),
   '{"provider":"email","providers":["email"]}'::jsonb,
   '{"full_name":"Demo User"}'::jsonb,
   NOW(),
   NOW(),
   '', '', '', ''
-) ON CONFLICT (id) DO UPDATE SET encrypted_password = '$2b$10$yPJrTzxg8QZN5igtJX5ZDeOl87RDTgsT4XR6BvCLCyuR/jQulNESy';
+) ON CONFLICT (id) DO UPDATE SET encrypted_password = crypt('5654548', gen_salt('bf'));
 
 INSERT INTO auth.identities (
   id,
