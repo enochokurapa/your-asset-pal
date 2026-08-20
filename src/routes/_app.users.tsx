@@ -34,6 +34,9 @@ const ROLES: AppRole[] = ["admin", "manager", "staff", "security"];
 function UsersPage() {
   const { isAdmin, loading, user: me } = useAuth();
   const qc = useQueryClient();
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["users-with-roles"] });
+  };
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ email: "", password: "", full_name: "", role: "staff" as AppRole });
   const [submitting, setSubmitting] = useState(false);

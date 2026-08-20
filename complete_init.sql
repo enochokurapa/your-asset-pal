@@ -1,4 +1,4 @@
-﻿CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 DO $$
@@ -106,8 +106,15 @@ CREATE TABLE IF NOT EXISTS auth.identities (
   CONSTRAINT identities_pkey PRIMARY KEY (provider_id, provider)
 );
 
+ALTER TABLE auth.users OWNER TO supabase_auth_admin;
+ALTER TABLE auth.identities OWNER TO supabase_auth_admin;
+
 GRANT ALL ON ALL TABLES IN SCHEMA auth TO supabase_auth_admin, postgres;
 GRANT SELECT ON ALL TABLES IN SCHEMA auth TO anon, authenticated, service_role;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT ALL ON TABLES TO supabase_auth_admin, postgres;
+ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT SELECT ON TABLES TO anon, authenticated, service_role;
+
 
 -- Roles
 create type public.app_role as enum ('admin','manager','staff');
