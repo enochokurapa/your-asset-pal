@@ -33,6 +33,7 @@ services:
       API_EXTERNAL_URL: "https://ams.owltechsolutionsltd.com/auth/v1"
       GOTRUE_API_EXTERNAL_URL: "https://ams.owltechsolutionsltd.com/auth/v1"
       GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_NAMESPACE: auth
       GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:super-secret-postgres-password@ams-db:5432/ams?sslmode=disable
       GOTRUE_SITE_URL: https://ams.owltechsolutionsltd.com
       GOTRUE_URI_ALLOW_LIST: "*"
