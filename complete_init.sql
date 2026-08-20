@@ -657,15 +657,23 @@ DROP TRIGGER IF EXISTS trg_audit_approvals ON public.approval_requests;
 CREATE TRIGGER trg_audit_approvals AFTER INSERT OR UPDATE OR DELETE ON public.approval_requests
   FOR EACH ROW EXECUTE FUNCTION public.write_audit();
 
--- 11. Realtime (safe: create publication if it doesn't exist, then add tables)
+-- 11. Realtime (safe for PG15: all in one DO block)
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
     CREATE PUBLICATION supabase_realtime;
   END IF;
+  IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'notifications' AND relnamespace = 'public'::regnamespace) THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'notifications') THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+    END IF;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'approval_requests' AND relnamespace = 'public'::regnamespace) THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'approval_requests') THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.approval_requests;
+    END IF;
+  END IF;
 END $$;
-ALTER PUBLICATION supabase_realtime ADD TABLE IF EXISTS public.notifications;
-ALTER PUBLICATION supabase_realtime ADD TABLE IF EXISTS public.approval_requests;
 
 REVOKE EXECUTE ON FUNCTION public.notify_on_approval() FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.write_audit() FROM PUBLIC, anon, authenticated;
