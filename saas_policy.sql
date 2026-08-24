@@ -1,9 +1,17 @@
 -- SaaS control-plane policy layer for AssetFlow.
 -- Safe to run on the existing database after complete_init.sql.
--- This introduces SaaS-admin vs tenant-admin separation, 28-day trials,
+-- Introduces SaaS-admin vs tenant-admin separation, 28-day trials,
 -- module entitlements, paid custom-domain gating, and billing records.
 
 BEGIN;
+
+-- Supabase/PostgREST service_role must really bypass RLS for trusted server functions.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+    ALTER ROLE service_role BYPASSRLS;
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS public.saas_settings (
   id boolean PRIMARY KEY DEFAULT true CHECK (id = true),
@@ -52,7 +60,7 @@ SET tenant_role = CASE
   ELSE 'member'
 END;
 
--- SaaS owner account. This is separate from the tenant 'admin' application role.
+-- Platform owner. This flag is separate from a tenant application role.
 UPDATE public.profiles
 SET is_saas_admin = true
 WHERE lower(email) = 'tesobrain@gmail.com';
@@ -131,6 +139,21 @@ RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$
   SELECT tenant_id FROM public.profiles WHERE id=auth.uid();
 $$;
 
+CREATE OR REPLACE FUNCTION public.can_manage_tenant_user(_actor uuid, _target uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$
+  SELECT public.is_saas_admin(_actor)
+    OR EXISTS (
+      SELECT 1
+      FROM public.profiles a
+      JOIN public.profiles t ON t.id = _target
+      WHERE a.id = _actor
+        AND a.tenant_role = 'tenant_admin'
+        AND a.tenant_id IS NOT NULL
+        AND a.tenant_id = t.tenant_id
+        AND t.is_saas_admin = false
+    );
+$$;
+
 ALTER TABLE public.saas_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.saas_modules ENABLE ROW LEVEL SECURITY;
@@ -160,9 +183,69 @@ DROP POLICY IF EXISTS "tenant read own billing" ON public.billing_transactions;
 CREATE POLICY "tenant read own billing" ON public.billing_transactions FOR SELECT TO authenticated
   USING (tenant_id = public.current_tenant_id() OR public.is_saas_admin(auth.uid()));
 
+-- Remove legacy cross-workspace profile/role reads and keep tenant-scoped reads.
+DROP POLICY IF EXISTS "auth read profiles" ON public.profiles;
+DROP POLICY IF EXISTS "profiles select self" ON public.profiles;
+DROP POLICY IF EXISTS "profiles select admin" ON public.profiles;
+DROP POLICY IF EXISTS "users read profiles" ON public.profiles;
+DROP POLICY IF EXISTS "read profiles" ON public.profiles;
+CREATE POLICY "profiles select tenant" ON public.profiles FOR SELECT TO authenticated
+  USING (tenant_id = public.current_tenant_id() OR id = auth.uid() OR public.is_saas_admin(auth.uid()));
+
+DROP POLICY IF EXISTS "auth read roles" ON public.user_roles;
+DROP POLICY IF EXISTS "user_roles select self" ON public.user_roles;
+DROP POLICY IF EXISTS "user_roles select admin" ON public.user_roles;
+CREATE POLICY "user_roles select tenant" ON public.user_roles FOR SELECT TO authenticated
+  USING (user_id = auth.uid() OR public.can_manage_tenant_user(auth.uid(), user_id));
+
+-- Tenant admins must never be able to alter the SaaS administrator or another tenant's user controls.
+DROP POLICY IF EXISTS "tenant safe insert roles" ON public.user_roles;
+DROP POLICY IF EXISTS "tenant safe update roles" ON public.user_roles;
+DROP POLICY IF EXISTS "tenant safe delete roles" ON public.user_roles;
+CREATE POLICY "tenant safe insert roles" AS RESTRICTIVE ON public.user_roles FOR INSERT TO authenticated
+  WITH CHECK (public.can_manage_tenant_user(auth.uid(), user_id));
+CREATE POLICY "tenant safe update roles" AS RESTRICTIVE ON public.user_roles FOR UPDATE TO authenticated
+  USING (public.can_manage_tenant_user(auth.uid(), user_id))
+  WITH CHECK (public.can_manage_tenant_user(auth.uid(), user_id));
+CREATE POLICY "tenant safe delete roles" AS RESTRICTIVE ON public.user_roles FOR DELETE TO authenticated
+  USING (public.can_manage_tenant_user(auth.uid(), user_id));
+
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['user_permissions','user_action_rights','user_approval_rights','user_branch_access']
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS "auth read %1$s" ON public.%1$I', t);
+    EXECUTE format('DROP POLICY IF EXISTS "%1$s select self" ON public.%1$I', t);
+    EXECUTE format('DROP POLICY IF EXISTS "%1$s select admin" ON public.%1$I', t);
+    EXECUTE format('DROP POLICY IF EXISTS "%1$s tenant read" ON public.%1$I', t);
+    EXECUTE format($p$CREATE POLICY "%1$s tenant read" ON public.%1$I
+      FOR SELECT TO authenticated
+      USING (user_id = auth.uid() OR public.can_manage_tenant_user(auth.uid(), user_id))$p$, t);
+
+    EXECUTE format('DROP POLICY IF EXISTS "%1$s tenant safe insert" ON public.%1$I', t);
+    EXECUTE format('DROP POLICY IF EXISTS "%1$s tenant safe update" ON public.%1$I', t);
+    EXECUTE format('DROP POLICY IF EXISTS "%1$s tenant safe delete" ON public.%1$I', t);
+    EXECUTE format($p$CREATE POLICY "%1$s tenant safe insert" AS RESTRICTIVE ON public.%1$I
+      FOR INSERT TO authenticated WITH CHECK (public.can_manage_tenant_user(auth.uid(), user_id))$p$, t);
+    EXECUTE format($p$CREATE POLICY "%1$s tenant safe update" AS RESTRICTIVE ON public.%1$I
+      FOR UPDATE TO authenticated USING (public.can_manage_tenant_user(auth.uid(), user_id))
+      WITH CHECK (public.can_manage_tenant_user(auth.uid(), user_id))$p$, t);
+    EXECUTE format($p$CREATE POLICY "%1$s tenant safe delete" AS RESTRICTIVE ON public.%1$I
+      FOR DELETE TO authenticated USING (public.can_manage_tenant_user(auth.uid(), user_id))$p$, t);
+  END LOOP;
+END $$;
+
+-- Sensitive SaaS/tenant flags can only be changed by trusted server functions.
+-- Browser users may edit only their display name and clear their first-login password flag.
+REVOKE UPDATE ON public.profiles FROM authenticated;
+GRANT UPDATE (full_name, must_change_password) ON public.profiles TO authenticated;
+
 REVOKE EXECUTE ON FUNCTION public.is_saas_admin(uuid) FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION public.current_tenant_id() FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.can_manage_tenant_user(uuid, uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.is_saas_admin(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.current_tenant_id() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.can_manage_tenant_user(uuid, uuid) TO authenticated, service_role;
 
 COMMIT;
