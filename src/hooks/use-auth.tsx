@@ -63,6 +63,7 @@ interface AuthCtx {
   tenantName: string | null;
   subscriptionStatus: SubscriptionStatus;
   trialEndsAt: string | null;
+  subscriptionEndsAt: string | null;
   enabledModules: Set<ModuleKey>;
   canExportReports: boolean;
   canUseCustomDomain: boolean;
@@ -91,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [tenantName, setTenantName] = useState<string | null>(null);
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>("unknown");
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
+  const [subscriptionEndsAt, setSubscriptionEndsAt] = useState<string | null>(null);
   const [enabledModules, setEnabledModules] = useState<Set<ModuleKey>>(new Set(ALL_MODULES));
   const [loading, setLoading] = useState(true);
 
@@ -99,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setActionRights(new Set()); setBranchScope(null); setMustChangePassword(false);
     setIsActive(true); setIsSaasAdmin(false); setTenantRole("member");
     setTenantId(null); setTenantName(null); setSubscriptionStatus("unknown");
-    setTrialEndsAt(null); setEnabledModules(new Set(ALL_MODULES));
+    setTrialEndsAt(null); setSubscriptionEndsAt(null); setEnabledModules(new Set(ALL_MODULES));
   };
 
   const loadFor = async (uid: string) => {
@@ -133,19 +135,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setTenantRole(prof?.tenant_role === "tenant_admin" ? "tenant_admin" : "member");
       setTenantId(prof?.tenant_id ?? null);
 
-      // SaaS policy tables are loaded separately so an older DB can still show the app
-      // long enough for the migration to be applied. Once present, they become authoritative.
       if (prof?.tenant_id) {
         const [{ data: tenant }, { data: modules }, { data: overrides }] = await Promise.all([
-          (supabase as any).from("tenants").select("name,subscription_status,trial_ends_at").eq("id", prof.tenant_id).maybeSingle(),
+          (supabase as any).from("tenants").select("name,subscription_status,trial_ends_at,subscription_ends_at").eq("id", prof.tenant_id).maybeSingle(),
           (supabase as any).from("saas_modules").select("module_key,globally_enabled,trial_enabled,paid_enabled").order("sort_order"),
           (supabase as any).from("tenant_module_overrides").select("module_key,enabled").eq("tenant_id", prof.tenant_id),
         ]);
         if (tenant) {
           setTenantName(tenant.name ?? null);
           setTrialEndsAt(tenant.trial_ends_at ?? null);
+          setSubscriptionEndsAt(tenant.subscription_ends_at ?? null);
+
           let effective: SubscriptionStatus = tenant.subscription_status ?? "unknown";
-          if (effective === "trial" && tenant.trial_ends_at && new Date(tenant.trial_ends_at).getTime() <= Date.now()) effective = "expired";
+          const now = Date.now();
+          if (effective === "trial" && tenant.trial_ends_at && new Date(tenant.trial_ends_at).getTime() <= now) effective = "expired";
+          if (effective === "active" && tenant.subscription_ends_at && new Date(tenant.subscription_ends_at).getTime() <= now) effective = "expired";
           setSubscriptionStatus(effective);
 
           const paid = effective === "active";
@@ -196,7 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthCtx = {
     user: session?.user ?? null, session, roles, permissions, approvalRights, actionRights, branchScope,
     loading, mustChangePassword, isActive, isAdmin, isTenantAdmin, isSaasAdmin, isManager,
-    tenantId, tenantName, subscriptionStatus, trialEndsAt, enabledModules,
+    tenantId, tenantName, subscriptionStatus, trialEndsAt, subscriptionEndsAt, enabledModules,
     canExportReports: subscriptionStatus === "active",
     canUseCustomDomain: subscriptionStatus === "active",
     canWrite: subscriptionUsable && (isAdmin || isManager),
