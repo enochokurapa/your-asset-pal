@@ -40,7 +40,7 @@ function BillingPage() {
   const daysLeft = trialEndsAt ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000)) : null;
 
   const start = async () => {
-    if (!isTenantAdmin) return toast.error("Only a tenant administrator can upgrade the workspace");
+    if (!isTenantAdmin) return toast.error("Only an admin can upgrade the workspace");
     setBusy(true);
     try {
       const headers = await getServerAuthHeaders();
@@ -74,22 +74,22 @@ function BillingPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="p-5"><p className="text-xs uppercase tracking-wide text-muted-foreground">Current status</p><div className="mt-2 flex items-center gap-2"><Badge className="capitalize">{subscriptionStatus}</Badge>{subscriptionStatus === "active" && <CheckCircle2 className="h-4 w-4 text-success" />}</div></Card>
         <Card className="p-5"><p className="text-xs uppercase tracking-wide text-muted-foreground">Free trial</p><p className="mt-2 text-xl font-semibold">4 weeks</p>{subscriptionStatus === "trial" && daysLeft !== null && <p className="mt-1 text-xs text-muted-foreground">{daysLeft} day(s) remaining</p>}</Card>
-        <Card className="p-5"><p className="text-xs uppercase tracking-wide text-muted-foreground">Paid plan</p><p className="mt-2 text-xl font-semibold">{price > 0 ? money(price, currency) : "Price not set"}</p><p className="mt-1 text-xs text-muted-foreground">Price is controlled by the SaaS administrator.</p></Card>
+        <Card className="p-5"><p className="text-xs uppercase tracking-wide text-muted-foreground">Paid plan</p><p className="mt-2 text-xl font-semibold">{price > 0 ? money(price, currency) : "Price not set"}</p><p className="mt-1 text-xs text-muted-foreground">Price is controlled by the SaaS Admin.</p></Card>
       </div>
 
       {subscriptionStatus === "active" ? (
-        <Card className="p-6"><div className="flex items-start gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 text-success" /><div><h2 className="font-semibold">Paid plan active</h2><p className="mt-1 text-sm text-muted-foreground">Report exports and custom-domain connection are enabled.</p></div></div></Card>
+        <Card className="p-6"><div className="flex items-start gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 text-success" /><div><h2 className="font-semibold">Paid plan active</h2><p className="mt-1 text-sm text-muted-foreground">Paid features, report exports and custom-domain connection are enabled.</p></div></div></Card>
       ) : (
         <Card className="space-y-5 p-6">
-          <div className="flex items-start gap-3"><CreditCard className="mt-0.5 h-5 w-5 text-primary" /><div><h2 className="font-semibold">Upgrade with Yo! Payments Uganda</h2><p className="mt-1 text-sm text-muted-foreground">A mobile-money payment prompt will be sent to the number below. No email delivery is required.</p></div></div>
-          {!isTenantAdmin && <div className="flex gap-2 rounded-lg border bg-muted/40 p-3 text-sm"><LockKeyhole className="h-4 w-4" />Only a tenant administrator can start an upgrade.</div>}
-          {ctx && !ctx.paymentConfigured && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Yo! Payments credentials have not been added to this deployment yet. The upgrade flow is ready; the API username/password will be supplied through server environment variables at deployment.</div>}
+          <div className="flex items-start gap-3"><CreditCard className="mt-0.5 h-5 w-5 text-primary" /><div><h2 className="font-semibold">Upgrade with Mobile Money</h2><p className="mt-1 text-sm text-muted-foreground">A payment prompt will be sent to the mobile-money number below. No email delivery is required.</p></div></div>
+          {!isTenantAdmin && <div className="flex gap-2 rounded-lg border bg-muted/40 p-3 text-sm"><LockKeyhole className="h-4 w-4" />Only an admin can start an upgrade.</div>}
+          {ctx && !ctx.paymentConfigured && <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Payment credentials have not been added to this deployment yet. The upgrade flow is ready and credentials are supplied securely on the server.</div>}
           <div className="max-w-md space-y-2"><Label>Mobile money number</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="2567XXXXXXXX" disabled={!isTenantAdmin || !ctx?.paymentConfigured} /><p className="text-xs text-muted-foreground">Use international format, for example 2567XXXXXXXX.</p></div>
           <div className="flex flex-wrap gap-2"><Button onClick={start} disabled={busy || !isTenantAdmin || !ctx?.paymentConfigured || price <= 0}>{busy ? "Sending prompt…" : `Pay ${price > 0 ? money(price, currency) : "configured price"}`}</Button>{transactionId && <Button variant="outline" onClick={check} disabled={checking}><Clock className="mr-2 h-4 w-4" />{checking ? "Checking…" : "Check payment status"}</Button>}</div>
         </Card>
       )}
 
-      <Card className="p-5 text-sm text-muted-foreground"><strong className="text-foreground">Trial policy:</strong> up to 4 active tenant users for 4 weeks. Assets and Settings remain available according to module access. Reports can be viewed during trial, but the built-in PDF/Excel export is a paid feature.</Card>
+      <Card className="p-5 text-sm text-muted-foreground"><strong className="text-foreground">Trial policy:</strong> up to 4 active users for 4 weeks. Features that are not included in the trial remain visible and clearly marked as paid. Reports can be viewed during trial, but built-in PDF/Excel export is a paid feature.</Card>
     </div>
   );
 }
