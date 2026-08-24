@@ -114,7 +114,7 @@ function SaasAdminPage() {
       await refetchTenants();
       toast.success(`${tenant.name} is now ${status}`);
     } catch (e: any) {
-      toast.error(e?.message ?? "Could not update tenant");
+      toast.error(e?.message ?? "Could not update organization");
     }
   };
 
@@ -123,13 +123,13 @@ function SaasAdminPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2"><ShieldCheck className="h-6 w-6 text-primary" /><h1 className="text-2xl font-bold tracking-tight">SaaS Administration</h1></div>
-          <p className="mt-1 text-sm text-muted-foreground">Platform-level controls. Tenant administrators cannot access this page.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Platform-level controls. Regular admins cannot access this page.</p>
         </div>
         <Badge>SaaS Admin</Badge>
       </div>
 
       <Card className="space-y-5 p-6">
-        <div><h2 className="font-semibold">Plan policy & pricing</h2><p className="text-sm text-muted-foreground">These values apply platform-wide. Yo! Payments credentials remain server-side and are added only when deployment is ready.</p></div>
+        <div><h2 className="font-semibold">Plan policy & pricing</h2><p className="text-sm text-muted-foreground">These values apply platform-wide. Payment credentials remain server-side and are added only when deployment is ready.</p></div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-2"><Label>Trial days</Label><Input type="number" min={1} max={365} value={form.trial_days} onChange={(e) => setForm({ ...form, trial_days: Number(e.target.value) })} /></div>
           <div className="space-y-2"><Label>Trial user limit</Label><Input type="number" min={1} value={form.trial_user_limit} onChange={(e) => setForm({ ...form, trial_user_limit: Number(e.target.value) })} /></div>
@@ -140,7 +140,7 @@ function SaasAdminPage() {
       </Card>
 
       <Card className="p-6">
-        <div className="mb-5 flex items-center gap-2"><Boxes className="h-5 w-5 text-primary" /><div><h2 className="font-semibold">Module control</h2><p className="text-sm text-muted-foreground">Global OFF wins over all tenant/user permissions. Tenant admins may only grant users access to modules the SaaS platform allows.</p></div></div>
+        <div className="mb-5 flex items-center gap-2"><Boxes className="h-5 w-5 text-primary" /><div><h2 className="font-semibold">Module control</h2><p className="text-sm text-muted-foreground">Global OFF wins over all workspace and user permissions. Admins may only grant users access to modules the SaaS platform allows. Trial-disabled modules stay visible as paid features.</p></div></div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground"><th className="py-2 pr-4">Module</th><th className="px-3 py-2 text-center">Platform</th><th className="px-3 py-2 text-center">Free trial</th><th className="px-3 py-2 text-center">Paid</th></tr></thead>
@@ -150,9 +150,9 @@ function SaasAdminPage() {
       </Card>
 
       <Card className="p-6">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /><div><h2 className="font-semibold">Tenants</h2><p className="text-sm text-muted-foreground">Subscription state is controlled here or automatically after a confirmed payment.</p></div></div><Button variant="outline" size="sm" onClick={() => refetchTenants()}><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button></div>
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><Building2 className="h-5 w-5 text-primary" /><div><h2 className="font-semibold">Organizations</h2><p className="text-sm text-muted-foreground">Subscription state is controlled here or automatically after a confirmed payment.</p></div></div><Button variant="outline" size="sm" onClick={() => refetchTenants()}><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button></div>
         <div className="space-y-3">
-          {tenants.length === 0 ? <p className="text-sm text-muted-foreground">No tenants found.</p> : tenants.map((t: any) => (
+          {tenants.length === 0 ? <p className="text-sm text-muted-foreground">No organizations found.</p> : tenants.map((t: any) => (
             <div key={t.id} className="flex flex-col gap-3 rounded-lg border p-4 md:flex-row md:items-center md:justify-between">
               <div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{t.name}</p><Badge variant="outline" className="capitalize">{t.subscription_status}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{t.slug} · Trial ends {t.trial_ends_at ? new Date(t.trial_ends_at).toLocaleDateString() : "—"}</p></div>
               <div className="w-full md:w-48"><Select value={t.subscription_status} onValueChange={(v) => changeTenantStatus(t, v as any)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="trial">Trial</SelectItem><SelectItem value="active">Active / Paid</SelectItem><SelectItem value="expired">Expired</SelectItem><SelectItem value="suspended">Suspended</SelectItem></SelectContent></Select></div>
