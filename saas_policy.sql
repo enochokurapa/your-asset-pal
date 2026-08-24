@@ -202,12 +202,12 @@ CREATE POLICY "user_roles select tenant" ON public.user_roles FOR SELECT TO auth
 DROP POLICY IF EXISTS "tenant safe insert roles" ON public.user_roles;
 DROP POLICY IF EXISTS "tenant safe update roles" ON public.user_roles;
 DROP POLICY IF EXISTS "tenant safe delete roles" ON public.user_roles;
-CREATE POLICY "tenant safe insert roles" AS RESTRICTIVE ON public.user_roles FOR INSERT TO authenticated
+CREATE POLICY "tenant safe insert roles" ON public.user_roles AS RESTRICTIVE FOR INSERT TO authenticated
   WITH CHECK (public.can_manage_tenant_user(auth.uid(), user_id));
-CREATE POLICY "tenant safe update roles" AS RESTRICTIVE ON public.user_roles FOR UPDATE TO authenticated
+CREATE POLICY "tenant safe update roles" ON public.user_roles AS RESTRICTIVE FOR UPDATE TO authenticated
   USING (public.can_manage_tenant_user(auth.uid(), user_id))
   WITH CHECK (public.can_manage_tenant_user(auth.uid(), user_id));
-CREATE POLICY "tenant safe delete roles" AS RESTRICTIVE ON public.user_roles FOR DELETE TO authenticated
+CREATE POLICY "tenant safe delete roles" ON public.user_roles AS RESTRICTIVE FOR DELETE TO authenticated
   USING (public.can_manage_tenant_user(auth.uid(), user_id));
 
 DO $$
@@ -226,12 +226,12 @@ BEGIN
     EXECUTE format('DROP POLICY IF EXISTS "%1$s tenant safe insert" ON public.%1$I', t);
     EXECUTE format('DROP POLICY IF EXISTS "%1$s tenant safe update" ON public.%1$I', t);
     EXECUTE format('DROP POLICY IF EXISTS "%1$s tenant safe delete" ON public.%1$I', t);
-    EXECUTE format($p$CREATE POLICY "%1$s tenant safe insert" AS RESTRICTIVE ON public.%1$I
+    EXECUTE format($p$CREATE POLICY "%1$s tenant safe insert" ON public.%1$I AS RESTRICTIVE
       FOR INSERT TO authenticated WITH CHECK (public.can_manage_tenant_user(auth.uid(), user_id))$p$, t);
-    EXECUTE format($p$CREATE POLICY "%1$s tenant safe update" AS RESTRICTIVE ON public.%1$I
+    EXECUTE format($p$CREATE POLICY "%1$s tenant safe update" ON public.%1$I AS RESTRICTIVE
       FOR UPDATE TO authenticated USING (public.can_manage_tenant_user(auth.uid(), user_id))
       WITH CHECK (public.can_manage_tenant_user(auth.uid(), user_id))$p$, t);
-    EXECUTE format($p$CREATE POLICY "%1$s tenant safe delete" AS RESTRICTIVE ON public.%1$I
+    EXECUTE format($p$CREATE POLICY "%1$s tenant safe delete" ON public.%1$I AS RESTRICTIVE
       FOR DELETE TO authenticated USING (public.can_manage_tenant_user(auth.uid(), user_id))$p$, t);
   END LOOP;
 END $$;
