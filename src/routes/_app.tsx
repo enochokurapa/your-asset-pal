@@ -68,6 +68,13 @@ function AppLayout() {
     return <Navigate to="/saas-admin" />;
   }
 
+  const currentNavItem = !isSaasAdmin
+    ? tenantNav.find((n) => pathname.startsWith(n.to))
+    : undefined;
+
+  if (currentNavItem?.tenantAdminOnly && !isTenantAdmin) return <Navigate to="/dashboard" />;
+  if (currentNavItem?.adminOnly && !isAdmin) return <Navigate to="/dashboard" />;
+
   const visibleNav = isSaasAdmin
     ? saasNav
     : tenantNav.filter((n) => {
@@ -77,9 +84,7 @@ function AppLayout() {
         return true;
       });
 
-  const currentModuleItem = !isSaasAdmin
-    ? tenantNav.find((n) => n.module && pathname.startsWith(n.to))
-    : undefined;
+  const currentModuleItem = currentNavItem?.module ? currentNavItem : undefined;
   const lockedPaidFeature = currentModuleItem?.module && isPaidFeature(currentModuleItem.module)
     ? currentModuleItem
     : null;
