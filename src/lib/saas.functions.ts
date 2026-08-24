@@ -18,16 +18,10 @@ async function getProfile(userId: string) {
 async function assertTenantAdmin(userId: string) {
   const p = await getProfile(userId);
 
-  // SaaS administrators use the platform control plane and must never be treated
-  // as a tenant administrator for billing or tenant-owned resources.
   if (p.is_saas_admin) {
-    throw new Error("SaaS administrators cannot perform tenant billing actions");
+    throw new Error("SaaS Admin cannot perform workspace billing actions");
   }
 
-  // Tenant-admin authority can come from the explicit tenant_role flag OR the
-  // application's existing admin role. This keeps billing consistent with the UI
-  // and repairs older/stale rows where user_roles says admin but tenant_role was
-  // never promoted.
   const { data: adminRole, error: roleError } = await admin.from("user_roles")
     .select("role")
     .eq("user_id", userId)
@@ -36,10 +30,9 @@ async function assertTenantAdmin(userId: string) {
   if (roleError) throw new Error(roleError.message);
 
   const canManageTenant = p.tenant_role === "tenant_admin" || Boolean(adminRole);
-  if (!canManageTenant) throw new Error("Tenant administrator privileges required");
-  if (!p.tenant_id) throw new Error("No tenant is assigned to this account");
+  if (!canManageTenant) throw new Error("Administrator privileges required");
+  if (!p.tenant_id) throw new Error("No workspace is assigned to this account");
 
-  // Self-heal legacy/stale tenant profiles so future checks remain consistent.
   if (p.tenant_role !== "tenant_admin" && adminRole) {
     const { error: repairError } = await admin.from("profiles")
       .update({ tenant_role: "tenant_admin" })
@@ -298,7 +291,7 @@ async function yoRequest(body: string) {
     body,
   });
   const text = await r.text();
-  if (!r.ok) throw new Error(`Yo! Payments gateway returned HTTP ${r.status}`);
+  if (!r.ok) throw new Error(`Payment gateway returned HTTP ${r.status}`);
   return text;
 }
 
@@ -309,14 +302,14 @@ export const startYoUpgrade = createServerFn({ method: "POST" })
     const p = await assertTenantAdmin(context.userId);
     const username = process.env.YO_API_USERNAME;
     const password = process.env.YO_API_PASSWORD;
-    if (!username || !password) throw new Error("Yo! Payments is not configured on this deployment yet");
+    if (!username || !password) throw new Error("Payment gateway is not configured on this deployment yet");
 
     const { data: settings } = await admin.from("saas_settings").select("paid_price,currency").eq("id", true).single();
     const amount = Number(settings?.paid_price ?? 0);
-    if (amount <= 0) throw new Error("The SaaS administrator has not set a paid-plan price yet");
+    if (amount <= 0) throw new Error("The SaaS Admin has not set a paid-plan price yet");
 
     const phone = data.phone.replace(/\s+/g, "").replace(/^\+/, "");
-    if (!/^256\d{9}$/.test(phone)) throw new Error("Use a Uganda mobile-money number in format 2567XXXXXXXX");
+    if (!/^256\d{9}$/.test(phone)) throw new Error("Use a mobile-money number in format 2567XXXXXXXX");
 
     const { data: tx, error: txError } = await admin.from("billing_transactions").insert({
       tenant_id: p.tenant_id,
@@ -353,7 +346,7 @@ export const startYoUpgrade = createServerFn({ method: "POST" })
       }).eq("id", tx.id);
       if (response.Status !== "OK") {
         await admin.from("billing_transactions").update({ status: "failed" }).eq("id", tx.id);
-        throw new Error(response.ErrorMessage || response.StatusMessage || "Yo! Payments rejected the request");
+        throw new Error(response.ErrorMessage || response.StatusMessage || "Payment gateway rejected the request");
       }
       return { transactionId: tx.id, providerReference: response.TransactionReference, status: response.TransactionStatus || "PENDING" };
     } catch (e) {
@@ -369,11 +362,11 @@ export const checkYoUpgrade = createServerFn({ method: "POST" })
     const p = await assertTenantAdmin(context.userId);
     const username = process.env.YO_API_USERNAME;
     const password = process.env.YO_API_PASSWORD;
-    if (!username || !password) throw new Error("Yo! Payments is not configured on this deployment yet");
+    if (!username || !password) throw new Error("Payment gateway is not configured on this deployment yet");
     const { data: tx, error } = await admin.from("billing_transactions").select("*")
       .eq("id", data.transaction_id).eq("tenant_id", p.tenant_id).single();
     if (error || !tx) throw new Error("Payment transaction not found");
-    if (!tx.provider_reference) throw new Error("Yo! Payments transaction reference is not available");
+    if (!tx.provider_reference) throw new Error("Payment transaction reference is not available");
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?><AutoCreate><Request>` +
       `<APIUsername>${xmlEscape(username)}</APIUsername><APIPassword>${xmlEscape(password)}</APIPassword>` +
