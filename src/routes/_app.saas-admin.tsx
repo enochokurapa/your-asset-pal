@@ -11,6 +11,7 @@ import {
   updateSaasSettings,
   updateTenantSubscription,
 } from "@/lib/saas.functions";
+import { getServerAuthHeaders } from "@/lib/auth-headers";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,9 +43,26 @@ function SaasAdminPage() {
   const [savingSettings, setSavingSettings] = useState(false);
   const [form, setForm] = useState<SettingsForm>({ trial_days: 28, trial_user_limit: 4, paid_price: 0, currency: "UGX" });
 
-  const { data: ctx } = useQuery({ queryKey: ["saas-context"], queryFn: () => getCtx(), enabled: isSaasAdmin });
-  const { data: modules = [], refetch: refetchModules } = useQuery({ queryKey: ["saas-admin-modules"], queryFn: () => listModules(), enabled: isSaasAdmin });
-  const { data: tenants = [], refetch: refetchTenants } = useQuery({ queryKey: ["saas-admin-tenants"], queryFn: () => listTenants(), enabled: isSaasAdmin });
+  const authCall = async <T,>(fn: (arg: any) => Promise<T>, arg: any = {}) => {
+    const headers = await getServerAuthHeaders();
+    return fn({ ...arg, headers });
+  };
+
+  const { data: ctx } = useQuery({
+    queryKey: ["saas-context"],
+    queryFn: () => authCall(getCtx),
+    enabled: isSaasAdmin,
+  });
+  const { data: modules = [], refetch: refetchModules } = useQuery({
+    queryKey: ["saas-admin-modules"],
+    queryFn: () => authCall(listModules),
+    enabled: isSaasAdmin,
+  });
+  const { data: tenants = [], refetch: refetchTenants } = useQuery({
+    queryKey: ["saas-admin-tenants"],
+    queryFn: () => authCall(listTenants),
+    enabled: isSaasAdmin,
+  });
 
   useEffect(() => {
     if (!ctx?.settings) return;
@@ -62,7 +80,7 @@ function SaasAdminPage() {
   const updateSettings = async () => {
     setSavingSettings(true);
     try {
-      await saveSettings({ data: form });
+      await authCall(saveSettings, { data: form });
       toast.success("SaaS settings saved");
       await qc.invalidateQueries({ queryKey: ["saas-context"] });
     } catch (e: any) {
@@ -74,7 +92,7 @@ function SaasAdminPage() {
 
   const toggleModule = async (m: any, field: "globally_enabled" | "trial_enabled" | "paid_enabled", value: boolean) => {
     try {
-      await saveModule({
+      await authCall(saveModule, {
         data: {
           module_key: m.module_key,
           globally_enabled: field === "globally_enabled" ? value : !!m.globally_enabled,
@@ -92,7 +110,7 @@ function SaasAdminPage() {
 
   const changeTenantStatus = async (tenant: any, status: "trial" | "active" | "expired" | "suspended") => {
     try {
-      await saveTenant({ data: { tenant_id: tenant.id, status, plan_code: status === "active" ? "paid" : "trial" } });
+      await authCall(saveTenant, { data: { tenant_id: tenant.id, status, plan_code: status === "active" ? "paid" : "trial" } });
       await refetchTenants();
       toast.success(`${tenant.name} is now ${status}`);
     } catch (e: any) {
@@ -125,7 +143,7 @@ function SaasAdminPage() {
         <div className="mb-5 flex items-center gap-2"><Boxes className="h-5 w-5 text-primary" /><div><h2 className="font-semibold">Module control</h2><p className="text-sm text-muted-foreground">Global OFF wins over all tenant/user permissions. Tenant admins may only grant users access to modules the SaaS platform allows.</p></div></div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead><tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground"><th className="py-2 pr-4">Module</th><th className="py-2 px-3 text-center">Platform</th><th className="py-2 px-3 text-center">Free trial</th><th className="py-2 px-3 text-center">Paid</th></tr></thead>
+            <thead><tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground"><th className="py-2 pr-4">Module</th><th className="px-3 py-2 text-center">Platform</th><th className="px-3 py-2 text-center">Free trial</th><th className="px-3 py-2 text-center">Paid</th></tr></thead>
             <tbody>{modules.map((m: any) => <tr key={m.module_key} className="border-b last:border-0"><td className="py-3 pr-4"><p className="font-medium">{m.label}</p><p className="text-xs text-muted-foreground">{m.module_key}</p></td><td className="px-3 text-center"><div className="flex justify-center"><Switch checked={!!m.globally_enabled} onCheckedChange={(v) => toggleModule(m, "globally_enabled", v)} /></div></td><td className="px-3 text-center"><div className="flex justify-center"><Switch checked={!!m.trial_enabled} disabled={!m.globally_enabled} onCheckedChange={(v) => toggleModule(m, "trial_enabled", v)} /></div></td><td className="px-3 text-center"><div className="flex justify-center"><Switch checked={!!m.paid_enabled} disabled={!m.globally_enabled} onCheckedChange={(v) => toggleModule(m, "paid_enabled", v)} /></div></td></tr>)}</tbody>
           </table>
         </div>
