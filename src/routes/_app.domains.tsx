@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/hooks/use-auth";
 import { listCustomDomains, addCustomDomain, verifyCustomDomain } from "@/lib/saas.functions";
+import { getServerAuthHeaders } from "@/lib/auth-headers";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +26,7 @@ function DomainsPage() {
   const { data: domains = [], refetch } = useQuery({
     queryKey: ["custom-domains"],
     enabled: isTenantAdmin && canUseCustomDomain,
-    queryFn: () => listFn(),
+    queryFn: async () => listFn({ headers: await getServerAuthHeaders() }),
   });
 
   if (!isTenantAdmin) {
@@ -46,13 +47,23 @@ function DomainsPage() {
   const add = async () => {
     if (!hostname.trim()) return;
     setBusy(true);
-    try { await addFn({ data: { hostname } }); setHostname(""); await refetch(); toast.success("Domain added. Add the TXT record shown below, then verify."); }
-    catch (e: any) { toast.error(e?.message ?? "Could not add domain"); }
+    try {
+      const headers = await getServerAuthHeaders();
+      await addFn({ data: { hostname }, headers });
+      setHostname("");
+      await refetch();
+      toast.success("Domain added. Add the TXT record shown below, then verify.");
+    } catch (e: any) { toast.error(e?.message ?? "Could not add domain"); }
     finally { setBusy(false); }
   };
+
   const verify = async (id: string) => {
-    try { await verifyFn({ data: { domain_id: id } }); await refetch(); toast.success("Domain ownership verified"); }
-    catch (e: any) { toast.error(e?.message ?? "Verification failed"); }
+    try {
+      const headers = await getServerAuthHeaders();
+      await verifyFn({ data: { domain_id: id }, headers });
+      await refetch();
+      toast.success("Domain ownership verified");
+    } catch (e: any) { toast.error(e?.message ?? "Verification failed"); }
   };
 
   return (
