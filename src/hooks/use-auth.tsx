@@ -185,13 +185,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isAdmin = roles.includes("admin");
   const isManager = roles.includes("manager");
-  const isTenantAdmin = tenantRole === "tenant_admin" || isAdmin;
+  const isTenantAdmin = !isSaasAdmin && (tenantRole === "tenant_admin" || isAdmin);
   const subscriptionUsable = subscriptionStatus === "active" || subscriptionStatus === "trial" || subscriptionStatus === "unknown";
 
-  const canView = (m: ModuleKey) => subscriptionUsable && enabledModules.has(m) && (isAdmin || permissions.has(m));
-  const canApprove = (k: ApprovalKind) => subscriptionUsable && (isAdmin || approvalRights.has(k));
-  const canDo = (k: ActionKind) => subscriptionUsable && (isAdmin || isManager || actionRights.has(k));
+  const canView = (m: ModuleKey) => !isSaasAdmin && subscriptionUsable && enabledModules.has(m) && (isAdmin || permissions.has(m));
+  const canApprove = (k: ApprovalKind) => !isSaasAdmin && subscriptionUsable && (isAdmin || approvalRights.has(k));
+  const canDo = (k: ActionKind) => !isSaasAdmin && subscriptionUsable && (isAdmin || isManager || actionRights.has(k));
   const canSeeBranch = (branchId: string | null | undefined) => {
+    if (isSaasAdmin) return false;
     if (!branchScope) return true;
     if (!branchId) return true;
     return branchScope.has(branchId);
@@ -201,9 +202,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: session?.user ?? null, session, roles, permissions, approvalRights, actionRights, branchScope,
     loading, mustChangePassword, isActive, isAdmin, isTenantAdmin, isSaasAdmin, isManager,
     tenantId, tenantName, subscriptionStatus, trialEndsAt, subscriptionEndsAt, enabledModules,
-    canExportReports: subscriptionStatus === "active",
-    canUseCustomDomain: subscriptionStatus === "active",
-    canWrite: subscriptionUsable && (isAdmin || isManager),
+    canExportReports: !isSaasAdmin && subscriptionStatus === "active",
+    canUseCustomDomain: !isSaasAdmin && subscriptionStatus === "active",
+    canWrite: !isSaasAdmin && subscriptionUsable && (isAdmin || isManager),
     canView, canApprove, canDo, canSeeBranch,
     signOut: async () => {
       try { await supabase.auth.signOut(); }
