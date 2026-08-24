@@ -26,7 +26,7 @@ const actionSchema = z.enum([
 ]);
 
 async function getTenantAdminProfile(userId: string) {
-  if (!userId) throw new Error("Tenant administrator privileges required: Not authenticated");
+  if (!userId) throw new Error("Administrator privileges required: Not authenticated");
   const [{ data: role, error: roleError }, { data: profile, error: profileError }] = await Promise.all([
     admin.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle(),
     admin.from("profiles").select("id,tenant_id,tenant_role,is_saas_admin").eq("id", userId).single(),
@@ -34,15 +34,13 @@ async function getTenantAdminProfile(userId: string) {
   if (roleError) throw new Error(roleError.message);
   if (profileError || !profile) throw new Error("Administrator profile is not configured");
 
-  // SaaS administrators control the platform from /saas-admin. They are intentionally
-  // not tenant administrators and cannot mutate tenant-user roles/permissions here.
   if (profile.is_saas_admin) {
-    throw new Error("SaaS administrators manage platform policy, not tenant users");
+    throw new Error("SaaS Admin manages platform policy, not workspace users");
   }
   if (!role && profile.tenant_role !== "tenant_admin") {
-    throw new Error("Tenant administrator privileges required");
+    throw new Error("Administrator privileges required");
   }
-  if (!profile.tenant_id) throw new Error("No tenant is assigned to this administrator");
+  if (!profile.tenant_id) throw new Error("No workspace is assigned to this administrator");
   return profile;
 }
 
@@ -53,9 +51,9 @@ async function assertSameTenant(adminUserId: string, targetUserId: string) {
     .eq("id", targetUserId)
     .single();
   if (error || !target || target.tenant_id !== p.tenant_id) {
-    throw new Error("You cannot manage a user from another tenant");
+    throw new Error("You cannot manage a user from another workspace");
   }
-  if (target.is_saas_admin) throw new Error("Tenant administrators cannot manage the SaaS administrator account");
+  if (target.is_saas_admin) throw new Error("Admins cannot manage the SaaS Admin account");
   return p;
 }
 
@@ -73,7 +71,7 @@ async function enforceSeatLimit(tenantId: string) {
     throw new Error("Your 4-week free trial has expired. Upgrade to add users.");
   }
   if (trialStillValid && (count ?? 0) >= Number(settings?.trial_user_limit ?? 4)) {
-    throw new Error(`Free trial is limited to ${settings?.trial_user_limit ?? 4} active tenant users. Upgrade to add more users.`);
+    throw new Error(`Free trial is limited to ${settings?.trial_user_limit ?? 4} active users. Upgrade to add more users.`);
   }
 }
 
@@ -174,7 +172,7 @@ export const setUserRole = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertSameTenant(context.userId, data.user_id);
     if (data.user_id === context.userId && data.role === "admin" && !data.enabled) {
-      throw new Error("You cannot remove your own tenant administrator role");
+      throw new Error("You cannot remove your own admin role");
     }
     if (data.enabled) {
       const { error } = await admin.from("user_roles").upsert(

@@ -30,7 +30,7 @@ function DomainsPage() {
   });
 
   if (!isTenantAdmin) {
-    return <Card className="mx-auto max-w-2xl p-6"><h1 className="text-xl font-semibold">Custom domain</h1><p className="mt-2 text-sm text-muted-foreground">Only a tenant administrator can manage the workspace domain.</p></Card>;
+    return <Card className="mx-auto max-w-2xl p-6"><h1 className="text-xl font-semibold">Custom domain</h1><p className="mt-2 text-sm text-muted-foreground">Only an admin can manage the workspace domain.</p></Card>;
   }
 
   if (!canUseCustomDomain) {

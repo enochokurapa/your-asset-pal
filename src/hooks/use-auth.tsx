@@ -65,10 +65,12 @@ interface AuthCtx {
   trialEndsAt: string | null;
   subscriptionEndsAt: string | null;
   enabledModules: Set<ModuleKey>;
+  paidOnlyModules: Set<ModuleKey>;
   canExportReports: boolean;
   canUseCustomDomain: boolean;
   canWrite: boolean;
   canView: (m: ModuleKey) => boolean;
+  isPaidFeature: (m: ModuleKey) => boolean;
   canApprove: (k: ApprovalKind) => boolean;
   canDo: (k: ActionKind) => boolean;
   canSeeBranch: (branchId: string | null | undefined) => boolean;
@@ -94,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
   const [subscriptionEndsAt, setSubscriptionEndsAt] = useState<string | null>(null);
   const [enabledModules, setEnabledModules] = useState<Set<ModuleKey>>(new Set(ALL_MODULES));
+  const [paidOnlyModules, setPaidOnlyModules] = useState<Set<ModuleKey>>(new Set());
   const [loading, setLoading] = useState(true);
 
   const resetMetadata = () => {
@@ -102,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsActive(true); setIsSaasAdmin(false); setTenantRole("member");
     setTenantId(null); setTenantName(null); setSubscriptionStatus("unknown");
     setTrialEndsAt(null); setSubscriptionEndsAt(null); setEnabledModules(new Set(ALL_MODULES));
+    setPaidOnlyModules(new Set());
   };
 
   const loadFor = async (uid: string) => {
@@ -155,12 +159,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const paid = effective === "active";
           const overrideMap = new Map((overrides ?? []).map((x: any) => [x.module_key, x.enabled]));
           if (modules?.length) {
-            const allowed = modules.filter((m: any) => {
+            const eligible = modules.filter((m: any) => {
               if (!m.globally_enabled) return false;
-              if (paid ? !m.paid_enabled : !m.trial_enabled) return false;
               return overrideMap.has(m.module_key) ? overrideMap.get(m.module_key) !== false : true;
-            }).map((m: any) => m.module_key as ModuleKey);
+            });
+            const allowed = eligible.filter((m: any) => paid ? !!m.paid_enabled : !!m.trial_enabled)
+              .map((m: any) => m.module_key as ModuleKey);
+            const lockedPaid = effective === "trial"
+              ? eligible.filter((m: any) => !m.trial_enabled && !!m.paid_enabled).map((m: any) => m.module_key as ModuleKey)
+              : [];
             setEnabledModules(new Set(allowed));
+            setPaidOnlyModules(new Set(lockedPaid));
           }
         }
       }
@@ -187,8 +196,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isManager = roles.includes("manager");
   const isTenantAdmin = !isSaasAdmin && (tenantRole === "tenant_admin" || isAdmin);
   const subscriptionUsable = subscriptionStatus === "active" || subscriptionStatus === "trial" || subscriptionStatus === "unknown";
+  const hasUserModuleAccess = (m: ModuleKey) => isAdmin || permissions.has(m);
 
-  const canView = (m: ModuleKey) => !isSaasAdmin && subscriptionUsable && enabledModules.has(m) && (isAdmin || permissions.has(m));
+  const canView = (m: ModuleKey) => !isSaasAdmin && subscriptionUsable && enabledModules.has(m) && hasUserModuleAccess(m);
+  const isPaidFeature = (m: ModuleKey) => !isSaasAdmin && subscriptionStatus === "trial" && paidOnlyModules.has(m) && hasUserModuleAccess(m);
   const canApprove = (k: ApprovalKind) => !isSaasAdmin && subscriptionUsable && (isAdmin || approvalRights.has(k));
   const canDo = (k: ActionKind) => !isSaasAdmin && subscriptionUsable && (isAdmin || isManager || actionRights.has(k));
   const canSeeBranch = (branchId: string | null | undefined) => {
@@ -201,11 +212,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthCtx = {
     user: session?.user ?? null, session, roles, permissions, approvalRights, actionRights, branchScope,
     loading, mustChangePassword, isActive, isAdmin, isTenantAdmin, isSaasAdmin, isManager,
-    tenantId, tenantName, subscriptionStatus, trialEndsAt, subscriptionEndsAt, enabledModules,
+    tenantId, tenantName, subscriptionStatus, trialEndsAt, subscriptionEndsAt, enabledModules, paidOnlyModules,
     canExportReports: !isSaasAdmin && subscriptionStatus === "active",
     canUseCustomDomain: !isSaasAdmin && subscriptionStatus === "active",
     canWrite: !isSaasAdmin && subscriptionUsable && (isAdmin || isManager),
-    canView, canApprove, canDo, canSeeBranch,
+    canView, isPaidFeature, canApprove, canDo, canSeeBranch,
     signOut: async () => {
       try { await supabase.auth.signOut(); }
       catch (e) { console.error("[signOut] error:", e); }
