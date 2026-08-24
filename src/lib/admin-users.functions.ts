@@ -6,22 +6,25 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 const admin = supabaseAdmin as any;
 
 async function getAdminProfile(userId: string) {
-  if (!userId) throw new Error("Admin privileges required: Not authenticated");
+  if (!userId) throw new Error("Tenant administrator privileges required: Not authenticated");
   const [{ data: role, error: roleError }, { data: profile, error: profileError }] = await Promise.all([
     admin.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle(),
     admin.from("profiles").select("id,tenant_id,tenant_role,is_saas_admin").eq("id", userId).single(),
   ]);
   if (roleError) throw new Error(roleError.message);
   if (profileError || !profile) throw new Error("Administrator profile is not configured");
-  if (!role && !profile.is_saas_admin) throw new Error("Admin privileges required: Your account does not have Admin rights");
+  if (!role && profile.tenant_role !== "tenant_admin" && !profile.is_saas_admin) {
+    throw new Error("Tenant administrator privileges required");
+  }
   if (!profile.tenant_id) throw new Error("No tenant is assigned to this administrator");
   return profile;
 }
 
 async function assertSameTenant(adminUserId: string, targetUserId: string) {
   const p = await getAdminProfile(adminUserId);
-  const { data: target } = await admin.from("profiles").select("tenant_id").eq("id", targetUserId).single();
+  const { data: target } = await admin.from("profiles").select("tenant_id,is_saas_admin").eq("id", targetUserId).single();
   if (!target || target.tenant_id !== p.tenant_id) throw new Error("You cannot manage a user from another tenant");
+  if (target.is_saas_admin && !p.is_saas_admin) throw new Error("Tenant administrators cannot manage the SaaS administrator account");
   return p;
 }
 
@@ -29,14 +32,17 @@ async function enforceSeatLimit(tenantId: string) {
   const [{ data: tenant }, { data: settings }, { count }] = await Promise.all([
     admin.from("tenants").select("subscription_status,trial_ends_at").eq("id", tenantId).single(),
     admin.from("saas_settings").select("trial_user_limit").eq("id", true).single(),
-    admin.from("profiles").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("is_active", true),
+    admin.from("profiles").select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .eq("is_active", true)
+      .eq("is_saas_admin", false),
   ]);
   const trialStillValid = tenant?.subscription_status === "trial" && new Date(tenant.trial_ends_at).getTime() > Date.now();
   if (tenant?.subscription_status === "trial" && !trialStillValid) {
     throw new Error("Your 4-week free trial has expired. Upgrade to add users.");
   }
   if (trialStillValid && (count ?? 0) >= Number(settings?.trial_user_limit ?? 4)) {
-    throw new Error(`Free trial is limited to ${settings?.trial_user_limit ?? 4} active users. Upgrade to add more users.`);
+    throw new Error(`Free trial is limited to ${settings?.trial_user_limit ?? 4} active tenant users. Upgrade to add more users.`);
   }
 }
 
@@ -63,20 +69,19 @@ export const createUserAccount = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     const uid = created.user!.id;
 
-    // The DB trigger creates a profile; attach it to this tenant and require first-login password change.
     const { error: profileError } = await admin.from("profiles").update({
       full_name: data.full_name,
       must_change_password: true,
       tenant_id: p.tenant_id,
       tenant_role: data.role === "admin" ? "tenant_admin" : "member",
       is_active: true,
+      is_saas_admin: false,
     }).eq("id", uid);
     if (profileError) {
       await supabaseAdmin.auth.admin.deleteUser(uid);
       throw new Error(profileError.message);
     }
 
-    // The trigger creates staff by default. Replace it with the selected single initial role.
     await admin.from("user_roles").delete().eq("user_id", uid);
     const { error: roleError } = await admin.from("user_roles").insert({ user_id: uid, role: data.role });
     if (roleError) {
@@ -127,9 +132,7 @@ export const setUserActive = createServerFn({ method: "POST" })
 
 export const deleteUserAccount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
-    z.object({ user_id: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input) => z.object({ user_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await assertSameTenant(context.userId, data.user_id);
     if (data.user_id === context.userId) throw new Error("You cannot delete your own account");
