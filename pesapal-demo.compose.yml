@@ -1,0 +1,160 @@
+services:
+  pesapal-db:
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM postgres:15-alpine
+        COPY complete_init.sql /docker-entrypoint-initdb.d/01-init.sql
+    container_name: pesapal-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ams
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "super-secret-postgres-password"
+    volumes:
+      - pesapal-db-data:/var/lib/postgresql/data
+    networks:
+      - pesapal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ams"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  pesapal-auth:
+    image: supabase/gotrue:v2.158.1
+    container_name: pesapal-auth
+    restart: unless-stopped
+    depends_on:
+      pesapal-db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: "0.0.0.0"
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: "https://pesapal.owltechsolutionsltd.com/auth/v1"
+      GOTRUE_API_EXTERNAL_URL: "https://pesapal.owltechsolutionsltd.com/auth/v1"
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_NAMESPACE: auth
+      GOTRUE_DB_DATABASE_URL: "postgres://supabase_auth_admin:super-secret-postgres-password@pesapal-db:5432/ams?sslmode=disable"
+      GOTRUE_SITE_URL: "https://pesapal.owltechsolutionsltd.com"
+      GOTRUE_URI_ALLOW_LIST: "*"
+      GOTRUE_JWT_SECRET: "super-secret-jwt-token-with-at-least-32-characters-long"
+      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_DISABLE_SIGNUP: "false"
+    expose:
+      - "9999"
+    networks:
+      - pesapal
+      - coolify
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=coolify"
+      - "traefik.http.middlewares.pesapal-auth-strip.stripprefix.prefixes=/auth/v1"
+      - "traefik.http.routers.pesapal-auth-https.rule=Host(`pesapal.owltechsolutionsltd.com`) && PathPrefix(`/auth/v1`)"
+      - "traefik.http.routers.pesapal-auth-https.entrypoints=https"
+      - "traefik.http.routers.pesapal-auth-https.tls=true"
+      - "traefik.http.routers.pesapal-auth-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.pesapal-auth-https.priority=10000"
+      - "traefik.http.routers.pesapal-auth-https.middlewares=pesapal-auth-strip@docker"
+      - "traefik.http.routers.pesapal-auth-https.service=pesapal-auth-svc"
+      - "traefik.http.services.pesapal-auth-svc.loadbalancer.server.port=9999"
+      - "traefik.http.routers.pesapal-auth-http.rule=Host(`pesapal.owltechsolutionsltd.com`) && PathPrefix(`/auth/v1`)"
+      - "traefik.http.routers.pesapal-auth-http.entrypoints=http"
+      - "traefik.http.routers.pesapal-auth-http.priority=10000"
+      - "traefik.http.routers.pesapal-auth-http.middlewares=pesapal-auth-strip@docker"
+      - "traefik.http.routers.pesapal-auth-http.service=pesapal-auth-svc"
+
+  pesapal-rest:
+    image: postgrest/postgrest:v12.2.0
+    container_name: pesapal-rest
+    restart: unless-stopped
+    depends_on:
+      pesapal-db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: "postgres://authenticator:super-secret-postgres-password@pesapal-db:5432/ams"
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: "super-secret-jwt-token-with-at-least-32-characters-long"
+    expose:
+      - "3000"
+    networks:
+      - pesapal
+      - coolify
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=coolify"
+      - "traefik.http.middlewares.pesapal-rest-strip.stripprefix.prefixes=/rest/v1"
+      - "traefik.http.routers.pesapal-rest-https.rule=Host(`pesapal.owltechsolutionsltd.com`) && PathPrefix(`/rest/v1`)"
+      - "traefik.http.routers.pesapal-rest-https.entrypoints=https"
+      - "traefik.http.routers.pesapal-rest-https.tls=true"
+      - "traefik.http.routers.pesapal-rest-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.pesapal-rest-https.priority=10000"
+      - "traefik.http.routers.pesapal-rest-https.middlewares=pesapal-rest-strip@docker"
+      - "traefik.http.routers.pesapal-rest-https.service=pesapal-rest-svc"
+      - "traefik.http.services.pesapal-rest-svc.loadbalancer.server.port=3000"
+      - "traefik.http.routers.pesapal-rest-http.rule=Host(`pesapal.owltechsolutionsltd.com`) && PathPrefix(`/rest/v1`)"
+      - "traefik.http.routers.pesapal-rest-http.entrypoints=http"
+      - "traefik.http.routers.pesapal-rest-http.priority=10000"
+      - "traefik.http.routers.pesapal-rest-http.middlewares=pesapal-rest-strip@docker"
+      - "traefik.http.routers.pesapal-rest-http.service=pesapal-rest-svc"
+
+  pesapal-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SUPABASE_PROJECT_ID: "ams-self-hosted"
+        SUPABASE_PUBLISHABLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNjAwMDAwMDAwLCJleHAiOjIwMDAwMDAwMDB9.V-Nq7_uazFUYvZFXyq_whGnFkWy4W_3o4k6m04sGc5Q"
+        SUPABASE_URL: "https://pesapal.owltechsolutionsltd.com"
+        VITE_SUPABASE_PROJECT_ID: "ams-self-hosted"
+        VITE_SUPABASE_PUBLISHABLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNjAwMDAwMDAwLCJleHAiOjIwMDAwMDAwMDB9.V-Nq7_uazFUYvZFXyq_whGnFkWy4W_3o4k6m04sGc5Q"
+        VITE_SUPABASE_URL: "https://pesapal.owltechsolutionsltd.com"
+    container_name: pesapal-app
+    restart: unless-stopped
+    depends_on:
+      pesapal-auth:
+        condition: service_started
+      pesapal-rest:
+        condition: service_started
+    environment:
+      SUPABASE_PROJECT_ID: "ams-self-hosted"
+      SUPABASE_URL: "https://pesapal.owltechsolutionsltd.com"
+      SUPABASE_PUBLISHABLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNjAwMDAwMDAwLCJleHAiOjIwMDAwMDAwMDB9.V-Nq7_uazFUYvZFXyq_whGnFkWy4W_3o4k6m04sGc5Q"
+      SUPABASE_SERVICE_ROLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE2MDAwMDAwMCwiZXhwIjoyMDAwMDAwMDAwfQ.FFGoBzCoT3bR0JMmOUFOOtvvZjGhMG1jN3sWeoM8l6w"
+      VITE_SUPABASE_PROJECT_ID: "ams-self-hosted"
+      VITE_SUPABASE_URL: "https://pesapal.owltechsolutionsltd.com"
+      VITE_SUPABASE_PUBLISHABLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNjAwMDAwMDAwLCJleHAiOjIwMDAwMDAwMDB9.V-Nq7_uazFUYvZFXyq_whGnFkWy4W_3o4k6m04sGc5Q"
+    expose:
+      - "3000"
+    networks:
+      - pesapal
+      - coolify
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=coolify"
+      - "traefik.http.routers.pesapal-app-https.rule=Host(`pesapal.owltechsolutionsltd.com`)"
+      - "traefik.http.routers.pesapal-app-https.entrypoints=https"
+      - "traefik.http.routers.pesapal-app-https.tls=true"
+      - "traefik.http.routers.pesapal-app-https.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.pesapal-app-https.priority=1"
+      - "traefik.http.routers.pesapal-app-https.service=pesapal-app-svc"
+      - "traefik.http.services.pesapal-app-svc.loadbalancer.server.port=3000"
+      - "traefik.http.routers.pesapal-app-http.rule=Host(`pesapal.owltechsolutionsltd.com`)"
+      - "traefik.http.routers.pesapal-app-http.entrypoints=http"
+      - "traefik.http.routers.pesapal-app-http.priority=1"
+      - "traefik.http.routers.pesapal-app-http.service=pesapal-app-svc"
+
+networks:
+  pesapal:
+    name: pesapal-net
+  coolify:
+    external: true
+
+volumes:
+  pesapal-db-data:
+    name: pesapal-db-data
