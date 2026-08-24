@@ -21,6 +21,8 @@ export type ActionKind =
   | "approve_own_request"
   | "manage_audit_log";
 
+export type SubscriptionStatus = "trial" | "active" | "expired" | "suspended" | "unknown";
+
 export const ALL_MODULES: ModuleKey[] = [
   "dashboard", "assets", "categories", "locations", "branches", "users", "reports", "audit", "depreciation", "gate_pass", "verification", "settings",
 ];
@@ -37,8 +39,7 @@ export const ALL_ACTION_KINDS: ActionKind[] = [
   "request_asset_deletion", "approve_asset_deletion",
   "request_attachment_deletion", "approve_attachment_deletion",
   "perform_verification", "view_verification_reports",
-  "approve_own_request",
-  "manage_audit_log",
+  "approve_own_request", "manage_audit_log",
 ];
 
 export const DEFAULT_NEW_USER_MODULES: ModuleKey[] = ["dashboard", "assets"];
@@ -50,13 +51,22 @@ interface AuthCtx {
   permissions: Set<ModuleKey>;
   approvalRights: Set<ApprovalKind>;
   actionRights: Set<ActionKind>;
-  /** null = all branches visible; otherwise restricted allow-list */
   branchScope: Set<string> | null;
   loading: boolean;
   mustChangePassword: boolean;
   isActive: boolean;
   isAdmin: boolean;
+  isTenantAdmin: boolean;
+  isSaasAdmin: boolean;
   isManager: boolean;
+  tenantId: string | null;
+  tenantName: string | null;
+  subscriptionStatus: SubscriptionStatus;
+  trialEndsAt: string | null;
+  subscriptionEndsAt: string | null;
+  enabledModules: Set<ModuleKey>;
+  canExportReports: boolean;
+  canUseCustomDomain: boolean;
   canWrite: boolean;
   canView: (m: ModuleKey) => boolean;
   canApprove: (k: ApprovalKind) => boolean;
@@ -76,9 +86,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [branchScope, setBranchScope] = useState<Set<string> | null>(null);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [isActive, setIsActive] = useState(true);
+  const [isSaasAdmin, setIsSaasAdmin] = useState(false);
+  const [tenantRole, setTenantRole] = useState<"tenant_admin" | "member">("member");
+  const [tenantId, setTenantId] = useState<string | null>(null);
+  const [tenantName, setTenantName] = useState<string | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>("unknown");
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
+  const [subscriptionEndsAt, setSubscriptionEndsAt] = useState<string | null>(null);
+  const [enabledModules, setEnabledModules] = useState<Set<ModuleKey>>(new Set(ALL_MODULES));
   const [loading, setLoading] = useState(true);
 
-  const loadFor = async (uid: string, email?: string) => {
+  const resetMetadata = () => {
+    setRoles([]); setPermissions(new Set()); setApprovalRights(new Set());
+    setActionRights(new Set()); setBranchScope(null); setMustChangePassword(false);
+    setIsActive(true); setIsSaasAdmin(false); setTenantRole("member");
+    setTenantId(null); setTenantName(null); setSubscriptionStatus("unknown");
+    setTrialEndsAt(null); setSubscriptionEndsAt(null); setEnabledModules(new Set(ALL_MODULES));
+  };
+
+  const loadFor = async (uid: string) => {
     try {
       const [rRes, pRes, aRes, actRes, brRes, profRes] = await Promise.allSettled([
         supabase.from("user_roles").select("role").eq("user_id", uid),
@@ -86,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         supabase.from("user_approval_rights" as any).select("approval_kind").eq("user_id", uid),
         supabase.from("user_action_rights" as any).select("action_kind").eq("user_id", uid),
         supabase.from("user_branch_access" as any).select("branch_id").eq("user_id", uid),
-        supabase.from("profiles").select("must_change_password,is_active").eq("id", uid).maybeSingle(),
+        (supabase as any).from("profiles").select("must_change_password,is_active,tenant_id,tenant_role,is_saas_admin").eq("id", uid).maybeSingle(),
       ]);
 
       const r = rRes.status === "fulfilled" ? rRes.value.data : null;
@@ -94,18 +120,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const a = aRes.status === "fulfilled" ? aRes.value.data : null;
       const act = actRes.status === "fulfilled" ? actRes.value.data : null;
       const br = brRes.status === "fulfilled" ? brRes.value.data : null;
-      const prof = profRes.status === "fulfilled" ? profRes.value.data : null;
-
-      let rs = (r ?? []).map((x: any) => x.role as AppRole);
-
-      // Fallback: If user has no roles loaded or is default admin user (tesobrain@gmail.com)
-      if (rs.length === 0 && (email?.includes("tesobrain") || email?.includes("admin"))) {
-        rs = ["admin"];
-        // Attempt background insert into user_roles
-        supabase.from("user_roles").insert({ user_id: uid, role: "admin" }).then(({ error }) => {
-          if (error) console.warn("[AuthProvider] Auto-assign admin role notice:", error.message);
-        });
-      }
+      const prof: any = profRes.status === "fulfilled" ? profRes.value.data : null;
+      const rs = (r ?? []).map((x: any) => x.role as AppRole);
 
       setRoles(rs);
       setPermissions(new Set((p ?? []).filter((x: any) => x.can_view).map((x: any) => x.module as ModuleKey)));
@@ -113,8 +129,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setActionRights(new Set((act ?? []).map((x: any) => x.action_kind as ActionKind)));
       const brList = (br ?? []).map((x: any) => x.branch_id as string);
       setBranchScope(rs.includes("admin") || brList.length === 0 ? null : new Set(brList));
-      setMustChangePassword(Boolean((prof as any)?.must_change_password));
-      setIsActive((prof as any)?.is_active !== false);
+      setMustChangePassword(Boolean(prof?.must_change_password));
+      setIsActive(prof?.is_active !== false);
+      setIsSaasAdmin(Boolean(prof?.is_saas_admin));
+      setTenantRole(prof?.tenant_role === "tenant_admin" ? "tenant_admin" : "member");
+      setTenantId(prof?.tenant_id ?? null);
+
+      if (prof?.tenant_id) {
+        const [{ data: tenant }, { data: modules }, { data: overrides }] = await Promise.all([
+          (supabase as any).from("tenants").select("name,subscription_status,trial_ends_at,subscription_ends_at").eq("id", prof.tenant_id).maybeSingle(),
+          (supabase as any).from("saas_modules").select("module_key,globally_enabled,trial_enabled,paid_enabled").order("sort_order"),
+          (supabase as any).from("tenant_module_overrides").select("module_key,enabled").eq("tenant_id", prof.tenant_id),
+        ]);
+        if (tenant) {
+          setTenantName(tenant.name ?? null);
+          setTrialEndsAt(tenant.trial_ends_at ?? null);
+          setSubscriptionEndsAt(tenant.subscription_ends_at ?? null);
+
+          let effective: SubscriptionStatus = tenant.subscription_status ?? "unknown";
+          const now = Date.now();
+          if (effective === "trial" && tenant.trial_ends_at && new Date(tenant.trial_ends_at).getTime() <= now) effective = "expired";
+          if (effective === "active" && tenant.subscription_ends_at && new Date(tenant.subscription_ends_at).getTime() <= now) effective = "expired";
+          setSubscriptionStatus(effective);
+
+          const paid = effective === "active";
+          const overrideMap = new Map((overrides ?? []).map((x: any) => [x.module_key, x.enabled]));
+          if (modules?.length) {
+            const allowed = modules.filter((m: any) => {
+              if (!m.globally_enabled) return false;
+              if (paid ? !m.paid_enabled : !m.trial_enabled) return false;
+              return overrideMap.has(m.module_key) ? overrideMap.get(m.module_key) !== false : true;
+            }).map((m: any) => m.module_key as ModuleKey);
+            setEnabledModules(new Set(allowed));
+          }
+        }
+      }
     } catch (err) {
       console.error("[AuthProvider] Failed to load user auth metadata:", err);
     }
@@ -123,16 +172,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
       setSession(s);
-      if (s?.user) setTimeout(() => loadFor(s.user.id, s.user.email), 0);
-      else {
-        setRoles([]); setPermissions(new Set()); setApprovalRights(new Set());
-        setActionRights(new Set()); setBranchScope(null);
-        setMustChangePassword(false); setIsActive(true);
-      }
+      if (s?.user) setTimeout(() => loadFor(s.user.id), 0);
+      else resetMetadata();
     });
     supabase.auth.getSession().then(async ({ data }) => {
       setSession(data.session);
-      if (data.session?.user) await loadFor(data.session.user.id, data.session.user.email);
+      if (data.session?.user) await loadFor(data.session.user.id);
       setLoading(false);
     });
     return () => sub.subscription.unsubscribe();
@@ -140,10 +185,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isAdmin = roles.includes("admin");
   const isManager = roles.includes("manager");
+  const isTenantAdmin = tenantRole === "tenant_admin" || isAdmin;
+  const subscriptionUsable = subscriptionStatus === "active" || subscriptionStatus === "trial" || subscriptionStatus === "unknown";
 
-  const canView = (m: ModuleKey) => isAdmin || permissions.has(m);
-  const canApprove = (k: ApprovalKind) => isAdmin || approvalRights.has(k);
-  const canDo = (k: ActionKind) => isAdmin || isManager || actionRights.has(k);
+  const canView = (m: ModuleKey) => subscriptionUsable && enabledModules.has(m) && (isAdmin || permissions.has(m));
+  const canApprove = (k: ApprovalKind) => subscriptionUsable && (isAdmin || approvalRights.has(k));
+  const canDo = (k: ActionKind) => subscriptionUsable && (isAdmin || isManager || actionRights.has(k));
   const canSeeBranch = (branchId: string | null | undefined) => {
     if (!branchScope) return true;
     if (!branchId) return true;
@@ -151,39 +198,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const value: AuthCtx = {
-    user: session?.user ?? null,
-    session,
-    roles,
-    permissions,
-    approvalRights,
-    actionRights,
-    branchScope,
-    loading,
-    mustChangePassword,
-    isActive,
-    isAdmin,
-    isManager,
-    canWrite: isAdmin || isManager,
-    canView,
-    canApprove,
-    canDo,
-    canSeeBranch,
+    user: session?.user ?? null, session, roles, permissions, approvalRights, actionRights, branchScope,
+    loading, mustChangePassword, isActive, isAdmin, isTenantAdmin, isSaasAdmin, isManager,
+    tenantId, tenantName, subscriptionStatus, trialEndsAt, subscriptionEndsAt, enabledModules,
+    canExportReports: subscriptionStatus === "active",
+    canUseCustomDomain: subscriptionStatus === "active",
+    canWrite: subscriptionUsable && (isAdmin || isManager),
+    canView, canApprove, canDo, canSeeBranch,
     signOut: async () => {
-      try {
-        await supabase.auth.signOut();
-      } catch (e) {
-        console.error("[signOut] error:", e);
-      } finally {
-        setSession(null);
-        setRoles([]);
-        setPermissions(new Set());
-        setApprovalRights(new Set());
-        setActionRights(new Set());
-        setBranchScope(null);
-        try {
-          localStorage.clear();
-          sessionStorage.clear();
-        } catch {}
+      try { await supabase.auth.signOut(); }
+      catch (e) { console.error("[signOut] error:", e); }
+      finally {
+        setSession(null); resetMetadata();
+        try { localStorage.clear(); sessionStorage.clear(); } catch {}
         window.location.href = "/login";
       }
     },
