@@ -30,25 +30,32 @@ function ProfilePage() {
   });
   const { data: branches = [] } = useQuery({
     queryKey: ["branches-active"],
+    enabled: !isSaasAdmin,
     queryFn: async () => (await supabase.from("branches").select("id,name").eq("is_active", true).order("name")).data ?? [],
   });
   const { data: locations = [] } = useQuery({
     queryKey: ["locations-list"],
+    enabled: !isSaasAdmin,
     queryFn: async () => (await supabase.from("locations").select("id,name").order("name")).data ?? [],
   });
 
   useEffect(() => {
     if (!profile) return;
     setFullName(profile.full_name ?? "");
-    const meta = (user?.user_metadata ?? {}) as any;
-    setBranchId(meta.branch_id ?? "");
-    setLocationId(meta.location_id ?? "");
-  }, [profile, user]);
+    if (!isSaasAdmin) {
+      const meta = (user?.user_metadata ?? {}) as any;
+      setBranchId(meta.branch_id ?? "");
+      setLocationId(meta.location_id ?? "");
+    }
+  }, [profile, user, isSaasAdmin]);
 
   const save = async () => {
     setSaving(true);
     const { error: pErr } = await supabase.from("profiles").update({ full_name: fullName }).eq("id", user!.id);
-    const { error: uErr } = await supabase.auth.updateUser({ data: { full_name: fullName, branch_id: branchId || null, location_id: locationId || null } });
+    const metadata = isSaasAdmin
+      ? { full_name: fullName }
+      : { full_name: fullName, branch_id: branchId || null, location_id: locationId || null };
+    const { error: uErr } = await supabase.auth.updateUser({ data: metadata });
     setSaving(false);
     if (pErr || uErr) return toast.error((pErr ?? uErr)!.message);
     toast.success("Profile updated");
@@ -60,7 +67,7 @@ function ProfilePage() {
     <div className="max-w-2xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">My profile</h1>
-        <p className="text-sm text-muted-foreground">Update your profile, password and in-app notifications.</p>
+        <p className="text-sm text-muted-foreground">Update your profile and password.</p>
       </div>
 
       <Card className="space-y-4 p-6">
@@ -69,34 +76,37 @@ function ProfilePage() {
           <div>
             <p className="font-semibold">{user?.email}</p>
             <div className="mt-1 flex flex-wrap gap-1">
-              {roles.length === 0 ? <Badge variant="outline">no role</Badge> : roles.map((r) => <Badge key={r} variant="secondary" className="capitalize">{r}</Badge>)}
+              {!isSaasAdmin && (roles.length === 0 ? <Badge variant="outline">no role</Badge> : roles.map((r) => <Badge key={r} variant="secondary" className="capitalize">{r}</Badge>))}
               {isTenantAdmin && <Badge variant="outline">Tenant admin</Badge>}
-              {isSaasAdmin && <Badge>SaaS admin</Badge>}
+              {isSaasAdmin && <Badge>SaaS administrator</Badge>}
             </div>
           </div>
         </div>
         <div className="space-y-2"><Label>Full name</Label><Input value={fullName} onChange={(e) => setFullName(e.target.value)} /></div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Branch</Label>
-            <Select value={branchId || "none"} onValueChange={(v) => setBranchId(v === "none" ? "" : v)}>
-              <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-              <SelectContent><SelectItem value="none">— None —</SelectItem>{branches.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
-            </Select>
+
+        {!isSaasAdmin && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Branch</Label>
+              <Select value={branchId || "none"} onValueChange={(v) => setBranchId(v === "none" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent><SelectItem value="none">— None —</SelectItem>{branches.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Location</Label>
+              <Select value={locationId || "none"} onValueChange={(v) => setLocationId(v === "none" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent><SelectItem value="none">— None —</SelectItem>{locations.map((l: any) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label>Location</Label>
-            <Select value={locationId || "none"} onValueChange={(v) => setLocationId(v === "none" ? "" : v)}>
-              <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-              <SelectContent><SelectItem value="none">— None —</SelectItem>{locations.map((l: any) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-        </div>
+        )}
         <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save changes"}</Button>
       </Card>
 
       <ChangePasswordCard />
-      <NotificationPrefsCard />
+      {!isSaasAdmin && <NotificationPrefsCard />}
     </div>
   );
 }
