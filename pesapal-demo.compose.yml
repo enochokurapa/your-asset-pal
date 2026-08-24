@@ -6,6 +6,7 @@ services:
         FROM postgres:15-alpine
         COPY complete_init.sql /docker-entrypoint-initdb.d/01-init.sql
         COPY server_seed.sql /docker-entrypoint-initdb.d/02-seed.sql
+        COPY saas_policy.sql /docker-entrypoint-initdb.d/03-saas-policy.sql
     container_name: pesapal-db
     restart: unless-stopped
     environment:
@@ -126,10 +127,14 @@ services:
       SUPABASE_PROJECT_ID: "ams-self-hosted"
       SUPABASE_URL: "https://pesapal.owltechsolutionsltd.com"
       SUPABASE_PUBLISHABLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNjAwMDAwMDAwLCJleHAiOjIwMDAwMDAwMDB9.V-Nq7_uazFUYvZFXyq_whGnFkWy4W_3o4k6m04sGc5Q"
-      SUPABASE_SERVICE_ROLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE2MDAwMDAwMCwiZXhwIjoyMDAwMDAwMDAwfQ.FFGoBzCoT3bR0JMmOUFOOtvvZjGhMG1jN3sWeoM8l6w"
+      SUPABASE_SERVICE_ROLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE2MDAwMDAwMCwiZXhwIjoyMDAwMDAwMDAwfQ.oeN2RF9Dij2wbGdSl4SXReFSoKYYZ437UYmF4OG65PM"
       VITE_SUPABASE_PROJECT_ID: "ams-self-hosted"
       VITE_SUPABASE_URL: "https://pesapal.owltechsolutionsltd.com"
       VITE_SUPABASE_PUBLISHABLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNjAwMDAwMDAwLCJleHAiOjIwMDAwMDAwMDB9.V-Nq7_uazFUYvZFXyq_whGnFkWy4W_3o4k6m04sGc5Q"
+      YO_API_USERNAME: "${YO_API_USERNAME:-}"
+      YO_API_PASSWORD: "${YO_API_PASSWORD:-}"
+      YO_API_MODE: "${YO_API_MODE:-production}"
+      YO_API_URL: "${YO_API_URL:-}"
     expose:
       - "3000"
     networks:
