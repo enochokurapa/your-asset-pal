@@ -17,10 +17,38 @@ async function getProfile(userId: string) {
 
 async function assertTenantAdmin(userId: string) {
   const p = await getProfile(userId);
-  if (p.tenant_role !== "tenant_admin" && !p.is_saas_admin) {
-    throw new Error("Tenant administrator privileges required");
+
+  // SaaS administrators use the platform control plane and must never be treated
+  // as a tenant administrator for billing or tenant-owned resources.
+  if (p.is_saas_admin) {
+    throw new Error("SaaS administrators cannot perform tenant billing actions");
   }
+
+  // Tenant-admin authority can come from the explicit tenant_role flag OR the
+  // application's existing admin role. This keeps billing consistent with the UI
+  // and repairs older/stale rows where user_roles says admin but tenant_role was
+  // never promoted.
+  const { data: adminRole, error: roleError } = await admin.from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("role", "admin")
+    .maybeSingle();
+  if (roleError) throw new Error(roleError.message);
+
+  const canManageTenant = p.tenant_role === "tenant_admin" || Boolean(adminRole);
+  if (!canManageTenant) throw new Error("Tenant administrator privileges required");
   if (!p.tenant_id) throw new Error("No tenant is assigned to this account");
+
+  // Self-heal legacy/stale tenant profiles so future checks remain consistent.
+  if (p.tenant_role !== "tenant_admin" && adminRole) {
+    const { error: repairError } = await admin.from("profiles")
+      .update({ tenant_role: "tenant_admin" })
+      .eq("id", userId)
+      .eq("is_saas_admin", false);
+    if (repairError) throw new Error(repairError.message);
+    p.tenant_role = "tenant_admin";
+  }
+
   return p;
 }
 
