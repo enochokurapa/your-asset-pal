@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth, AppRole, ALL_MODULES, ALL_APPROVAL_KINDS, ALL_ACTION_KINDS, ModuleKey, ApprovalKind, ActionKind } from "@/hooks/use-auth";
 import {
   createUserAccount, adminResetPassword, setUserActive, deleteUserAccount,
+  setUserRole, setUserModulePermission, setUserApprovalRight, setUserActionRight, setUserBranchAccess,
 } from "@/lib/admin-users.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,18 +26,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { UserPlus, Users as UsersIcon, KeyRound, Trash2, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/_app/users")({
-  component: UsersPage,
-});
+export const Route = createFileRoute("/_app/users")({ component: UsersPage });
 
 const ROLES: AppRole[] = ["admin", "manager", "staff", "security"];
 
 function UsersPage() {
-  const { isAdmin, loading, user: me } = useAuth();
+  const { isTenantAdmin, isSaasAdmin, loading, user: me } = useAuth();
   const qc = useQueryClient();
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["users-with-roles"] });
-  };
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["users-with-roles"] });
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ email: "", password: "", full_name: "", role: "staff" as AppRole });
   const [submitting, setSubmitting] = useState(false);
@@ -45,19 +42,30 @@ function UsersPage() {
   const resetFn = useServerFn(adminResetPassword);
   const activeFn = useServerFn(setUserActive);
   const deleteFn = useServerFn(deleteUserAccount);
+  const roleFn = useServerFn(setUserRole);
+  const moduleFn = useServerFn(setUserModulePermission);
+  const approvalFn = useServerFn(setUserApprovalRight);
+  const actionFn = useServerFn(setUserActionRight);
+  const branchFn = useServerFn(setUserBranchAccess);
+
+  const getAuthHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return {};
+    return { Authorization: `Bearer ${session.access_token}` };
+  };
 
   const { data: branchesAll = [] } = useQuery({
     queryKey: ["branches-all-for-perms"],
-    enabled: isAdmin,
+    enabled: isTenantAdmin && !isSaasAdmin,
     queryFn: async () => (await supabase.from("branches").select("id,name,code").order("name")).data ?? [],
   });
 
   const { data = [], isLoading } = useQuery({
     queryKey: ["users-with-roles"],
-    enabled: isAdmin,
+    enabled: isTenantAdmin && !isSaasAdmin,
     queryFn: async () => {
       const [{ data: profiles }, { data: roles }, { data: perms }, { data: rights }, { data: acts }, { data: brs }] = await Promise.all([
-        supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+        supabase.from("profiles").select("*").eq("is_saas_admin", false).order("created_at", { ascending: false }),
         supabase.from("user_roles").select("user_id, role"),
         supabase.from("user_permissions" as any).select("user_id, module, can_view"),
         supabase.from("user_approval_rights" as any).select("user_id, approval_kind"),
@@ -76,17 +84,12 @@ function UsersPage() {
   });
 
   if (loading) return <div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
-  if (!isAdmin) return <Navigate to="/dashboard" />;
-
-  const getAuthHeaders = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) return {};
-    return { Authorization: `Bearer ${session.access_token}` };
-  };
+  if (isSaasAdmin) return <Navigate to="/saas-admin" />;
+  if (!isTenantAdmin) return <Navigate to="/dashboard" />;
 
   const create = async () => {
-    if (!form.email || !form.password) { toast.error("Email and password required"); return; }
-    if (form.password.length < 6) { toast.error("Password must be at least 6 characters"); return; }
+    if (!form.email || !form.password) return toast.error("Email and password required");
+    if (form.password.length < 6) return toast.error("Password must be at least 6 characters");
     setSubmitting(true);
     try {
       const headers = await getAuthHeaders();
@@ -95,95 +98,52 @@ function UsersPage() {
       setOpen(false);
       setForm({ email: "", password: "", full_name: "", role: "staff" });
       invalidate();
+    } catch (e: any) { toast.error(e?.message ?? "Failed to create user"); }
+    finally { setSubmitting(false); }
+  };
+
+  const call = async (fn: any, payload: any, success?: string) => {
+    try {
+      const headers = await getAuthHeaders();
+      await fn({ data: payload, headers });
+      if (success) toast.success(success);
+      invalidate();
     } catch (e: any) {
-      toast.error(e?.message ?? "Failed to create user");
-    } finally {
-      setSubmitting(false);
+      toast.error(e?.message ?? "Could not update user");
+      throw e;
     }
   };
 
   const onReset = async (userId: string, newPass: string) => {
-    try {
-      const headers = await getAuthHeaders();
-      await resetFn({ data: { user_id: userId, new_password: newPass }, headers });
-      toast.success("Password reset successfully");
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed to reset password");
-    }
+    await call(resetFn, { user_id: userId, new_password: newPass }, "Password reset. Share the temporary password with the user.");
   };
 
   const setRole = async (userId: string, role: AppRole, currentRoles: AppRole[]) => {
-    const op = currentRoles.includes(role)
-      ? supabase.from("user_roles").delete().eq("user_id", userId).eq("role", role)
-      : supabase.from("user_roles").insert({ user_id: userId, role });
-    const { error } = await op;
-    if (error) return toast.error(error.message);
-    invalidate();
+    await call(roleFn, { user_id: userId, role, enabled: !currentRoles.includes(role) });
   };
 
   const toggleModule = async (userId: string, module: ModuleKey, on: boolean) => {
-    if (on) {
-      const { error } = await supabase.from("user_permissions" as any).delete().eq("user_id", userId).eq("module", module);
-      if (error) return toast.error(error.message);
-    } else {
-      const { error } = await supabase.from("user_permissions" as any).insert({ user_id: userId, module, can_view: true });
-      if (error) return toast.error(error.message);
-    }
-    invalidate();
+    await call(moduleFn, { user_id: userId, module, enabled: !on });
   };
+
   const toggleAction = async (userId: string, kind: ActionKind, on: boolean) => {
-    if (on) {
-      const { error } = await supabase.from("user_action_rights" as any).delete().eq("user_id", userId).eq("action_kind", kind);
-      if (error) return toast.error(error.message);
-    } else {
-      const { error } = await supabase.from("user_action_rights" as any).insert({ user_id: userId, action_kind: kind });
-      if (error) return toast.error(error.message);
-    }
-    invalidate();
+    await call(actionFn, { user_id: userId, action_kind: kind, enabled: !on });
   };
 
   const toggleBranch = async (userId: string, branchId: string, on: boolean) => {
-    if (on) {
-      const { error } = await supabase.from("user_branch_access" as any).delete().eq("user_id", userId).eq("branch_id", branchId);
-      if (error) return toast.error(error.message);
-    } else {
-      const { error } = await supabase.from("user_branch_access" as any).insert({ user_id: userId, branch_id: branchId });
-      if (error) return toast.error(error.message);
-    }
-    invalidate();
+    await call(branchFn, { user_id: userId, branch_id: branchId, enabled: !on });
   };
 
   const toggleApproval = async (userId: string, kind: ApprovalKind, on: boolean) => {
-    if (on) {
-      const { error } = await supabase.from("user_approval_rights" as any).delete().eq("user_id", userId).eq("approval_kind", kind);
-      if (error) return toast.error(error.message);
-    } else {
-      const { error } = await supabase.from("user_approval_rights" as any).insert({ user_id: userId, approval_kind: kind });
-      if (error) return toast.error(error.message);
-    }
-    invalidate();
+    await call(approvalFn, { user_id: userId, approval_kind: kind, enabled: !on });
   };
 
   const onToggleActive = async (userId: string, makeActive: boolean) => {
-    try {
-      const headers = await getAuthHeaders();
-      await activeFn({ data: { user_id: userId, active: makeActive }, headers });
-      toast.success(makeActive ? "User reactivated" : "User deactivated");
-      invalidate();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed");
-    }
+    await call(activeFn, { user_id: userId, active: makeActive }, makeActive ? "User reactivated" : "User deactivated");
   };
 
   const onDelete = async (userId: string) => {
-    try {
-      const headers = await getAuthHeaders();
-      await deleteFn({ data: { user_id: userId }, headers });
-      toast.success("User deleted");
-      invalidate();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Failed");
-    }
+    await call(deleteFn, { user_id: userId }, "User deleted");
   };
 
   return (
@@ -191,14 +151,14 @@ function UsersPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Users & responsibilities</h1>
-          <p className="text-sm text-muted-foreground">Create accounts, assign roles, modules and approval rights.</p>
+          <p className="text-sm text-muted-foreground">Tenant administrators create accounts and assign roles, modules, branches and approval rights.</p>
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button><UserPlus className="mr-2 h-4 w-4" /> New user</Button></DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create user account</DialogTitle>
-              <DialogDescription>The user will sign in with this temporary password and be required to change it.</DialogDescription>
+              <DialogDescription>The user signs in with this temporary password and must change it after the first successful login.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
               <div className="space-y-2"><Label>Full name *</Label><Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></div>
@@ -221,10 +181,7 @@ function UsersPage() {
         {isLoading ? (
           <p className="py-12 text-center text-sm text-muted-foreground">Loading…</p>
         ) : data.length === 0 ? (
-          <div className="py-12 text-center">
-            <UsersIcon className="mx-auto h-10 w-10 text-muted-foreground/40" />
-            <p className="mt-3 text-sm text-muted-foreground">No users yet.</p>
-          </div>
+          <div className="py-12 text-center"><UsersIcon className="mx-auto h-10 w-10 text-muted-foreground/40" /><p className="mt-3 text-sm text-muted-foreground">No tenant users yet.</p></div>
         ) : (
           <div className="space-y-3">
             {data.map((u: any) => (
@@ -240,10 +197,7 @@ function UsersPage() {
                 onBranch={toggleBranch}
                 onActive={onToggleActive}
                 onDelete={onDelete}
-                onReset={async (uid: string, pwd: string) => {
-                  try { await resetFn({ data: { user_id: uid, new_password: pwd } }); toast.success("Password reset. Share it with the user."); }
-                  catch (e: any) { toast.error(e?.message ?? "Failed"); }
-                }}
+                onReset={onReset}
               />
             ))}
           </div>
@@ -273,12 +227,8 @@ function UserRow({ u, self, branchesAll, onRole, onModule, onApproval, onAction,
           {ROLES.map((r) => {
             const on = u.roles.includes(r);
             return (
-              <button
-                key={r}
-                onClick={() => onRole(u.id, r, u.roles)}
-                disabled={self && r === "admin" && on}
-                className={`rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors ${on ? "border-primary bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"} disabled:opacity-50`}
-              >
+              <button key={r} onClick={() => onRole(u.id, r, u.roles)} disabled={self && r === "admin" && on}
+                className={`rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors ${on ? "border-primary bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"} disabled:opacity-50`}>
                 {r}
               </button>
             );
@@ -287,51 +237,22 @@ function UserRow({ u, self, branchesAll, onRole, onModule, onApproval, onAction,
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
-        <Button variant="outline" size="sm" onClick={() => setPermsOpen((s) => !s)}>
-          <Settings2 className="mr-2 h-4 w-4" /> {permsOpen ? "Hide" : "Permissions"}
-        </Button>
-
+        <Button variant="outline" size="sm" onClick={() => setPermsOpen((s) => !s)}><Settings2 className="mr-2 h-4 w-4" /> {permsOpen ? "Hide" : "Permissions"}</Button>
         <Dialog open={resetOpen} onOpenChange={setResetOpen}>
-          <DialogTrigger asChild>
-            <Button variant="outline" size="sm"><KeyRound className="mr-2 h-4 w-4" /> Reset password</Button>
-          </DialogTrigger>
+          <DialogTrigger asChild><Button variant="outline" size="sm"><KeyRound className="mr-2 h-4 w-4" /> Reset password</Button></DialogTrigger>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Reset password for {u.email}</DialogTitle>
-              <DialogDescription>Set a temporary password. The user will be asked to change it on next sign-in.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-2 py-2">
-              <Label>New temporary password</Label>
-              <Input type="password" autoComplete="new-password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} />
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setResetOpen(false)}>Cancel</Button>
-              <Button onClick={async () => { if (newPwd.length < 6) return toast.error("At least 6 characters"); await onReset(u.id, newPwd); setNewPwd(""); setResetOpen(false); }}>Save</Button>
-            </DialogFooter>
+            <DialogHeader><DialogTitle>Reset password for {u.email}</DialogTitle><DialogDescription>Set a temporary password. The user must change it on next sign-in.</DialogDescription></DialogHeader>
+            <div className="space-y-2 py-2"><Label>New temporary password</Label><Input type="password" autoComplete="new-password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} /></div>
+            <DialogFooter><Button variant="outline" onClick={() => setResetOpen(false)}>Cancel</Button><Button onClick={async () => { if (newPwd.length < 6) return toast.error("At least 6 characters"); try { await onReset(u.id, newPwd); setNewPwd(""); setResetOpen(false); } catch {} }}>Save</Button></DialogFooter>
           </DialogContent>
         </Dialog>
-
-        <div className="flex items-center gap-2 text-sm">
-          <Switch checked={u.is_active !== false} disabled={self} onCheckedChange={(v) => onActive(u.id, v)} />
-          <span className="text-muted-foreground">{u.is_active !== false ? "Active" : "Inactive"}</span>
-        </div>
-
+        <div className="flex items-center gap-2 text-sm"><Switch checked={u.is_active !== false} disabled={self} onCheckedChange={(v) => onActive(u.id, v)} /><span className="text-muted-foreground">{u.is_active !== false ? "Active" : "Inactive"}</span></div>
         {!self && (
           <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm" className="ml-auto"><Trash2 className="mr-2 h-4 w-4" /> Delete</Button>
-            </AlertDialogTrigger>
+            <AlertDialogTrigger asChild><Button variant="destructive" size="sm" className="ml-auto"><Trash2 className="mr-2 h-4 w-4" /> Delete</Button></AlertDialogTrigger>
             <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete this user?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This permanently removes <strong>{u.email}</strong>. Their roles and permissions are revoked. Records they created remain.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={() => onDelete(u.id)}>Delete</AlertDialogAction>
-              </AlertDialogFooter>
+              <AlertDialogHeader><AlertDialogTitle>Delete this user?</AlertDialogTitle><AlertDialogDescription>This permanently removes <strong>{u.email}</strong>. Their roles and permissions are revoked. Records they created remain.</AlertDialogDescription></AlertDialogHeader>
+              <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => onDelete(u.id)}>Delete</AlertDialogAction></AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
         )}
@@ -342,66 +263,24 @@ function UserRow({ u, self, branchesAll, onRole, onModule, onApproval, onAction,
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Modules they can view</p>
             <div className="grid grid-cols-2 gap-2">
-              {ALL_MODULES.map((m) => {
-                const on = u.modules.has(m);
-                return (
-                  <label key={m} className="flex items-center gap-2 text-sm capitalize">
-                    <Checkbox checked={on} onCheckedChange={() => onModule(u.id, m, on)} />
-                    {m}
-                  </label>
-                );
-              })}
+              {ALL_MODULES.map((m) => { const on = u.modules.has(m); return <label key={m} className="flex items-center gap-2 text-sm capitalize"><Checkbox checked={on} onCheckedChange={() => onModule(u.id, m, on)} />{m.replace(/_/g, " ")}</label>; })}
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">Admins automatically see every module.</p>
+            <p className="mt-2 text-xs text-muted-foreground">Tenant admins automatically see modules allowed by the SaaS plan.</p>
           </div>
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Approval rights</p>
-            <div className="grid grid-cols-1 gap-2">
-              {ALL_APPROVAL_KINDS.map((k) => {
-                const on = u.approvals.has(k);
-                return (
-                  <label key={k} className="flex items-center gap-2 text-sm capitalize">
-                    <Checkbox checked={on} onCheckedChange={() => onApproval(u.id, k, on)} />
-                    {k.replace(/_/g, " ")}
-                  </label>
-                );
-              })}
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">Admins approve everything by default.</p>
+            <div className="grid grid-cols-1 gap-2">{ALL_APPROVAL_KINDS.map((k) => { const on = u.approvals.has(k); return <label key={k} className="flex items-center gap-2 text-sm capitalize"><Checkbox checked={on} onCheckedChange={() => onApproval(u.id, k, on)} />{k.replace(/_/g, " ")}</label>; })}</div>
           </div>
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Asset actions they can initiate</p>
-            <div className="grid grid-cols-1 gap-2">
-              {ALL_ACTION_KINDS.map((k) => {
-                const on = u.actions.has(k);
-                return (
-                  <label key={k} className="flex items-center gap-2 text-sm capitalize">
-                    <Checkbox checked={on} onCheckedChange={() => onAction(u.id, k, on)} />
-                    {k.replace(/_/g, " ")}
-                  </label>
-                );
-              })}
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">"Add asset" unlocks manual entry, bulk import and scanning. Initiate rights let staff submit movement / retirement / disposal requests for admin approval.</p>
+            <div className="grid grid-cols-1 gap-2">{ALL_ACTION_KINDS.map((k) => { const on = u.actions.has(k); return <label key={k} className="flex items-center gap-2 text-sm capitalize"><Checkbox checked={on} onCheckedChange={() => onAction(u.id, k, on)} />{k.replace(/_/g, " ")}</label>; })}</div>
           </div>
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Visible branches</p>
-            {(branchesAll ?? []).length === 0 ? (
-              <p className="text-sm text-muted-foreground">No branches created yet.</p>
-            ) : (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {(branchesAll ?? []).map((b: any) => {
-                  const on = u.branches.has(b.id);
-                  return (
-                    <label key={b.id} className="flex items-center gap-2 text-sm">
-                      <Checkbox checked={on} onCheckedChange={() => onBranch(u.id, b.id, on)} />
-                      <span>{b.name}{b.code ? <span className="ml-1 text-xs text-muted-foreground">({b.code})</span> : null}</span>
-                    </label>
-                  );
-                })}
-              </div>
+            {(branchesAll ?? []).length === 0 ? <p className="text-sm text-muted-foreground">No branches created yet.</p> : (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{(branchesAll ?? []).map((b: any) => { const on = u.branches.has(b.id); return <label key={b.id} className="flex items-center gap-2 text-sm"><Checkbox checked={on} onCheckedChange={() => onBranch(u.id, b.id, on)} /><span>{b.name}{b.code ? <span className="ml-1 text-xs text-muted-foreground">({b.code})</span> : null}</span></label>; })}</div>
             )}
-            <p className="mt-2 text-xs text-muted-foreground">Leave all unticked to grant access to every branch. Tick specific branches to limit what this user sees.</p>
+            <p className="mt-2 text-xs text-muted-foreground">Leave all unticked to grant access to every branch. Tick specific branches to limit visibility.</p>
           </div>
         </div>
       )}
