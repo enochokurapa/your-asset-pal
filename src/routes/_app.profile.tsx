@@ -63,6 +63,8 @@ function ProfilePage() {
     qc.invalidateQueries({ queryKey: ["profiles-list"] });
   };
 
+  const visibleRoles = isTenantAdmin ? roles.filter((r) => r !== "admin") : roles;
+
   return (
     <div className="max-w-2xl space-y-6">
       <div>
@@ -76,9 +78,9 @@ function ProfilePage() {
           <div>
             <p className="font-semibold">{user?.email}</p>
             <div className="mt-1 flex flex-wrap gap-1">
-              {!isSaasAdmin && (roles.length === 0 ? <Badge variant="outline">no role</Badge> : roles.map((r) => <Badge key={r} variant="secondary" className="capitalize">{r}</Badge>))}
-              {isTenantAdmin && <Badge variant="outline">Tenant admin</Badge>}
-              {isSaasAdmin && <Badge>SaaS administrator</Badge>}
+              {!isSaasAdmin && (visibleRoles.length === 0 && !isTenantAdmin ? <Badge variant="outline">no role</Badge> : visibleRoles.map((r) => <Badge key={r} variant="secondary" className="capitalize">{r}</Badge>))}
+              {isTenantAdmin && <Badge variant="outline">Admin</Badge>}
+              {isSaasAdmin && <Badge>SaaS Admin</Badge>}
             </div>
           </div>
         </div>
