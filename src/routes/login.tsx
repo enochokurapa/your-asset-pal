@@ -12,6 +12,27 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
+function authErrorMessage(error: unknown): string {
+  const raw =
+    error && typeof error === "object" && "message" in error
+      ? String((error as { message?: unknown }).message ?? "")
+      : error instanceof Error
+        ? error.message
+        : String(error ?? "");
+
+  // Do not expose low-level JSON/proxy errors to users. These messages indicate
+  // an infrastructure response, not bad credentials.
+  if (
+    /unexpected non-whitespace character after json|unexpected token.*json|failed to fetch|fetch failed|networkerror|upstream_(?:unreachable|misconfigured|not_configured)/i.test(
+      raw,
+    )
+  ) {
+    return "The sign-in service is temporarily unavailable. Please try again in a moment.";
+  }
+
+  return raw || "Sign in failed. Please try again.";
+}
+
 function LoginPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -24,12 +45,28 @@ function LoginPage() {
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
+
     setSubmitting(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setSubmitting(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Welcome back");
-    navigate({ to: "/dashboard" });
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (error) {
+        toast.error(authErrorMessage(error));
+        return;
+      }
+
+      toast.success("Welcome back");
+      navigate({ to: "/dashboard" });
+    } catch (error) {
+      console.error("[Login] Sign-in request failed", error);
+      toast.error(authErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
