@@ -22,20 +22,26 @@ import {
 import {
   THEME_PRESETS, FONT_OPTIONS, loadStoredTheme, saveStoredTheme, type StoredTheme,
 } from "@/lib/theme";
+import { announceBrandingChanged } from "@/lib/branding";
 
 export const Route = createFileRoute("/_app/settings")({
   component: SettingsPage,
 });
 
 function SettingsPage() {
-  const { loading, canView, canDo } = useAuth();
+  const { loading, canView, canDo, tenantId } = useAuth();
   const canManage = canDo("manage_document_templates");
   const [tpl, setTpl] = useState<DocumentTemplate | null>(null);
   const [saving, setSaving] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const previewTimer = useRef<any>(null);
 
-  useEffect(() => { loadTemplate(true).then(setTpl); }, []);
+  useEffect(() => {
+    loadTemplate(true).then(setTpl).catch((error) => {
+      console.error("Unable to load company branding", error);
+      toast.error(error?.message || "Unable to load company branding. Refresh and try again.");
+    });
+  }, [tenantId]);
 
   // Debounced live preview
   useEffect(() => {
@@ -53,6 +59,10 @@ function SettingsPage() {
     setTpl((t) => (t ? { ...t, [k]: v } : t));
 
   const onPickFile = async (key: "logo_data_url" | "watermark_image_data_url", file: File) => {
+    if (file.size > 500_000) {
+      toast.error("Image is too large. Choose a PNG or JPG smaller than 500 KB.");
+      return;
+    }
     const dataUrl = await fileToDataUrl(file);
     set(key, dataUrl);
   };
@@ -60,17 +70,31 @@ function SettingsPage() {
   const save = async () => {
     if (!tpl) return;
     if (!canManage) { toast.error("You don't have permission to edit templates"); return; }
+    if (!tenantId) { toast.error("Your company workspace could not be identified. Sign in again."); return; }
+    if (!tpl.organization_name.trim()) { toast.error("Organization name is required."); return; }
     setSaving(true);
-    const { id, created_at, updated_at, ...rest } = tpl as any;
-    const payload = { ...rest, updated_by: (await supabase.auth.getUser()).data.user?.id };
-    const { error } = await supabase
-      .from("document_templates" as any)
-      .update(payload)
-      .eq("id", id);
-    setSaving(false);
-    if (error) { toast.error(error.message); return; }
-    invalidateTemplateCache();
-    toast.success("Template saved · applies to all new PDFs");
+    try {
+      const { id, created_at, updated_at, tenant_id, ...rest } = tpl as any;
+      const userResult = await supabase.auth.getUser();
+      if (userResult.error || !userResult.data.user) throw userResult.error || new Error("Your session expired. Sign in again.");
+      const payload = { ...rest, organization_name: tpl.organization_name.trim(), tenant_id: tenantId, updated_by: userResult.data.user.id };
+      const query = id && id !== "default"
+        ? supabase.from("document_templates" as any).update(payload).eq("id", id).eq("tenant_id", tenantId)
+        : supabase.from("document_templates" as any).insert(payload);
+      const { data, error } = await query.select("*").maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error("Branding was not saved. Check your company administrator permission.");
+      const saved = { ...DEFAULT_TEMPLATE, ...(data as any) } as DocumentTemplate;
+      setTpl(saved);
+      invalidateTemplateCache();
+      announceBrandingChanged(saved);
+      toast.success("Company branding saved across the workspace and new PDFs");
+    } catch (error: any) {
+      console.error("Unable to save company branding", error);
+      toast.error(error?.message || error?.details || "Unable to save company branding. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const reset = () => setTpl((t) => (t ? { ...DEFAULT_TEMPLATE, id: t.id, name: t.name } : t));
@@ -129,7 +153,7 @@ function SettingsPage() {
                   </div>
                 ) : (
                   <label className="flex cursor-pointer items-center gap-2 rounded border border-dashed p-3 text-sm text-muted-foreground hover:bg-muted/50">
-                    <Upload className="h-4 w-4" /> Upload PNG/JPG (recommended &lt; 200 KB)
+                    <Upload className="h-4 w-4" /> Upload PNG/JPG (maximum 500 KB)
                     <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && onPickFile("logo_data_url", e.target.files[0])} />
                   </label>
                 )}
@@ -674,4 +698,3 @@ function UserGuidesPanel() {
     </div>
   );
 }
-
