@@ -337,15 +337,22 @@ function AssetsPage() {
   };
 
   const [reqKind, setReqKind] = useState<"retirement" | "disposal" | "deletion" | null>(null);
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
   const requestRetire = (a: any, kind: "retirement" | "disposal" | "deletion" = "retirement") => { setRetireAsset(a); setRetireReason(""); setReqKind(kind); setRetireOpen(true); };
   const submitRetire = async () => {
+    if (requestSubmitting) return;
     if (!retireReason.trim()) { toast.error("Reason is required"); return; }
+    setRequestSubmitting(true);
     try {
       await submitApproval({ kind: reqKind ?? "retirement", assetId: retireAsset.id, reason: retireReason.trim() });
       setRetireOpen(false);
       qc.invalidateQueries({ queryKey: ["pending-approvals"] });
       qc.invalidateQueries({ queryKey: ["notifications"] });
-    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    } catch (e: any) {
+      toast.error(e?.code === "23505" ? "A request for this asset is already pending" : e?.message ?? "Failed");
+    } finally {
+      setRequestSubmitting(false);
+    }
   };
 
   const removeAsset = async (a: any) => {
@@ -737,8 +744,10 @@ function AssetsPage() {
             <Textarea rows={3} value={retireReason} onChange={(e) => setRetireReason(e.target.value)} placeholder="End of useful life / damaged beyond repair / lost…" />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRetireOpen(false)}>Cancel</Button>
-            <Button onClick={submitRetire}>Submit for approval</Button>
+            <Button variant="outline" onClick={() => setRetireOpen(false)} disabled={requestSubmitting}>Cancel</Button>
+            <Button onClick={submitRetire} disabled={requestSubmitting}>
+              {requestSubmitting ? "Submitting…" : "Submit for approval"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
