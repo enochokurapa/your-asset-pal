@@ -192,6 +192,17 @@ export const updateTenantSubscription = createServerFn({ method: "POST" })
     if (data.status === "active") {
       patch.subscription_started_at = new Date().toISOString();
       patch.subscription_ends_at = new Date(Date.now() + 30 * 86400000).toISOString();
+    } else if (data.status === "trial") {
+      const { data: settings, error: settingsError } = await admin.from("saas_settings")
+        .select("trial_days").eq("id", true).single();
+      if (settingsError) throw new Error(settingsError.message);
+      const trialDays = Number(settings?.trial_days);
+      if (!Number.isInteger(trialDays) || trialDays < 1) throw new Error("Trial policy is not configured");
+      const startedAt = new Date();
+      patch.trial_started_at = startedAt.toISOString();
+      patch.trial_ends_at = new Date(startedAt.getTime() + trialDays * 86400000).toISOString();
+      patch.subscription_started_at = null;
+      patch.subscription_ends_at = null;
     }
     const { error } = await admin.from("tenants").update(patch).eq("id", data.tenant_id);
     if (error) throw new Error(error.message);
