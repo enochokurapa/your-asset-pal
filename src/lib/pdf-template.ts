@@ -74,13 +74,14 @@ const CACHE_TTL_MS = 60_000;
 
 export async function loadTemplate(force = false): Promise<DocumentTemplate> {
   if (!force && cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.t;
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("document_templates" as any)
     .select("*")
     .eq("is_active", true)
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (error) throw error;
   const t = (data as any) ? { ...DEFAULT_TEMPLATE, ...(data as any) } : DEFAULT_TEMPLATE;
   cache = { t, at: Date.now() };
   return t;
