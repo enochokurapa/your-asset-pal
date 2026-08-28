@@ -11,6 +11,20 @@ interface Props {
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const CAMERA_START_TIMEOUT_MS = 12_000;
+
+function withTimeout<T>(promise: Promise<T>, milliseconds: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(
+      () => reject(new DOMException("Camera startup timed out", "AbortError")),
+      milliseconds,
+    );
+    promise.then(
+      (value) => { window.clearTimeout(timer); resolve(value); },
+      (reason) => { window.clearTimeout(timer); reject(reason); },
+    );
+  });
+}
 
 function isIOSDevice() {
   if (typeof navigator === "undefined") return false;
@@ -84,16 +98,22 @@ export function ScannerDialog({ open, onOpenChange, onScan }: Props) {
     setStarting(true);
 
     try {
+      if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+        throw new Error("Live camera requires HTTPS. Use Take photo instead.");
+      }
       await stopScanner();
       await wait(120);
       if (generation !== generationRef.current) return;
 
-      let camera: string | MediaTrackConstraints = { facingMode: { ideal: "environment" } };
+      const ios = isIOSDevice();
+      let camera: string | MediaTrackConstraints = { facingMode: "environment" };
 
       // Asking for the camera list first gives iOS a chance to expose the actual
       // rear camera device id. If that fails, Html5Qrcode still gets a normal
       // environment-facing constraint as a fallback.
-      try {
+      // On iPhone, enumerating devices before opening the stream can hang or
+      // consume the user gesture. Request the rear camera directly instead.
+      if (!ios) try {
         const cameras = await Html5Qrcode.getCameras();
         if (cameras.length) {
           const rearCamera = [...cameras].reverse().find((device) =>
@@ -111,13 +131,16 @@ export function ScannerDialog({ open, onOpenChange, onScan }: Props) {
       const scanner = new Html5Qrcode(elId, { verbose: false });
       scannerRef.current = scanner;
 
-      await scanner.start(
-        camera,
-        { fps: 15 },
-        (decoded) => {
-          void completeScan(decoded);
-        },
-        () => {},
+      await withTimeout(
+        scanner.start(
+          camera,
+          { fps: ios ? 10 : 15 },
+          (decoded) => {
+            void completeScan(decoded);
+          },
+          () => {},
+        ),
+        CAMERA_START_TIMEOUT_MS,
       );
 
       if (generation !== generationRef.current) {
@@ -235,7 +258,7 @@ export function ScannerDialog({ open, onOpenChange, onScan }: Props) {
             {starting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
             Retry camera
           </Button>
-          <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={starting}>
+          <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
             <ImagePlus className="h-4 w-4" />
             Take photo
           </Button>
