@@ -37,6 +37,8 @@ function BillingPage() {
   });
   const price = ctx?.settings?.paidPrice ?? 0;
   const currency = ctx?.settings?.currency ?? "UGX";
+  const trialDays = ctx?.settings?.trialDays ?? null;
+  const trialUserLimit = ctx?.settings?.trialUserLimit ?? null;
   const daysLeft = trialEndsAt ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000)) : null;
 
   const start = async () => {
@@ -73,7 +75,7 @@ function BillingPage() {
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="p-5"><p className="text-xs uppercase tracking-wide text-muted-foreground">Current status</p><div className="mt-2 flex items-center gap-2"><Badge className="capitalize">{subscriptionStatus}</Badge>{subscriptionStatus === "active" && <CheckCircle2 className="h-4 w-4 text-success" />}</div></Card>
-        <Card className="p-5"><p className="text-xs uppercase tracking-wide text-muted-foreground">Free trial</p><p className="mt-2 text-xl font-semibold">4 weeks</p>{subscriptionStatus === "trial" && daysLeft !== null && <p className="mt-1 text-xs text-muted-foreground">{daysLeft} day(s) remaining</p>}</Card>
+        <Card className="p-5"><p className="text-xs uppercase tracking-wide text-muted-foreground">Free trial</p><p className="mt-2 text-xl font-semibold">{trialDays !== null ? `${trialDays} days` : "Loading…"}</p>{subscriptionStatus === "trial" && daysLeft !== null && <p className="mt-1 text-xs text-muted-foreground"><strong>{daysLeft} day(s) remaining</strong>{trialEndsAt ? ` · ends ${new Date(trialEndsAt).toLocaleDateString()}` : ""}</p>}</Card>
         <Card className="p-5"><p className="text-xs uppercase tracking-wide text-muted-foreground">Paid plan</p><p className="mt-2 text-xl font-semibold">{price > 0 ? money(price, currency) : "Price not set"}</p><p className="mt-1 text-xs text-muted-foreground">Price is controlled by the SaaS Admin.</p></Card>
       </div>
 
@@ -89,7 +91,7 @@ function BillingPage() {
         </Card>
       )}
 
-      <Card className="p-5 text-sm text-muted-foreground"><strong className="text-foreground">Trial policy:</strong> up to 4 active users for 4 weeks. Features that are not included in the trial remain visible and clearly marked as paid. Reports can be viewed during trial, but built-in PDF/Excel export is a paid feature.</Card>
+      <Card className="p-5 text-sm text-muted-foreground"><strong className="text-foreground">Trial policy:</strong> {trialUserLimit !== null ? `up to ${trialUserLimit} active users` : "user limit loading"} for {trialDays !== null ? `${trialDays} days` : "the configured period"}. These limits are controlled by the SaaS Admin. Features that are not included in the trial remain visible and clearly marked as paid. Reports can be viewed during trial, but built-in PDF/Excel export is a paid feature.</Card>
     </div>
   );
 }
