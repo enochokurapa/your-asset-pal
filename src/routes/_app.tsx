@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, Link, Navigate, useRouterState } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth, ModuleKey } from "@/hooks/use-auth";
 import {
   LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X, FileBarChart,
@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 import { NotificationBell } from "@/components/notification-bell";
 import { triggerInstallPrompt } from "@/components/install-pwa-prompt";
 import { toast } from "sonner";
+import { DEFAULT_TEMPLATE, type DocumentTemplate } from "@/lib/pdf-template";
+import { applyBrowserBranding, BRANDING_CHANGED_EVENT, loadTenantBranding } from "@/lib/branding";
 
 export const Route = createFileRoute("/_app")({ component: AppLayout });
 
@@ -49,10 +51,28 @@ const saasNav: NavItem[] = [
 function AppLayout() {
   const {
     user, loading, signOut, isAdmin, isTenantAdmin, isSaasAdmin, roles, canView, isPaidFeature,
-    mustChangePassword, canExportReports, subscriptionStatus, trialEndsAt,
+    mustChangePassword, canExportReports, subscriptionStatus, trialEndsAt, tenantId, tenantName,
   } = useAuth();
   const [open, setOpen] = useState(false);
+  const [branding, setBranding] = useState<DocumentTemplate>(DEFAULT_TEMPLATE);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  useEffect(() => {
+    if (isSaasAdmin || !tenantId) return;
+    let active = true;
+    loadTenantBranding(tenantId).then((value) => {
+      if (!active) return;
+      setBranding(value);
+      applyBrowserBranding(value);
+    }).catch((error) => console.error("Unable to apply company branding", error));
+    const onChanged = (event: Event) => {
+      const value = (event as CustomEvent<DocumentTemplate>).detail;
+      setBranding(value);
+      applyBrowserBranding(value);
+    };
+    window.addEventListener(BRANDING_CHANGED_EVENT, onChanged);
+    return () => { active = false; window.removeEventListener(BRANDING_CHANGED_EVENT, onChanged); };
+  }, [tenantId, isSaasAdmin]);
 
   if (loading) {
     return (
@@ -118,11 +138,11 @@ function AppLayout() {
       >
         <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-5">
           <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-              {isSaasAdmin ? <ShieldCheck className="h-5 w-5" /> : <Boxes className="h-5 w-5" />}
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+              {isSaasAdmin ? <ShieldCheck className="h-5 w-5" /> : branding.logo_data_url ? <img src={branding.logo_data_url} alt="Company logo" className="h-full w-full bg-white object-contain p-0.5" /> : <Boxes className="h-5 w-5" />}
             </div>
             <div>
-              <p className="text-sm font-semibold leading-none">AssetFlow</p>
+              <p className="max-w-40 truncate text-sm font-semibold leading-none">{isSaasAdmin ? "AssetFlow" : branding.organization_name || tenantName || "AssetFlow"}</p>
               <p className="mt-0.5 text-[10px] uppercase tracking-wider text-sidebar-foreground/60">
                 {isSaasAdmin ? "SaaS Control Plane" : "Asset Manager"}
               </p>
