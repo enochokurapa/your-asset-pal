@@ -73,7 +73,7 @@ const empty: AssetForm = {
 };
 
 function AssetsPage() {
-  const { canWrite, isAdmin, user, canDo, canSeeBranch } = useAuth();
+  const { canWrite, isAdmin, user, canDo, canSeeBranch, canView } = useAuth();
   const canAdd = canWrite || canDo("add_asset");
   const canEdit = canWrite || canDo("edit_asset");
   const canRequestRetire = canWrite || canDo("initiate_retirement");
@@ -81,6 +81,8 @@ function AssetsPage() {
   const canRequestMove = canWrite || canDo("initiate_movement");
   const canRequestMaint = canWrite || canDo("initiate_maintenance");
   const canRequestDelete = canDo("request_asset_deletion") || isAdmin;
+  const canManageDepreciation = canView("depreciation") &&
+    (canWrite || canDo("manage_depreciation") || canDo("override_depreciation"));
   const qc = useQueryClient();
   const search = useSearch({ from: "/_app/assets" });
   const nav = useNavigate();
@@ -93,6 +95,7 @@ function AssetsPage() {
   const [fDept, setFDept] = useState("");
 
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<AssetForm>(empty);
   const [scanOpen, setScanOpen] = useState(false);
   const [scanMode, setScanMode] = useState<"lookup" | "tag" | "serial">("lookup");
@@ -236,6 +239,7 @@ function AssetsPage() {
   };
 
   const save = async () => {
+    if (saving) return;
     if (!form.asset_tag.trim() || !form.name.trim()) { toast.error("Tag and name are required"); return; }
     if (!form.branch_id) { toast.error("Branch is required"); return; }
 
@@ -260,46 +264,76 @@ function AssetsPage() {
       status: form.status,
       purchase_value: form.purchase_value ? Number(form.purchase_value) : null,
       purchase_date: form.purchase_date || null,
-      depreciation_method: form.depreciation_method || null,
-      useful_life_months: form.useful_life_months ? Number(form.useful_life_months) : null,
-      residual_value: form.residual_value ? Number(form.residual_value) : 0,
-      depreciation_start_date: form.depreciation_start_date || null,
-      depreciation_frequency: form.depreciation_frequency || "monthly",
-      total_units: form.total_units ? Number(form.total_units) : null,
     };
-    // Validation: residual < cost, useful life > 0
-    if (payload.purchase_value && payload.residual_value >= payload.purchase_value) {
-      toast.error("Residual value must be less than purchase value"); return;
-    }
-    if (payload.useful_life_months !== null && payload.useful_life_months <= 0) {
-      toast.error("Useful life must be greater than 0"); return;
-    }
-
-    if (form.id) {
-      const { error } = await supabase.from("assets").update(payload).eq("id", form.id);
-      if (error) { toast.error(error.message); return; }
-      toast.success("Asset updated");
-    } else {
-      const { data: created, error } = await supabase
-        .from("assets").insert({ ...payload, created_by: user?.id ?? null }).select().single();
-      if (error || !created) { toast.error(error?.message ?? "Failed"); return; }
-      // Create the initial custody record inline if provided
-      if (form.assigned_to_name.trim() || form.department.trim()) {
-        await supabase.from("asset_assignments").insert({
-          asset_id: created.id,
-          assigned_to_name: form.assigned_to_name.trim() || null,
-          department: form.department.trim() || null,
-          branch_id: form.branch_id,
-          assignment_date: new Date().toISOString().slice(0, 10),
-          created_by: user?.id ?? null,
+    // Users without depreciation access must never be blocked by, or alter,
+    // depreciation configuration while carrying out normal asset activity.
+    if (canManageDepreciation) {
+      if (form.depreciation_method) {
+        Object.assign(payload, {
+          depreciation_method: form.depreciation_method,
+          useful_life_months: form.useful_life_months ? Number(form.useful_life_months) : null,
+          residual_value: form.residual_value ? Number(form.residual_value) : 0,
+          depreciation_start_date: form.depreciation_start_date || null,
+          depreciation_frequency: form.depreciation_frequency || "monthly",
+          total_units: form.total_units ? Number(form.total_units) : null,
+        });
+        if (payload.purchase_value && payload.residual_value >= payload.purchase_value) {
+          toast.error("Residual value must be less than purchase value"); return;
+        }
+        if (payload.useful_life_months !== null && payload.useful_life_months <= 0) {
+          toast.error("Useful life must be greater than 0"); return;
+        }
+      } else {
+        // Explicitly selecting None disables depreciation without requiring any
+        // of its supporting values.
+        Object.assign(payload, {
+          depreciation_method: null,
+          useful_life_months: null,
+          residual_value: 0,
+          depreciation_start_date: null,
+          depreciation_frequency: "monthly",
+          total_units: null,
         });
       }
-      toast.success("Asset created");
     }
-    setOpen(false);
-    qc.invalidateQueries({ queryKey: ["assets"] });
-    qc.invalidateQueries({ queryKey: ["asset-assignments-current"] });
-    qc.invalidateQueries({ queryKey: ["dashboard-stats"] }); qc.invalidateQueries({ queryKey: ["tile-assets"] });
+
+    setSaving(true);
+    try {
+      if (form.id) {
+        const { error } = await supabase.from("assets").update(payload).eq("id", form.id);
+        if (error) { toast.error(error.message); return; }
+        toast.success("Asset updated");
+      } else {
+        const { data: created, error } = await supabase
+          .from("assets").insert({ ...payload, created_by: user?.id ?? null }).select().single();
+        if (error || !created) { toast.error(error?.message ?? "Failed"); return; }
+        // Assignment is secondary activity: a failure must not disguise a
+        // successfully created asset, but it must be made visible to the user.
+        if (form.assigned_to_name.trim() || form.department.trim()) {
+          const { error: assignmentError } = await supabase.from("asset_assignments").insert({
+            asset_id: created.id,
+            assigned_to_name: form.assigned_to_name.trim() || null,
+            department: form.department.trim() || null,
+            branch_id: form.branch_id,
+            assignment_date: new Date().toISOString().slice(0, 10),
+            created_by: user?.id ?? null,
+          });
+          if (assignmentError) {
+            toast.warning("Asset created, but custodian assignment failed", { description: assignmentError.message });
+          } else {
+            toast.success("Asset created");
+          }
+        } else {
+          toast.success("Asset created");
+        }
+      }
+      setOpen(false);
+      qc.invalidateQueries({ queryKey: ["assets"] });
+      qc.invalidateQueries({ queryKey: ["asset-assignments-current"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-stats"] }); qc.invalidateQueries({ queryKey: ["tile-assets"] });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const [reqKind, setReqKind] = useState<"retirement" | "disposal" | "deletion" | null>(null);
@@ -438,6 +472,7 @@ function AssetsPage() {
                 </div>
 
                 {/* Depreciation */}
+                {canManageDepreciation && (
                 <div className="sm:col-span-2 rounded-lg border bg-muted/20 p-3">
                   <p className="mb-2 text-sm font-medium">Depreciation (optional)</p>
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -488,6 +523,7 @@ function AssetsPage() {
                     )}
                   </div>
                 </div>
+                )}
 
                 {/* Inline custodian on create */}
                 {!form.id && (
@@ -509,7 +545,7 @@ function AssetsPage() {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                <Button onClick={save}>{form.id ? "Save changes" : "Create asset"}</Button>
+                <Button onClick={save} disabled={saving}>{saving ? "Saving…" : form.id ? "Save changes" : "Create asset"}</Button>
               </DialogFooter>
               {form.id && (
                 <div className="border-t pt-4">
