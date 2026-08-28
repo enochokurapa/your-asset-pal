@@ -113,21 +113,21 @@ function AppLayout() {
     ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000))
     : null;
 
-  const blockTrialReportExport = (e: React.MouseEvent<HTMLElement>) => {
-    if (isSaasAdmin || !pathname.startsWith("/reports") || canExportReports) return;
+  const blockRestrictedExport = (e: React.MouseEvent<HTMLElement>) => {
+    if (isSaasAdmin || canExportReports) return;
     const target = e.target as HTMLElement;
     const button = target.closest("button");
     if (!button) return;
     const text = (button.textContent || "").trim().toLowerCase();
-    if (text === "pdf" || text === "excel") {
+    if (/\b(pdf|excel|xlsx|csv)\b/.test(text)) {
       e.preventDefault();
       e.stopPropagation();
-      toast.error("Report downloads are available on the paid plan. You can still view all reports during the free trial.");
+      toast.error("Exports are available on the paid plan. You can still view the information during the free trial.");
     }
   };
 
   return (
-    <div className="flex min-h-screen w-full bg-background">
+    <div className="flex min-h-screen w-full bg-background" onClickCapture={blockRestrictedExport}>
       {open && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setOpen(false)} />}
 
       <aside
@@ -212,7 +212,7 @@ function AppLayout() {
           <Button variant="ghost" size="icon" title="Sign out" onClick={signOut} aria-label="Sign out"><LogOut className="h-4 w-4 text-muted-foreground hover:text-foreground" /></Button>
         </header>
 
-        <main className="flex-1 px-4 py-6 md:px-8 md:py-8" onClickCapture={blockTrialReportExport}>
+        <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
           {!isSaasAdmin && pathname.startsWith("/reports") && !canExportReports && subscriptionStatus === "trial" && !lockedPaidFeature && (
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
               <div className="flex items-center gap-2"><LockKeyhole className="h-4 w-4" /><span><strong>Free trial:</strong> reports are view-only. PDF and Excel downloads are locked until upgrade.</span></div>
