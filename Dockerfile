@@ -12,7 +12,8 @@ FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Pass build arguments from Coolify to environment variables so they are embedded at build time
+# Pass public build arguments from Coolify to environment variables so they are embedded at build time.
+# Never add service-role, database, R2, email, or payment secrets as VITE_* variables.
 ARG SUPABASE_PROJECT_ID
 ARG SUPABASE_PUBLISHABLE_KEY
 ARG SUPABASE_URL
@@ -36,6 +37,9 @@ RUN bun run build
 # Production runtime stage
 FROM base AS runner
 WORKDIR /app
+
+# pg_dump, pg_restore and psql power database backup/restore.
+RUN apk add --no-cache postgresql-client
 
 ENV NODE_ENV=production
 ENV PORT=3000

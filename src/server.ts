@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { startBackupScheduler } from "./lib/backup-core.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -27,6 +28,11 @@ const SUPABASE_PROXY_ROUTES: SupabaseProxyRoute[] = [
 ];
 
 let serverEntryPromise: Promise<ServerEntry> | undefined;
+
+// The scheduler is intentionally part of the application server so a separate paid
+// cron service is not required. It checks the saved SaaS policy every five minutes
+// and creates a backup only when the configured 6/24-hour interval has elapsed.
+startBackupScheduler();
 
 async function getServerEntry(): Promise<ServerEntry> {
   if (!serverEntryPromise) {

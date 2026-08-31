@@ -58,20 +58,44 @@ async function assertSameTenant(adminUserId: string, targetUserId: string) {
 }
 
 async function enforceSeatLimit(tenantId: string) {
-  const [{ data: tenant }, { data: settings }, { count }] = await Promise.all([
+  const [tenantResult, settingsResult, countResult] = await Promise.all([
     admin.from("tenants").select("subscription_status,trial_ends_at").eq("id", tenantId).single(),
-    admin.from("saas_settings").select("trial_user_limit").eq("id", true).single(),
+    admin.from("saas_settings").select("trial_days,trial_user_limit").eq("id", true).single(),
     admin.from("profiles").select("id", { count: "exact", head: true })
       .eq("tenant_id", tenantId)
       .eq("is_active", true)
       .eq("is_saas_admin", false),
   ]);
-  const trialStillValid = tenant?.subscription_status === "trial" && new Date(tenant.trial_ends_at).getTime() > Date.now();
-  if (tenant?.subscription_status === "trial" && !trialStillValid) {
-    throw new Error("Your 4-week free trial has expired. Upgrade to add users.");
+
+  if (tenantResult.error || !tenantResult.data) {
+    throw new Error(tenantResult.error?.message || "Workspace subscription is not configured");
   }
-  if (trialStillValid && (count ?? 0) >= Number(settings?.trial_user_limit ?? 4)) {
-    throw new Error(`Free trial is limited to ${settings?.trial_user_limit ?? 4} active users. Upgrade to add more users.`);
+  if (settingsResult.error || !settingsResult.data) {
+    throw new Error(settingsResult.error?.message || "Global SaaS trial policy is not configured");
+  }
+  if (countResult.error) throw new Error(countResult.error.message);
+
+  const tenant = tenantResult.data;
+  const settings = settingsResult.data;
+  const trialDays = Number(settings.trial_days);
+  const trialUserLimit = Number(settings.trial_user_limit);
+  if (!Number.isInteger(trialDays) || trialDays < 1) {
+    throw new Error("Global trial duration is invalid");
+  }
+  if (!Number.isInteger(trialUserLimit) || trialUserLimit < 1) {
+    throw new Error("Global trial user limit is invalid");
+  }
+
+  const trialStillValid =
+    tenant.subscription_status === "trial" &&
+    Boolean(tenant.trial_ends_at) &&
+    new Date(tenant.trial_ends_at).getTime() > Date.now();
+
+  if (tenant.subscription_status === "trial" && !trialStillValid) {
+    throw new Error(`Your ${trialDays}-day free trial has expired. Upgrade to add users.`);
+  }
+  if (trialStillValid && (countResult.count ?? 0) >= trialUserLimit) {
+    throw new Error(`Free trial is limited to ${trialUserLimit} active users. Upgrade to add more users.`);
   }
 }
 

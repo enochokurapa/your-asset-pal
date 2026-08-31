@@ -62,23 +62,48 @@ function computeStatus(tenant: any) {
   return "expired";
 }
 
+function parseSaasSettings(settings: any) {
+  if (!settings) throw new Error("Global SaaS settings are not configured");
+  const trialDays = Number(settings.trial_days);
+  const trialUserLimit = Number(settings.trial_user_limit);
+  const paidPrice = Number(settings.paid_price);
+  const currency = String(settings.currency || "").toUpperCase();
+  if (!Number.isInteger(trialDays) || trialDays < 1) throw new Error("Global trial duration is invalid");
+  if (!Number.isInteger(trialUserLimit) || trialUserLimit < 1) throw new Error("Global trial user limit is invalid");
+  if (!Number.isFinite(paidPrice) || paidPrice < 0) throw new Error("Global paid-plan price is invalid");
+  if (!currency) throw new Error("Global SaaS currency is invalid");
+  return { trialDays, trialUserLimit, paidPrice, currency };
+}
+
 export const getSaasContext = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const profile = await getProfile(context.userId);
-    const [{ data: tenant }, { data: settings }, { data: modules }, { data: overrides }] = await Promise.all([
+    const [tenantResult, settingsResult, modulesResult, overridesResult] = await Promise.all([
       admin.from("tenants").select("*").eq("id", profile.tenant_id).maybeSingle(),
       admin.from("saas_settings").select("*").eq("id", true).single(),
       admin.from("saas_modules").select("*").order("sort_order"),
       profile.tenant_id
         ? admin.from("tenant_module_overrides").select("module_key,enabled").eq("tenant_id", profile.tenant_id)
-        : Promise.resolve({ data: [] }),
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
+    if (tenantResult.error) throw new Error(tenantResult.error.message);
+    if (settingsResult.error || !settingsResult.data) {
+      throw new Error(settingsResult.error?.message || "Global SaaS settings are not configured");
+    }
+    if (modulesResult.error) throw new Error(modulesResult.error.message);
+    if (overridesResult.error) throw new Error(overridesResult.error.message);
+
+    const tenant = tenantResult.data;
+    const settings = settingsResult.data;
+    const modules = modulesResult.data ?? [];
+    const overrides = overridesResult.data ?? [];
+    const parsedSettings = parseSaasSettings(settings);
     const status = computeStatus(tenant);
     const paid = status === "active";
-    const overrideMap = new Map((overrides ?? []).map((x: any) => [x.module_key, x.enabled]));
-    const enabledModules = (modules ?? [])
+    const overrideMap = new Map(overrides.map((x: any) => [x.module_key, x.enabled]));
+    const enabledModules = modules
       .filter((m: any) => {
         if (!m.globally_enabled) return false;
         const planEnabled = paid ? m.paid_enabled : m.trial_enabled;
@@ -103,12 +128,7 @@ export const getSaasContext = createServerFn({ method: "GET" })
         trialEndsAt: tenant.trial_ends_at,
         subscriptionEndsAt: tenant.subscription_ends_at,
       } : null,
-      settings: {
-        trialDays: settings?.trial_days ?? 28,
-        trialUserLimit: settings?.trial_user_limit ?? 4,
-        paidPrice: Number(settings?.paid_price ?? 0),
-        currency: settings?.currency ?? "UGX",
-      },
+      settings: parsedSettings,
       enabledModules,
       canExportReports: paid,
       canUseCustomDomain: paid,
@@ -133,6 +153,8 @@ export const updateSaasSettings = createServerFn({ method: "POST" })
       updated_by: context.userId,
     }).eq("id", true);
     if (error) throw new Error(error.message);
+    const { error: applyError } = await admin.rpc("apply_current_saas_trial_policy");
+    if (applyError) throw new Error(`Settings saved but trial workspaces could not be synchronized: ${applyError.message}`);
     return { ok: true };
   });
 
@@ -195,8 +217,8 @@ export const updateTenantSubscription = createServerFn({ method: "POST" })
     } else if (data.status === "trial") {
       const { data: settings, error: settingsError } = await admin.from("saas_settings")
         .select("trial_days").eq("id", true).single();
-      if (settingsError) throw new Error(settingsError.message);
-      const trialDays = Number(settings?.trial_days);
+      if (settingsError || !settings) throw new Error(settingsError?.message || "Trial policy is not configured");
+      const trialDays = Number(settings.trial_days);
       if (!Number.isInteger(trialDays) || trialDays < 1) throw new Error("Trial policy is not configured");
       const startedAt = new Date();
       patch.trial_started_at = startedAt.toISOString();
@@ -315,9 +337,13 @@ export const startYoUpgrade = createServerFn({ method: "POST" })
     const password = process.env.YO_API_PASSWORD;
     if (!username || !password) throw new Error("Payment gateway is not configured on this deployment yet");
 
-    const { data: settings } = await admin.from("saas_settings").select("paid_price,currency").eq("id", true).single();
-    const amount = Number(settings?.paid_price ?? 0);
-    if (amount <= 0) throw new Error("The SaaS Admin has not set a paid-plan price yet");
+    const { data: settings, error: settingsError } = await admin.from("saas_settings")
+      .select("paid_price,currency").eq("id", true).single();
+    if (settingsError || !settings) throw new Error(settingsError?.message || "Global SaaS pricing is not configured");
+    const amount = Number(settings.paid_price);
+    const currency = String(settings.currency || "").toUpperCase();
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error("The SaaS Admin has not set a paid-plan price yet");
+    if (!currency) throw new Error("The SaaS Admin has not set a billing currency yet");
 
     const phone = data.phone.replace(/\s+/g, "").replace(/^\+/, "");
     if (!/^256\d{9}$/.test(phone)) throw new Error("Use a mobile-money number in format 2567XXXXXXXX");
@@ -326,7 +352,7 @@ export const startYoUpgrade = createServerFn({ method: "POST" })
       tenant_id: p.tenant_id,
       phone,
       amount,
-      currency: settings?.currency ?? "UGX",
+      currency,
       status: "pending",
     }).select().single();
     if (txError) throw new Error(txError.message);
