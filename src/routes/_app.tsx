@@ -4,7 +4,7 @@ import { useAuth, ModuleKey } from "@/hooks/use-auth";
 import {
   LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X, FileBarChart,
   Building2, History, UserCircle, TrendingDown, DoorOpen, Settings, ClipboardCheck, Download,
-  CreditCard, Globe2, ShieldCheck, LockKeyhole,
+  CreditCard, Globe2, ShieldCheck, LockKeyhole, DatabaseBackup,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,7 @@ type NavItem = {
   module?: ModuleKey;
   adminOnly?: boolean;
   tenantAdminOnly?: boolean;
+  exact?: boolean;
 };
 
 const tenantNav: NavItem[] = [
@@ -43,9 +44,12 @@ const tenantNav: NavItem[] = [
   { to: "/profile", label: "My profile", icon: UserCircle },
 ];
 
-const saasNav: NavItem[] = [
-  { to: "/saas-admin", label: "Platform Overview", icon: ShieldCheck },
-  { to: "/profile", label: "My profile", icon: UserCircle },
+const saasAdminNav: NavItem[] = [
+  { to: "/saas-admin", label: "SaaS Overview", icon: ShieldCheck, exact: true },
+  { to: "/saas-admin/policy", label: "Plan & Pricing", icon: CreditCard },
+  { to: "/saas-admin/backups", label: "Backup & Restore", icon: DatabaseBackup },
+  { to: "/saas-admin/modules", label: "Module Control", icon: Boxes },
+  { to: "/saas-admin/organizations", label: "Organizations", icon: Building2 },
 ];
 
 function AppLayout() {
@@ -58,7 +62,7 @@ function AppLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
-    if (isSaasAdmin || !tenantId) return;
+    if (!tenantId) return;
     let active = true;
     loadTenantBranding(tenantId).then((value) => {
       if (!active) return;
@@ -72,7 +76,7 @@ function AppLayout() {
     };
     window.addEventListener(BRANDING_CHANGED_EVENT, onChanged);
     return () => { active = false; window.removeEventListener(BRANDING_CHANGED_EVENT, onChanged); };
-  }, [tenantId, isSaasAdmin]);
+  }, [tenantId]);
 
   if (loading) {
     return (
@@ -84,25 +88,20 @@ function AppLayout() {
   if (!user) return <Navigate to="/login" />;
   if (mustChangePassword) return <Navigate to="/welcome" />;
 
-  if (isSaasAdmin && !pathname.startsWith("/saas-admin") && !pathname.startsWith("/profile")) {
-    return <Navigate to="/saas-admin" />;
-  }
-
-  const currentNavItem = !isSaasAdmin
-    ? tenantNav.find((n) => pathname.startsWith(n.to))
-    : undefined;
+  const allNav = isSaasAdmin ? [...tenantNav, ...saasAdminNav] : tenantNav;
+  const currentNavItem = allNav.find((n) =>
+    n.exact ? pathname === n.to : pathname.startsWith(n.to),
+  );
 
   if (currentNavItem?.tenantAdminOnly && !isTenantAdmin) return <Navigate to="/dashboard" />;
   if (currentNavItem?.adminOnly && !isAdmin) return <Navigate to="/dashboard" />;
 
-  const visibleNav = isSaasAdmin
-    ? saasNav
-    : tenantNav.filter((n) => {
-        if (n.tenantAdminOnly && !isTenantAdmin) return false;
-        if (n.adminOnly && !isAdmin) return false;
-        if (n.module && !canView(n.module) && !isPaidFeature(n.module)) return false;
-        return true;
-      });
+  const visibleTenantNav = tenantNav.filter((n) => {
+    if (n.tenantAdminOnly && !isTenantAdmin) return false;
+    if (n.adminOnly && !isAdmin) return false;
+    if (n.module && !canView(n.module) && !isPaidFeature(n.module)) return false;
+    return true;
+  });
 
   const currentModuleItem = currentNavItem?.module ? currentNavItem : undefined;
   const lockedPaidFeature = currentModuleItem?.module && isPaidFeature(currentModuleItem.module)
@@ -114,7 +113,7 @@ function AppLayout() {
     : null;
 
   const blockRestrictedExport = (e: React.MouseEvent<HTMLElement>) => {
-    if (isSaasAdmin || canExportReports) return;
+    if (canExportReports) return;
     const target = e.target as HTMLElement;
     const button = target.closest("button");
     if (!button) return;
@@ -124,6 +123,31 @@ function AppLayout() {
       e.stopPropagation();
       toast.error("Exports are available on the paid plan. You can still view the information during the free trial.");
     }
+  };
+
+  const renderNavItem = (item: NavItem) => {
+    const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
+    const Icon = item.icon;
+    const paid = item.module ? isPaidFeature(item.module) : false;
+    return (
+      <Link
+        key={item.to}
+        to={item.to}
+        onClick={() => setOpen(false)}
+        className={cn(
+          "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+          active ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm" : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        )}
+      >
+        <Icon className="h-4 w-4" />
+        <span className="min-w-0 flex-1">{item.label}</span>
+        {paid && (
+          <span className="flex items-center gap-1 rounded-full border border-current/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide opacity-80">
+            <LockKeyhole className="h-3 w-3" /> Paid
+          </span>
+        )}
+      </Link>
+    );
   };
 
   return (
@@ -139,49 +163,29 @@ function AppLayout() {
         <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-5">
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-              {isSaasAdmin ? <ShieldCheck className="h-5 w-5" /> : branding.logo_data_url ? <img src={branding.logo_data_url} alt="Company logo" className="h-full w-full bg-white object-contain p-0.5" /> : <Boxes className="h-5 w-5" />}
+              {branding.logo_data_url ? <img src={branding.logo_data_url} alt="Company logo" className="h-full w-full bg-white object-contain p-0.5" /> : <Boxes className="h-5 w-5" />}
             </div>
             <div>
-              <p className="max-w-40 truncate text-sm font-semibold leading-none">{isSaasAdmin ? "AssetFlow" : branding.organization_name || tenantName || "AssetFlow"}</p>
-              <p className="mt-0.5 text-[10px] uppercase tracking-wider text-sidebar-foreground/60">
-                {isSaasAdmin ? "SaaS Control Plane" : "Asset Manager"}
-              </p>
+              <p className="max-w-40 truncate text-sm font-semibold leading-none">{branding.organization_name || tenantName || "AssetFlow"}</p>
+              <p className="mt-0.5 text-[10px] uppercase tracking-wider text-sidebar-foreground/60">Asset Manager</p>
             </div>
           </div>
           <button className="md:hidden" onClick={() => setOpen(false)} aria-label="Close menu"><X className="h-5 w-5" /></button>
         </div>
 
-        {isSaasAdmin && (
-          <div className="mx-3 mt-3 rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-3 py-2 text-xs text-sidebar-foreground/75">
-            Platform administration is separate from customer workspaces.
-          </div>
-        )}
-
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {visibleNav.map((item) => {
-            const active = pathname.startsWith(item.to);
-            const Icon = item.icon;
-            const paid = item.module ? isPaidFeature(item.module) : false;
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                onClick={() => setOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  active ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm" : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                <span className="min-w-0 flex-1">{item.label}</span>
-                {paid && (
-                  <span className="flex items-center gap-1 rounded-full border border-current/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide opacity-80">
-                    <LockKeyhole className="h-3 w-3" /> Paid
-                  </span>
-                )}
-              </Link>
-            );
-          })}
+          {visibleTenantNav.map(renderNavItem)}
+
+          {isSaasAdmin && (
+            <>
+              <div className="mx-1 mb-1 mt-4 border-t border-sidebar-border pt-4">
+                <p className="px-2 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/50">
+                  SaaS Administration
+                </p>
+              </div>
+              {saasAdminNav.map(renderNavItem)}
+            </>
+          )}
         </nav>
 
         <div className="border-t border-sidebar-border p-3">
@@ -199,27 +203,26 @@ function AppLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur md:px-8">
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setOpen(true)} aria-label="Open menu"><Menu className="h-5 w-5" /></Button>
-          {isSaasAdmin && <div className="hidden text-sm font-medium text-foreground sm:block">Platform Administration</div>}
           <div className="flex-1" />
-          {!isSaasAdmin && subscriptionStatus === "trial" && isTenantAdmin && (
+          {subscriptionStatus === "trial" && isTenantAdmin && (
             <Button asChild variant="outline" size="sm" className="hidden gap-1.5 border-primary/20 bg-primary/5 text-xs font-semibold text-primary hover:bg-primary/10 sm:inline-flex">
               <Link to="/billing">Trial · {trialDaysLeft ?? "—"} days left</Link>
             </Button>
           )}
           <div className="hidden text-sm text-muted-foreground lg:block">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</div>
           <Button variant="outline" size="sm" className="gap-1.5 rounded-lg border-primary/20 bg-primary/5 text-xs font-semibold text-primary hover:bg-primary/10" onClick={triggerInstallPrompt}><Download className="h-3.5 w-3.5" /><span className="hidden sm:inline">Install App</span></Button>
-          {!isSaasAdmin && <NotificationBell />}
+          <NotificationBell />
           <Button variant="ghost" size="icon" title="Sign out" onClick={signOut} aria-label="Sign out"><LogOut className="h-4 w-4 text-muted-foreground hover:text-foreground" /></Button>
         </header>
 
         <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
-          {!isSaasAdmin && pathname.startsWith("/reports") && !canExportReports && subscriptionStatus === "trial" && !lockedPaidFeature && (
+          {pathname.startsWith("/reports") && !canExportReports && subscriptionStatus === "trial" && !lockedPaidFeature && (
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
               <div className="flex items-center gap-2"><LockKeyhole className="h-4 w-4" /><span><strong>Free trial:</strong> reports are view-only. PDF and Excel downloads are locked until upgrade.</span></div>
               {isTenantAdmin && <Button asChild size="sm"><Link to="/billing">Upgrade</Link></Button>}
             </div>
           )}
-          {!isSaasAdmin && (subscriptionStatus === "expired" || subscriptionStatus === "suspended") && !pathname.startsWith("/billing") && (
+          {(subscriptionStatus === "expired" || subscriptionStatus === "suspended") && !pathname.startsWith("/billing") && !pathname.startsWith("/saas-admin") && (
             <div className="mb-5 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
               <strong>{subscriptionStatus === "expired" ? "Trial/subscription expired." : "Workspace suspended."}</strong> Application modules are unavailable until the workspace is reactivated.{isTenantAdmin && <> <Link to="/billing" className="font-semibold text-primary underline">Open billing</Link>.</>}
             </div>
