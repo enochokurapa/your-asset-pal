@@ -194,16 +194,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isAdmin = roles.includes("admin");
   const isManager = roles.includes("manager");
-  const isTenantAdmin = !isSaasAdmin && (tenantRole === "tenant_admin" || isAdmin);
+  // SaaS administration is an additional platform privilege. It must not remove
+  // the user's normal tenant role or RBAC permissions.
+  const isTenantAdmin = tenantRole === "tenant_admin" || isAdmin;
   const subscriptionUsable = subscriptionStatus === "active" || subscriptionStatus === "trial" || subscriptionStatus === "unknown";
   const hasUserModuleAccess = (m: ModuleKey) => isAdmin || permissions.has(m);
 
-  const canView = (m: ModuleKey) => !isSaasAdmin && subscriptionUsable && enabledModules.has(m) && hasUserModuleAccess(m);
-  const isPaidFeature = (m: ModuleKey) => !isSaasAdmin && subscriptionStatus === "trial" && paidOnlyModules.has(m) && hasUserModuleAccess(m);
-  const canApprove = (k: ApprovalKind) => !isSaasAdmin && subscriptionUsable && (isAdmin || approvalRights.has(k));
-  const canDo = (k: ActionKind) => !isSaasAdmin && subscriptionUsable && (isAdmin || isManager || actionRights.has(k));
+  const canView = (m: ModuleKey) => subscriptionUsable && enabledModules.has(m) && hasUserModuleAccess(m);
+  const isPaidFeature = (m: ModuleKey) => subscriptionStatus === "trial" && paidOnlyModules.has(m) && hasUserModuleAccess(m);
+  const canApprove = (k: ApprovalKind) => subscriptionUsable && (isAdmin || approvalRights.has(k));
+  const canDo = (k: ActionKind) => subscriptionUsable && (isAdmin || isManager || actionRights.has(k));
   const canSeeBranch = (branchId: string | null | undefined) => {
-    if (isSaasAdmin) return false;
     if (!branchScope) return true;
     if (!branchId) return true;
     return branchScope.has(branchId);
@@ -213,9 +214,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user: session?.user ?? null, session, roles, permissions, approvalRights, actionRights, branchScope,
     loading, mustChangePassword, isActive, isAdmin, isTenantAdmin, isSaasAdmin, isManager,
     tenantId, tenantName, subscriptionStatus, trialEndsAt, subscriptionEndsAt, enabledModules, paidOnlyModules,
-    canExportReports: !isSaasAdmin && subscriptionStatus === "active",
-    canUseCustomDomain: !isSaasAdmin && subscriptionStatus === "active",
-    canWrite: !isSaasAdmin && subscriptionUsable && (isAdmin || isManager),
+    canExportReports: subscriptionStatus === "active",
+    canUseCustomDomain: subscriptionStatus === "active",
+    canWrite: subscriptionUsable && (isAdmin || isManager),
     canView, isPaidFeature, canApprove, canDo, canSeeBranch,
     signOut: async () => {
       try { await supabase.auth.signOut(); }
