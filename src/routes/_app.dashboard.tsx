@@ -8,10 +8,10 @@ import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, 
 import { PendingApprovalsCard } from "@/components/pending-approvals-card";
 import { PendingGatePassesCard } from "@/components/pending-gate-passes-card";
 import { TileAssetsDialog, type TileFilter } from "@/components/tile-assets-dialog";
+import { SaasAdminOverview } from "@/components/saas-admin-overview";
 import { formatUGX } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: Dashboard,
@@ -27,6 +27,11 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 function Dashboard() {
+  const { isSaasAdmin } = useAuth();
+  return isSaasAdmin ? <SaasAdminOverview /> : <TenantDashboard />;
+}
+
+function TenantDashboard() {
   const { canSeeBranch, branchScope } = useAuth();
   const nav = useNavigate();
   const scopeKey = branchScope ? Array.from(branchScope).sort().join(",") : "all";
@@ -52,7 +57,6 @@ function Dashboard() {
       const visibleBranchList = selectedBranch === "all" ? branchList : branchList.filter((b: any) => b.id === selectedBranch);
       const visibleAssetIds = new Set(list.map((a: any) => a.id));
       const pendList = (pending.data ?? []).filter((p: any) => !p.asset_id || visibleAssetIds.has(p.asset_id));
-
 
       const pendingRet = new Set(pendList.filter((p: any) => p.kind === "retirement").map((p: any) => p.asset_id));
       const pendingRepair = new Set(pendList.filter((p: any) => p.kind === "maintenance").map((p: any) => p.asset_id));
@@ -83,7 +87,6 @@ function Dashboard() {
       const gpPending = gpList.filter((g: any) => g.status === "pending").length;
       const gpOutside = gpList.filter((g: any) => g.status === "approved" || g.status === "checked_out").length;
 
-      // Verification stats — most recent verification per asset, scoped to current branch view
       const vList = (verifs.data ?? []).filter((v: any) =>
         canSeeBranch(v.branch_id) && (selectedBranch === "all" || v.branch_id === selectedBranch)
       );
@@ -132,28 +135,26 @@ function Dashboard() {
     },
   });
 
-  // Each tile gets its own corporate accent color.
   const stats: { label: string; value: number; icon: any; color: string; filter: TileFilter; subtotal?: number; navigateTo?: string }[] = [
-    { label: "Total Assets",    value: data?.total ?? 0,       icon: Package,        color: "#1E3A8A", filter: { kind: "all" },                               subtotal: data?.totalValue },
-    { label: "Active Assets",   value: data?.active ?? 0,      icon: CheckCircle2,   color: "#047857", filter: { kind: "active" },                            subtotal: data?.activeValue },
-    { label: "Branches",        value: data?.branchCount ?? 0, icon: Building2,      color: "#7C3AED", filter: { kind: "all" } },
-    { label: "In Storage",      value: data?.statusCounts.find((s) => s.key === "in_storage")?.value ?? 0, icon: Boxes, color: "#475569", filter: { kind: "status", status: "in_storage" }, subtotal: data?.inStorageValue },
-    { label: "In Use",          value: data?.inUse ?? 0,       icon: CheckCircle2,   color: "#0E7490", filter: { kind: "status", status: "in_use" },          subtotal: data?.inUseValue },
-    { label: "Under Repair",    value: data?.repair ?? 0,      icon: Wrench,         color: "#B45309", filter: { kind: "status", status: "under_repair" } },
-    { label: "Retired",         value: data?.retired ?? 0,     icon: Archive,        color: "#52525B", filter: { kind: "status", status: "retired" } },
-    { label: "Disposed",        value: data?.disposed ?? 0,    icon: Trash2,         color: "#3F3F46", filter: { kind: "status", status: "disposed" } },
-    { label: "Missing",         value: data?.missing ?? 0,     icon: AlertTriangle,  color: "#B91C1C", filter: { kind: "status", status: "missing" } },
-    { label: "For Disposal",    value: data?.forDisposal ?? 0, icon: Trash2,         color: "#C2410C", filter: { kind: "for_disposal" } },
-    { label: "For Retirement",  value: data?.forRetirement ?? 0, icon: Archive,      color: "#A16207", filter: { kind: "pending_retirement" } },
-    { label: "For Repair",      value: data?.forRepair ?? 0,   icon: Wrench,         color: "#BE185D", filter: { kind: "pending_repair" },                    subtotal: data?.repairAmount },
-    { label: "Out of Premises", value: data?.gpOutside ?? 0,   icon: PackageCheck,   color: "#0369A1", filter: { kind: "all" }, navigateTo: "/gate-pass" },
-    { label: "Gate Pass Pending", value: data?.gpPending ?? 0, icon: DoorOpen,       color: "#9333EA", filter: { kind: "all" }, navigateTo: "/gate-pass" },
-    { label: "Verified Assets",   value: data?.verifiedCount ?? 0, icon: ClipboardCheck, color: "#15803D", filter: { kind: "all" }, navigateTo: "/verification" },
+    { label: "Total Assets", value: data?.total ?? 0, icon: Package, color: "#1E3A8A", filter: { kind: "all" }, subtotal: data?.totalValue },
+    { label: "Active Assets", value: data?.active ?? 0, icon: CheckCircle2, color: "#047857", filter: { kind: "active" }, subtotal: data?.activeValue },
+    { label: "Branches", value: data?.branchCount ?? 0, icon: Building2, color: "#7C3AED", filter: { kind: "all" } },
+    { label: "In Storage", value: data?.statusCounts.find((s) => s.key === "in_storage")?.value ?? 0, icon: Boxes, color: "#475569", filter: { kind: "status", status: "in_storage" }, subtotal: data?.inStorageValue },
+    { label: "In Use", value: data?.inUse ?? 0, icon: CheckCircle2, color: "#0E7490", filter: { kind: "status", status: "in_use" }, subtotal: data?.inUseValue },
+    { label: "Under Repair", value: data?.repair ?? 0, icon: Wrench, color: "#B45309", filter: { kind: "status", status: "under_repair" } },
+    { label: "Retired", value: data?.retired ?? 0, icon: Archive, color: "#52525B", filter: { kind: "status", status: "retired" } },
+    { label: "Disposed", value: data?.disposed ?? 0, icon: Trash2, color: "#3F3F46", filter: { kind: "status", status: "disposed" } },
+    { label: "Missing", value: data?.missing ?? 0, icon: AlertTriangle, color: "#B91C1C", filter: { kind: "status", status: "missing" } },
+    { label: "For Disposal", value: data?.forDisposal ?? 0, icon: Trash2, color: "#C2410C", filter: { kind: "for_disposal" } },
+    { label: "For Retirement", value: data?.forRetirement ?? 0, icon: Archive, color: "#A16207", filter: { kind: "pending_retirement" } },
+    { label: "For Repair", value: data?.forRepair ?? 0, icon: Wrench, color: "#BE185D", filter: { kind: "pending_repair" }, subtotal: data?.repairAmount },
+    { label: "Out of Premises", value: data?.gpOutside ?? 0, icon: PackageCheck, color: "#0369A1", filter: { kind: "all" }, navigateTo: "/gate-pass" },
+    { label: "Gate Pass Pending", value: data?.gpPending ?? 0, icon: DoorOpen, color: "#9333EA", filter: { kind: "all" }, navigateTo: "/gate-pass" },
+    { label: "Verified Assets", value: data?.verifiedCount ?? 0, icon: ClipboardCheck, color: "#15803D", filter: { kind: "all" }, navigateTo: "/verification" },
     { label: "Mismatched / Unverified", value: (data?.mismatchedCount ?? 0) + (data?.unverifiedCount ?? 0), icon: ClipboardX, color: "#DC2626", filter: { kind: "all" }, navigateTo: "/verification" },
   ];
 
   const [tile, setTile] = useState<{ title: string; filter: TileFilter } | null>(null);
-
   const pieData = (data?.statusCounts ?? []).filter((s) => s.value > 0);
 
   return (
@@ -184,7 +185,6 @@ function Dashboard() {
           </div>
         )}
       </div>
-
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {stats.map((s) => (
@@ -223,7 +223,6 @@ function Dashboard() {
         filter={tile?.filter ?? { kind: "all" }}
         branchId={selectedBranch === "all" ? null : selectedBranch}
       />
-
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="p-5">
@@ -282,7 +281,6 @@ function Dashboard() {
           </ResponsiveContainer>
         </div>
       </Card>
-
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="md:col-span-2"><PendingApprovalsCard /></div>
