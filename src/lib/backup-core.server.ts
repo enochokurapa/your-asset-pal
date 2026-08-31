@@ -30,7 +30,6 @@ export type BackupPolicy = {
 
 type R2Config = {
   endpoint: URL;
-  accountId: string;
   accessKeyId: string;
   secretAccessKey: string;
   bucket: string;
@@ -74,7 +73,7 @@ function getR2Config(): R2Config {
   endpoint.pathname = endpoint.pathname.replace(/\/+$/, "");
   endpoint.search = "";
   endpoint.hash = "";
-  return { endpoint, accountId, accessKeyId, secretAccessKey, bucket };
+  return { endpoint, accessKeyId, secretAccessKey, bucket };
 }
 
 function awsEncode(value: string) {
@@ -110,11 +109,16 @@ function signingKey(secret: string, dateStamp: string) {
   return hmac(kService, "aws4_request");
 }
 
+function lexicalCompare(a: string, b: string) {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 function canonicalQuery(params: Record<string, string>) {
   return Object.entries(params)
-    .sort(([aKey, aValue], [bKey, bValue]) =>
-      aKey === bKey ? aValue.localeCompare(bValue) : aKey.localeCompare(bKey),
-    )
+    .sort(([aKey, aValue], [bKey, bValue]) => {
+      const keyOrder = lexicalCompare(awsEncode(aKey), awsEncode(bKey));
+      return keyOrder || lexicalCompare(awsEncode(aValue), awsEncode(bValue));
+    })
     .map(([key, value]) => `${awsEncode(key)}=${awsEncode(value)}`)
     .join("&");
 }
@@ -406,6 +410,7 @@ export async function restoreDatabaseBackup(key: string) {
   return runExclusive(async () => {
     const dir = await mkdtemp(join(tmpdir(), "assetflow-restore-"));
     const filePath = join(dir, "restore.dump");
+    const temporaryUpload = key.startsWith(RESTORE_UPLOAD_PREFIX);
     try {
       // Download and validate the requested restore point before making any database change.
       await downloadR2ToFile(key, filePath);
@@ -414,14 +419,13 @@ export async function restoreDatabaseBackup(key: string) {
       // Always create a fresh safety backup immediately before a destructive restore.
       await createDatabaseBackupInternal("pre-restore");
       await restoreDumpFile(filePath);
-
-      if (key.startsWith(RESTORE_UPLOAD_PREFIX)) {
+      return { ok: true, restoredKey: key, restoredAt: new Date().toISOString() };
+    } finally {
+      if (temporaryUpload) {
         await deleteR2Object(key).catch((error) =>
           console.warn("[Backup] Temporary restore upload cleanup failed", error),
         );
       }
-      return { ok: true, restoredKey: key, restoredAt: new Date().toISOString() };
-    } finally {
       await rm(dir, { recursive: true, force: true });
     }
   });
@@ -479,7 +483,9 @@ async function scheduledBackupTick() {
   if (!policy.enabled) return;
   const backups = await listBackupObjects();
   const newest = backups[0];
-  const ageMs = newest ? Date.now() - new Date(newest.createdAt).getTime() : Number.POSITIVE_INFINITY;
+  const ageMs = newest
+    ? Date.now() - new Date(newest.createdAt).getTime()
+    : Number.POSITIVE_INFINITY;
   if (ageMs < policy.intervalHours * 60 * 60 * 1000) return;
   await createDatabaseBackup("automatic");
 }
