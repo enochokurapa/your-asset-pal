@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="AssetFlow 360 mark">
+  <rect width="64" height="64" rx="14" fill="#C77435"/>
+  <path d="M17 34.5 29.5 19a4 4 0 0 1 6 0L47 33.5" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M17.5 34.5 29 46a4 4 0 0 0 6 0l12-12" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M25.5 34h13" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+</svg>
