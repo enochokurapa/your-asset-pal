@@ -16,7 +16,7 @@ SET subscription_status = 'active',
     updated_at = now()
 WHERE slug = 'default';
 
-DO $
+DO $tenant_backfill$
 DECLARE
   table_name text;
   default_tenant uuid;
@@ -55,7 +55,7 @@ BEGIN
       );
     END IF;
   END LOOP;
-END $$;
+END $tenant_backfill$;
 
 CREATE OR REPLACE FUNCTION public.enforce_row_tenant()
 RETURNS trigger
