@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, ArrowRight, Boxes, Check, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { provisionFreeTrialWorkspace } from "@/lib/saas.functions";
 import { getServerAuthHeaders } from "@/lib/auth-headers";
