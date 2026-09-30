@@ -110,7 +110,7 @@ function normalizePlatformLogo(dataUrl: string | null): string | null {
 export const getPublicSaasBranding = createServerFn({ method: "GET" })
   .handler(async () => {
     const { data, error } = await admin.from("saas_settings")
-      .select("platform_name,platform_logo_data_url,platform_icon_data_url")
+      .select("platform_name,platform_logo_data_url,platform_icon_data_url,platform_primary_color,platform_secondary_color")
       .eq("id", true)
       .single();
     if (error) throw new Error(error.message);
@@ -118,6 +118,8 @@ export const getPublicSaasBranding = createServerFn({ method: "GET" })
       name: data?.platform_name || "AssetFlow 360",
       logoDataUrl: data?.platform_logo_data_url || null,
       iconDataUrl: data?.platform_icon_data_url || null,
+      primaryColor: data?.platform_primary_color || "#C77435",
+      secondaryColor: data?.platform_secondary_color || "#4B47DC",
     };
   });
 
@@ -127,12 +129,14 @@ export const updateSaasBranding = createServerFn({ method: "POST" })
     platform_name: z.string().trim().min(2).max(80).optional(),
     logo_data_url: z.string().nullable().optional(),
     icon_data_url: z.string().nullable().optional(),
+    primary_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+    secondary_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   }).parse(input))
   .handler(async ({ data, context }) => {
     await assertSaasAdmin(context.userId);
 
     const { data: current, error: readError } = await admin.from("saas_settings")
-      .select("platform_name,platform_logo_data_url,platform_icon_data_url")
+      .select("platform_name,platform_logo_data_url,platform_icon_data_url,platform_primary_color,platform_secondary_color")
       .eq("id", true)
       .single();
     if (readError || !current) throw new Error(readError?.message || "Platform branding is not configured");
@@ -144,16 +148,27 @@ export const updateSaasBranding = createServerFn({ method: "POST" })
       ? current.platform_icon_data_url
       : normalizePlatformLogo(data.icon_data_url);
     const platformName = data.platform_name ?? current.platform_name ?? "AssetFlow 360";
+    const primaryColor = (data.primary_color ?? current.platform_primary_color ?? "#C77435").toUpperCase();
+    const secondaryColor = (data.secondary_color ?? current.platform_secondary_color ?? "#4B47DC").toUpperCase();
 
     const { error } = await admin.from("saas_settings").update({
       platform_name: platformName,
       platform_logo_data_url: logo,
       platform_icon_data_url: icon,
+      platform_primary_color: primaryColor,
+      platform_secondary_color: secondaryColor,
       updated_at: new Date().toISOString(),
       updated_by: context.userId,
     }).eq("id", true);
     if (error) throw new Error(error.message);
-    return { ok: true, name: platformName, logoDataUrl: logo, iconDataUrl: icon };
+    return {
+      ok: true,
+      name: platformName,
+      logoDataUrl: logo,
+      iconDataUrl: icon,
+      primaryColor,
+      secondaryColor,
+    };
   });
 
 export const provisionFreeTrialWorkspace = createServerFn({ method: "POST" })
