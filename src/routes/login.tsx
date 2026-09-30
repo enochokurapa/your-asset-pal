@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Navigate, Link } from "@tanstack/react-router";
+import { createFileRoute, Navigate, Link } from "@tanstack/react-router";
 import { useState, FormEvent } from "react";
 import { ArrowLeft, Boxes, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,7 +31,6 @@ function authErrorMessage(error: unknown): string {
 
 function LoginPage() {
   const { user, loading, tenantId } = useAuth();
-  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
