@@ -1,6 +1,6 @@
 import { createFileRoute, Navigate, Link } from "@tanstack/react-router";
 import { useState, FormEvent } from "react";
-import { ArrowLeft, Boxes, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
