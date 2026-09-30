@@ -373,10 +373,20 @@ export const updateTenantModule = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({
     tenant_id: z.string().uuid(),
     module_key: z.string().min(1).max(100),
-    enabled: z.boolean(),
+    enabled: z.boolean().nullable(),
   }).parse(input))
   .handler(async ({ data, context }) => {
     await assertSaasAdmin(context.userId);
+
+    if (data.enabled === null) {
+      const { error } = await admin.from("tenant_module_overrides")
+        .delete()
+        .eq("tenant_id", data.tenant_id)
+        .eq("module_key", data.module_key);
+      if (error) throw new Error(error.message);
+      return { ok: true, inherited: true };
+    }
+
     const { error } = await admin.from("tenant_module_overrides").upsert({
       tenant_id: data.tenant_id,
       module_key: data.module_key,
@@ -384,7 +394,7 @@ export const updateTenantModule = createServerFn({ method: "POST" })
       updated_at: new Date().toISOString(),
     }, { onConflict: "tenant_id,module_key" });
     if (error) throw new Error(error.message);
-    return { ok: true };
+    return { ok: true, inherited: false };
   });
 
 export const updateTenantSubscription = createServerFn({ method: "POST" })
@@ -691,6 +701,32 @@ export const updateSaasTenantName = createServerFn({ method: "POST" })
       name: data.name,
       updated_at: new Date().toISOString(),
     }).eq("id", data.tenant_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const updateSaasTenantUserStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({
+    tenant_id: z.string().uuid(),
+    user_id: z.string().uuid(),
+    is_active: z.boolean(),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertSaasAdmin(context.userId);
+
+    const { data: target, error: targetError } = await admin.from("profiles")
+      .select("id,tenant_id,is_saas_admin")
+      .eq("id", data.user_id)
+      .eq("tenant_id", data.tenant_id)
+      .single();
+    if (targetError || !target) throw new Error("Business user not found");
+    if (target.is_saas_admin) throw new Error("A SaaS administrator cannot be changed from a business account");
+
+    const { error } = await admin.from("profiles")
+      .update({ is_active: data.is_active })
+      .eq("id", data.user_id)
+      .eq("tenant_id", data.tenant_id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
