@@ -34,8 +34,8 @@ function RegisterPage() {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (submitting) return;
-    if (form.password.length < 8) return toast.error("Use at least 8 characters for your password.");
-    if (form.password !== confirmPassword) return toast.error("Passwords do not match.");
+    if (!user && form.password.length < 8) return toast.error("Use at least 8 characters for your password.");
+    if (!user && form.password !== confirmPassword) return toast.error("Passwords do not match.");
 
     setSubmitting(true);
     let createdNewAuthUser = false;
