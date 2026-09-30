@@ -4,6 +4,7 @@ import { ArrowLeft, Boxes, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import { PlatformLogo } from "@/components/platform-logo";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -67,7 +68,7 @@ function LoginPage() {
               <ArrowLeft className="h-4 w-4" /> Back to home
             </Link>
             <div className="mb-8 flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Boxes className="h-5 w-5" /></span>
+              <PlatformLogo className="h-11 w-11 rounded-xl" imageClassName="bg-white p-0.5" />
               <div><p className="font-bold">AssetFlow 360</p><p className="text-xs text-muted-foreground">Fixed asset management</p></div>
             </div>
 
