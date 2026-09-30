@@ -323,7 +323,7 @@ function MovementsPanel({ assetId }: { assetId: string }) {
 
 /* ---------- Attachments ---------- */
 function AttachmentsPanel({ assetId }: { assetId: string }) {
-  const { canWrite, canDo, user, isAdmin } = useAuth();
+  const { canWrite, canDo, user, isAdmin, tenantId } = useAuth();
   const qc = useQueryClient();
   const [kind, setKind] = useState("invoice");
   const [uploading, setUploading] = useState(false);
@@ -340,7 +340,7 @@ function AttachmentsPanel({ assetId }: { assetId: string }) {
   });
   const upload = async (file: File) => {
     setUploading(true);
-    const path = `${assetId}/${Date.now()}-${file.name}`;
+    if (!tenantId) { toast.error("Workspace is not configured"); setUploading(false); return; }\n    const path = `${tenantId}/${assetId}/${Date.now()}-${file.name}`;
     const { error: upErr } = await supabase.storage.from("asset-files").upload(path, file);
     if (upErr) { toast.error(upErr.message); setUploading(false); return; }
     const { error } = await supabase.from("asset_attachments").insert({
