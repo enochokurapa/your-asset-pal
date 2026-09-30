@@ -117,3 +117,23 @@
   --brand-secondary: var(--platform-secondary, #4B47DC);
   --brand-secondary-foreground: #ffffff;
 }
+
+.platform-brand .brand-secondary-text {
+  color: var(--brand-secondary);
+}
+
+.platform-brand .brand-secondary-soft {
+  color: var(--brand-secondary);
+  background: color-mix(in srgb, var(--brand-secondary) 10%, transparent);
+}
+
+.platform-brand .brand-secondary-chip {
+  color: #ffffff;
+  border-color: color-mix(in srgb, var(--brand-secondary) 35%, transparent);
+  background: color-mix(in srgb, var(--brand-secondary) 16%, transparent);
+}
+
+.platform-brand .brand-secondary-bg {
+  color: #ffffff;
+  background: var(--brand-secondary);
+}
