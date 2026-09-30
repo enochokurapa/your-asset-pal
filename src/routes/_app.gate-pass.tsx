@@ -478,7 +478,8 @@ function CreateDialog({ open, onClose, assets, userId, onCreated }: {
       const asset = assets.find((a) => a.id === assetId);
       let attachment_url: string | null = null;
       if (file) {
-        if (!tenantId) throw new Error("Workspace is not configured");\n        const path = `${tenantId}/gate-pass/${assetId}/${Date.now()}-${file.name}`;
+        if (!tenantId) throw new Error("Workspace is not configured");
+        const path = `${tenantId}/gate-pass/${assetId}/${Date.now()}-${file.name}`;
         const { error: upErr } = await supabase.storage.from("asset-files").upload(path, file);
         if (upErr) throw upErr;
         attachment_url = path;
