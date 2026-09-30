@@ -610,7 +610,7 @@ export const getSaasTenantDetail = createServerFn({ method: "POST" })
       admin.from("billing_transactions").select("id,provider_reference,amount,currency,status,created_at").eq("tenant_id", data.tenant_id).order("created_at", { ascending: false }).limit(20),
       admin.from("saas_modules").select("*").order("sort_order"),
       admin.from("tenant_module_overrides").select("module_key,enabled").eq("tenant_id", data.tenant_id),
-      admin.from("audit_log").select("id,action,entity_type,created_at,actor_id").eq("tenant_id", data.tenant_id).order("created_at", { ascending: false }).limit(20),
+      admin.from("audit_log").select("id,action,entity_type,created_at,actor_user_id").eq("tenant_id", data.tenant_id).order("created_at", { ascending: false }).limit(20),
       admin.from("document_templates").select("organization_name,logo_data_url,updated_at").eq("tenant_id", data.tenant_id).eq("is_active", true).order("updated_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
 
