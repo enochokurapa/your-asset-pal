@@ -85,3 +85,35 @@
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
 }
+
+
+/* AssetFlow 360 public/platform brand palette */
+.platform-brand {
+  --primary: #C77435;
+  --primary-foreground: #ffffff;
+  --ring: #C77435;
+  --secondary: color-mix(in srgb, #4B47DC 9%, white);
+  --secondary-foreground: #3834b8;
+  --accent: color-mix(in srgb, #4B47DC 12%, white);
+  --accent-foreground: #302cad;
+  --sidebar-primary: #C77435;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-ring: #C77435;
+  --brand-secondary: #4B47DC;
+  --brand-secondary-foreground: #ffffff;
+}
+
+.dark .platform-brand {
+  --primary: #C77435;
+  --primary-foreground: #ffffff;
+  --ring: #C77435;
+  --secondary: color-mix(in srgb, #4B47DC 24%, #0b0b10);
+  --secondary-foreground: #f4f3ff;
+  --accent: color-mix(in srgb, #4B47DC 28%, #0b0b10);
+  --accent-foreground: #ffffff;
+  --sidebar-primary: #C77435;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-ring: #C77435;
+  --brand-secondary: #4B47DC;
+  --brand-secondary-foreground: #ffffff;
+}

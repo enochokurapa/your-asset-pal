@@ -465,6 +465,7 @@ function SummaryCards({ passes }: { passes: GP[] }) {
 function CreateDialog({ open, onClose, assets, userId, onCreated }: {
   open: boolean; onClose: () => void; assets: any[]; userId: string; onCreated: () => void;
 }) {
+  const { tenantId } = useAuth();
   const [assetId, setAssetId] = useState("");
   const [reason, setReason] = useState("");
   const [destination, setDestination] = useState("");
@@ -477,7 +478,8 @@ function CreateDialog({ open, onClose, assets, userId, onCreated }: {
       const asset = assets.find((a) => a.id === assetId);
       let attachment_url: string | null = null;
       if (file) {
-        const path = `gate-pass/${assetId}/${Date.now()}-${file.name}`;
+        if (!tenantId) throw new Error("Workspace is not configured");
+        const path = `${tenantId}/gate-pass/${assetId}/${Date.now()}-${file.name}`;
         const { error: upErr } = await supabase.storage.from("asset-files").upload(path, file);
         if (upErr) throw upErr;
         attachment_url = path;

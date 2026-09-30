@@ -1,7 +1,7 @@
 http:
   routers:
     ams-auth-https:
-      rule: "Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/auth/v1`)"
+      rule: "Host(`assetflow360.com`) && PathPrefix(`/auth/v1`)"
       service: "ams-auth-service"
       entryPoints:
         - "https"
@@ -12,7 +12,7 @@ http:
         - "ams-auth-strip"
 
     ams-rest-https:
-      rule: "Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/rest/v1`)"
+      rule: "Host(`assetflow360.com`) && PathPrefix(`/rest/v1`)"
       service: "ams-rest-service"
       entryPoints:
         - "https"
@@ -23,7 +23,7 @@ http:
         - "ams-rest-strip"
 
     ams-auth-http:
-      rule: "Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/auth/v1`)"
+      rule: "Host(`assetflow360.com`) && PathPrefix(`/auth/v1`)"
       service: "ams-auth-service"
       entryPoints:
         - "http"
@@ -32,7 +32,7 @@ http:
         - "ams-auth-strip"
 
     ams-rest-http:
-      rule: "Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/rest/v1`)"
+      rule: "Host(`assetflow360.com`) && PathPrefix(`/rest/v1`)"
       service: "ams-rest-service"
       entryPoints:
         - "http"

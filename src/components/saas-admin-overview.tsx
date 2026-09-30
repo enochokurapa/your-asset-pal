@@ -5,6 +5,7 @@ import {
   Building2,
   Boxes,
   DatabaseBackup,
+  ImageIcon,
   Settings2,
   ShieldCheck,
 } from "lucide-react";
@@ -15,6 +16,12 @@ const SECTIONS = [
     title: "Plan & Pricing",
     description: "Set global trial days, user limits, paid price and currency.",
     icon: Settings2,
+  },
+  {
+    to: "/saas-admin/branding",
+    title: "Platform Branding",
+    description: "Upload the global AssetFlow 360 logo in PNG, WebP or SVG format.",
+    icon: ImageIcon,
   },
   {
     to: "/saas-admin/backups",
@@ -45,11 +52,11 @@ export function SaasAdminOverview() {
           <h1 className="text-2xl font-bold tracking-tight">SaaS Dashboard</h1>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Platform-level controls for plans, backups, modules and organizations.
+          Platform-level controls for branding, plans, backups, modules and organizations.
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {SECTIONS.map((section) => {
           const Icon = section.icon;
           return (

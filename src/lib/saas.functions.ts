@@ -75,6 +75,162 @@ function parseSaasSettings(settings: any) {
   return { trialDays, trialUserLimit, paidPrice, currency };
 }
 
+function normalizePlatformLogo(dataUrl: string | null): string | null {
+  if (!dataUrl) return null;
+  if (dataUrl.length > 2_800_000) throw new Error("Logo is too large. Keep the file under 2 MB.");
+
+  const match = dataUrl.match(/^data:(image\/(?:png|webp|svg\+xml));base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) throw new Error("Use a PNG, WebP or SVG logo.");
+
+  const mime = match[1];
+  const payload = match[2];
+  const bytes = Buffer.from(payload, "base64");
+  if (!bytes.length || bytes.length > 2_000_000) {
+    throw new Error("Logo is too large. Keep the file under 2 MB.");
+  }
+
+  if (mime === "image/png") {
+    const signature = bytes.subarray(0, 8).toString("hex");
+    if (signature !== "89504e470d0a1a0a") throw new Error("The uploaded PNG is not valid.");
+  } else if (mime === "image/webp") {
+    if (bytes.subarray(0, 4).toString("ascii") !== "RIFF" || bytes.subarray(8, 12).toString("ascii") !== "WEBP") {
+      throw new Error("The uploaded WebP is not valid.");
+    }
+  } else {
+    const svg = bytes.toString("utf8").trim();
+    if (!/<svg(?:\s|>)/i.test(svg)) throw new Error("The uploaded SVG is not valid.");
+    if (/<script\b|<foreignObject\b|\son[a-z]+\s*=|javascript\s*:|data\s*:\s*text\/html/i.test(svg)) {
+      throw new Error("The SVG contains unsupported active content.");
+    }
+  }
+
+  return `data:${mime};base64,${bytes.toString("base64")}`;
+}
+
+export const getPublicSaasBranding = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const { data, error } = await admin.from("saas_settings")
+      .select("platform_logo_data_url")
+      .eq("id", true)
+      .single();
+    if (error) throw new Error(error.message);
+    return {
+      name: "AssetFlow 360",
+      logoDataUrl: data?.platform_logo_data_url || null,
+    };
+  });
+
+export const updateSaasBranding = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({
+    logo_data_url: z.string().nullable(),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertSaasAdmin(context.userId);
+    const logo = normalizePlatformLogo(data.logo_data_url);
+    const { error } = await admin.from("saas_settings").update({
+      platform_logo_data_url: logo,
+      updated_at: new Date().toISOString(),
+      updated_by: context.userId,
+    }).eq("id", true);
+    if (error) throw new Error(error.message);
+    return { ok: true, logoDataUrl: logo };
+  });
+
+export const provisionFreeTrialWorkspace = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({
+    organization_name: z.string().trim().min(2).max(160),
+    full_name: z.string().trim().min(2).max(160),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const profile = await getProfile(context.userId);
+    if (profile.is_saas_admin) throw new Error("Platform administrators cannot create a trial workspace");
+    if (profile.tenant_id) throw new Error("This account already belongs to a workspace");
+
+    const { data: settings, error: settingsError } = await admin.from("saas_settings")
+      .select("trial_days,trial_user_limit,paid_price,currency")
+      .eq("id", true)
+      .single();
+    if (settingsError || !settings) {
+      throw new Error(settingsError?.message || "Free-trial policy is not configured");
+    }
+    const parsed = parseSaasSettings(settings);
+
+    const baseSlug = data.organization_name
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 42) || "workspace";
+    const slug = `${baseSlug}-${context.userId.replace(/-/g, "").slice(0, 10)}`;
+
+    let tenantId: string | null = null;
+    try {
+      const { data: tenant, error: tenantError } = await admin.from("tenants")
+        .insert({
+          name: data.organization_name,
+          slug,
+          subscription_status: "trial",
+          plan_code: "trial",
+        })
+        .select("id,trial_ends_at")
+        .single();
+      if (tenantError || !tenant) throw new Error(tenantError?.message || "Could not create workspace");
+      tenantId = tenant.id;
+
+      const { error: profileError } = await admin.from("profiles").update({
+        full_name: data.full_name,
+        tenant_id: tenantId,
+        tenant_role: "tenant_admin",
+        is_active: true,
+        is_saas_admin: false,
+        must_change_password: false,
+      }).eq("id", context.userId).is("tenant_id", null);
+      if (profileError) throw new Error(profileError.message);
+
+      const { error: deleteRoleError } = await admin.from("user_roles")
+        .delete()
+        .eq("user_id", context.userId);
+      if (deleteRoleError) throw new Error(deleteRoleError.message);
+
+      const { error: roleError } = await admin.from("user_roles").insert({
+        user_id: context.userId,
+        role: "admin",
+      });
+      if (roleError) throw new Error(roleError.message);
+
+      const { error: templateError } = await admin.from("document_templates").insert({
+        tenant_id: tenantId,
+        name: "Default",
+        is_active: true,
+        organization_name: data.organization_name,
+        updated_by: context.userId,
+      });
+      if (templateError && !/duplicate/i.test(templateError.message)) {
+        throw new Error(templateError.message);
+      }
+
+      return {
+        ok: true,
+        tenantId,
+        trialDays: parsed.trialDays,
+        trialEndsAt: tenant.trial_ends_at,
+      };
+    } catch (error) {
+      if (tenantId) {
+        await admin.from("profiles").update({
+          tenant_id: null,
+          tenant_role: "member",
+        }).eq("id", context.userId).eq("tenant_id", tenantId);
+        await admin.from("user_roles").delete().eq("user_id", context.userId);
+        await admin.from("user_roles").insert({ user_id: context.userId, role: "staff" });
+        await admin.from("tenants").delete().eq("id", tenantId);
+      }
+      throw error;
+    }
+  });
+
 export const getSaasContext = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

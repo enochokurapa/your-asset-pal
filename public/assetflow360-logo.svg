@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 72" role="img" aria-label="AssetFlow 360">
+  <rect x="0" y="4" width="64" height="64" rx="14" fill="#C77435"/>
+  <path d="M17 38.5 29.5 23a4 4 0 0 1 6 0L47 37.5" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M17.5 38.5 29 50a4 4 0 0 0 6 0l12-12" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M25.5 38h13" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+  <text x="82" y="46" font-family="Inter,Arial,sans-serif" font-size="32" font-weight="800" letter-spacing="1.2" fill="#171717">ASSETFLOW</text>
+  <text x="281" y="46" font-family="Inter,Arial,sans-serif" font-size="32" font-weight="800" letter-spacing="1.2" fill="#C77435">360</text>
+</svg>

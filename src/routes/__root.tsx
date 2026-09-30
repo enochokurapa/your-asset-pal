@@ -58,13 +58,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { name: "theme-color", content: "#1f3550" },
-      { title: "AssetFlow — Fixed Asset Management" },
-      { name: "description", content: "Track, assign and manage your organization's fixed assets." },
+      { name: "theme-color", content: "#C77435" },
+      { title: "AssetFlow 360 — Fixed Asset Management" },
+      { name: "description", content: "Track, assign, verify, depreciate and report on fixed assets securely with AssetFlow 360." },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "icon", href: "/assetflow360-mark.svg", type: "image/svg+xml" },
       { rel: "apple-touch-icon", href: "/icon-192.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },

@@ -1,15 +1,19 @@
 {
-  "name": "AssetFlow — Fixed Asset Management",
-  "short_name": "AssetFlow",
+  "name": "AssetFlow 360 — Fixed Asset Management",
+  "short_name": "AssetFlow 360",
   "id": "/",
-  "description": "Track, assign, and manage your organization's fixed assets.",
+  "description": "Track, assign, verify, depreciate and report on your organization's fixed assets.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#0f172a",
   "theme_color": "#1f3550",
-  "categories": ["business", "productivity", "utilities"],
+  "categories": [
+    "business",
+    "productivity",
+    "utilities"
+  ],
   "icons": [
     {
       "src": "/icon-192.png",

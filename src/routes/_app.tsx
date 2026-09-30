@@ -4,7 +4,7 @@ import { useAuth, ModuleKey } from "@/hooks/use-auth";
 import {
   LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X, FileBarChart,
   Building2, History, UserCircle, TrendingDown, DoorOpen, Settings, ClipboardCheck, Download,
-  CreditCard, Globe2, ShieldCheck, LockKeyhole, DatabaseBackup,
+  CreditCard, Globe2, ShieldCheck, LockKeyhole, DatabaseBackup, ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ import { triggerInstallPrompt } from "@/components/install-pwa-prompt";
 import { toast } from "sonner";
 import { DEFAULT_TEMPLATE, type DocumentTemplate } from "@/lib/pdf-template";
 import { applyBrowserBranding, BRANDING_CHANGED_EVENT, loadTenantBranding } from "@/lib/branding";
+import { PlatformLogo } from "@/components/platform-logo";
 
 export const Route = createFileRoute("/_app")({ component: AppLayout });
 
@@ -47,6 +48,7 @@ const tenantNav: NavItem[] = [
 const saasAdminNav: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/saas-admin/policy", label: "Plan & Pricing", icon: CreditCard },
+  { to: "/saas-admin/branding", label: "Platform Branding", icon: ImageIcon },
   { to: "/saas-admin/backups", label: "Backup & Restore", icon: DatabaseBackup },
   { to: "/saas-admin/modules", label: "Module Control", icon: Boxes },
   { to: "/saas-admin/organizations", label: "Organizations", icon: Building2 },
@@ -176,7 +178,7 @@ function AppLayout() {
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
               {isSaasAdmin ? (
-                <ShieldCheck className="h-5 w-5" />
+                <PlatformLogo className="h-full w-full bg-transparent" imageClassName="bg-white p-0.5" fallbackClassName="bg-sidebar-primary text-sidebar-primary-foreground" />
               ) : branding.logo_data_url ? (
                 <img src={branding.logo_data_url} alt="Company logo" className="h-full w-full bg-white object-contain p-0.5" />
               ) : (
@@ -185,7 +187,7 @@ function AppLayout() {
             </div>
             <div>
               <p className="max-w-40 truncate text-sm font-semibold leading-none">
-                {isSaasAdmin ? "AssetFlow" : branding.organization_name || tenantName || "AssetFlow"}
+                {isSaasAdmin ? "AssetFlow 360" : branding.organization_name || tenantName || "AssetFlow"}
               </p>
               <p className="mt-0.5 text-[10px] uppercase tracking-wider text-sidebar-foreground/60">
                 {isSaasAdmin ? "SaaS Control" : "Asset Manager"}
