@@ -73,12 +73,23 @@ function SaasAdminBrandingPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="platform-brand space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Platform branding</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Change the AssetFlow 360 platform logo shown on public and SaaS administration screens.
         </p>
+      </div>
+
+      <div className="grid max-w-3xl grid-cols-2 gap-3">
+        <div className="rounded-xl border bg-[#C77435] p-4 text-white">
+          <p className="text-xs font-semibold uppercase tracking-wider text-white/75">Primary</p>
+          <p className="mt-2 text-lg font-bold">#C77435</p>
+        </div>
+        <div className="rounded-xl border bg-[#4B47DC] p-4 text-white">
+          <p className="text-xs font-semibold uppercase tracking-wider text-white/75">Secondary</p>
+          <p className="mt-2 text-lg font-bold">#4B47DC</p>
+        </div>
       </div>
 
       <Card className="max-w-3xl p-6">
