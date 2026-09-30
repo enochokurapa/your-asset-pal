@@ -340,7 +340,8 @@ function AttachmentsPanel({ assetId }: { assetId: string }) {
   });
   const upload = async (file: File) => {
     setUploading(true);
-    if (!tenantId) { toast.error("Workspace is not configured"); setUploading(false); return; }\n    const path = `${tenantId}/${assetId}/${Date.now()}-${file.name}`;
+    if (!tenantId) { toast.error("Workspace is not configured"); setUploading(false); return; }
+    const path = `${tenantId}/${assetId}/${Date.now()}-${file.name}`;
     const { error: upErr } = await supabase.storage.from("asset-files").upload(path, file);
     if (upErr) { toast.error(upErr.message); setUploading(false); return; }
     const { error } = await supabase.from("asset_attachments").insert({
