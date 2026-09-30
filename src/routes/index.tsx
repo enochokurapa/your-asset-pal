@@ -18,7 +18,7 @@ export const Route = createFileRoute("/")({
 });
 
 const featureCards = [
-  { icon: Package, title: "Complete asset register", text: "Track asset tags, categories, locations, custodians, condition, documents and lifecycle status." },
+  { icon: Package, title: "Complete asset register", text: "Track asset tags, categories, locations, custodians, condition and lifecycle status." },
   { icon: ScanLine, title: "Verification & control", text: "Verify assets in the field, record mismatches and keep a clean accountability trail." },
   { icon: TrendingDown, title: "Depreciation", text: "Manage useful life, methods, runs, overrides and depreciation reporting from the same system." },
   { icon: DoorOpen, title: "Gate passes", text: "Control assets leaving your premises with requests, approvals, checkout and return records." },
@@ -41,6 +41,7 @@ const modules = [
   { icon: Settings, label: "Settings", text: "Workspace and branding" },
   { icon: CreditCard, label: "Plan & Billing", text: "Subscription controls" },
   { icon: Globe2, label: "Custom Domain", text: "Branded access on paid plans" },
+  { icon: Users, label: "My Profile", text: "Personal account settings" },
 ];
 
 function PublicHome() {
