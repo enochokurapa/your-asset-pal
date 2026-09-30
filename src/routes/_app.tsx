@@ -13,7 +13,7 @@ import { triggerInstallPrompt } from "@/components/install-pwa-prompt";
 import { toast } from "sonner";
 import { DEFAULT_TEMPLATE, type DocumentTemplate } from "@/lib/pdf-template";
 import { applyBrowserBranding, BRANDING_CHANGED_EVENT, loadTenantBranding } from "@/lib/branding";
-import { PlatformLogo } from "@/components/platform-logo";
+import { PlatformLogo, PlatformName } from "@/components/platform-logo";
 
 export const Route = createFileRoute("/_app")({ component: AppLayout });
 
@@ -46,12 +46,12 @@ const tenantNav: NavItem[] = [
 ];
 
 const saasAdminNav: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { to: "/dashboard", label: "Control Center", icon: LayoutDashboard, exact: true },
+  { to: "/saas-admin/organizations", label: "Businesses", icon: Building2 },
+  { to: "/saas-admin/branding", label: "Branding", icon: ImageIcon },
   { to: "/saas-admin/policy", label: "Plan & Pricing", icon: CreditCard },
-  { to: "/saas-admin/branding", label: "Platform Branding", icon: ImageIcon },
+  { to: "/saas-admin/modules", label: "Global Modules", icon: Boxes },
   { to: "/saas-admin/backups", label: "Backup & Restore", icon: DatabaseBackup },
-  { to: "/saas-admin/modules", label: "Module Control", icon: Boxes },
-  { to: "/saas-admin/organizations", label: "Organizations", icon: Building2 },
   { to: "/profile", label: "My profile", icon: UserCircle },
 ];
 
@@ -165,7 +165,7 @@ function AppLayout() {
   };
 
   return (
-    <div className="flex min-h-screen w-full bg-background" onClickCapture={blockRestrictedExport}>
+    <div className={cn("flex min-h-screen w-full bg-background", isSaasAdmin && "platform-brand")} onClickCapture={blockRestrictedExport}>
       {open && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setOpen(false)} />}
 
       <aside
@@ -187,10 +187,10 @@ function AppLayout() {
             </div>
             <div>
               <p className="max-w-40 truncate text-sm font-semibold leading-none">
-                {isSaasAdmin ? "AssetFlow 360" : branding.organization_name || tenantName || "AssetFlow"}
+                {isSaasAdmin ? <PlatformName /> : branding.organization_name || tenantName || "AssetFlow"}
               </p>
               <p className="mt-0.5 text-[10px] uppercase tracking-wider text-sidebar-foreground/60">
-                {isSaasAdmin ? "SaaS Control" : "Asset Manager"}
+                {isSaasAdmin ? "Platform Control" : "Asset Manager"}
               </p>
             </div>
           </div>
@@ -199,7 +199,7 @@ function AppLayout() {
 
         {isSaasAdmin && (
           <div className="mx-3 mt-3 rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-3 py-2 text-xs text-sidebar-foreground/75">
-            Platform administration
+            Business & platform administration
           </div>
         )}
 
@@ -222,7 +222,7 @@ function AppLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur md:px-8">
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setOpen(true)} aria-label="Open menu"><Menu className="h-5 w-5" /></Button>
-          {isSaasAdmin && <div className="hidden text-sm font-medium text-foreground sm:block">SaaS Administration</div>}
+          {isSaasAdmin && <div className="hidden text-sm font-medium text-foreground sm:block">AssetFlow 360 · SaaS Control Center</div>}
           <div className="flex-1" />
           {!isSaasAdmin && subscriptionStatus === "trial" && isTenantAdmin && (
             <Button asChild variant="outline" size="sm" className="hidden gap-1.5 border-primary/20 bg-primary/5 text-xs font-semibold text-primary hover:bg-primary/10 sm:inline-flex">

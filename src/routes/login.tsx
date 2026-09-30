@@ -102,7 +102,7 @@ function LoginPage() {
         <aside className="relative hidden overflow-hidden bg-sidebar p-12 text-sidebar-foreground lg:flex lg:flex-col lg:justify-center">
           <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(to_right,var(--sidebar-border)_1px,transparent_1px),linear-gradient(to_bottom,var(--sidebar-border)_1px,transparent_1px)] [background-size:44px_44px]" />
           <div className="relative max-w-xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#8f8cff]">One asset control center</p>
+            <p className="brand-secondary-text text-sm font-semibold uppercase tracking-[0.18em]">One asset control center</p>
             <h2 className="mt-4 text-4xl font-bold tracking-tight">Track ownership, movement, verification and value without losing the audit trail.</h2>
             <p className="mt-5 leading-7 text-sidebar-foreground/70">Your organization works inside its own tenant boundary with permissions layered on top.</p>
           </div>

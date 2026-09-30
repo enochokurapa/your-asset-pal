@@ -110,31 +110,65 @@ function normalizePlatformLogo(dataUrl: string | null): string | null {
 export const getPublicSaasBranding = createServerFn({ method: "GET" })
   .handler(async () => {
     const { data, error } = await admin.from("saas_settings")
-      .select("platform_logo_data_url")
+      .select("platform_name,platform_logo_data_url,platform_icon_data_url,platform_primary_color,platform_secondary_color")
       .eq("id", true)
       .single();
     if (error) throw new Error(error.message);
     return {
-      name: "AssetFlow 360",
+      name: data?.platform_name || "AssetFlow 360",
       logoDataUrl: data?.platform_logo_data_url || null,
+      iconDataUrl: data?.platform_icon_data_url || null,
+      primaryColor: data?.platform_primary_color || "#C77435",
+      secondaryColor: data?.platform_secondary_color || "#4B47DC",
     };
   });
 
 export const updateSaasBranding = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({
-    logo_data_url: z.string().nullable(),
+    platform_name: z.string().trim().min(2).max(80).optional(),
+    logo_data_url: z.string().nullable().optional(),
+    icon_data_url: z.string().nullable().optional(),
+    primary_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+    secondary_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   }).parse(input))
   .handler(async ({ data, context }) => {
     await assertSaasAdmin(context.userId);
-    const logo = normalizePlatformLogo(data.logo_data_url);
+
+    const { data: current, error: readError } = await admin.from("saas_settings")
+      .select("platform_name,platform_logo_data_url,platform_icon_data_url,platform_primary_color,platform_secondary_color")
+      .eq("id", true)
+      .single();
+    if (readError || !current) throw new Error(readError?.message || "Platform branding is not configured");
+
+    const logo = data.logo_data_url === undefined
+      ? current.platform_logo_data_url
+      : normalizePlatformLogo(data.logo_data_url);
+    const icon = data.icon_data_url === undefined
+      ? current.platform_icon_data_url
+      : normalizePlatformLogo(data.icon_data_url);
+    const platformName = data.platform_name ?? current.platform_name ?? "AssetFlow 360";
+    const primaryColor = (data.primary_color ?? current.platform_primary_color ?? "#C77435").toUpperCase();
+    const secondaryColor = (data.secondary_color ?? current.platform_secondary_color ?? "#4B47DC").toUpperCase();
+
     const { error } = await admin.from("saas_settings").update({
+      platform_name: platformName,
       platform_logo_data_url: logo,
+      platform_icon_data_url: icon,
+      platform_primary_color: primaryColor,
+      platform_secondary_color: secondaryColor,
       updated_at: new Date().toISOString(),
       updated_by: context.userId,
     }).eq("id", true);
     if (error) throw new Error(error.message);
-    return { ok: true, logoDataUrl: logo };
+    return {
+      ok: true,
+      name: platformName,
+      logoDataUrl: logo,
+      iconDataUrl: icon,
+      primaryColor,
+      secondaryColor,
+    };
   });
 
 export const provisionFreeTrialWorkspace = createServerFn({ method: "POST" })
@@ -339,10 +373,20 @@ export const updateTenantModule = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({
     tenant_id: z.string().uuid(),
     module_key: z.string().min(1).max(100),
-    enabled: z.boolean(),
+    enabled: z.boolean().nullable(),
   }).parse(input))
   .handler(async ({ data, context }) => {
     await assertSaasAdmin(context.userId);
+
+    if (data.enabled === null) {
+      const { error } = await admin.from("tenant_module_overrides")
+        .delete()
+        .eq("tenant_id", data.tenant_id)
+        .eq("module_key", data.module_key);
+      if (error) throw new Error(error.message);
+      return { ok: true, inherited: true };
+    }
+
     const { error } = await admin.from("tenant_module_overrides").upsert({
       tenant_id: data.tenant_id,
       module_key: data.module_key,
@@ -350,7 +394,7 @@ export const updateTenantModule = createServerFn({ method: "POST" })
       updated_at: new Date().toISOString(),
     }, { onConflict: "tenant_id,module_key" });
     if (error) throw new Error(error.message);
-    return { ok: true };
+    return { ok: true, inherited: false };
   });
 
 export const updateTenantSubscription = createServerFn({ method: "POST" })
@@ -396,6 +440,295 @@ export const listSaasTenants = createServerFn({ method: "GET" })
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return data ?? [];
+  });
+
+export const getSaasAdminDashboard = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertSaasAdmin(context.userId);
+
+    const [
+      tenantsResult,
+      profilesResult,
+      assetsResult,
+      branchesResult,
+      transactionsResult,
+      domainsResult,
+      auditResult,
+      settingsResult,
+    ] = await Promise.all([
+      admin.from("tenants").select("id,name,slug,subscription_status,plan_code,trial_ends_at,subscription_ends_at,created_at,updated_at").order("created_at", { ascending: false }),
+      admin.from("profiles").select("id,tenant_id,is_active,is_saas_admin,created_at"),
+      admin.from("assets").select("id,tenant_id,status,purchase_value,created_at"),
+      admin.from("branches").select("id,tenant_id,is_active"),
+      admin.from("billing_transactions").select("tenant_id,amount,currency,status,created_at"),
+      admin.from("custom_domains").select("tenant_id,status,hostname"),
+      admin.from("audit_log").select("tenant_id,created_at").order("created_at", { ascending: false }).limit(5000),
+      admin.from("saas_settings").select("trial_days,trial_user_limit,paid_price,currency,backup_enabled,backup_interval_hours").eq("id", true).single(),
+    ]);
+
+    for (const result of [
+      tenantsResult, profilesResult, assetsResult, branchesResult,
+      transactionsResult, domainsResult, auditResult,
+    ]) {
+      if (result.error) throw new Error(result.error.message);
+    }
+    if (settingsResult.error || !settingsResult.data) {
+      throw new Error(settingsResult.error?.message || "Global SaaS settings are not configured");
+    }
+
+    const tenants = tenantsResult.data ?? [];
+    const profiles = profilesResult.data ?? [];
+    const assets = assetsResult.data ?? [];
+    const branches = branchesResult.data ?? [];
+    const transactions = transactionsResult.data ?? [];
+    const domains = domainsResult.data ?? [];
+    const audit = auditResult.data ?? [];
+
+    const usersByTenant = new Map<string, number>();
+    const assetsByTenant = new Map<string, { count: number; value: number; recent: number }>();
+    const branchesByTenant = new Map<string, number>();
+    const revenueByTenant = new Map<string, number>();
+    const domainsByTenant = new Map<string, { total: number; active: number }>();
+    const lastActivityByTenant = new Map<string, string>();
+    const cutoff30 = Date.now() - 30 * 86400000;
+
+    for (const p of profiles) {
+      if (!p.tenant_id || p.is_saas_admin || p.is_active === false) continue;
+      usersByTenant.set(p.tenant_id, (usersByTenant.get(p.tenant_id) ?? 0) + 1);
+    }
+    for (const a of assets) {
+      if (!a.tenant_id) continue;
+      const current = assetsByTenant.get(a.tenant_id) ?? { count: 0, value: 0, recent: 0 };
+      current.count += 1;
+      current.value += Number(a.purchase_value) || 0;
+      if (a.created_at && new Date(a.created_at).getTime() >= cutoff30) current.recent += 1;
+      assetsByTenant.set(a.tenant_id, current);
+    }
+    for (const b of branches) {
+      if (!b.tenant_id || b.is_active === false) continue;
+      branchesByTenant.set(b.tenant_id, (branchesByTenant.get(b.tenant_id) ?? 0) + 1);
+    }
+    for (const tx of transactions) {
+      if (!tx.tenant_id || tx.status !== "successful") continue;
+      revenueByTenant.set(tx.tenant_id, (revenueByTenant.get(tx.tenant_id) ?? 0) + (Number(tx.amount) || 0));
+    }
+    for (const d of domains) {
+      if (!d.tenant_id) continue;
+      const current = domainsByTenant.get(d.tenant_id) ?? { total: 0, active: 0 };
+      current.total += 1;
+      if (d.status === "active" || d.status === "verified") current.active += 1;
+      domainsByTenant.set(d.tenant_id, current);
+    }
+    for (const row of audit) {
+      if (!row.tenant_id || lastActivityByTenant.has(row.tenant_id)) continue;
+      lastActivityByTenant.set(row.tenant_id, row.created_at);
+    }
+
+    const tenantStats = tenants.map((tenant: any) => {
+      const status = computeStatus(tenant);
+      const assetStats = assetsByTenant.get(tenant.id) ?? { count: 0, value: 0, recent: 0 };
+      const domainStats = domainsByTenant.get(tenant.id) ?? { total: 0, active: 0 };
+      return {
+        id: tenant.id,
+        name: tenant.name,
+        slug: tenant.slug,
+        status,
+        rawStatus: tenant.subscription_status,
+        planCode: tenant.plan_code,
+        trialEndsAt: tenant.trial_ends_at,
+        subscriptionEndsAt: tenant.subscription_ends_at,
+        createdAt: tenant.created_at,
+        updatedAt: tenant.updated_at,
+        users: usersByTenant.get(tenant.id) ?? 0,
+        assets: assetStats.count,
+        assetValue: assetStats.value,
+        assetsAdded30d: assetStats.recent,
+        branches: branchesByTenant.get(tenant.id) ?? 0,
+        revenue: revenueByTenant.get(tenant.id) ?? 0,
+        domains: domainStats.total,
+        activeDomains: domainStats.active,
+        lastActivityAt: lastActivityByTenant.get(tenant.id) ?? null,
+      };
+    });
+
+    const effectiveStatusCount = (status: string) => tenantStats.filter((t: any) => t.status === status).length;
+    const newWorkspaces30d = tenantStats.filter((t: any) => new Date(t.createdAt).getTime() >= cutoff30).length;
+
+    return {
+      summary: {
+        organizations: tenantStats.length,
+        active: effectiveStatusCount("active"),
+        trials: effectiveStatusCount("trial"),
+        expired: effectiveStatusCount("expired"),
+        suspended: effectiveStatusCount("suspended"),
+        users: tenantStats.reduce((sum: number, t: any) => sum + t.users, 0),
+        assets: tenantStats.reduce((sum: number, t: any) => sum + t.assets, 0),
+        assetValue: tenantStats.reduce((sum: number, t: any) => sum + t.assetValue, 0),
+        newWorkspaces30d,
+        assetsAdded30d: tenantStats.reduce((sum: number, t: any) => sum + t.assetsAdded30d, 0),
+        successfulRevenue: tenantStats.reduce((sum: number, t: any) => sum + t.revenue, 0),
+      },
+      tenants: tenantStats,
+      policy: {
+        trialDays: Number(settingsResult.data.trial_days),
+        trialUserLimit: Number(settingsResult.data.trial_user_limit),
+        paidPrice: Number(settingsResult.data.paid_price),
+        currency: String(settingsResult.data.currency || "").toUpperCase(),
+      },
+      technical: {
+        database: "operational",
+        authProxyConfigured: Boolean(process.env.SUPABASE_AUTH_INTERNAL_URL),
+        restProxyConfigured: Boolean(process.env.SUPABASE_REST_INTERNAL_URL),
+        paymentConfigured: Boolean(process.env.YO_API_USERNAME && process.env.YO_API_PASSWORD),
+        databaseBackupConfigured: Boolean(process.env.DATABASE_URL),
+        r2Configured: Boolean(
+          process.env.R2_ACCOUNT_ID &&
+          process.env.R2_ACCESS_KEY_ID &&
+          process.env.R2_SECRET_ACCESS_KEY &&
+          process.env.R2_BUCKET
+        ),
+        backupEnabled: Boolean(settingsResult.data.backup_enabled),
+        backupIntervalHours: Number(settingsResult.data.backup_interval_hours || 24),
+      },
+    };
+  });
+
+export const getSaasTenantDetail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ tenant_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertSaasAdmin(context.userId);
+
+    const [
+      tenantResult,
+      profilesResult,
+      assetsResult,
+      branchesResult,
+      domainsResult,
+      billingResult,
+      modulesResult,
+      overridesResult,
+      auditResult,
+      brandingResult,
+    ] = await Promise.all([
+      admin.from("tenants").select("*").eq("id", data.tenant_id).single(),
+      admin.from("profiles").select("id,email,full_name,is_active,tenant_role,is_saas_admin,created_at").eq("tenant_id", data.tenant_id).order("created_at"),
+      admin.from("assets").select("id,status,purchase_value,created_at").eq("tenant_id", data.tenant_id),
+      admin.from("branches").select("id,name,code,is_active").eq("tenant_id", data.tenant_id).order("name"),
+      admin.from("custom_domains").select("id,hostname,status,verified_at,created_at").eq("tenant_id", data.tenant_id).order("created_at", { ascending: false }),
+      admin.from("billing_transactions").select("id,provider_reference,amount,currency,status,created_at").eq("tenant_id", data.tenant_id).order("created_at", { ascending: false }).limit(20),
+      admin.from("saas_modules").select("*").order("sort_order"),
+      admin.from("tenant_module_overrides").select("module_key,enabled").eq("tenant_id", data.tenant_id),
+      admin.from("audit_log").select("id,action,entity_type,created_at,actor_user_id").eq("tenant_id", data.tenant_id).order("created_at", { ascending: false }).limit(20),
+      admin.from("document_templates").select("organization_name,logo_data_url,updated_at").eq("tenant_id", data.tenant_id).eq("is_active", true).order("updated_at", { ascending: false }).limit(1).maybeSingle(),
+    ]);
+
+    for (const result of [
+      tenantResult, profilesResult, assetsResult, branchesResult, domainsResult,
+      billingResult, modulesResult, overridesResult, auditResult, brandingResult,
+    ]) {
+      if (result.error) throw new Error(result.error.message);
+    }
+
+    const profiles = profilesResult.data ?? [];
+    const userIds = profiles.map((p: any) => p.id);
+    const rolesResult = userIds.length
+      ? await admin.from("user_roles").select("user_id,role").in("user_id", userIds)
+      : { data: [], error: null };
+    if (rolesResult.error) throw new Error(rolesResult.error.message);
+
+    const roleMap = new Map<string, string[]>();
+    for (const row of rolesResult.data ?? []) {
+      const roles = roleMap.get(row.user_id) ?? [];
+      roles.push(row.role);
+      roleMap.set(row.user_id, roles);
+    }
+
+    const tenant = tenantResult.data;
+    const status = computeStatus(tenant);
+    const paid = status === "active";
+    const overrides = new Map((overridesResult.data ?? []).map((row: any) => [row.module_key, row.enabled]));
+    const modules = (modulesResult.data ?? []).map((module: any) => {
+      const planEnabled = paid ? module.paid_enabled : module.trial_enabled;
+      const override = overrides.has(module.module_key) ? overrides.get(module.module_key) : null;
+      return {
+        ...module,
+        override,
+        effectiveEnabled: Boolean(module.globally_enabled && planEnabled && override !== false),
+      };
+    });
+
+    const assets = assetsResult.data ?? [];
+    const assetStatus: Record<string, number> = {};
+    for (const asset of assets) {
+      assetStatus[asset.status] = (assetStatus[asset.status] ?? 0) + 1;
+    }
+
+    return {
+      tenant: {
+        ...tenant,
+        effective_status: status,
+      },
+      metrics: {
+        users: profiles.filter((p: any) => !p.is_saas_admin && p.is_active !== false).length,
+        assets: assets.length,
+        assetValue: assets.reduce((sum: number, a: any) => sum + (Number(a.purchase_value) || 0), 0),
+        branches: (branchesResult.data ?? []).filter((b: any) => b.is_active !== false).length,
+        assetStatus,
+      },
+      users: profiles
+        .filter((p: any) => !p.is_saas_admin)
+        .map((p: any) => ({ ...p, roles: roleMap.get(p.id) ?? [] })),
+      branches: branchesResult.data ?? [],
+      domains: domainsResult.data ?? [],
+      billing: billingResult.data ?? [],
+      modules,
+      recentActivity: auditResult.data ?? [],
+      branding: brandingResult.data ?? null,
+    };
+  });
+
+export const updateSaasTenantName = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({
+    tenant_id: z.string().uuid(),
+    name: z.string().trim().min(2).max(160),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertSaasAdmin(context.userId);
+    const { error } = await admin.from("tenants").update({
+      name: data.name,
+      updated_at: new Date().toISOString(),
+    }).eq("id", data.tenant_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const updateSaasTenantUserStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({
+    tenant_id: z.string().uuid(),
+    user_id: z.string().uuid(),
+    is_active: z.boolean(),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertSaasAdmin(context.userId);
+
+    const { data: target, error: targetError } = await admin.from("profiles")
+      .select("id,tenant_id,is_saas_admin")
+      .eq("id", data.user_id)
+      .eq("tenant_id", data.tenant_id)
+      .single();
+    if (targetError || !target) throw new Error("Business user not found");
+    if (target.is_saas_admin) throw new Error("A SaaS administrator cannot be changed from a business account");
+
+    const { error } = await admin.from("profiles")
+      .update({ is_active: data.is_active })
+      .eq("id", data.user_id)
+      .eq("tenant_id", data.tenant_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 export const listSaasModules = createServerFn({ method: "GET" })

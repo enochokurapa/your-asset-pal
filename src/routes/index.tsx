@@ -80,7 +80,7 @@ function PublicHome() {
           <div className="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 sm:py-28 lg:grid-cols-[1.02fr_.98fr] lg:items-center lg:px-8 lg:py-32">
             <div>
               <div className="mb-6 inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground shadow-sm">
-                <ShieldCheck className="h-3.5 w-3.5 text-[#4B47DC]" /> Secure multi-tenant asset management
+                <ShieldCheck className="h-3.5 w-3.5 brand-secondary-text" /> Secure multi-tenant asset management
               </div>
               <h1 className="max-w-3xl text-4xl font-bold tracking-[-0.04em] sm:text-5xl lg:text-6xl">
                 Know every asset. <span className="text-primary">Control every movement.</span>
@@ -165,7 +165,7 @@ function PublicHome() {
           <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {featureCards.map(({icon: Icon,title,text}) => (
               <article key={title} className="rounded-2xl border bg-card p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#4B47DC]/10 text-[#4B47DC]"><Icon className="h-5 w-5" /></span>
+                <span className="brand-secondary-soft flex h-11 w-11 items-center justify-center rounded-xl"><Icon className="h-5 w-5" /></span>
                 <h3 className="mt-5 font-bold">{title}</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">{text}</p>
               </article>
             ))}
@@ -182,7 +182,7 @@ function PublicHome() {
             <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {modules.map(({icon:Icon,label,text}) => (
                 <div key={label} className="flex gap-3 rounded-xl border bg-background p-4">
-                  <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#4B47DC]/10 text-[#4B47DC]"><Icon className="h-4 w-4" /></span>
+                  <span className="brand-secondary-soft mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"><Icon className="h-4 w-4" /></span>
                   <div><p className="text-sm font-bold">{label}</p><p className="mt-0.5 text-xs leading-5 text-muted-foreground">{text}</p></div>
                 </div>
               ))}
@@ -205,7 +205,7 @@ function PublicHome() {
             </div>
           </div>
           <div className="rounded-3xl bg-sidebar p-7 text-sidebar-foreground shadow-xl sm:p-9">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#4B47DC] text-white"><LockKeyhole className="h-6 w-6" /></div>
+            <div className="brand-secondary-bg flex h-12 w-12 items-center justify-center rounded-2xl"><LockKeyhole className="h-6 w-6" /></div>
             <p className="mt-7 text-sm font-semibold uppercase tracking-[0.16em] text-sidebar-foreground/60">Tenant boundary</p>
             <h3 className="mt-2 text-2xl font-bold">Security lives below the interface.</h3>
             <p className="mt-3 text-sm leading-6 text-sidebar-foreground/70">A hidden menu is not a security control. Tenant checks are enforced at the data layer so a customer request cannot simply query another workspace's rows.</p>

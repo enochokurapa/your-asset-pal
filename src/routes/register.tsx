@@ -89,7 +89,7 @@ function RegisterPage() {
           </Link>
         </div>
         <div className="relative z-10 my-auto max-w-lg">
-          <span className="inline-flex items-center gap-2 rounded-full border border-[#4B47DC]/30 bg-[#4B47DC]/10 px-3 py-1.5 text-xs font-semibold text-white"><ShieldCheck className="h-3.5 w-3.5 text-[#8f8cff]" /> Private workspace from day one</span>
+          <span className="brand-secondary-chip inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold"><ShieldCheck className="h-3.5 w-3.5" /> Private workspace from day one</span>
           <h1 className="mt-6 text-4xl font-bold tracking-tight">Start managing assets without sharing a workspace with anyone else.</h1>
           <p className="mt-4 leading-7 text-sidebar-foreground/70">Your organization receives its own tenant boundary, administrator account and trial workspace.</p>
           <div className="mt-8 space-y-3 text-sm text-sidebar-foreground/80">
