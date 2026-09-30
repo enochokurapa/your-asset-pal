@@ -214,9 +214,6 @@ END $$;
 ALTER TABLE public.categories DROP CONSTRAINT IF EXISTS categories_name_key;
 ALTER TABLE public.locations DROP CONSTRAINT IF EXISTS locations_name_key;
 ALTER TABLE public.assets DROP CONSTRAINT IF EXISTS assets_asset_tag_key;
-ALTER TABLE public.gate_passes DROP CONSTRAINT IF EXISTS gate_passes_pass_number_key;
-ALTER TABLE public.category_depreciation_defaults DROP CONSTRAINT IF EXISTS category_depreciation_defaults_category_id_key;
-ALTER TABLE public.depreciation_runs DROP CONSTRAINT IF EXISTS depreciation_runs_period_start_period_end_key;
 
 CREATE UNIQUE INDEX IF NOT EXISTS categories_tenant_name_key
   ON public.categories (tenant_id, lower(name));
@@ -224,13 +221,29 @@ CREATE UNIQUE INDEX IF NOT EXISTS locations_tenant_name_key
   ON public.locations (tenant_id, lower(name));
 CREATE UNIQUE INDEX IF NOT EXISTS assets_tenant_asset_tag_key
   ON public.assets (tenant_id, asset_tag);
-CREATE UNIQUE INDEX IF NOT EXISTS gate_passes_tenant_pass_number_key
-  ON public.gate_passes (tenant_id, pass_number)
-  WHERE pass_number IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS category_depreciation_defaults_tenant_category_key
-  ON public.category_depreciation_defaults (tenant_id, category_id);
-CREATE UNIQUE INDEX IF NOT EXISTS depreciation_runs_tenant_period_key
-  ON public.depreciation_runs (tenant_id, period_start, period_end);
+
+DO $$
+BEGIN
+  IF to_regclass('public.gate_passes') IS NOT NULL THEN
+    ALTER TABLE public.gate_passes DROP CONSTRAINT IF EXISTS gate_passes_pass_number_key;
+    EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS gate_passes_tenant_pass_number_key
+      ON public.gate_passes (tenant_id, pass_number) WHERE pass_number IS NOT NULL';
+  END IF;
+
+  IF to_regclass('public.category_depreciation_defaults') IS NOT NULL THEN
+    ALTER TABLE public.category_depreciation_defaults
+      DROP CONSTRAINT IF EXISTS category_depreciation_defaults_category_id_key;
+    EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS category_depreciation_defaults_tenant_category_key
+      ON public.category_depreciation_defaults (tenant_id, category_id)';
+  END IF;
+
+  IF to_regclass('public.depreciation_runs') IS NOT NULL THEN
+    ALTER TABLE public.depreciation_runs
+      DROP CONSTRAINT IF EXISTS depreciation_runs_period_start_period_end_key;
+    EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS depreciation_runs_tenant_period_key
+      ON public.depreciation_runs (tenant_id, period_start, period_end)';
+  END IF;
+END $$;
 
 -- Isolate private storage. New objects must live under <tenant-uuid>/...
 -- Legacy unprefixed objects are visible only to the original default workspace.
