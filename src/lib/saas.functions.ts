@@ -75,6 +75,68 @@ function parseSaasSettings(settings: any) {
   return { trialDays, trialUserLimit, paidPrice, currency };
 }
 
+function normalizePlatformLogo(dataUrl: string | null): string | null {
+  if (!dataUrl) return null;
+  if (dataUrl.length > 2_800_000) throw new Error("Logo is too large. Keep the file under 2 MB.");
+
+  const match = dataUrl.match(/^data:(image\/(?:png|webp|svg\+xml));base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) throw new Error("Use a PNG, WebP or SVG logo.");
+
+  const mime = match[1];
+  const payload = match[2];
+  const bytes = Buffer.from(payload, "base64");
+  if (!bytes.length || bytes.length > 2_000_000) {
+    throw new Error("Logo is too large. Keep the file under 2 MB.");
+  }
+
+  if (mime === "image/png") {
+    const signature = bytes.subarray(0, 8).toString("hex");
+    if (signature !== "89504e470d0a1a0a") throw new Error("The uploaded PNG is not valid.");
+  } else if (mime === "image/webp") {
+    if (bytes.subarray(0, 4).toString("ascii") !== "RIFF" || bytes.subarray(8, 12).toString("ascii") !== "WEBP") {
+      throw new Error("The uploaded WebP is not valid.");
+    }
+  } else {
+    const svg = bytes.toString("utf8").trim();
+    if (!/<svg(?:\s|>)/i.test(svg)) throw new Error("The uploaded SVG is not valid.");
+    if (/<script\b|<foreignObject\b|\son[a-z]+\s*=|javascript\s*:|data\s*:\s*text\/html/i.test(svg)) {
+      throw new Error("The SVG contains unsupported active content.");
+    }
+  }
+
+  return `data:${mime};base64,${bytes.toString("base64")}`;
+}
+
+export const getPublicSaasBranding = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const { data, error } = await admin.from("saas_settings")
+      .select("platform_logo_data_url")
+      .eq("id", true)
+      .single();
+    if (error) throw new Error(error.message);
+    return {
+      name: "AssetFlow 360",
+      logoDataUrl: data?.platform_logo_data_url || null,
+    };
+  });
+
+export const updateSaasBranding = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({
+    logo_data_url: z.string().nullable(),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertSaasAdmin(context.userId);
+    const logo = normalizePlatformLogo(data.logo_data_url);
+    const { error } = await admin.from("saas_settings").update({
+      platform_logo_data_url: logo,
+      updated_at: new Date().toISOString(),
+      updated_by: context.userId,
+    }).eq("id", true);
+    if (error) throw new Error(error.message);
+    return { ok: true, logoDataUrl: logo };
+  });
+
 export const provisionFreeTrialWorkspace = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({
