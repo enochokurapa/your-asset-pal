@@ -59,8 +59,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { name: "theme-color", content: "#1f3550" },
-      { title: "AssetFlow — Fixed Asset Management" },
-      { name: "description", content: "Track, assign and manage your organization's fixed assets." },
+      { title: "AssetFlow 360 — Fixed Asset Management" },
+      { name: "description", content: "Track, assign, verify, depreciate and report on fixed assets securely with AssetFlow 360." },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
