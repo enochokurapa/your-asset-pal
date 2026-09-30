@@ -5,7 +5,18 @@
 
 BEGIN;
 
-DO $$
+-- Existing users/data from pesapal.owltechsolutionsltd.com stay in the original
+-- workspace and are grandfathered as an active legacy tenant. New public signups
+-- are provisioned into separate trial tenants and never inherit this workspace.
+UPDATE public.tenants
+SET subscription_status = 'active',
+    plan_code = 'legacy',
+    subscription_started_at = COALESCE(subscription_started_at, created_at, now()),
+    subscription_ends_at = NULL,
+    updated_at = now()
+WHERE slug = 'default';
+
+DO $
 DECLARE
   table_name text;
   default_tenant uuid;
