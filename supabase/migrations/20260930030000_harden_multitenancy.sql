@@ -16,7 +16,7 @@ SET subscription_status = 'active',
     updated_at = now()
 WHERE slug = 'default';
 
-DO $
+DO $$
 DECLARE
   table_name text;
   default_tenant uuid;
