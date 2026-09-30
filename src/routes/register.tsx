@@ -7,6 +7,7 @@ import { provisionFreeTrialWorkspace } from "@/lib/saas.functions";
 import { getServerAuthHeaders } from "@/lib/auth-headers";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import { PlatformLogo } from "@/components/platform-logo";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -83,7 +84,7 @@ function RegisterPage() {
         <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(to_right,var(--sidebar-border)_1px,transparent_1px),linear-gradient(to_bottom,var(--sidebar-border)_1px,transparent_1px)] [background-size:42px_42px]" />
         <div className="relative z-10">
           <Link to="/" className="inline-flex items-center gap-2.5 font-bold">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-sidebar-primary"><Boxes className="h-5 w-5" /></span>
+            <PlatformLogo className="h-10 w-10 rounded-xl" imageClassName="bg-white p-0.5" fallbackClassName="bg-sidebar-primary text-sidebar-primary-foreground" />
             AssetFlow 360
           </Link>
         </div>
@@ -104,7 +105,7 @@ function RegisterPage() {
         <div className="w-full max-w-lg">
           <Link to="/" className="mb-8 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Back to home</Link>
           <div className="mb-7 lg:hidden">
-            <div className="flex items-center gap-2.5 font-bold"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Boxes className="h-5 w-5" /></span>AssetFlow 360</div>
+            <div className="flex items-center gap-2.5 font-bold"><PlatformLogo className="h-9 w-9 rounded-xl" imageClassName="bg-white p-0.5" />AssetFlow 360</div>
           </div>
 
           <h2 className="text-3xl font-bold tracking-tight">Create your free trial</h2>
