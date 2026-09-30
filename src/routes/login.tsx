@@ -1,12 +1,13 @@
 import { createFileRoute, Navigate, Link } from "@tanstack/react-router";
 import { useState, FormEvent } from "react";
-import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { PlatformLogo } from "@/components/platform-logo";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
@@ -49,7 +50,6 @@ function LoginPage() {
         toast.error(authErrorMessage(error));
         return;
       }
-      toast.success("Welcome back");
       window.location.assign("/dashboard");
     } catch (error) {
       console.error("[Login] Sign-in request failed", error);
@@ -60,53 +60,74 @@ function LoginPage() {
   };
 
   return (
-    <div className="platform-brand min-h-screen bg-background">
-      <div className="mx-auto grid min-h-screen max-w-7xl lg:grid-cols-2">
-        <section className="flex items-center justify-center px-4 py-10 sm:px-8 lg:px-12">
-          <div className="w-full max-w-md">
-            <Link to="/" className="mb-9 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" /> Back to home
+    <div className="platform-brand min-h-screen bg-muted/25 px-4 py-6 sm:py-10">
+      <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-md flex-col justify-center sm:min-h-[calc(100vh-5rem)]">
+        <Link to="/" className="mx-auto mb-5">
+          <PlatformLogo variant="lockup" className="h-9 w-[165px]" />
+        </Link>
+
+        <Card className="p-5 shadow-sm sm:p-6">
+          <div className="mb-5 text-center">
+            <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Sign in</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Access your AssetFlow 360 workspace.</p>
+          </div>
+
+          <form onSubmit={onSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                required
+                autoFocus
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@company.com"
+                className="h-10"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPwd ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="h-10 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPwd((s) => !s)}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+                  aria-label={showPwd ? "Hide password" : "Show password"}
+                  tabIndex={-1}
+                >
+                  {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <Button type="submit" className="h-10 w-full" disabled={submitting}>
+              {submitting ? "Signing in…" : "Sign in"}
+            </Button>
+          </form>
+
+          <p className="mt-5 border-t pt-4 text-center text-sm text-muted-foreground">
+            New here?{" "}
+            <Link to="/register" className="font-semibold text-primary hover:underline">
+              Start free trial
             </Link>
-            <div className="mb-8 flex items-center gap-3">
-              <PlatformLogo className="h-11 w-11 rounded-xl" imageClassName="bg-white p-0.5" />
-              <div><p className="font-bold">AssetFlow 360</p><p className="text-xs text-muted-foreground">Fixed asset management</p></div>
-            </div>
+          </p>
+        </Card>
 
-            <h1 className="text-3xl font-bold tracking-tight">Sign in to your workspace</h1>
-            <p className="mt-2 text-sm text-muted-foreground">Use your AssetFlow 360 account credentials.</p>
-
-            <form onSubmit={onSubmit} className="mt-8 space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Input id="password" type={showPwd ? "text" : "password"} autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} className="pr-10" />
-                  <button type="button" onClick={() => setShowPwd((s) => !s)} className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground" aria-label={showPwd ? "Hide password" : "Show password"} tabIndex={-1}>
-                    {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-              </div>
-              <Button type="submit" size="lg" className="h-12 w-full" disabled={submitting}>{submitting ? "Signing in…" : "Sign in"}</Button>
-            </form>
-
-            <div className="mt-7 border-t pt-6 text-center">
-              <p className="text-sm text-muted-foreground">New to AssetFlow 360?</p>
-              <Button asChild variant="outline" className="mt-3 w-full"><Link to="/register">Start a free trial</Link></Button>
-            </div>
-          </div>
-        </section>
-
-        <aside className="relative hidden overflow-hidden bg-sidebar p-12 text-sidebar-foreground lg:flex lg:flex-col lg:justify-center">
-          <div className="absolute inset-0 opacity-25 [background-image:linear-gradient(to_right,var(--sidebar-border)_1px,transparent_1px),linear-gradient(to_bottom,var(--sidebar-border)_1px,transparent_1px)] [background-size:44px_44px]" />
-          <div className="relative max-w-xl">
-            <p className="brand-secondary-text text-sm font-semibold uppercase tracking-[0.18em]">One asset control center</p>
-            <h2 className="mt-4 text-4xl font-bold tracking-tight">Track ownership, movement, verification and value without losing the audit trail.</h2>
-            <p className="mt-5 leading-7 text-sidebar-foreground/70">Your organization works inside its own tenant boundary with permissions layered on top.</p>
-          </div>
-        </aside>
+        <Link to="/" className="mx-auto mt-4 text-xs font-medium text-muted-foreground hover:text-foreground">
+          Back to website
+        </Link>
       </div>
     </div>
   );

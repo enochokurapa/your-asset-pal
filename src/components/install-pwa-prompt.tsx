@@ -20,8 +20,11 @@ export function InstallPwaPrompt() {
     // 1. Register service worker if supported
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
-        .register("/sw.js")
-        .then((reg) => console.log("[PWA] Service Worker registered:", reg.scope))
+        .register("/sw.js", { updateViaCache: "none" })
+        .then((reg) => {
+          reg.update().catch(() => undefined);
+          console.log("[PWA] Service Worker registered:", reg.scope);
+        })
         .catch((err) => console.warn("[PWA] Service Worker registration failed:", err));
     }
 
@@ -155,7 +158,7 @@ export function InstallPwaPrompt() {
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                  Install AssetFlow on your desktop or mobile device for fast access, native window, and offline support.
+                  Install AssetFlow on your desktop or mobile device for fast access and a dedicated app window.
                 </p>
 
                 <div className="mt-3 flex items-center gap-2">
