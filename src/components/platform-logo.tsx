@@ -48,7 +48,7 @@ export function PlatformLogo({
   const { data } = usePlatformBranding();
   const src = variant === "lockup"
     ? (data?.logoDataUrl || "/assetflow360-logo.svg")
-    : (data?.iconDataUrl || data?.logoDataUrl || "/assetflow360-mark.svg");
+    : (data?.iconDataUrl || "/assetflow360-mark.svg");
 
   return (
     <span className={cn("inline-flex items-center justify-center overflow-hidden", className)}>
