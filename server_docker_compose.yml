@@ -30,12 +30,12 @@ services:
     environment:
       GOTRUE_API_HOST: "0.0.0.0"
       GOTRUE_API_PORT: 9999
-      API_EXTERNAL_URL: "https://ams.owltechsolutionsltd.com/auth/v1"
-      GOTRUE_API_EXTERNAL_URL: "https://ams.owltechsolutionsltd.com/auth/v1"
+      API_EXTERNAL_URL: "https://assetflow360.com/auth/v1"
+      GOTRUE_API_EXTERNAL_URL: "https://assetflow360.com/auth/v1"
       GOTRUE_DB_DRIVER: postgres
       GOTRUE_DB_NAMESPACE: auth
       GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:super-secret-postgres-password@ams-db:5432/ams?sslmode=disable
-      GOTRUE_SITE_URL: https://ams.owltechsolutionsltd.com
+      GOTRUE_SITE_URL: https://assetflow360.com
       GOTRUE_URI_ALLOW_LIST: "*"
       GOTRUE_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
       GOTRUE_JWT_EXP: 3600
@@ -51,7 +51,7 @@ services:
       - "traefik.docker.network=coolify"
       # StripPrefix middleware: GoTrue listens at root, so strip /auth/v1 before forwarding
       - "traefik.http.middlewares.ams-auth-strip.stripprefix.prefixes=/auth/v1"
-      - "traefik.http.routers.ams-auth-https.rule=Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/auth/v1`)"
+      - "traefik.http.routers.ams-auth-https.rule=Host(`assetflow360.com`) && PathPrefix(`/auth/v1`)"
       - "traefik.http.routers.ams-auth-https.entrypoints=https"
       - "traefik.http.routers.ams-auth-https.tls=true"
       - "traefik.http.routers.ams-auth-https.tls.certresolver=letsencrypt"
@@ -60,7 +60,7 @@ services:
       - "traefik.http.routers.ams-auth-https.service=ams-auth-svc"
       - "traefik.http.services.ams-auth-svc.loadbalancer.server.port=9999"
       # HTTP router
-      - "traefik.http.routers.ams-auth-http.rule=Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/auth/v1`)"
+      - "traefik.http.routers.ams-auth-http.rule=Host(`assetflow360.com`) && PathPrefix(`/auth/v1`)"
       - "traefik.http.routers.ams-auth-http.entrypoints=http"
       - "traefik.http.routers.ams-auth-http.priority=10000"
       - "traefik.http.routers.ams-auth-http.middlewares=ams-auth-strip@docker"
@@ -85,7 +85,7 @@ services:
       - "traefik.docker.network=coolify"
       # StripPrefix middleware: PostgREST listens at root, so strip /rest/v1 before forwarding
       - "traefik.http.middlewares.ams-rest-strip.stripprefix.prefixes=/rest/v1"
-      - "traefik.http.routers.ams-rest-https.rule=Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/rest/v1`)"
+      - "traefik.http.routers.ams-rest-https.rule=Host(`assetflow360.com`) && PathPrefix(`/rest/v1`)"
       - "traefik.http.routers.ams-rest-https.entrypoints=https"
       - "traefik.http.routers.ams-rest-https.tls=true"
       - "traefik.http.routers.ams-rest-https.tls.certresolver=letsencrypt"
@@ -94,7 +94,7 @@ services:
       - "traefik.http.routers.ams-rest-https.service=ams-rest-svc"
       - "traefik.http.services.ams-rest-svc.loadbalancer.server.port=3000"
       # HTTP router
-      - "traefik.http.routers.ams-rest-http.rule=Host(`ams.owltechsolutionsltd.com`) && PathPrefix(`/rest/v1`)"
+      - "traefik.http.routers.ams-rest-http.rule=Host(`assetflow360.com`) && PathPrefix(`/rest/v1`)"
       - "traefik.http.routers.ams-rest-http.entrypoints=http"
       - "traefik.http.routers.ams-rest-http.priority=10000"
       - "traefik.http.routers.ams-rest-http.middlewares=ams-rest-strip@docker"
