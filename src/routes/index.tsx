@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import { PlatformLogo } from "@/components/platform-logo";
 
 export const Route = createFileRoute("/")({
   component: PublicHome,
@@ -52,9 +53,7 @@ function PublicHome() {
       <header className="sticky top-0 z-50 border-b bg-background/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center px-4 sm:px-6 lg:px-8">
           <Link to="/" className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-              <Boxes className="h-5 w-5" />
-            </span>
+            <PlatformLogo className="h-9 w-9 rounded-xl shadow-sm" imageClassName="bg-white p-0.5" />
             <span className="text-lg font-bold tracking-tight">AssetFlow <span className="text-primary">360</span></span>
           </Link>
           <nav className="ml-auto hidden items-center gap-7 text-sm font-medium text-muted-foreground md:flex">
@@ -231,7 +230,7 @@ function PublicHome() {
 
       <footer className="border-t">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2 font-semibold text-foreground"><Boxes className="h-4 w-4 text-primary" /> AssetFlow 360</div>
+          <div className="flex items-center gap-2 font-semibold text-foreground"><PlatformLogo className="h-6 w-6 rounded-md" imageClassName="bg-white p-0.5" /> AssetFlow 360</div>
           <p>Fixed asset management for accountable organizations.</p>
         </div>
       </footer>
