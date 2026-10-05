@@ -19,6 +19,7 @@ import { AssetDetailTabs } from "@/components/asset-detail-tabs";
 import { formatUGX } from "@/lib/utils";
 import { submitApproval } from "@/lib/approvals";
 import { downloadTemplate, importAssetsFromFile } from "@/lib/bulk-import";
+import { AssetLocationFields } from "@/components/asset-location-fields";
 
 export const Route = createFileRoute("/_app/assets")({
   component: AssetsPage,
