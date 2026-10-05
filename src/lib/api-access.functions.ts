@@ -34,17 +34,34 @@ export const listApiKeys = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
+async function assertTrackingModuleEnabled(tenantId: string) {
+  const [{ data: tenant }, { data: module }, { data: override }] = await Promise.all([
+    admin.from("tenants").select("subscription_status").eq("id", tenantId).single(),
+    admin.from("saas_modules").select("globally_enabled,trial_enabled,paid_enabled").eq("module_key", "live_tracking").single(),
+    admin.from("tenant_module_overrides").select("enabled").eq("tenant_id", tenantId).eq("module_key", "live_tracking").maybeSingle(),
+  ]);
+  const paid = tenant?.subscription_status === "active";
+  const planEnabled = paid ? !!module?.paid_enabled : !!module?.trial_enabled;
+  if (!module?.globally_enabled || !planEnabled || override?.enabled === false) {
+    throw new Error("Live Tracking is not enabled for this workspace");
+  }
+}
+
 export const createApiKey = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({
     name: z.string().trim().min(2).max(80),
+    key_type: z.enum(["read", "tracking"]).default("read"),
   }).parse(input))
   .handler(async ({ data, context }) => {
     const tenantId = await requireTenantAdmin(context.userId);
+    if (data.key_type === "tracking") await assertTrackingModuleEnabled(tenantId);
     const raw = `af_live_${randomBytes(24).toString("hex")}`;
     const hash = createHash("sha256").update(raw).digest("hex");
     const prefix = raw.slice(0, 16);
-    const scopes = ["assets:read", "locations:read", "branches:read"];
+    const scopes = data.key_type === "tracking"
+      ? ["tracking:write"]
+      : ["assets:read", "locations:read", "branches:read"];
     const { data: created, error } = await admin
       .from("api_keys")
       .insert({
