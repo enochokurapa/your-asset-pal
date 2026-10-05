@@ -46,8 +46,21 @@ function LocationsPage() {
     queryKey:["geo-countries"],
     queryFn:async()=> (await (supabase as any).from("geo_countries").select("code,name").eq("enabled",true).order("name")).data ?? [],
   });
+  const { data: locationAssets = [] } = useQuery({
+    queryKey:["location-kpi-assets"],
+    queryFn:async()=>{
+      const {data,error}=await (supabase as any).from("assets")
+        .select("id,location_id,geo_place_id,location_latitude,location_longitude");
+      if(error) throw error;
+      return data ?? [];
+    },
+  });
 
-  const mapped = (locations as any[]).filter((l)=>l.geo_place_id || (l.latitude!=null && l.longitude!=null)).length;
+
+  const locatedAssets = (locationAssets as any[]).filter((a)=>a.location_id || a.geo_place_id).length;
+  const unlocatedAssets = Math.max(0, locationAssets.length - locatedAssets);
+  const gpsVerifiedAssets = (locationAssets as any[]).filter((a)=>a.location_latitude != null && a.location_longitude != null).length;
+  const subLocations = (locations as any[]).filter((l)=>!!l.parent_id).length;
 
   return (
     <div className="space-y-6">
@@ -55,6 +68,23 @@ function LocationsPage() {
         <h1 className="text-2xl font-bold tracking-tight">Locations</h1>
         <p className="text-sm text-muted-foreground">Organisation locations and the global geography used by assets, movements and verification.</p>
       </div>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          ["Organisation locations", locations.length],
+          ["Sub-locations", subLocations],
+          ["Assets with location", locatedAssets],
+          ["Assets without location", unlocatedAssets],
+        ].map(([label,value])=>(
+          <Card key={String(label)} className="p-4">
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+          </Card>
+        ))}
+      </div>
+      {gpsVerifiedAssets > 0 && (
+        <p className="text-xs text-muted-foreground">{gpsVerifiedAssets} asset{gpsVerifiedAssets===1?"":"s"} currently have GPS verification.</p>
+      )}
 
       <Tabs defaultValue="organisation">
         <TabsList>
