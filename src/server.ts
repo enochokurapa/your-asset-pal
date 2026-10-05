@@ -164,10 +164,6 @@ async function maybeHandlePublicApi(request: Request): Promise<Response | null> 
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/v1/")) return null;
 
-  if (request.method !== "GET") {
-    return jsonResponse(405, { error: "method_not_allowed", message: "API v1 is read-only in this release." });
-  }
-
   const auth = request.headers.get("authorization") || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
   if (!token.startsWith("af_live_")) {
@@ -186,16 +182,103 @@ async function maybeHandlePublicApi(request: Request): Promise<Response | null> 
   }
 
   const resource = url.pathname.slice("/api/v1/".length).replace(/\/+$/, "");
+  const scopes = Array.isArray(key.scopes) ? key.scopes : [];
+
+  if (resource === "tracking/events") {
+    if (request.method !== "POST") {
+      return jsonResponse(405, { error: "method_not_allowed", message: "Use POST for tracking telemetry." });
+    }
+    if (!scopes.includes("tracking:write")) {
+      return jsonResponse(403, { error: "forbidden", message: "API key does not have tracking:write permission." });
+    }
+
+    const [{ data: tenant }, { data: module }, { data: override }] = await Promise.all([
+      apiAdmin.from("tenants").select("subscription_status").eq("id", key.tenant_id).single(),
+      apiAdmin.from("saas_modules").select("globally_enabled,trial_enabled,paid_enabled").eq("module_key", "live_tracking").single(),
+      apiAdmin.from("tenant_module_overrides").select("enabled").eq("tenant_id", key.tenant_id).eq("module_key", "live_tracking").maybeSingle(),
+    ]);
+    const paid = tenant?.subscription_status === "active";
+    const planEnabled = paid ? !!module?.paid_enabled : !!module?.trial_enabled;
+    if (!module?.globally_enabled || !planEnabled || override?.enabled === false) {
+      return jsonResponse(403, { error: "module_disabled", message: "Live Tracking is not enabled for this workspace." });
+    }
+
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonResponse(400, { error: "invalid_json", message: "A JSON body is required." });
+    }
+    const provider = String(body?.provider || "").trim().toLowerCase();
+    const externalDeviceId = String(body?.external_device_id || "").trim();
+    const latitude = Number(body?.latitude);
+    const longitude = Number(body?.longitude);
+    const accuracy = body?.accuracy_m == null ? null : Number(body.accuracy_m);
+    const speed = body?.speed_kph == null ? null : Number(body.speed_kph);
+    const heading = body?.heading_degrees == null ? null : Number(body.heading_degrees);
+    const recordedAt = body?.recorded_at ? new Date(body.recorded_at) : new Date();
+
+    if (!provider || !externalDeviceId || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+        !Number.isFinite(longitude) || longitude < -180 || longitude > 180 || Number.isNaN(recordedAt.getTime())) {
+      return jsonResponse(400, { error: "invalid_telemetry", message: "provider, external_device_id, latitude and longitude are required." });
+    }
+
+    const { data: device, error: deviceError } = await apiAdmin.from("tracking_devices")
+      .select("id,asset_id,is_active")
+      .eq("tenant_id", key.tenant_id)
+      .eq("provider", provider)
+      .eq("external_device_id", externalDeviceId)
+      .maybeSingle();
+    if (deviceError || !device) {
+      return jsonResponse(404, { error: "device_not_found", message: "Tracking device is not registered in this workspace." });
+    }
+    if (!device.is_active) {
+      return jsonResponse(409, { error: "device_disabled", message: "Tracking device is registered but disabled." });
+    }
+
+    const telemetry = {
+      tenant_id: key.tenant_id,
+      device_id: device.id,
+      asset_id: device.asset_id,
+      latitude,
+      longitude,
+      accuracy_m: Number.isFinite(accuracy) ? accuracy : null,
+      speed_kph: Number.isFinite(speed) ? speed : null,
+      heading_degrees: Number.isFinite(heading) ? heading : null,
+      recorded_at: recordedAt.toISOString(),
+      metadata: body?.metadata && typeof body.metadata === "object" ? body.metadata : {},
+    };
+    const { data: event, error: eventError } = await apiAdmin.from("tracking_events").insert(telemetry).select("id,recorded_at").single();
+    if (eventError) return jsonResponse(500, { error: "telemetry_failed", message: eventError.message });
+
+    await apiAdmin.from("tracking_devices").update({ last_seen_at: recordedAt.toISOString(), updated_at: new Date().toISOString() }).eq("id", device.id);
+    if (device.asset_id) {
+      await apiAdmin.from("assets").update({
+        live_latitude: latitude,
+        live_longitude: longitude,
+        live_accuracy_m: Number.isFinite(accuracy) ? accuracy : null,
+        live_recorded_at: recordedAt.toISOString(),
+        live_tracking_device_id: device.id,
+      }).eq("id", device.asset_id).eq("tenant_id", key.tenant_id);
+    }
+    await apiAdmin.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", key.id);
+    return jsonResponse(201, { data: { event_id: event.id, recorded_at: event.recorded_at }, meta: { api_version: "v1" } });
+  }
+
+  if (request.method !== "GET") {
+    return jsonResponse(405, { error: "method_not_allowed", message: "This API v1 resource is read-only." });
+  }
+
   const config: Record<string, { table: string; scope: string; select: string }> = {
     assets: {
       table: "assets",
       scope: "assets:read",
-      select: "id,asset_tag,serial_number,name,description,status,purchase_value,purchase_date,category_id,location_id,branch_id,created_at,updated_at",
+      select: "id,asset_tag,serial_number,name,description,status,purchase_value,purchase_date,category_id,location_id,branch_id,geo_place_id,location_latitude,location_longitude,location_accuracy_m,location_verified_at,live_latitude,live_longitude,live_accuracy_m,live_recorded_at,created_at,updated_at",
     },
     locations: {
       table: "locations",
       scope: "locations:read",
-      select: "id,name,address,parent_id,is_active,country_code,administrative_area,locality,custom_area,latitude,longitude,gps_accuracy_m,location_source,last_verified_at,created_at",
+      select: "id,name,address,parent_id,is_active,location_type,branch_id,geo_place_id,is_structured,country_code,administrative_area,locality,custom_area,latitude,longitude,gps_accuracy_m,location_source,last_verified_at,created_at",
     },
     branches: {
       table: "branches",
@@ -209,7 +292,6 @@ async function maybeHandlePublicApi(request: Request): Promise<Response | null> 
     return jsonResponse(404, { error: "not_found", message: "Unknown API v1 resource." });
   }
 
-  const scopes = Array.isArray(key.scopes) ? key.scopes : [];
   if (!scopes.includes(chosen.scope)) {
     return jsonResponse(403, { error: "forbidden", message: `API key does not have ${chosen.scope} permission.` });
   }
