@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { KeyRound, Copy, Ban, PlugZap, ShieldCheck } from "lucide-react";
@@ -24,6 +25,7 @@ function IntegrationsPage() {
   const makeKey = useServerFn(createApiKey);
   const revokeKey = useServerFn(revokeApiKey);
   const [name, setName] = useState("");
+  const [keyType, setKeyType] = useState<"read" | "tracking">("read");
   const [newKey, setNewKey] = useState<string | null>(null);
 
   const authCall = async <T,>(fn: (arg: any) => Promise<T>, arg: any = {}) => {
@@ -42,9 +44,10 @@ function IntegrationsPage() {
   const create = async () => {
     if (!name.trim()) return toast.error("Give the API key a name");
     try {
-      const result: any = await authCall(makeKey, { data: { name: name.trim() } });
+      const result: any = await authCall(makeKey, { data: { name: name.trim(), key_type: keyType } });
       setNewKey(result.key);
       setName("");
+      setKeyType("read");
       await refetch();
       toast.success("API key created");
     } catch (e: any) {
@@ -88,10 +91,23 @@ function IntegrationsPage() {
               <Label>Key name</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. PesaPal ERP integration" />
             </div>
+            <div className="space-y-2">
+              <Label>Key type</Label>
+              <Select value={keyType} onValueChange={(v) => setKeyType(v as "read" | "tracking")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="read">Read-only integration</SelectItem>
+                  {canView("live_tracking") && <SelectItem value="tracking">Live tracking ingest</SelectItem>}
+                </SelectContent>
+              </Select>
+            </div>
             <Button onClick={create} disabled={!canView("api_access")}>Generate API key</Button>
             <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
-              Default scopes: <strong>assets:read</strong>, <strong>locations:read</strong>, <strong>branches:read</strong>.
-              Write scopes are intentionally disabled for the first release.
+              {keyType === "tracking" ? (
+                <>Scope: <strong>tracking:write</strong>. Use only for an approved GPS/IoT provider.</>
+              ) : (
+                <>Scopes: <strong>assets:read</strong>, <strong>locations:read</strong>, <strong>branches:read</strong>.</>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -106,6 +122,7 @@ function IntegrationsPage() {
               <code className="rounded border p-2">GET /api/v1/assets</code>
               <code className="rounded border p-2">GET /api/v1/locations</code>
               <code className="rounded border p-2">GET /api/v1/branches</code>
+              {canView("live_tracking") && <code className="rounded border p-2">POST /api/v1/tracking/events</code>}
             </div>
             <p className="text-xs text-muted-foreground">
               Send the key as <code>Authorization: Bearer af_live_...</code>. Results are automatically restricted to this workspace.
