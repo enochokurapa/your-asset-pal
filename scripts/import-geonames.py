@@ -22,7 +22,7 @@ def download(country: str) -> bytes:
 
 def parse(country: str, raw: bytes):
     with zipfile.ZipFile(io.BytesIO(raw)) as z:
-        txt_name = next(name for name in z.namelist() if name.upper().endswith(".TXT"))
+        txt_name = next(name for name in z.namelist() if name.upper() == f"{country}.TXT")
         with z.open(txt_name) as fh:
             rows = []
             for bline in fh:
