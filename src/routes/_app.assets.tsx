@@ -511,167 +511,292 @@ function AssetsPage() {
             </label>
           )}
           {canAdd && (
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) setWizardStep(0); }}>
             <DialogTrigger asChild><Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New asset</Button></DialogTrigger>
-            <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{form.id ? "Edit asset" : "New asset"}</DialogTitle>
-                <DialogDescription>Fill in the details below.</DialogDescription>
+            <DialogContent className="flex max-h-[92vh] max-w-3xl flex-col overflow-hidden p-0">
+              <DialogHeader className="border-b px-5 pb-4 pt-5 sm:px-6">
+                <DialogTitle>{form.id ? "Edit asset" : "Register asset"}</DialogTitle>
+                <DialogDescription className="sm:hidden">Step {wizardStep + 1} of {wizardSteps.length} · {wizardSteps[wizardStep].title}</DialogDescription>
+
+                <div className="hidden pt-4 sm:block">
+                  <div className="grid grid-cols-5 gap-2">
+                    {wizardSteps.map((step, index) => {
+                      const done = index < wizardStep;
+                      const active = index === wizardStep;
+                      return (
+                        <button
+                          key={step.title}
+                          type="button"
+                          onClick={() => index <= wizardStep && setWizardStep(index)}
+                          className={`min-w-0 text-left ${index <= wizardStep ? "cursor-pointer" : "cursor-default"}`}
+                        >
+                          <div className="flex items-center">
+                            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${
+                              done ? "border-primary bg-primary text-primary-foreground" :
+                              active ? "border-primary text-primary" :
+                              "border-border text-muted-foreground"
+                            }`}>
+                              {done ? <Check className="h-3.5 w-3.5" /> : index + 1}
+                            </span>
+                            {index < wizardSteps.length - 1 && (
+                              <span className={`ml-2 h-px flex-1 ${done ? "bg-primary" : "bg-border"}`} />
+                            )}
+                          </div>
+                          <p className={`mt-1 truncate text-xs ${active ? "font-semibold text-foreground" : "text-muted-foreground"}`}>{step.short}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </DialogHeader>
-              <div className="grid gap-4 py-2 sm:grid-cols-2">
-                <div className="space-y-2 sm:col-span-1">
-                  <Label htmlFor="tag">Asset tag *</Label>
-                  <div className="flex gap-2">
-                    <Input id="tag" value={form.asset_tag} onChange={(e) => setForm({ ...form, asset_tag: e.target.value })} placeholder="LAP-001" />
-                    <Button type="button" size="icon" variant="outline" title="Scan tag (QR or barcode)" onClick={() => { setScanMode("tag"); setScanOpen(true); }}>
-                      <ScanLine className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-2 sm:col-span-1">
-                  <Label htmlFor="serial">Serial number</Label>
-                  <div className="flex gap-2">
-                    <Input id="serial" value={form.serial_number} onChange={(e) => setForm({ ...form, serial_number: e.target.value })} placeholder="SN-XXXXXXXX" />
-                    <Button type="button" size="icon" variant="outline" title="Scan serial (QR or barcode)" onClick={() => { setScanMode("serial"); setScanOpen(true); }}>
-                      <ScanLine className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="name">Name *</Label>
-                  <Input id="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="desc">Description</Label>
-                  <Textarea id="desc" rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-                </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label>Category</Label>
-                  <Select value={form.category_id ?? "none"} onValueChange={(v) => setForm({ ...form, category_id: v === "none" ? null : v })}>
-                    <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">— None —</SelectItem>
-                      {categories.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
 
-                <AssetLocationFields
-                  value={{
-                    branch_id: form.branch_id,
-                    location_id: form.location_id,
-                    geo_place_id: form.geo_place_id,
-                    location_latitude: form.location_latitude,
-                    location_longitude: form.location_longitude,
-                    location_accuracy_m: form.location_accuracy_m,
-                    location_source: form.location_source,
-                  }}
-                  onChange={(location) => setForm((current) => ({ ...current, ...location }))}
-                  branches={visibleBranches}
-                  locations={locations as any[]}
-                />
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as Status })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(STATUS_LABEL).map(([k, v]) => (
-                        <SelectItem key={k} value={k} disabled={(k === "retired" || k === "disposed") && !isAdmin}>{v}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {!isAdmin && <p className="text-[11px] text-muted-foreground">Retire / dispose require admin approval via the asset's Disposal tab.</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="val">Purchase value (UGX)</Label>
-                  <Input id="val" type="number" step="1" value={form.purchase_value} onChange={(e) => setForm({ ...form, purchase_value: e.target.value })} />
-                </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="date">Purchase date</Label>
-                  <Input id="date" type="date" value={form.purchase_date} onChange={(e) => setForm({ ...form, purchase_date: e.target.value })} />
-                </div>
-
-                {/* Depreciation */}
-                {canManageDepreciation && (
-                <div className="sm:col-span-2 rounded-lg border bg-muted/20 p-3">
-                  <p className="mb-2 text-sm font-medium">Depreciation (optional)</p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label>Method</Label>
-                      <Select value={form.depreciation_method || "none"} onValueChange={(v) => setForm({ ...form, depreciation_method: v === "none" ? "" : v })}>
-                        <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">— None —</SelectItem>
-                          <SelectItem value="straight_line">Straight line</SelectItem>
-                          <SelectItem value="reducing_balance">Reducing balance</SelectItem>
-                          <SelectItem value="units_of_production">Units of production</SelectItem>
-                        </SelectContent>
-                      </Select>
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+                {wizardStep === 0 && (
+                  <div className="space-y-5">
+                    <div>
+                      <h3 className="text-base font-semibold">Identify the asset</h3>
+                      <p className="text-sm text-muted-foreground">Capture the unique details used to identify this asset.</p>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Frequency</Label>
-                      <Select value={form.depreciation_frequency} onValueChange={(v) => setForm({ ...form, depreciation_frequency: v })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="monthly">Monthly</SelectItem>
-                          <SelectItem value="quarterly">Quarterly</SelectItem>
-                          <SelectItem value="annually">Annually</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Useful life (months)</Label>
-                      <Input type="number" min={1} value={form.useful_life_months}
-                        onChange={(e) => setForm({ ...form, useful_life_months: e.target.value })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Residual value (UGX)</Label>
-                      <Input type="number" min={0} value={form.residual_value}
-                        onChange={(e) => setForm({ ...form, residual_value: e.target.value })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Start date</Label>
-                      <Input type="date" value={form.depreciation_start_date}
-                        onChange={(e) => setForm({ ...form, depreciation_start_date: e.target.value })} />
-                    </div>
-                    {form.depreciation_method === "units_of_production" && (
+                    <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <Label>Total expected units</Label>
-                        <Input type="number" min={0} value={form.total_units}
-                          onChange={(e) => setForm({ ...form, total_units: e.target.value })} />
+                        <Label htmlFor="tag">Asset tag *</Label>
+                        <div className="flex gap-2">
+                          <Input id="tag" autoFocus value={form.asset_tag} onChange={(e) => setForm({ ...form, asset_tag: e.target.value })} placeholder="LAP-001" />
+                          <Button type="button" size="icon" variant="outline" title="Scan tag" onClick={() => { setScanMode("tag"); setScanOpen(true); }}>
+                            <ScanLine className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="serial">Serial number</Label>
+                        <div className="flex gap-2">
+                          <Input id="serial" value={form.serial_number} onChange={(e) => setForm({ ...form, serial_number: e.target.value })} placeholder="Optional" />
+                          <Button type="button" size="icon" variant="outline" title="Scan serial" onClick={() => { setScanMode("serial"); setScanOpen(true); }}>
+                            <ScanLine className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="space-y-2 sm:col-span-2">
+                        <Label htmlFor="name">Asset name *</Label>
+                        <Input id="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Dell Latitude 5420" />
+                      </div>
+                      <div className="space-y-2 sm:col-span-2">
+                        <Label htmlFor="desc">Description</Label>
+                        <Textarea id="desc" rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Optional notes or identifying details" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 1 && (
+                  <div className="space-y-5">
+                    <div>
+                      <h3 className="text-base font-semibold">Classify the asset</h3>
+                      <p className="text-sm text-muted-foreground">Choose its category and current operational status.</p>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Category</Label>
+                        <Select value={form.category_id ?? "none"} onValueChange={(v) => setForm({ ...form, category_id: v === "none" ? null : v })}>
+                          <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Not specified</SelectItem>
+                            {categories.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Status</Label>
+                        <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as Status })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(STATUS_LABEL).map(([k, v]) => (
+                              <SelectItem key={k} value={k} disabled={(k === "retired" || k === "disposed") && !isAdmin}>{v}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 2 && (
+                  <div className="space-y-5">
+                    <div>
+                      <h3 className="text-base font-semibold">Set the location</h3>
+                      <p className="text-sm text-muted-foreground">Only the location fields configured by your organisation are shown.</p>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <AssetLocationFields
+                        value={{
+                          branch_id: form.branch_id,
+                          location_id: form.location_id,
+                          geo_place_id: form.geo_place_id,
+                          location_latitude: form.location_latitude,
+                          location_longitude: form.location_longitude,
+                          location_accuracy_m: form.location_accuracy_m,
+                          location_source: form.location_source,
+                        }}
+                        onChange={(location) => setForm((current) => ({ ...current, ...location }))}
+                        branches={visibleBranches}
+                        locations={locations as any[]}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 3 && (
+                  <div className="space-y-5">
+                    <div>
+                      <h3 className="text-base font-semibold">Assignment & value</h3>
+                      <p className="text-sm text-muted-foreground">Add ownership and financial details where they are available.</p>
+                    </div>
+
+                    {!form.id && (
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="custodian">Custodian</Label>
+                          <Input id="custodian" value={form.assigned_to_name} onChange={(e) => setForm({ ...form, assigned_to_name: e.target.value })} placeholder="Full name" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="dept">Department</Label>
+                          <Input id="dept" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} placeholder="e.g. Finance" />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="val">Purchase value (UGX)</Label>
+                        <Input id="val" type="number" min={0} step="1" value={form.purchase_value} onChange={(e) => setForm({ ...form, purchase_value: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="date">Purchase date</Label>
+                        <Input id="date" type="date" value={form.purchase_date} onChange={(e) => setForm({ ...form, purchase_date: e.target.value })} />
+                      </div>
+                    </div>
+
+                    {canManageDepreciation && (
+                      <div className="rounded-xl border">
+                        <button type="button" onClick={() => setFinancialOpen((v) => !v)} className="flex w-full items-center justify-between px-4 py-3 text-left">
+                          <div>
+                            <p className="text-sm font-medium">Depreciation</p>
+                            <p className="text-xs text-muted-foreground">Optional financial configuration</p>
+                          </div>
+                          <ChevronRight className={`h-4 w-4 transition-transform ${financialOpen ? "rotate-90" : ""}`} />
+                        </button>
+                        {financialOpen && (
+                          <div className="grid gap-4 border-t p-4 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label>Method</Label>
+                              <Select value={form.depreciation_method || "none"} onValueChange={(v) => setForm({ ...form, depreciation_method: v === "none" ? "" : v })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">None</SelectItem>
+                                  <SelectItem value="straight_line">Straight line</SelectItem>
+                                  <SelectItem value="reducing_balance">Reducing balance</SelectItem>
+                                  <SelectItem value="units_of_production">Units of production</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            {form.depreciation_method && (
+                              <>
+                                <div className="space-y-2">
+                                  <Label>Frequency</Label>
+                                  <Select value={form.depreciation_frequency} onValueChange={(v) => setForm({ ...form, depreciation_frequency: v })}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="monthly">Monthly</SelectItem>
+                                      <SelectItem value="quarterly">Quarterly</SelectItem>
+                                      <SelectItem value="annually">Annually</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Useful life (months)</Label>
+                                  <Input type="number" min={1} value={form.useful_life_months} onChange={(e) => setForm({ ...form, useful_life_months: e.target.value })} />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Residual value (UGX)</Label>
+                                  <Input type="number" min={0} value={form.residual_value} onChange={(e) => setForm({ ...form, residual_value: e.target.value })} />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Start date</Label>
+                                  <Input type="date" value={form.depreciation_start_date} onChange={(e) => setForm({ ...form, depreciation_start_date: e.target.value })} />
+                                </div>
+                                {form.depreciation_method === "units_of_production" && (
+                                  <div className="space-y-2">
+                                    <Label>Total expected units</Label>
+                                    <Input type="number" min={0} value={form.total_units} onChange={(e) => setForm({ ...form, total_units: e.target.value })} />
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                </div>
                 )}
 
-                {/* Inline custodian on create */}
-                {!form.id && (
-                  <div className="sm:col-span-2 rounded-lg border bg-muted/30 p-3">
-                    <p className="mb-2 text-sm font-medium">Assign custodian (optional)</p>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="custodian">Custodian (full name)</Label>
-                        <Input id="custodian" value={form.assigned_to_name} onChange={(e) => setForm({ ...form, assigned_to_name: e.target.value })} placeholder="Jane Doe" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="dept">Department</Label>
-                        <Input id="dept" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} placeholder="Finance" />
-                      </div>
+                {wizardStep === 4 && (
+                  <div className="space-y-5">
+                    <div>
+                      <h3 className="text-base font-semibold">Review & save</h3>
+                      <p className="text-sm text-muted-foreground">Confirm the important details before saving.</p>
                     </div>
-                    <p className="mt-2 text-[11px] text-muted-foreground">Creates an initial custody record assigned to this person & department.</p>
+                    <div className="overflow-hidden rounded-xl border">
+                      {[
+                        ["Asset", form.name || "—"],
+                        ["Asset tag", form.asset_tag || "—"],
+                        ["Serial number", form.serial_number || "Not specified"],
+                        ["Category", reviewCategory],
+                        ["Status", STATUS_LABEL[form.status]],
+                        ["Branch", reviewBranch],
+                        ["Location", reviewLocation],
+                        ...(!form.id ? [["Custodian", form.assigned_to_name || "Not assigned"], ["Department", form.department || "Not specified"]] : []),
+                        ["Purchase value", form.purchase_value ? formatUGX(Number(form.purchase_value)) : "Not specified"],
+                        ["GPS", form.location_latitude && form.location_longitude ? "Captured" : "Not captured"],
+                      ].map(([label, value], index) => (
+                        <div key={String(label)} className={`grid grid-cols-[130px_1fr] gap-3 px-4 py-3 text-sm ${index ? "border-t" : ""}`}>
+                          <span className="text-muted-foreground">{label}</span>
+                          <span className="font-medium">{value}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                <Button onClick={save} disabled={saving}>{saving ? "Saving…" : form.id ? "Save changes" : "Create asset"}</Button>
-              </DialogFooter>
-              {form.id && (
-                <div className="border-t pt-4">
-                  <AssetDetailTabs assetId={form.id} />
+
+              <DialogFooter className="border-t bg-background px-5 py-4 sm:justify-between sm:px-6">
+                <div className="flex gap-2">
+                  <Button type="button" variant="ghost" onClick={() => { setOpen(false); setWizardStep(0); }}>Cancel</Button>
+                  {wizardStep > 0 && (
+                    <Button type="button" variant="outline" onClick={() => setWizardStep((step) => Math.max(0, step - 1))}>
+                      <ChevronLeft className="mr-2 h-4 w-4" /> Back
+                    </Button>
+                  )}
                 </div>
-              )}
+
+                <div className="flex flex-1 justify-end gap-2">
+                  {wizardStep < wizardSteps.length - 1 ? (
+                    <Button type="button" onClick={nextWizardStep}>
+                      Next <ChevronRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <>
+                      {!form.id && (
+                        <Button type="button" variant="outline" onClick={() => save(true)} disabled={saving}>
+                          {saving ? "Saving…" : "Save & add next"}
+                        </Button>
+                      )}
+                      <Button type="button" onClick={() => save(false)} disabled={saving}>
+                        {saving ? "Saving…" : form.id ? "Save changes" : "Save asset"}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </DialogFooter>
             </DialogContent>
           </Dialog>
           )}
