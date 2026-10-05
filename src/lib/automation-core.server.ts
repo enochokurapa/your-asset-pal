@@ -62,7 +62,17 @@ async function upsertNotification(input: {
   entityId: string;
   requiresAction?: boolean;
 }) {
-  const { error } = await admin.from("notifications").upsert({
+  const now = new Date().toISOString();
+  const { data: existing, error: findError } = await admin.from("notifications")
+    .select("id")
+    .eq("user_id", input.userId)
+    .eq("type", input.type)
+    .eq("entity_type", input.entityType)
+    .eq("entity_id", input.entityId)
+    .maybeSingle();
+  if (findError) throw findError;
+
+  const payload = {
     tenant_id: input.tenantId,
     user_id: input.userId,
     type: input.type,
@@ -73,9 +83,13 @@ async function upsertNotification(input: {
     requires_action: input.requiresAction ?? false,
     beep: false,
     read_at: null,
-    created_at: new Date().toISOString(),
-  }, { onConflict: "user_id,type,entity_type,entity_id" });
-  if (error) throw error;
+    created_at: now,
+  };
+
+  const result = existing
+    ? await admin.from("notifications").update(payload).eq("id", (existing as any).id)
+    : await admin.from("notifications").insert(payload);
+  if (result.error) throw result.error;
 }
 
 async function runApprovalReminders(s: AutomationSettings, users: string[]) {
