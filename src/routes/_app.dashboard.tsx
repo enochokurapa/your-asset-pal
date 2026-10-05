@@ -41,7 +41,7 @@ function TenantDashboard() {
 
     queryFn: async () => {
       const [assets, cats, locs, branches, pending, gatePasses, verifs] = await Promise.all([
-        supabase.from("assets").select("id,status,name,asset_tag,branch_id,set_for_disposal,purchase_value,created_at").order("created_at", { ascending: false }),
+        supabase.from("assets").select("id,status,name,asset_tag,branch_id,location_id,geo_place_id,location_latitude,location_longitude,set_for_disposal,purchase_value,created_at").order("created_at", { ascending: false }),
         supabase.from("categories").select("id", { count: "exact", head: true }),
         supabase.from("locations").select("id", { count: "exact", head: true }),
         supabase.from("branches").select("id,name,code,is_active"),
@@ -123,6 +123,9 @@ function TenantDashboard() {
         catCount: cats.count ?? 0,
         locCount: locs.count ?? 0,
         branchCount: visibleBranchList.length,
+        locatedAssets: list.filter((a:any)=>a.location_id || a.geo_place_id).length,
+        unlocatedAssets: list.filter((a:any)=>!a.location_id && !a.geo_place_id).length,
+        gpsVerifiedAssets: list.filter((a:any)=>a.location_latitude != null && a.location_longitude != null).length,
         perBranch,
         statusCounts,
         branchesForFilter,
@@ -139,6 +142,8 @@ function TenantDashboard() {
     { label: "Total Assets", value: data?.total ?? 0, icon: Package, color: "#1E3A8A", filter: { kind: "all" }, subtotal: data?.totalValue },
     { label: "Active Assets", value: data?.active ?? 0, icon: CheckCircle2, color: "#047857", filter: { kind: "active" }, subtotal: data?.activeValue },
     { label: "Branches", value: data?.branchCount ?? 0, icon: Building2, color: "#7C3AED", filter: { kind: "all" } },
+    { label: "Located Assets", value: data?.locatedAssets ?? 0, icon: MapPin, color: "#0F766E", filter: { kind: "all" }, navigateTo: "/locations" },
+    { label: "No Location", value: data?.unlocatedAssets ?? 0, icon: AlertTriangle, color: "#B45309", filter: { kind: "all" }, navigateTo: "/locations" },
     { label: "In Storage", value: data?.statusCounts.find((s) => s.key === "in_storage")?.value ?? 0, icon: Boxes, color: "#475569", filter: { kind: "status", status: "in_storage" }, subtotal: data?.inStorageValue },
     { label: "In Use", value: data?.inUse ?? 0, icon: CheckCircle2, color: "#0E7490", filter: { kind: "status", status: "in_use" }, subtotal: data?.inUseValue },
     { label: "Under Repair", value: data?.repair ?? 0, icon: Wrench, color: "#B45309", filter: { kind: "status", status: "under_repair" } },
@@ -186,7 +191,7 @@ function TenantDashboard() {
         )}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         {stats.map((s) => (
           <Card
             key={s.label}
