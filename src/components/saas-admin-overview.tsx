@@ -95,10 +95,10 @@ export function SaasAdminOverview() {
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Organizations" value={isLoading ? "—" : summary?.organizations ?? 0} detail={`${summary?.active ?? 0} active · ${summary?.trials ?? 0} trials`} icon={Building2} />
-        <MetricCard label="Business users" value={isLoading ? "—" : summary?.users ?? 0} detail={`${summary?.newWorkspaces30d ?? 0} new workspaces in 30 days`} icon={Users} />
-        <MetricCard label="Managed assets" value={isLoading ? "—" : format(summary?.assets)} detail={`${format(summary?.assetsAdded30d)} added in the last 30 days`} icon={Boxes} />
-        <MetricCard label="Successful billing" value={isLoading ? "—" : `${currency} ${format(summary?.successfulRevenue)}`} detail={`Current paid price: ${currency} ${format(policy?.paidPrice)}`} icon={CircleDollarSign} />
+        <MetricCard label="Organizations" value={isLoading ? "-" : summary?.organizations ?? 0} detail={`${summary?.active ?? 0} active · ${summary?.trials ?? 0} trials`} icon={Building2} />
+        <MetricCard label="Business users" value={isLoading ? "-" : summary?.users ?? 0} detail={`${summary?.newWorkspaces30d ?? 0} new workspaces in 30 days`} icon={Users} />
+        <MetricCard label="Managed assets" value={isLoading ? "-" : format(summary?.assets)} detail={`${format(summary?.assetsAdded30d)} added in the last 30 days`} icon={Boxes} />
+        <MetricCard label="Successful billing" value={isLoading ? "-" : `${currency} ${format(summary?.successfulRevenue)}`} detail={`Current paid price: ${currency} ${format(policy?.paidPrice)}`} icon={CircleDollarSign} />
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.35fr_.65fr]">

@@ -43,7 +43,7 @@ function WelcomePage() {
     }
     // Refresh the session so the new password takes effect, then sign in fresh.
     try { await supabase.auth.refreshSession(); } catch { /* no-op */ }
-    toast.success("Password updated — please sign in with your new password.");
+    toast.success("Password updated - please sign in with your new password.");
     await supabase.auth.signOut();
     // Hard navigation so the auth context fully resets.
     if (typeof window !== "undefined") {

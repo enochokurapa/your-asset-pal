@@ -154,14 +154,14 @@ export function PendingApprovalsCard() {
   // ---- Export helpers ----
   const buildExportRows = () => filtered.map((r: any) => ({
     type: String(r.kind).replace(/_/g, " "),
-    asset: r.asset ? `${r.asset.name ?? ""}${r.asset.asset_tag ? ` (${r.asset.asset_tag})` : ""}` : "—",
-    branch: resolveBranchName(r) || "—",
-    location: resolveLocationName(r) || "—",
-    requester: r.requester?.full_name || r.requester?.email || "—",
+    asset: r.asset ? `${r.asset.name ?? ""}${r.asset.asset_tag ? ` (${r.asset.asset_tag})` : ""}` : "-",
+    branch: resolveBranchName(r) || "-",
+    location: resolveLocationName(r) || "-",
+    requester: r.requester?.full_name || r.requester?.email || "-",
     requested_at: fmtDateTimeEAT(r.created_at),
     reason: r.reason ?? "",
     status: r.status,
-    decision: r.status === "pending" ? "—" : r.status,
+    decision: r.status === "pending" ? "-" : r.status,
   }));
 
   const HEAD = ["Type", "Asset", "Branch", "Location", "Requester", "Requested at (EAT)", "Reason", "Status", "Final decision"];
@@ -261,7 +261,7 @@ export function PendingApprovalsCard() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-[10px] uppercase">{r.kind.replace(/_/g, " ")}</Badge>
-                  <p className="truncate text-sm font-medium">{r.asset?.name ?? "—"}</p>
+                  <p className="truncate text-sm font-medium">{r.asset?.name ?? "-"}</p>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {r.asset?.asset_tag ?? ""} · by {r.requester?.full_name || r.requester?.email || "user"} · {fmtDateTimeEAT(r.created_at)}
@@ -311,7 +311,7 @@ export function PendingApprovalsCard() {
             <div className="space-y-3 text-sm">
               <div>
                 <p className="text-xs uppercase text-muted-foreground">Requested by</p>
-                <p>{detail.requester?.full_name || detail.requester?.email || "—"} · {fmtDateTimeEAT(detail.created_at)} EAT</p>
+                <p>{detail.requester?.full_name || detail.requester?.email || "-"} · {fmtDateTimeEAT(detail.created_at)} EAT</p>
               </div>
               {resolveBranchName(detail) && (
                 <div>
@@ -359,7 +359,7 @@ export function PendingApprovalsCard() {
           </DialogHeader>
           <Textarea rows={4} value={decideReason} onChange={(e) => setDecideReason(e.target.value)}
             placeholder={decideOpen?.status === "approved"
-              ? "e.g. Approved — proceed with the transfer."
+              ? "e.g. Approved - proceed with the transfer."
               : "Explain why this request is being rejected…"} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setDecideOpen(null)}>Cancel</Button>

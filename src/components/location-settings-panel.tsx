@@ -28,7 +28,7 @@ type Settings = {
 const DEFAULTS: Settings = {
   location_mode: "internal",
   default_country_code: null,
-  allowed_country_codes: ["UG","KE","TZ","RW","ZM","MW","ZW"],
+  allowed_country_codes: [],
   default_branch_id: null,
   require_branch: false,
   require_geography: false,
@@ -90,9 +90,16 @@ export function LocationSettingsPanel() {
     setSaving(true);
     try {
       const { data: auth } = await supabase.auth.getUser();
+      const normalized = {
+        ...form,
+        require_branch: usesBranch ? form.require_branch : false,
+        require_geography: usesGeography ? form.require_geography : false,
+        require_internal_location: usesInternal ? form.require_internal_location : false,
+        require_gps: usesGeography ? form.require_gps : false,
+      };
       const { error } = await (supabase as any).from("tenant_location_settings").upsert({
         tenant_id: tenantId,
-        ...form,
+        ...normalized,
         updated_at: new Date().toISOString(),
         updated_by: auth.user?.id ?? null,
       }, { onConflict: "tenant_id" });
@@ -103,6 +110,21 @@ export function LocationSettingsPanel() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const usesGeography = ["geographic", "hybrid"].includes(form.location_mode);
+  const usesBranch = ["branch", "hybrid"].includes(form.location_mode);
+  const usesInternal = ["internal", "hybrid"].includes(form.location_mode);
+
+  const changeMode = (mode: Settings["location_mode"]) => {
+    setForm((current) => ({
+      ...current,
+      location_mode: mode,
+      require_branch: ["branch", "hybrid"].includes(mode) ? current.require_branch : false,
+      require_geography: ["geographic", "hybrid"].includes(mode) ? current.require_geography : false,
+      require_internal_location: ["internal", "hybrid"].includes(mode) ? current.require_internal_location : false,
+      require_gps: ["geographic", "hybrid"].includes(mode) ? current.require_gps : false,
+    }));
   };
 
   const modeDescription = {
@@ -124,7 +146,7 @@ export function LocationSettingsPanel() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Location model</Label>
-              <Select value={form.location_mode} onValueChange={(v) => set("location_mode", v as Settings["location_mode"])}>
+              <Select value={form.location_mode} onValueChange={(v) => changeMode(v as Settings["location_mode"])}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="internal">Internal</SelectItem>
@@ -136,53 +158,59 @@ export function LocationSettingsPanel() {
               <p className="text-xs text-muted-foreground">{modeDescription}</p>
             </div>
 
-            <div className="space-y-2">
-              <Label>Default branch</Label>
-              <Select value={form.default_branch_id || "none"} onValueChange={(v) => set("default_branch_id", v === "none" ? null : v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No default</SelectItem>
-                  {(branches as any[]).map((b) => <SelectItem key={b.id} value={b.id}>{b.name}{b.code ? ` (${b.code})` : ""}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <Label>Allowed countries</Label>
-              <div className="flex flex-wrap gap-2">
-                {(countries as any[]).map((c) => {
-                  const active = form.allowed_country_codes.includes(c.code);
-                  return (
-                    <button
-                      key={c.code}
-                      type="button"
-                      onClick={() => toggleCountry(c.code)}
-                      className={`rounded-lg border px-3 py-2 text-sm transition-colors ${active ? "border-primary bg-primary/10 text-primary" : "bg-background text-muted-foreground"}`}
-                    >
-                      {c.name}
-                    </button>
-                  );
-                })}
+            {usesBranch && (
+              <div className="space-y-2">
+                <Label>Default branch</Label>
+                <Select value={form.default_branch_id || "none"} onValueChange={(v) => set("default_branch_id", v === "none" ? null : v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No default</SelectItem>
+                    {(branches as any[]).map((b) => <SelectItem key={b.id} value={b.id}>{b.name}{b.code ? ` (${b.code})` : ""}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
-              <p className="text-xs text-muted-foreground">Only these countries will appear during asset capture.</p>
-            </div>
+            )}
 
-            <div className="space-y-2">
-              <Label>Default country</Label>
-              <Select
-                value={form.default_country_code || "none"}
-                onValueChange={(v) => set("default_country_code", v === "none" ? null : v)}
-                disabled={form.allowed_country_codes.length === 0}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No default — user selects</SelectItem>
-                  {(countries as any[])
-                    .filter((c) => form.allowed_country_codes.includes(c.code))
-                    .map((c) => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+            {usesGeography && (
+              <>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Countries used by this organisation</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {(countries as any[]).map((c) => {
+                      const active = form.allowed_country_codes.includes(c.code);
+                      return (
+                        <button
+                          key={c.code}
+                          type="button"
+                          onClick={() => toggleCountry(c.code)}
+                          className={`rounded-lg border px-3 py-2 text-sm transition-colors ${active ? "border-primary bg-primary/10 text-primary" : "bg-background text-muted-foreground"}`}
+                        >
+                          {c.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Select only countries where this organisation actually places or manages assets.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Default country</Label>
+                  <Select
+                    value={form.default_country_code || "none"}
+                    onValueChange={(v) => set("default_country_code", v === "none" ? null : v)}
+                    disabled={form.allowed_country_codes.length === 0}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No default; user selects</SelectItem>
+                      {(countries as any[])
+                        .filter((c) => form.allowed_country_codes.includes(c.code))
+                        .map((c) => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
           </div>
         </Card>
 
@@ -190,10 +218,12 @@ export function LocationSettingsPanel() {
           <summary className="cursor-pointer list-none px-4 py-3 font-medium">Required fields</summary>
           <div className="grid gap-3 border-t p-4 sm:grid-cols-2">
             {[
-              ["require_branch", "Branch", "Require a branch before an asset can be saved."],
-              ["require_geography", "Geographic area", "Require a district/county/region and mapped area."],
-              ["require_internal_location", "Internal location", "Require an office, store, room or site."],
-              ["require_gps", "GPS verification", "Require a device GPS capture before saving."],
+              ...(usesBranch ? [["require_branch", "Branch", "Require a branch before an asset can be saved."]] : []),
+              ...(usesGeography ? [
+                ["require_geography", "Geographic area", "Require a district, county or region and mapped area."],
+                ["require_gps", "GPS verification", "Require a device GPS capture before saving."],
+              ] : []),
+              ...(usesInternal ? [["require_internal_location", "Internal location", "Require an office, store, room or site."]] : []),
             ].map(([key, title, description]) => (
               <label key={key} className="flex items-start justify-between gap-4 rounded-lg border p-3">
                 <div><p className="text-sm font-medium">{title}</p><p className="text-xs text-muted-foreground">{description}</p></div>
@@ -207,10 +237,12 @@ export function LocationSettingsPanel() {
           <summary className="cursor-pointer list-none px-4 py-3 font-medium">Capture preferences</summary>
           <div className="grid gap-3 border-t p-4 sm:grid-cols-2">
             {[
-              ["allow_inline_location_create", "Quick add location", "Allow authorised users to add a room, store or site without leaving asset entry."],
-              ["remember_last_selection", "Remember last selection", "Reuse the previous branch/location during repeated capture."],
-              ["allow_custom_area", "Custom area", "Allow organisation-specific site names where needed."],
-              ["show_coordinates", "Show coordinates", "Display raw latitude and longitude to users."],
+              ...(usesInternal ? [["allow_inline_location_create", "Quick add location", "Allow authorised users to add a room, store or site without leaving asset entry."]] : []),
+              ["remember_last_selection", "Remember last selection", "Reuse the previous location choices during repeated capture."],
+              ...(usesGeography ? [
+                ["allow_custom_area", "Custom area", "Allow organisation-specific site names where needed."],
+                ["show_coordinates", "Show coordinates", "Display raw latitude and longitude to users."],
+              ] : []),
             ].map(([key, title, description]) => (
               <label key={key} className="flex items-start justify-between gap-4 rounded-lg border p-3">
                 <div><p className="text-sm font-medium">{title}</p><p className="text-xs text-muted-foreground">{description}</p></div>

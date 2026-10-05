@@ -228,7 +228,7 @@ function AppLayout() {
           <div className="flex-1" />
           {!isSaasAdmin && subscriptionStatus === "trial" && isTenantAdmin && (
             <Button asChild variant="outline" size="sm" className="hidden gap-1.5 border-primary/20 bg-primary/5 text-xs font-semibold text-primary hover:bg-primary/10 sm:inline-flex">
-              <Link to="/billing">Trial · {trialDaysLeft ?? "—"} days left</Link>
+              <Link to="/billing">Trial · {trialDaysLeft ?? "-"} days left</Link>
             </Button>
           )}
           <div className="hidden text-sm text-muted-foreground lg:block">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</div>

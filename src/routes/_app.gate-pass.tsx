@@ -99,15 +99,15 @@ function GatePassPage() {
   });
 
   const branchName = (id?: string | null) =>
-    (branchesQ.data ?? []).find((b: any) => b.id === id)?.name ?? "—";
+    (branchesQ.data ?? []).find((b: any) => b.id === id)?.name ?? "-";
   const userName = (id?: string | null) => {
-    if (!id) return "—";
+    if (!id) return "-";
     const p = (profilesQ.data ?? []).find((x: any) => x.id === id);
     return p?.full_name || p?.email || id.slice(0, 8);
   };
   const assetLabel = (id: string) => {
     const a = (assetsQ.data ?? []).find((x: any) => x.id === id);
-    return a ? `${a.asset_tag} — ${a.name}` : id.slice(0, 8);
+    return a ? `${a.asset_tag} - ${a.name}` : id.slice(0, 8);
   };
 
   const visiblePasses = useMemo(() => {
@@ -143,7 +143,7 @@ function GatePassPage() {
 
   // Build report rows for export/preview
   const reportRows = useMemo(() => visiblePasses.map((p: GP) => ({
-    "Pass No.": p.pass_number ?? "—",
+    "Pass No.": p.pass_number ?? "-",
     "Asset": assetLabel(p.asset_id),
     "Status": (p.status ?? "").replace(/_/g, " "),
     "Destination": p.destination ?? "",
@@ -251,7 +251,7 @@ function GatePassPage() {
                 <SelectContent>
                   <SelectItem value="all">All assets</SelectItem>
                   {(assetsQ.data ?? []).map((a: any) => (
-                    <SelectItem key={a.id} value={a.id}>{a.asset_tag} — {a.name}</SelectItem>
+                    <SelectItem key={a.id} value={a.id}>{a.asset_tag} - {a.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -338,7 +338,7 @@ function GatePassPage() {
               )}
               {visiblePasses.map((p: GP) => (
                 <TableRow key={p.id}>
-                  <TableCell className="font-mono text-xs">{p.pass_number ?? "—"}</TableCell>
+                  <TableCell className="font-mono text-xs">{p.pass_number ?? "-"}</TableCell>
                   <TableCell>{assetLabel(p.asset_id)}</TableCell>
                   <TableCell className="max-w-[200px] truncate">{p.destination}</TableCell>
                   <TableCell>{p.expected_return_date}</TableCell>
@@ -411,7 +411,7 @@ function ReportPreviewDialog({ mode, rows, summary, onClose, onDownload, canDown
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-6xl">
         <DialogHeader>
-          <DialogTitle>{mode === "pdf" ? "PDF Preview" : "Excel Preview"} — Gate Pass Report</DialogTitle>
+          <DialogTitle>{mode === "pdf" ? "PDF Preview" : "Excel Preview"} - Gate Pass Report</DialogTitle>
           <DialogDescription>{rows.length} record(s) · {summary}</DialogDescription>
         </DialogHeader>
         <div className="max-h-[60vh] overflow-auto border rounded-md">
@@ -524,7 +524,7 @@ function CreateDialog({ open, onClose, assets, locations, userId, onCreated }: {
               <SelectContent>
                 {assets.length === 0 && <div className="px-3 py-2 text-sm text-muted-foreground">No assets available</div>}
                 {assets.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>{a.asset_tag} — {a.name}</SelectItem>
+                  <SelectItem key={a.id} value={a.id}>{a.asset_tag} - {a.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -553,7 +553,7 @@ function CreateDialog({ open, onClose, assets, locations, userId, onCreated }: {
                 const id = value === "external" ? "" : value;
                 setDestinationLocationId(id);
                 const loc = locations.find((item: any) => item.id === id);
-                if (loc) setDestination(loc.address ? `${loc.name} — ${loc.address}` : loc.name);
+                if (loc) setDestination(loc.address ? `${loc.name} - ${loc.address}` : loc.name);
               }}>
                 <SelectTrigger><SelectValue placeholder="External / other" /></SelectTrigger>
                 <SelectContent>
@@ -685,14 +685,14 @@ function DetailDialog(props: {
         ["Requested by", props.requesterName],
         ["Requested at", new Date(gp.created_at).toLocaleString()],
         ["Approved by", props.approverName],
-        ["Decided at", gp.decided_at ? new Date(gp.decided_at).toLocaleString() : "—"],
-        ["Decision reason", gp.decision_reason ?? "—"],
+        ["Decided at", gp.decided_at ? new Date(gp.decided_at).toLocaleString() : "-"],
+        ["Decision reason", gp.decision_reason ?? "-"],
         ["Checked out by", props.checkedOutName],
-        ["Checked out at", gp.checked_out_at ? new Date(gp.checked_out_at).toLocaleString() : "—"],
+        ["Checked out at", gp.checked_out_at ? new Date(gp.checked_out_at).toLocaleString() : "-"],
         ["Returned by", props.returnedName],
-        ["Returned at", gp.returned_at ? new Date(gp.returned_at).toLocaleString() : "—"],
-        ["Return condition", gp.return_condition ?? "—"],
-        ["Return notes", gp.return_notes ?? "—"],
+        ["Returned at", gp.returned_at ? new Date(gp.returned_at).toLocaleString() : "-"],
+        ["Return condition", gp.return_condition ?? "-"],
+        ["Return notes", gp.return_notes ?? "-"],
       ],
       styles: { fontSize: 9, font: template.font_family },
       headStyles: { fillColor: tableHeadFill(template) },
@@ -739,7 +739,7 @@ function DetailDialog(props: {
           {gp.decision_reason && <Row label="Decision reason" value={gp.decision_reason} full />}
           {gp.checked_out_at && <Row label="Checked out" value={`${props.checkedOutName} · ${new Date(gp.checked_out_at).toLocaleString()}`} full />}
           {gp.returned_at && <Row label="Returned" value={`${props.returnedName} · ${new Date(gp.returned_at).toLocaleString()}`} full />}
-          {gp.return_condition && <Row label="Condition on return" value={`${gp.return_condition}${gp.return_notes ? " — " + gp.return_notes : ""}`} full />}
+          {gp.return_condition && <Row label="Condition on return" value={`${gp.return_condition}${gp.return_notes ? " - " + gp.return_notes : ""}`} full />}
           {gp.attachment_url && (
             <Row label="Attachment" full value={
               <Button size="sm" variant="link" onClick={async () => {

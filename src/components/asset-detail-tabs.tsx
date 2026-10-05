@@ -39,7 +39,7 @@ function DecideDialog({
           <DialogDescription>A short note is required so the requester understands the decision.</DialogDescription>
         </DialogHeader>
         <Textarea rows={4} value={reason} onChange={(e) => setReason(e.target.value)}
-          placeholder={status === "approved" ? "e.g. Approved — proceed." : "Explain why this is being rejected…"} />
+          placeholder={status === "approved" ? "e.g. Approved - proceed." : "Explain why this is being rejected…"} />
         <DialogFooter>
           <Button variant="outline" onClick={onCancel}>Cancel</Button>
           <Button
@@ -107,16 +107,16 @@ function VerificationPanel({ assetId }: { assetId: string }) {
           <div className="flex items-center gap-2">
             <Badge className={tone(v.status)}>{v.status.replace("_", " ")}</Badge>
             <p className="text-xs text-muted-foreground">{new Date(v.verified_at).toLocaleString()}</p>
-            <p className="ml-auto text-xs text-muted-foreground">by {v.profiles?.full_name ?? v.profiles?.email ?? "—"}</p>
+            <p className="ml-auto text-xs text-muted-foreground">by {v.profiles?.full_name ?? v.profiles?.email ?? "-"}</p>
           </div>
-          <p className="mt-1">{v.branches?.name ?? "—"}{v.locations?.name ? ` · ${v.locations.name}` : ""}{v.custodian_name ? ` · ${v.custodian_name}` : ""}{v.department ? ` · ${v.department}` : ""}{v.condition ? ` · ${v.condition}` : ""}</p>
+          <p className="mt-1">{v.branches?.name ?? "-"}{v.locations?.name ? ` · ${v.locations.name}` : ""}{v.custodian_name ? ` · ${v.custodian_name}` : ""}{v.department ? ` · ${v.department}` : ""}{v.condition ? ` · ${v.condition}` : ""}</p>
           {v.notes && <p className="mt-1 text-xs text-muted-foreground">{v.notes}</p>}
           {v.changes && Object.keys(v.changes).length > 0 && (
             <details className="mt-1 text-xs">
               <summary className="cursor-pointer text-muted-foreground">Changes ({Object.keys(v.changes).length})</summary>
               <ul className="mt-1 list-disc pl-5">
                 {Object.entries(v.changes as Record<string, { from: any; to: any }>).map(([k, val]) => (
-                  <li key={k}><b>{k}</b>: {String(val.from ?? "—")} → {String(val.to ?? "—")}</li>
+                  <li key={k}><b>{k}</b>: {String(val.from ?? "-")} → {String(val.to ?? "-")}</li>
                 ))}
               </ul>
             </details>
@@ -172,9 +172,9 @@ function CustodyPanel({ assetId }: { assetId: string }) {
           <div className="space-y-1"><Label>Department</Label><Input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} placeholder="Finance" /></div>
           <div className="space-y-1 sm:col-span-2"><Label>Branch</Label>
             <Select value={form.branch_id || "none"} onValueChange={(v) => setForm({ ...form, branch_id: v === "none" ? "" : v })}>
-              <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="-" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">— None —</SelectItem>
+                <SelectItem value="none">- None -</SelectItem>
                 {branches.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -189,7 +189,7 @@ function CustodyPanel({ assetId }: { assetId: string }) {
         {data.length === 0 ? <p className="text-sm text-muted-foreground">No custody records yet.</p> :
           data.map((r: any) => (
             <div key={r.id} className="rounded-lg border p-3 text-sm">
-              <p className="font-medium">{r.assigned_to_name || "—"} {r.department && <span className="text-muted-foreground">· {r.department}</span>}{r.branches?.name && <span className="text-muted-foreground"> · {r.branches.name}</span>}</p>
+              <p className="font-medium">{r.assigned_to_name || "-"} {r.department && <span className="text-muted-foreground">· {r.department}</span>}{r.branches?.name && <span className="text-muted-foreground"> · {r.branches.name}</span>}</p>
               <p className="text-xs text-muted-foreground">From {r.assignment_date}{r.return_date ? ` → ${r.return_date}` : " (open)"}</p>
               {r.notes && <p className="mt-1 text-xs">{r.notes}</p>}
             </div>
@@ -239,8 +239,8 @@ function MovementsPanel({ assetId }: { assetId: string }) {
     user: currentAssn?.assigned_to_name ?? "",
     department: currentAssn?.department ?? "",
   };
-  const locName = (id: string) => locs.find((l: any) => l.id === id)?.name ?? "—";
-  const brName = (id: string) => branches.find((b: any) => b.id === id)?.name ?? "—";
+  const locName = (id: string) => locs.find((l: any) => l.id === id)?.name ?? "-";
+  const brName = (id: string) => branches.find((b: any) => b.id === id)?.name ?? "-";
 
   const add = async () => {
     if (!form.to_location_id && !form.to_branch_id && !form.to_user.trim()) {
@@ -276,22 +276,22 @@ function MovementsPanel({ assetId }: { assetId: string }) {
         <div className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">
           <div className="rounded-md bg-muted/40 p-2 text-xs sm:col-span-2">
             <p className="font-medium text-muted-foreground">Currently with</p>
-            <p className="mt-1">{from.user || "—"}{from.department ? ` · ${from.department}` : ""} · {brName(from.branch_id)} · {locName(from.location_id)}</p>
+            <p className="mt-1">{from.user || "-"}{from.department ? ` · ${from.department}` : ""} · {brName(from.branch_id)} · {locName(from.location_id)}</p>
           </div>
           <div className="space-y-1"><Label>To location</Label>
             <Select value={form.to_location_id || "none"} onValueChange={(v) => setForm({ ...form, to_location_id: v === "none" ? "" : v })}>
-              <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="-" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">— None —</SelectItem>
+                <SelectItem value="none">- None -</SelectItem>
                 {locs.map((l: any) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1"><Label>To branch</Label>
             <Select value={form.to_branch_id || "none"} onValueChange={(v) => setForm({ ...form, to_branch_id: v === "none" ? "" : v })}>
-              <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="-" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">— None —</SelectItem>
+                <SelectItem value="none">- None -</SelectItem>
                 {branches.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -308,11 +308,11 @@ function MovementsPanel({ assetId }: { assetId: string }) {
           data.map((r: any) => (
             <div key={r.id} className="rounded-lg border p-3 text-sm">
               <div className="flex items-center gap-2">
-                <p className="font-medium">{r.from?.name ?? r.fromBranch?.name ?? "—"} → {r.to?.name ?? r.toBranch?.name ?? "—"}</p>
+                <p className="font-medium">{r.from?.name ?? r.fromBranch?.name ?? "-"} → {r.to?.name ?? r.toBranch?.name ?? "-"}</p>
                 <Badge variant="outline" className="text-xs capitalize">{r.transfer_type ?? "internal"}</Badge>
               </div>
-              {(r.from_user || r.to_user) && <p className="text-xs text-muted-foreground">Custody: {r.from_user ?? "—"} → {r.to_user ?? "—"}</p>}
-              {(r.fromBranch?.name || r.toBranch?.name) && <p className="text-xs text-muted-foreground">Branch: {r.fromBranch?.name ?? "—"} → {r.toBranch?.name ?? "—"}</p>}
+              {(r.from_user || r.to_user) && <p className="text-xs text-muted-foreground">Custody: {r.from_user ?? "-"} → {r.to_user ?? "-"}</p>}
+              {(r.fromBranch?.name || r.toBranch?.name) && <p className="text-xs text-muted-foreground">Branch: {r.fromBranch?.name ?? "-"} → {r.toBranch?.name ?? "-"}</p>}
               <p className="text-xs text-muted-foreground">{r.moved_at}{r.reason ? ` · ${r.reason}` : ""}</p>
             </div>
           ))}
@@ -594,7 +594,7 @@ function DisposalPanel({ assetId }: { assetId: string }) {
               <div key={r.id} className="flex items-start justify-between gap-2 rounded-lg border p-3 text-sm">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">{r.reason ?? "—"}</p>
+                    <p className="font-medium">{r.reason ?? "-"}</p>
                     <Badge variant="outline" className="text-xs">{kindLabel}</Badge>
                     <Badge variant={variant as any} className="capitalize">{status}</Badge>
                   </div>
@@ -744,7 +744,7 @@ function MaintenancePanel({ assetId }: { assetId: string }) {
               <div key={r.id} className="flex items-start justify-between gap-2 rounded-lg border p-3 text-sm">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">{r.reason ?? "—"}</p>
+                    <p className="font-medium">{r.reason ?? "-"}</p>
                     {p.priority && <Badge variant="outline" className="text-xs capitalize">{p.priority}</Badge>}
                     <Badge variant={variant as any} className="capitalize">{status}</Badge>
                   </div>
@@ -800,16 +800,16 @@ function ActivityPanel({ assetId }: { assetId: string }) {
   for (const m of movements as any[]) {
     events.push({
       id: `mv-${m.id}`, ts: m.moved_at ?? m.created_at,
-      title: `Moved: ${m.from?.name ?? m.fromBranch?.name ?? "—"} → ${m.to?.name ?? m.toBranch?.name ?? "—"}`,
-      subtitle: `${m.transfer_type ?? "internal"}${m.from_user || m.to_user ? ` · custody ${m.from_user ?? "—"} → ${m.to_user ?? "—"}` : ""} · by ${pm[m.moved_by] ?? "—"}`,
+      title: `Moved: ${m.from?.name ?? m.fromBranch?.name ?? "-"} → ${m.to?.name ?? m.toBranch?.name ?? "-"}`,
+      subtitle: `${m.transfer_type ?? "internal"}${m.from_user || m.to_user ? ` · custody ${m.from_user ?? "-"} → ${m.to_user ?? "-"}` : ""} · by ${pm[m.moved_by] ?? "-"}`,
       reason: m.reason ?? undefined,
     });
   }
   for (const a of assignments as any[]) {
     events.push({
       id: `as-${a.id}`, ts: a.assignment_date ?? a.created_at,
-      title: `Assigned to ${a.assigned_to_name ?? a.department ?? "—"}`,
-      subtitle: `${a.branches?.name ? a.branches.name + " · " : ""}${a.return_date ? `until ${a.return_date}` : "open"} · by ${pm[a.created_by] ?? "—"}`,
+      title: `Assigned to ${a.assigned_to_name ?? a.department ?? "-"}`,
+      subtitle: `${a.branches?.name ? a.branches.name + " · " : ""}${a.return_date ? `until ${a.return_date}` : "open"} · by ${pm[a.created_by] ?? "-"}`,
       reason: a.notes ?? undefined,
     });
   }
@@ -818,7 +818,7 @@ function ActivityPanel({ assetId }: { assetId: string }) {
     events.push({
       id: `ap-${r.id}`, ts: r.decided_at ?? r.created_at,
       title: `${kindLabel} request ${r.status}`,
-      subtitle: `requested by ${pm[r.requested_by] ?? "—"}${r.approver_id ? ` · decided by ${pm[r.approver_id] ?? "—"}` : ""}`,
+      subtitle: `requested by ${pm[r.requested_by] ?? "-"}${r.approver_id ? ` · decided by ${pm[r.approver_id] ?? "-"}` : ""}`,
       reason: r.reason ?? undefined,
       tone: r.status === "approved" ? "text-green-600" : r.status === "rejected" ? "text-destructive" : "text-muted-foreground",
     });

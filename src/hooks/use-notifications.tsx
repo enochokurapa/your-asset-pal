@@ -46,7 +46,7 @@ export function useNotifications() {
   }, [user, qc]);
 
   const notifs = query.data ?? [];
-  // Visual blink — no sound — whenever there's a pending action-required notification.
+  // Visual blink - no sound - whenever there's a pending action-required notification.
   const needsAttention = notifs.some(
     (n) => !n.read_at && n.requires_action && n.action_status === "pending",
   );

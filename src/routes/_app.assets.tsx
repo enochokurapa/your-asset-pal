@@ -481,7 +481,7 @@ function AssetsPage() {
     setImporting(true);
     try {
       const r = await importAssetsFromFile(f, user?.id ?? null);
-      toast.success(`Imported ${r.success} of ${r.total} rows`, { description: r.errors.length ? `${r.errors.length} rows had errors — check the asset_imports record.` : undefined });
+      toast.success(`Imported ${r.success} of ${r.total} rows`, { description: r.errors.length ? `${r.errors.length} rows had errors - check the asset_imports record.` : undefined });
       qc.invalidateQueries({ queryKey: ["assets"] });
     } catch (e: any) { toast.error(e?.message ?? "Import failed"); }
     finally { setImporting(false); }
@@ -747,8 +747,8 @@ function AssetsPage() {
                     </div>
                     <div className="overflow-hidden rounded-xl border">
                       {[
-                        ["Asset", form.name || "—"],
-                        ["Asset tag", form.asset_tag || "—"],
+                        ["Asset", form.name || "-"],
+                        ["Asset tag", form.asset_tag || "-"],
                         ["Serial number", form.serial_number || "Not specified"],
                         ["Category", reviewCategory],
                         ["Status", STATUS_LABEL[form.status]],
@@ -871,11 +871,11 @@ function AssetsPage() {
                   <tr key={a.id} className="border-b last:border-0 hover:bg-muted/40 cursor-pointer" onClick={() => openView(a, "activity")}>
                     <td className="px-3 py-3 font-mono text-xs">{a.asset_tag}</td>
                     <td className="px-3 py-3 font-medium">{a.name}{a.serial_number && <span className="ml-2 font-mono text-[10px] text-muted-foreground">SN: {a.serial_number}</span>}</td>
-                    <td className="hidden px-3 py-3 text-muted-foreground md:table-cell">{a.branches?.name ?? "—"}</td>
-                    <td className="hidden px-3 py-3 text-muted-foreground lg:table-cell">{a.categories?.name ?? "—"}</td>
-                    <td className="hidden px-3 py-3 text-muted-foreground lg:table-cell">{a.locations?.name ?? "—"}</td>
+                    <td className="hidden px-3 py-3 text-muted-foreground md:table-cell">{a.branches?.name ?? "-"}</td>
+                    <td className="hidden px-3 py-3 text-muted-foreground lg:table-cell">{a.categories?.name ?? "-"}</td>
+                    <td className="hidden px-3 py-3 text-muted-foreground lg:table-cell">{a.locations?.name ?? "-"}</td>
                     <td className="hidden px-3 py-3 text-muted-foreground md:table-cell">
-                      {a.custodian || "—"}{a.department && <span className="block text-[11px]">{a.department}</span>}
+                      {a.custodian || "-"}{a.department && <span className="block text-[11px]">{a.department}</span>}
                     </td>
                     <td className="px-3 py-3">
                       <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_TONE[a.status as Status]}`}>

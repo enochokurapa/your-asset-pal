@@ -68,7 +68,7 @@ function CategoriesPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Categories</h1>
-          <p className="text-sm text-muted-foreground">Group your assets — supports sub-categories.</p>
+          <p className="text-sm text-muted-foreground">Group your assets - supports sub-categories.</p>
         </div>
         {canWrite && (
           <Dialog open={open} onOpenChange={setOpen}>
@@ -82,9 +82,9 @@ function CategoriesPage() {
                 <div className="space-y-2">
                   <Label>Parent category</Label>
                   <Select value={form.parent_id ?? "none"} onValueChange={(v) => setForm({ ...form, parent_id: v === "none" ? null : v })}>
-                    <SelectTrigger><SelectValue placeholder="— Top level —" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="- Top level -" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">— Top level —</SelectItem>
+                      <SelectItem value="none">- Top level -</SelectItem>
                       {parents.filter((p: any) => p.id !== form.id).map((p: any) => (
                         <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                       ))}

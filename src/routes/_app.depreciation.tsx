@@ -160,9 +160,9 @@ function DepreciationPage() {
         total += r.depreciation; count += 1;
       }
       const finalStatus = count === 0 ? "failed" : "completed";
-      const finalNote = `${single ? `Single asset: ${assetMap.get(firstId)?.asset_tag ?? ""}` : `Selected: ${pool.length} asset(s)`}${count === 0 ? " — no eligible entry posted" : ""}`;
+      const finalNote = `${single ? `Single asset: ${assetMap.get(firstId)?.asset_tag ?? ""}` : `Selected: ${pool.length} asset(s)`}${count === 0 ? " - no eligible entry posted" : ""}`;
       const failReason = count === 0
-        ? `No entries posted. ${skipped} asset(s) skipped — none were eligible (already posted, at residual, or missing depreciation config).`
+        ? `No entries posted. ${skipped} asset(s) skipped - none were eligible (already posted, at residual, or missing depreciation config).`
         : null;
       await supabase.from("depreciation_runs" as any).update({
         status: finalStatus, total_amount: total, asset_count: count,
@@ -201,8 +201,8 @@ function DepreciationPage() {
     .filter((a) => a.purchase_value && a.depreciation_method)
     .map((a) => ({
       tag: a.asset_tag, name: a.name,
-      category: a.categories?.name ?? "—",
-      branch: a.branches?.name ?? "—",
+      category: a.categories?.name ?? "-",
+      branch: a.branches?.name ?? "-",
       cost: Number(a.purchase_value ?? 0),
       accumulated: Number(a.accumulated_depreciation ?? 0),
       impairment: Number(a.impairment_amount ?? 0),
@@ -266,7 +266,7 @@ function DepreciationPage() {
       if (today > due) {
         list.push({
           kind: "missing", severity: "warn", assetId: a.id,
-          title: `Missing depreciation · ${a.asset_tag} — ${a.name}`,
+          title: `Missing depreciation · ${a.asset_tag} - ${a.name}`,
           detail: `Last posted ${a.last_depreciation_date ?? "never"} (${f}).`,
         });
       }
@@ -279,7 +279,7 @@ function DepreciationPage() {
       if (nbv <= res + 0.01 && Number(a.accumulated_depreciation ?? 0) > 0) {
         list.push({
           kind: "residual", severity: "warn", assetId: a.id,
-          title: `At residual · ${a.asset_tag} — ${a.name}`,
+          title: `At residual · ${a.asset_tag} - ${a.name}`,
           detail: `NBV ${formatUGX(nbv)} reached residual ${formatUGX(res)}. Depreciation has stopped.`,
         });
       }
@@ -363,7 +363,7 @@ function DepreciationPage() {
       list.push({
         when: o.created_at, kind: "override", user_id: o.created_by,
         asset_id: o.asset_id, run_id: null, override_type: o.type,
-        summary: `${o.type.replace("_", " ")} · ${o.reason ?? "—"}`,
+        summary: `${o.type.replace("_", " ")} · ${o.reason ?? "-"}`,
         amount: Number(o.amount ?? 0),
       });
     }
@@ -383,10 +383,10 @@ function DepreciationPage() {
       return [
         new Date(e.when).toLocaleString(),
         e.kind,
-        asset ? `${asset.asset_tag} — ${asset.name}` : "—",
-        run ? `${run.period_start} → ${run.period_end}` : "—",
-        e.override_type ?? "—",
-        e.user_id ? (userMap.get(e.user_id) ?? "—") : "—",
+        asset ? `${asset.asset_tag} - ${asset.name}` : "-",
+        run ? `${run.period_start} → ${run.period_end}` : "-",
+        e.override_type ?? "-",
+        e.user_id ? (userMap.get(e.user_id) ?? "-") : "-",
         e.summary,
         e.amount,
       ] as (string | number)[];
@@ -491,7 +491,7 @@ function DepreciationPage() {
                   <SelectContent className="max-h-72">
                     <SelectItem value="all">All assets</SelectItem>
                     {(assets as any[]).map((a) => (
-                      <SelectItem key={a.id} value={a.id}>{a.asset_tag} — {a.name}</SelectItem>
+                      <SelectItem key={a.id} value={a.id}>{a.asset_tag} - {a.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -514,7 +514,7 @@ function DepreciationPage() {
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                 {alerts.length === 0
-                  ? "All clear — no missing runs, no failures, no assets at residual."
+                  ? "All clear - no missing runs, no failures, no assets at residual."
                   : "No alerts match the current filters."}
               </div>
             ) : (
@@ -562,7 +562,7 @@ function DepreciationPage() {
                     <SelectContent className="max-h-72">
                       <SelectItem value="all">All assets</SelectItem>
                       {(assets as any[]).map((a) => (
-                        <SelectItem key={a.id} value={a.id}>{a.asset_tag} — {a.name}</SelectItem>
+                        <SelectItem key={a.id} value={a.id}>{a.asset_tag} - {a.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -644,12 +644,12 @@ function DepreciationPage() {
                       >
                         <td className="px-2 py-1 whitespace-nowrap">{new Date(e.when).toLocaleString()}</td>
                         <td className="px-2 py-1"><Badge variant="outline" className="capitalize">{e.kind}</Badge></td>
-                        <td className="px-2 py-1">{asset ? `${asset.asset_tag} — ${asset.name}` : "—"}</td>
-                        <td className="px-2 py-1">{run ? `${run.period_start} → ${run.period_end}` : "—"}</td>
-                        <td className="px-2 py-1 capitalize">{e.override_type ? e.override_type.replace("_", " ") : "—"}</td>
-                        <td className="px-2 py-1">{e.user_id ? (userMap.get(e.user_id) ?? "—") : "—"}</td>
+                        <td className="px-2 py-1">{asset ? `${asset.asset_tag} - ${asset.name}` : "-"}</td>
+                        <td className="px-2 py-1">{run ? `${run.period_start} → ${run.period_end}` : "-"}</td>
+                        <td className="px-2 py-1 capitalize">{e.override_type ? e.override_type.replace("_", " ") : "-"}</td>
+                        <td className="px-2 py-1">{e.user_id ? (userMap.get(e.user_id) ?? "-") : "-"}</td>
                         <td className="px-2 py-1">{e.summary}</td>
-                        <td className="px-2 py-1 text-right tabular-nums">{e.amount ? formatUGX(e.amount) : "—"}</td>
+                        <td className="px-2 py-1 text-right tabular-nums">{e.amount ? formatUGX(e.amount) : "-"}</td>
                       </tr>
                     );
                   })}
@@ -686,7 +686,7 @@ function DepreciationPage() {
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums">{r.asset_count}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{formatUGX(r.total_amount)}</td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">{r.notes ?? "—"}</td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">{r.notes ?? "-"}</td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString()}</td>
                     </tr>
                   ))}

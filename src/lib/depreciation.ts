@@ -1,4 +1,4 @@
-// Depreciation calculation engine. Pure functions — no I/O.
+// Depreciation calculation engine. Pure functions - no I/O.
 
 export type DepreciationMethod = "straight_line" | "reducing_balance" | "units_of_production";
 export type DepreciationFrequency = "monthly" | "quarterly" | "annually";

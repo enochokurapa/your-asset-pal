@@ -155,10 +155,10 @@ export function DepreciationPanel({ assetId }: { assetId: string }) {
               <p><span className="text-muted-foreground">Frequency:</span> {FREQ_LABEL[(asset.depreciation_frequency ?? "monthly") as DepreciationFrequency]}</p>
               <p><span className="text-muted-foreground">Useful life:</span> {asset.useful_life_months} months</p>
               <p><span className="text-muted-foreground">Residual value:</span> {formatUGX(asset.residual_value)}</p>
-              <p><span className="text-muted-foreground">Start date:</span> {asset.depreciation_start_date ?? "—"}</p>
+              <p><span className="text-muted-foreground">Start date:</span> {asset.depreciation_start_date ?? "-"}</p>
               <p><span className="text-muted-foreground">Last run:</span> {asset.last_depreciation_date ?? "Never"}</p>
               {asset.depreciation_method === "units_of_production" && (
-                <p><span className="text-muted-foreground">Total units:</span> {asset.total_units ?? "—"} (used {asset.units_consumed ?? 0})</p>
+                <p><span className="text-muted-foreground">Total units:</span> {asset.total_units ?? "-"} (used {asset.units_consumed ?? 0})</p>
               )}
             </div>
           ) : (
@@ -302,7 +302,7 @@ export function DepreciationPanel({ assetId }: { assetId: string }) {
               <Button size="sm" variant="outline" onClick={() => exportScheduleXLSX(`${asset.asset_tag}-schedule`, schedule)}>
                 <Download className="mr-1 h-3 w-3" /> Excel
               </Button>
-              <Button size="sm" variant="outline" onClick={() => exportSchedulePDF(`${asset.asset_tag} – Depreciation schedule`, schedule, asset.name)}>
+              <Button size="sm" variant="outline" onClick={() => exportSchedulePDF(`${asset.asset_tag} - Depreciation schedule`, schedule, asset.name)}>
                 <FileText className="mr-1 h-3 w-3" /> PDF
               </Button>
             </div>

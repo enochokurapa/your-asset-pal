@@ -1,4 +1,4 @@
-// East African Time (EAT, UTC+3) — 24-hour formatting used app-wide.
+// East African Time (EAT, UTC+3) - 24-hour formatting used app-wide.
 const TZ = "Africa/Nairobi";
 
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
@@ -33,7 +33,7 @@ export function fmtDateTimeSecEAT(v: string | number | Date | null | undefined):
   const d = parse(v); if (!d) return "";
   return dateTimeSecFmt.format(d).replace(",", "");
 }
-/** ISO date (YYYY-MM-DD) in EAT — useful for date-only filtering. */
+/** ISO date (YYYY-MM-DD) in EAT - useful for date-only filtering. */
 export function isoDateEAT(v: string | number | Date | null | undefined): string {
   const d = parse(v); if (!d) return "";
   const [day, month, year] = dateFmt.format(d).split("/");

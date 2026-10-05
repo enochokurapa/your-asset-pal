@@ -94,7 +94,7 @@ function UsersPage() {
     try {
       const headers = await getAuthHeaders();
       await createFn({ data: form, headers });
-      toast.success("User created. Share the temporary password with them — they'll be asked to change it on first sign-in.");
+      toast.success("User created. Share the temporary password with them - they'll be asked to change it on first sign-in.");
       setOpen(false);
       setForm({ email: "", password: "", full_name: "", role: "staff" });
       invalidate();

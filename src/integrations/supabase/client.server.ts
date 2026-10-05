@@ -1,4 +1,4 @@
-// Server-side Supabase admin client — bypasses RLS.
+// Server-side Supabase admin client - bypasses RLS.
 // Use this for trusted server-side admin operations only.
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";

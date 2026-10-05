@@ -205,7 +205,7 @@ function TenantDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium" style={{ color: s.color }}>{s.label}</p>
-                <p className="mt-2 text-3xl font-bold tabular-nums">{isLoading ? "—" : s.value}</p>
+                <p className="mt-2 text-3xl font-bold tabular-nums">{isLoading ? "-" : s.value}</p>
                 {s.subtotal !== undefined && s.subtotal > 0 && (
                   <p className="mt-1 text-xs font-medium text-muted-foreground tabular-nums">{formatUGX(s.subtotal)}</p>
                 )}

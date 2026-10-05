@@ -52,10 +52,10 @@ export function PendingGatePassesCard() {
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="outline" className="text-[10px] uppercase">{r.status.replace(/_/g, " ")}</Badge>
                 {r.pass_number && <span className="font-mono text-xs">{r.pass_number}</span>}
-                <p className="truncate text-sm font-medium">{r.asset?.name ?? "—"}</p>
+                <p className="truncate text-sm font-medium">{r.asset?.name ?? "-"}</p>
               </div>
               <p className="text-xs text-muted-foreground truncate">
-                {r.asset?.asset_tag ?? ""} · to {r.destination ?? "—"} · by {r.requester?.full_name || r.requester?.email || "user"}
+                {r.asset?.asset_tag ?? ""} · to {r.destination ?? "-"} · by {r.requester?.full_name || r.requester?.email || "user"}
               </p>
             </div>
             <Button size="sm" variant="outline" onClick={() => nav({ to: "/gate-pass" })}>Open</Button>

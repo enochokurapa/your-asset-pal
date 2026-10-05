@@ -81,19 +81,19 @@ export function AssetInsightDialog({
     const { doc, startY } = createBrandedPdf({
       template, orientation: "portrait",
       title: focusLabel,
-      subtitle: `${asset.asset_tag} — ${asset.name}`,
+      subtitle: `${asset.asset_tag} - ${asset.name}`,
     });
 
     autoTable(doc, {
       startY,
       head: [["Field", "Value"]],
       body: [
-        ["Category", asset.categories?.name ?? "—"],
-        ["Branch", asset.branches?.name ?? "—"],
-        ["Method", asset.depreciation_method ?? "—"],
-        ["Frequency", asset.depreciation_frequency ?? "—"],
-        ["Useful life (months)", String(asset.useful_life_months ?? "—")],
-        ["Start date", asset.depreciation_start_date ?? "—"],
+        ["Category", asset.categories?.name ?? "-"],
+        ["Branch", asset.branches?.name ?? "-"],
+        ["Method", asset.depreciation_method ?? "-"],
+        ["Frequency", asset.depreciation_frequency ?? "-"],
+        ["Useful life (months)", String(asset.useful_life_months ?? "-")],
+        ["Start date", asset.depreciation_start_date ?? "-"],
         ["Last run", asset.last_depreciation_date ?? "Never"],
         ["Purchase value", formatUGX(asset.purchase_value)],
         ["Residual value", formatUGX(asset.residual_value)],
@@ -135,7 +135,7 @@ export function AssetInsightDialog({
         head: [["Date", "Type", "Amount", "Reason"]],
         body: (overrides as any[]).map((o) => [
           o.effective_date ?? new Date(o.created_at).toISOString().slice(0, 10),
-          o.type, formatUGX(o.amount), o.reason ?? "—",
+          o.type, formatUGX(o.amount), o.reason ?? "-",
         ]),
         styles: { fontSize: 8, font: template.font_family },
         headStyles: { fillColor: tableHeadFill(template) },
@@ -151,7 +151,7 @@ export function AssetInsightDialog({
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {asset ? `${asset.asset_tag} — ${asset.name}` : "Asset insight"}
+            {asset ? `${asset.asset_tag} - ${asset.name}` : "Asset insight"}
           </DialogTitle>
           <DialogDescription>
             {focus === "missed" && "Missed depreciation periods and complete run log for this asset."}
@@ -175,12 +175,12 @@ export function AssetInsightDialog({
 
             <div className="rounded-md border p-3 text-sm">
               <div className="grid gap-1 sm:grid-cols-2">
-                <p><span className="text-muted-foreground">Method:</span> {asset.depreciation_method ?? "—"}</p>
-                <p><span className="text-muted-foreground">Frequency:</span> {asset.depreciation_frequency ?? "—"}</p>
-                <p><span className="text-muted-foreground">Useful life:</span> {asset.useful_life_months ?? "—"} months</p>
-                <p><span className="text-muted-foreground">Start:</span> {asset.depreciation_start_date ?? "—"}</p>
+                <p><span className="text-muted-foreground">Method:</span> {asset.depreciation_method ?? "-"}</p>
+                <p><span className="text-muted-foreground">Frequency:</span> {asset.depreciation_frequency ?? "-"}</p>
+                <p><span className="text-muted-foreground">Useful life:</span> {asset.useful_life_months ?? "-"} months</p>
+                <p><span className="text-muted-foreground">Start:</span> {asset.depreciation_start_date ?? "-"}</p>
                 <p><span className="text-muted-foreground">Last run:</span> {asset.last_depreciation_date ?? "Never"}</p>
-                <p><span className="text-muted-foreground">Branch:</span> {asset.branches?.name ?? "—"}</p>
+                <p><span className="text-muted-foreground">Branch:</span> {asset.branches?.name ?? "-"}</p>
               </div>
             </div>
 
@@ -243,7 +243,7 @@ export function AssetInsightDialog({
                 <ul className="space-y-1 text-xs">
                   {(overrides as any[]).map((o) => (
                     <li key={o.id} className="flex justify-between border-b py-1">
-                      <span><Badge variant="outline" className="mr-2 capitalize">{o.type.replace("_", " ")}</Badge>{o.reason ?? "—"}</span>
+                      <span><Badge variant="outline" className="mr-2 capitalize">{o.type.replace("_", " ")}</Badge>{o.reason ?? "-"}</span>
                       <span className="tabular-nums">{formatUGX(o.amount)}</span>
                     </li>
                   ))}

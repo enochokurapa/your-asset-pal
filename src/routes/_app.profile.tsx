@@ -91,15 +91,15 @@ function ProfilePage() {
             <div className="space-y-2">
               <Label>Branch</Label>
               <Select value={branchId || "none"} onValueChange={(v) => setBranchId(v === "none" ? "" : v)}>
-                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent><SelectItem value="none">— None —</SelectItem>{branches.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
+                <SelectTrigger><SelectValue placeholder="-" /></SelectTrigger>
+                <SelectContent><SelectItem value="none">- None -</SelectItem>{branches.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>Location</Label>
               <Select value={locationId || "none"} onValueChange={(v) => setLocationId(v === "none" ? "" : v)}>
-                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent><SelectItem value="none">— None —</SelectItem>{locations.map((l: any) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
+                <SelectTrigger><SelectValue placeholder="-" /></SelectTrigger>
+                <SelectContent><SelectItem value="none">- None -</SelectItem>{locations.map((l: any) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>

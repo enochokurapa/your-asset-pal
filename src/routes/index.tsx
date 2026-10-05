@@ -12,7 +12,7 @@ export const Route = createFileRoute("/")({
   component: PublicHome,
   head: () => ({
     meta: [
-      { title: "AssetFlow 360 — Fixed Asset Management SaaS" },
+      { title: "AssetFlow 360 - Fixed Asset Management SaaS" },
       { name: "description", content: "Track, assign, verify, depreciate and report on fixed assets in one secure workspace. Start a free AssetFlow 360 trial." },
     ],
   }),
@@ -193,7 +193,7 @@ function PublicHome() {
         <section id="security" className="mx-auto grid max-w-7xl gap-10 px-4 py-20 sm:px-6 lg:grid-cols-2 lg:items-center lg:px-8">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary">Workspace isolation</p>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Your organization sees its data—not another customer's.</h2>
+            <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Your organization sees its data-not another customer's.</h2>
             <p className="mt-4 leading-7 text-muted-foreground">AssetFlow 360 enforces tenant boundaries in the database and uses tenant-scoped file paths for private uploads. User roles and module permissions then control access inside your own workspace.</p>
             <div className="mt-7 space-y-3">
               {[

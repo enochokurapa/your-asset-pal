@@ -58,9 +58,9 @@ export function AssetLocationFields({
       .select("code,name").eq("enabled", true).order("name")).data ?? [],
   });
 
-  const showBranch = ["branch", "hybrid"].includes(settings?.location_mode) || settings?.require_branch;
-  const showInternal = ["internal", "hybrid"].includes(settings?.location_mode) || settings?.require_internal_location;
-  const showGeo = ["geographic", "hybrid"].includes(settings?.location_mode) || settings?.require_geography;
+  const showBranch = ["branch", "hybrid"].includes(settings?.location_mode);
+  const showInternal = ["internal", "hybrid"].includes(settings?.location_mode);
+  const showGeo = ["geographic", "hybrid"].includes(settings?.location_mode);
 
   const eligibleLocations = useMemo(
     () => locations.filter((l: any) => l.is_active !== false && (!value.branch_id || !l.branch_id || l.branch_id === value.branch_id)),
@@ -256,12 +256,6 @@ export function AssetLocationFields({
               </div>
             )}
 
-            {allowedCountryCodes.length === 1 && selectedCountry && (
-              <p className="text-xs text-muted-foreground">
-                Country: {(countries as any[]).find((c) => c.code === selectedCountry)?.name ?? selectedCountry}
-              </p>
-            )}
-
             {selectedCountry ? (
               <GeoCascadeSelector
                 countryCode={selectedCountry}
@@ -271,7 +265,7 @@ export function AssetLocationFields({
               />
             ) : (
               <p className="rounded-lg border bg-background p-3 text-sm text-muted-foreground">
-                Select a country to continue.
+                Location countries are not configured for this organisation. Ask an administrator to complete Asset Location Setup.
               </p>
             )}
           </div>

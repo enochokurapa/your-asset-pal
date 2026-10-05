@@ -30,7 +30,7 @@ function prettyLabel(k: string) {
 }
 
 function prettyValue(v: any): string {
-  if (v === null || v === undefined || v === "") return "—";
+  if (v === null || v === undefined || v === "") return "-";
   if (typeof v === "boolean") return v ? "Yes" : "No";
   if (typeof v === "string" || typeof v === "number") return String(v);
   if (Array.isArray(v)) return v.map(prettyValue).join(", ");
@@ -91,7 +91,7 @@ export function ApprovalPayloadView({ payload }: { payload: Record<string, any> 
           display = names?.get(v) ?? v;
         } else if (k === "changes" && typeof v === "object" && v) {
           display = Object.entries(v as Record<string, any>)
-            .map(([ck, cv]: any) => `${prettyLabel(ck)}: ${cv?.from ?? "—"} → ${cv?.to ?? "—"}`)
+            .map(([ck, cv]: any) => `${prettyLabel(ck)}: ${cv?.from ?? "-"} → ${cv?.to ?? "-"}`)
             .join("; ");
         } else {
           display = prettyValue(v);

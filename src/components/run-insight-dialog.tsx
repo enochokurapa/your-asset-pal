@@ -56,8 +56,8 @@ export function RunInsightDialog({
         ["Status", run.status],
         ["Asset count", String(run.asset_count ?? 0)],
         ["Total", formatUGX(run.total_amount)],
-        ["Notes", run.notes ?? "—"],
-        ["Error message", run.error_message ?? "—"],
+        ["Notes", run.notes ?? "-"],
+        ["Error message", run.error_message ?? "-"],
         ["Run at", fmtDateTimeEAT(run.created_at)],
       ],
       styles: { fontSize: 9, font: template.font_family },
@@ -80,8 +80,8 @@ export function RunInsightDialog({
           fmtDateTimeEAT(l.created_at),
           l.step,
           l.status,
-          l.assets ? `${l.assets.asset_tag} — ${l.assets.name}` : "—",
-          l.message ?? "—",
+          l.assets ? `${l.assets.asset_tag} - ${l.assets.name}` : "-",
+          l.message ?? "-",
         ]),
         styles: { fontSize: 8, font: template.font_family },
         headStyles: { fillColor: tableHeadFill(template) },
@@ -91,8 +91,8 @@ export function RunInsightDialog({
     autoTable(doc, {
       head: [["Tag", "Asset", "Opening", "Depreciation", "Accumulated", "Closing"]],
       body: (entries as any[]).map((e) => [
-        e.assets?.asset_tag ?? "—",
-        e.assets?.name ?? "—",
+        e.assets?.asset_tag ?? "-",
+        e.assets?.name ?? "-",
         formatUGX(e.opening_value),
         formatUGX(e.depreciation_amount),
         formatUGX(e.accumulated_after),
@@ -157,7 +157,7 @@ export function RunInsightDialog({
                   <ul className="ml-4 list-disc space-y-0.5">
                     <li>None of the selected assets are depreciable (missing method, useful life, or purchase value).</li>
                     <li>All selected assets already had an entry posted for this period (duplicates skipped).</li>
-                    <li>Selected assets have reached residual value — no depreciation left to post.</li>
+                    <li>Selected assets have reached residual value - no depreciation left to post.</li>
                     <li>Depreciation start date is after the run's period end.</li>
                     {run.status === "running" && <li>The browser tab was closed before the run finished.</li>}
                   </ul>
@@ -184,7 +184,7 @@ export function RunInsightDialog({
                         <div className="w-24 shrink-0 font-medium capitalize">{l.step}</div>
                         <div className="flex-1">
                           {l.assets && <span className="mr-1 font-mono text-[10px] text-muted-foreground">[{l.assets.asset_tag}]</span>}
-                          {l.message ?? "—"}
+                          {l.message ?? "-"}
                         </div>
                       </li>
                     ))}
@@ -212,8 +212,8 @@ export function RunInsightDialog({
                       <tr><td colSpan={6} className="px-2 py-6 text-center text-muted-foreground">No entries.</td></tr>
                     ) : (entries as any[]).map((e) => (
                       <tr key={e.id} className="border-t">
-                        <td className="px-2 py-1 font-mono">{e.assets?.asset_tag ?? "—"}</td>
-                        <td className="px-2 py-1">{e.assets?.name ?? "—"}</td>
+                        <td className="px-2 py-1 font-mono">{e.assets?.asset_tag ?? "-"}</td>
+                        <td className="px-2 py-1">{e.assets?.name ?? "-"}</td>
                         <td className="px-2 py-1 text-right tabular-nums">{formatUGX(e.opening_value)}</td>
                         <td className="px-2 py-1 text-right tabular-nums">{formatUGX(e.depreciation_amount)}</td>
                         <td className="px-2 py-1 text-right tabular-nums">{formatUGX(e.accumulated_after)}</td>

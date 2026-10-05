@@ -67,7 +67,7 @@ function VerificationPage() {
     queryFn: async () => (await supabase.from("locations").select("id,name").order("name")).data ?? [],
   });
 
-  // Profiles map (verified_by FK targets auth.users, not profiles — fetch separately)
+  // Profiles map (verified_by FK targets auth.users, not profiles - fetch separately)
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles-verif"],
     queryFn: async () => (await supabase.from("profiles").select("id,email,full_name")).data ?? [],
@@ -151,7 +151,7 @@ function VerificationPage() {
     "Department": v.department ?? "",
     "Condition": v.condition ?? "",
     "Status": v.status,
-    "Verified by": profileMap[v.verified_by]?.full_name ?? profileMap[v.verified_by]?.email ?? "—",
+    "Verified by": profileMap[v.verified_by]?.full_name ?? profileMap[v.verified_by]?.email ?? "-",
     "Notes": v.notes ?? "",
     "Changes": v.changes && Object.keys(v.changes).length ? JSON.stringify(v.changes) : "",
   }));
@@ -286,14 +286,14 @@ function VerificationPage() {
                 >
                   <td className="px-3 py-2 whitespace-nowrap">{new Date(v.verified_at).toLocaleString()}</td>
                   <td className="px-3 py-2">
-                    <p className="font-medium">{v.assets?.name ?? "—"}</p>
+                    <p className="font-medium">{v.assets?.name ?? "-"}</p>
                     <p className="text-xs text-muted-foreground">{v.assets?.asset_tag ?? ""} {v.assets?.serial_number ? `· SN ${v.assets.serial_number}` : ""}</p>
                   </td>
-                  <td className="px-3 py-2">{v.branches?.name ?? "—"}{v.locations?.name ? ` · ${v.locations.name}` : ""}</td>
-                  <td className="px-3 py-2">{v.custodian_name ?? "—"}{v.department ? ` · ${v.department}` : ""}</td>
-                  <td className="px-3 py-2 capitalize">{v.condition ?? "—"}</td>
+                  <td className="px-3 py-2">{v.branches?.name ?? "-"}{v.locations?.name ? ` · ${v.locations.name}` : ""}</td>
+                  <td className="px-3 py-2">{v.custodian_name ?? "-"}{v.department ? ` · ${v.department}` : ""}</td>
+                  <td className="px-3 py-2 capitalize">{v.condition ?? "-"}</td>
                   <td className="px-3 py-2"><Badge className={STATUS_TONE[v.status as VStatus]}>{v.status.replace("_"," ")}</Badge></td>
-                  <td className="px-3 py-2 text-xs">{profileMap[v.verified_by]?.full_name ?? profileMap[v.verified_by]?.email ?? "—"}</td>
+                  <td className="px-3 py-2 text-xs">{profileMap[v.verified_by]?.full_name ?? profileMap[v.verified_by]?.email ?? "-"}</td>
                 </tr>
               ))}
             </tbody>
@@ -434,7 +434,7 @@ function VerifyDialog({
             <div>
               <p className="font-medium">Branch mismatch</p>
               <p className="text-muted-foreground">
-                Register says <b>{branches.find((b: any) => b.id === expectedBranchId)?.name ?? "—"}</b>, you are verifying at <b>{branches.find((b: any) => b.id === branchId)?.name ?? "—"}</b>. Save as Mismatched if this is not where it should be.
+                Register says <b>{branches.find((b: any) => b.id === expectedBranchId)?.name ?? "-"}</b>, you are verifying at <b>{branches.find((b: any) => b.id === branchId)?.name ?? "-"}</b>. Save as Mismatched if this is not where it should be.
               </p>
             </div>
           </div>
@@ -448,9 +448,9 @@ function VerifyDialog({
           <div className="space-y-1">
             <Label>Location</Label>
             <Select value={locationId || "none"} onValueChange={(v) => setLocationId(v === "none" ? "" : v)}>
-              <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="-" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">— None —</SelectItem>
+                <SelectItem value="none">- None -</SelectItem>
                 {locations.map((l: any) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -541,7 +541,7 @@ function CompareDialog({
   }));
   const changedRows = rows.filter((r) => r.changed);
 
-  const verifier = profileMap[current.verified_by]?.full_name ?? profileMap[current.verified_by]?.email ?? "—";
+  const verifier = profileMap[current.verified_by]?.full_name ?? profileMap[current.verified_by]?.email ?? "-";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -553,14 +553,14 @@ function CompareDialog({
           <DialogDescription>
             {previous
               ? `Comparing this verification against the previous one on ${new Date(previous.verified_at).toLocaleString()}.`
-              : "No earlier verification on file — showing this verification's recorded changes against the register at the time."}
+              : "No earlier verification on file - showing this verification's recorded changes against the register at the time."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-3 sm:grid-cols-3 text-sm">
           <div className="rounded-md border p-3">
             <p className="text-xs text-muted-foreground">Asset</p>
-            <p className="font-medium">{current.assets?.name ?? "—"}</p>
+            <p className="font-medium">{current.assets?.name ?? "-"}</p>
             <p className="text-xs text-muted-foreground">{current.assets?.asset_tag} {current.assets?.serial_number ? `· SN ${current.assets.serial_number}` : ""}</p>
           </div>
           <div className="rounded-md border p-3">
@@ -590,10 +590,10 @@ function CompareDialog({
               {rows.map((r) => (
                 <tr key={r.key} className={`border-t ${r.changed ? "bg-warning/5" : ""}`}>
                   <td className="px-3 py-2 font-medium">{r.label}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{r.from == null || r.from === "" ? "—" : String(r.from)}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{r.from == null || r.from === "" ? "-" : String(r.from)}</td>
                   <td className="px-3 py-2 text-muted-foreground">{r.changed ? <ArrowRight className="h-4 w-4" /> : ""}</td>
                   <td className={`px-3 py-2 ${r.changed ? "font-semibold text-warning-foreground" : ""}`}>
-                    {r.to == null || r.to === "" ? "—" : String(r.to)}
+                    {r.to == null || r.to === "" ? "-" : String(r.to)}
                   </td>
                   <td className="px-3 py-2">
                     {r.changed ? (

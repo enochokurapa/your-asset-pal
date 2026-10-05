@@ -22,7 +22,7 @@ export function announceBrandingChanged(template: DocumentTemplate) {
 
 export function applyBrowserBranding(template: DocumentTemplate) {
   const company = template.organization_name.trim() || "AssetFlow";
-  document.title = `${company} — Asset Management`;
+  document.title = `${company} - Asset Management`;
   setMetaColor(template.primary_color);
 
   if (template.logo_data_url) {
@@ -34,7 +34,7 @@ export function applyBrowserBranding(template: DocumentTemplate) {
   // Browsers use this manifest for future installs. Existing installed icons are
   // controlled by the OS and may require reinstalling the app to refresh its icon.
   const manifest = {
-    name: `${company} — Asset Management`, short_name: company.slice(0, 30), id: "/",
+    name: `${company} - Asset Management`, short_name: company.slice(0, 30), id: "/",
     description: `Manage ${company}'s fixed assets.`, start_url: "/", scope: "/",
     display: "standalone", orientation: "any",
     background_color: "#ffffff", theme_color: template.primary_color,

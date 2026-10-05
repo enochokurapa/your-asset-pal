@@ -57,7 +57,7 @@ const friendlyEntity = (t: string | null | undefined) => {
     case "depreciation_runs": return "Depreciation run";
     case "audit_log": return "Audit entry";
     default:
-      if (!t) return "—";
+      if (!t) return "-";
       return t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   }
 };
@@ -122,26 +122,26 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
   const assetMap = useMemo(() => Object.fromEntries((assetsList as any[]).map((a) => [a.id, a])), [assetsList]);
 
   const userLabel = (id: string | null | undefined) => {
-    if (!id) return "—";
+    if (!id) return "-";
     const p = profileMap[id as string];
-    return p?.full_name || p?.email || "—";
+    return p?.full_name || p?.email || "-";
   };
 
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
 
   const resolveValue = (key: string, value: any): string => {
-    if (value === null || value === undefined || value === "") return "—";
+    if (value === null || value === undefined || value === "") return "-";
     if (typeof value === "object") return JSON.stringify(value);
     const s = String(value);
     const k = key.toLowerCase();
     if (UUID_RE.test(s)) {
-      if (k.includes("branch")) return branchMap[s]?.name ?? "—";
-      if (k.includes("location")) return locationMap[s]?.name ?? "—";
-      if (k.includes("category")) return categoryMap[s]?.name ?? "—";
+      if (k.includes("branch")) return branchMap[s]?.name ?? "-";
+      if (k.includes("location")) return locationMap[s]?.name ?? "-";
+      if (k.includes("category")) return categoryMap[s]?.name ?? "-";
       if (k === "asset_id" || k === "asset") {
         const a = assetMap[s];
-        return a ? `${a.name}${a.asset_tag ? ` (${a.asset_tag})` : ""}` : "—";
+        return a ? `${a.name}${a.asset_tag ? ` (${a.asset_tag})` : ""}` : "-";
       }
       if (
         k.includes("user") || k.includes("_by") || k === "by" ||
@@ -156,7 +156,7 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
       if (locationMap[s]) return locationMap[s].name;
       if (categoryMap[s]) return categoryMap[s].name;
       if (assetMap[s]) return assetMap[s].name;
-      return "—";
+      return "-";
     }
     if (ISO_RE.test(s)) { try { return new Date(s).toLocaleString(); } catch { return s; } }
     return s;
@@ -294,7 +294,7 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
     if (picks.length === 0) { toast.error("Select at least one entry"); return; }
     const { loadTemplate, createBrandedPdf, applyTemplateChrome } = await import("@/lib/pdf-template");
     const template = await loadTemplate();
-    const { doc, startY } = createBrandedPdf({ template, orientation: "landscape", title: `Audit Log — ${picks.length} entries` });
+    const { doc, startY } = createBrandedPdf({ template, orientation: "landscape", title: `Audit Log - ${picks.length} entries` });
     picks.forEach((r: any, i: number) => {
       if (i > 0) {
         doc.addPage();

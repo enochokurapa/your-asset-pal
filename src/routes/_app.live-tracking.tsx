@@ -82,7 +82,7 @@ function LiveTrackingPage() {
           const e=latestByDevice.get(d.id);
           return <div key={d.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
             <div><div className="flex items-center gap-2"><p className="font-medium">{d.label||d.external_device_id}</p><Badge variant={d.is_active?"secondary":"outline"}>{d.is_active?"Active":"Disabled"}</Badge></div>
-              <p className="text-xs text-muted-foreground">{d.provider} · {d.assets?`${d.assets.asset_tag} — ${d.assets.name}`:"Not linked to an asset"}</p>
+              <p className="text-xs text-muted-foreground">{d.provider} · {d.assets?`${d.assets.asset_tag} - ${d.assets.name}`:"Not linked to an asset"}</p>
               {e&&<p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="h-3 w-3"/>{Number(e.latitude).toFixed(6)}, {Number(e.longitude).toFixed(6)} · {new Date(e.recorded_at).toLocaleString()}</p>}
             </div>
             <div className="flex items-center gap-2">
@@ -101,7 +101,7 @@ function LiveTrackingPage() {
         <div className="space-y-2"><Label>Device ID *</Label><Input value={externalId} onChange={e=>setExternalId(e.target.value)} placeholder="IMEI / provider device ID"/></div>
         <div className="space-y-2"><Label>Label</Label><Input value={label} onChange={e=>setLabel(e.target.value)} placeholder="Vehicle tracker 01"/></div>
         <div className="space-y-2"><Label>Asset</Label><Select value={assetId||"none"} onValueChange={v=>setAssetId(v==="none"?"":v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>
-          <SelectItem value="none">Not linked yet</SelectItem>{(assets as any[]).map(a=><SelectItem key={a.id} value={a.id}>{a.asset_tag} — {a.name}</SelectItem>)}
+          <SelectItem value="none">Not linked yet</SelectItem>{(assets as any[]).map(a=><SelectItem key={a.id} value={a.id}>{a.asset_tag} - {a.name}</SelectItem>)}
         </SelectContent></Select></div>
         <p className="text-xs text-muted-foreground">New trackers remain disabled until an administrator activates live tracking and configures the provider credentials.</p>
       </div>

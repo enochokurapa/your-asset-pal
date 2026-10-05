@@ -175,7 +175,7 @@ function SettingsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Logo max height (mm) — {tpl.logo_max_height}</Label>
+                  <Label>Logo max height (mm) - {tpl.logo_max_height}</Label>
                   <Slider value={[tpl.logo_max_height]} min={6} max={40} step={1} onValueChange={([v]) => set("logo_max_height", v)} />
                 </div>
               </div>
@@ -249,7 +249,7 @@ function SettingsPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Opacity — {Math.round(tpl.watermark_opacity * 100)}%</Label>
+                <Label>Opacity - {Math.round(tpl.watermark_opacity * 100)}%</Label>
                 <Slider value={[tpl.watermark_opacity * 100]} min={2} max={60} step={1} onValueChange={([v]) => set("watermark_opacity", v / 100)} />
               </div>
             </TabsContent>
@@ -268,7 +268,7 @@ function SettingsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Base font size — {tpl.base_font_size}pt</Label>
+                  <Label>Base font size - {tpl.base_font_size}pt</Label>
                   <Slider value={[tpl.base_font_size]} min={7} max={16} step={1} onValueChange={([v]) => set("base_font_size", v)} />
                 </div>
                 <div className="space-y-2">
@@ -362,7 +362,7 @@ async function generatePreview(tpl: DocumentTemplate): Promise<string> {
     body: [
       ["Asset", "LP-001 · Dell Latitude 7440"],
       ["Branch", "Head Office"],
-      ["Destination", "Client site — Garden City"],
+      ["Destination", "Client site - Garden City"],
       ["Reason", "Field installation"],
       ["Expected return", new Date(Date.now() + 5 * 86400000).toLocaleDateString()],
       ["Status", "approved"],
@@ -454,7 +454,7 @@ function AppearancePanel() {
         </Select>
         <div className="rounded-md border bg-card p-3" style={{ fontFamily: (FONT_OPTIONS.find((f) => f.id === (theme.fontId ?? "system")) ?? FONT_OPTIONS[0]).stack }}>
           <p className="text-lg font-semibold">The quick brown fox jumps over the lazy dog.</p>
-          <p className="text-sm text-muted-foreground">0123456789 — Sample heading and body in the selected font.</p>
+          <p className="text-sm text-muted-foreground">0123456789 - Sample heading and body in the selected font.</p>
         </div>
       </div>
       <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
@@ -559,7 +559,7 @@ const USER_GUIDES: GuideModule[] = [
     sections: [
       { heading: "Running depreciation", body: [
         "Go to Depreciation → Run depreciation.",
-        "Pick a frequency (monthly/quarterly/annually) — the previous period is pre-filled.",
+        "Pick a frequency (monthly/quarterly/annually) - the previous period is pre-filled.",
         "Tick assets to include, or use Missed only to catch up assets that were skipped.",
         "Click Run for N asset(s). The system posts entries and updates accumulated depreciation.",
       ]},
@@ -567,7 +567,7 @@ const USER_GUIDES: GuideModule[] = [
         "The Alerts tab lists failed/stuck runs, missing periods, and assets at residual.",
         "Use the filters (kind, asset, date range, search) to narrow the list.",
         "Click any failed-run alert to open the run dialog. It shows the failure reason, full stack trace (when available) and the step-by-step Run logs.",
-        "You also receive in-app notifications when a run fails — click the notification to jump straight to the failure.",
+        "You also receive in-app notifications when a run fails - click the notification to jump straight to the failure.",
       ]},
       { heading: "NBV & reports", body: [
         "NBV report, Accumulated, and By category tabs offer downloadable Excel/PDF reports.",
@@ -597,7 +597,7 @@ const USER_GUIDES: GuideModule[] = [
     description: "Generating, previewing, and exporting all system reports.",
     sections: [
       { heading: "Available reports", body: [
-        "Register, Movements, Retire/Dispose, Maintenance, Approvals, Verification, Depreciation, Gate Passes — each on its own tab.",
+        "Register, Movements, Retire/Dispose, Maintenance, Approvals, Verification, Depreciation, Gate Passes - each on its own tab.",
         "Apply filters at the top (branch, category, date range) before exporting.",
       ]},
       { heading: "Exporting", body: [
@@ -626,12 +626,12 @@ const USER_GUIDES: GuideModule[] = [
     description: "Configuring document branding, theme, fonts, and downloading these guides.",
     sections: [
       { heading: "Document Template", body: [
-        "Customize logo, header/footer, watermark, layout, paper size — preview updates live.",
+        "Customize logo, header/footer, watermark, layout, paper size - preview updates live.",
         "Click Save changes to apply across all PDFs generated by the system.",
       ]},
       { heading: "Appearance (theme & font)", body: [
         "Pick a color preset or set a custom primary color; choose an interface font from the curated list.",
-        "Theme is saved to your browser only — it does not affect other users.",
+        "Theme is saved to your browser only - it does not affect other users.",
       ]},
       { heading: "User guides", body: [
         "This tab. Click Download PDF next to any module to get a printable how-to guide for that module, or download the full guide for the whole system.",
@@ -697,7 +697,7 @@ function UserGuidesPanel() {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => downloadGuide([m], `user-guide-${m.id}.pdf`, `${m.name} — User Guide`)}
+              onClick={() => downloadGuide([m], `user-guide-${m.id}.pdf`, `${m.name} - User Guide`)}
             >
               PDF
             </Button>

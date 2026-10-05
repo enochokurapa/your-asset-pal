@@ -17,7 +17,7 @@ export const Route = createFileRoute("/register")({
   component: RegisterPage,
   head: () => ({
     meta: [
-      { title: "Start free trial — AssetFlow 360" },
+      { title: "Start free trial - AssetFlow 360" },
       { name: "description", content: "Create your organization's isolated AssetFlow 360 workspace and start a free trial." },
     ],
   }),

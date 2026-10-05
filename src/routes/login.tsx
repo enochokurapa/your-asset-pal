@@ -12,7 +12,7 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
-  head: () => ({ meta: [{ title: "Sign in — AssetFlow 360" }] }),
+  head: () => ({ meta: [{ title: "Sign in - AssetFlow 360" }] }),
 });
 
 function authErrorMessage(error: unknown): string {

@@ -92,7 +92,7 @@ export function TileAssetsDialog({
         {!selected ? (
           <>
             <DialogHeader>
-              <DialogTitle>{title} — Report</DialogTitle>
+              <DialogTitle>{title} - Report</DialogTitle>
               <DialogDescription>
                 {isLoading
                   ? "Loading…"
@@ -133,10 +133,10 @@ export function TileAssetsDialog({
                       <td className="px-3 py-2 font-mono text-xs">{a.asset_tag}</td>
                       <td className="px-3 py-2">{a.name}</td>
                       <td className="px-3 py-2"><Badge variant="secondary">{a.condition}</Badge></td>
-                      <td className="px-3 py-2">{a.department || "—"}</td>
+                      <td className="px-3 py-2">{a.department || "-"}</td>
                       <td className="px-3 py-2">{a.branches?.name ?? ""}</td>
-                      <td className="px-3 py-2">{a.custodian || "—"}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{a.purchase_value ? formatUGX(a.purchase_value) : "—"}</td>
+                      <td className="px-3 py-2">{a.custodian || "-"}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{a.purchase_value ? formatUGX(a.purchase_value) : "-"}</td>
                     </tr>
                   ))}
                   {!filtered.length && !isLoading && (
@@ -199,7 +199,7 @@ function Row({ k, v }: { k: string; v: any }) {
   return (
     <div className="flex justify-between gap-3 rounded border bg-card px-3 py-2">
       <span className="text-muted-foreground">{k}</span>
-      <span className="font-medium text-right">{v || "—"}</span>
+      <span className="font-medium text-right">{v || "-"}</span>
     </div>
   );
 }
