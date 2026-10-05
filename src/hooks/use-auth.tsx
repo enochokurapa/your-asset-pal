@@ -5,7 +5,7 @@ import type { Session, User } from "@supabase/supabase-js";
 export type AppRole = "admin" | "manager" | "staff" | "security";
 export type ModuleKey =
   | "dashboard" | "assets" | "categories" | "locations" | "branches"
-  | "users" | "reports" | "audit" | "depreciation" | "gate_pass" | "settings" | "verification";
+  | "users" | "reports" | "audit" | "depreciation" | "gate_pass" | "settings" | "verification"\n  | "geolocation" | "api_access" | "live_tracking";
 export type ApprovalKind =
   | "movement" | "retirement" | "disposal" | "reactivation" | "set_for_disposal" | "maintenance" | "deletion" | "attachment_deletion";
 export type ActionKind =
@@ -24,7 +24,7 @@ export type ActionKind =
 export type SubscriptionStatus = "trial" | "active" | "expired" | "suspended" | "unknown";
 
 export const ALL_MODULES: ModuleKey[] = [
-  "dashboard", "assets", "categories", "locations", "branches", "users", "reports", "audit", "depreciation", "gate_pass", "verification", "settings",
+  "dashboard", "assets", "categories", "locations", "branches", "users", "reports", "audit", "depreciation", "gate_pass", "verification", "settings", "geolocation", "api_access", "live_tracking",
 ];
 export const ALL_APPROVAL_KINDS: ApprovalKind[] = [
   "movement", "retirement", "disposal", "reactivation", "set_for_disposal", "maintenance", "deletion", "attachment_deletion",
