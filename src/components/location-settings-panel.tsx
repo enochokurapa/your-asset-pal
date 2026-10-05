@@ -96,73 +96,88 @@ export function LocationSettingsPanel() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start gap-3">
-        <MapPinned className="mt-0.5 h-5 w-5 text-primary" />
-        <div>
-          <h3 className="font-semibold">Asset location setup</h3>
-          <p className="text-sm text-muted-foreground">Configure this once. Asset-entry screens automatically use these defaults so staff do not repeatedly choose a location model.</p>
-        </div>
+      <div>
+        <h3 className="text-lg font-semibold">Asset location setup</h3>
+        <p className="text-sm text-muted-foreground">Set the organisation defaults once. Staff will only see the fields needed during asset capture.</p>
       </div>
 
       <fieldset disabled={!isTenantAdmin} className="space-y-5">
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="space-y-2">
-            <Label>Location model</Label>
-            <Select value={form.location_mode} onValueChange={(v) => set("location_mode", v as Settings["location_mode"])}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="internal">Internal</SelectItem>
-                <SelectItem value="branch">Branch based</SelectItem>
-                <SelectItem value="geographic">Geographic / field</SelectItem>
-                <SelectItem value="hybrid">Hybrid</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">{modeDescription}</p>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Default country</Label>
-            <Select value={form.default_country_code || "none"} onValueChange={(v) => set("default_country_code", v === "none" ? null : v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No default</SelectItem>
-                {(countries as any[]).map((c) => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Default branch</Label>
-            <Select value={form.default_branch_id || "none"} onValueChange={(v) => set("default_branch_id", v === "none" ? null : v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No default</SelectItem>
-                {(branches as any[]).map((b) => <SelectItem key={b.id} value={b.id}>{b.name}{b.code ? ` (${b.code})` : ""}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <Card className="grid gap-4 p-4 sm:grid-cols-2">
-          {[
-            ["require_branch", "Require branch", "Do not save an asset without a branch."],
-            ["require_geography", "Require geographic area", "Require a mapped district/town/area for each asset."],
-            ["require_internal_location", "Require internal location", "Require a room/store/office/site where the organisation uses internal locations."],
-            ["require_gps", "Require GPS verification", "Require a device GPS capture before saving the asset."],
-            ["allow_inline_location_create", "Allow quick location creation", "Authorized users can create a room/store/site without leaving asset entry."],
-            ["remember_last_selection", "Remember last selection", "Reuse the previous branch/location during bulk capture on the same device."],
-            ["allow_custom_area", "Allow custom area", "Permit organisation-specific site names when the global geography does not contain the exact place."],
-            ["show_coordinates", "Show raw coordinates", "Normally coordinates stay hidden to keep capture screens clean."],
-          ].map(([key, title, description]) => (
-            <div key={key} className="flex items-start justify-between gap-4 rounded-lg border p-3">
-              <div><p className="text-sm font-medium">{title}</p><p className="text-xs text-muted-foreground">{description}</p></div>
-              <Switch checked={Boolean(form[key as keyof Settings])} onCheckedChange={(v) => set(key as keyof Settings, v as never)} />
+        <Card className="p-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label>Location model</Label>
+              <Select value={form.location_mode} onValueChange={(v) => set("location_mode", v as Settings["location_mode"])}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="internal">Internal</SelectItem>
+                  <SelectItem value="branch">Branch based</SelectItem>
+                  <SelectItem value="geographic">Geographic / field</SelectItem>
+                  <SelectItem value="hybrid">Hybrid</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">{modeDescription}</p>
             </div>
-          ))}
+
+            <div className="space-y-2">
+              <Label>Default country</Label>
+              <Select value={form.default_country_code || "none"} onValueChange={(v) => set("default_country_code", v === "none" ? null : v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No default</SelectItem>
+                  {(countries as any[]).map((c) => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Default branch</Label>
+              <Select value={form.default_branch_id || "none"} onValueChange={(v) => set("default_branch_id", v === "none" ? null : v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No default</SelectItem>
+                  {(branches as any[]).map((b) => <SelectItem key={b.id} value={b.id}>{b.name}{b.code ? ` (${b.code})` : ""}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </Card>
 
+        <details className="rounded-xl border bg-card" open>
+          <summary className="cursor-pointer list-none px-4 py-3 font-medium">Required fields</summary>
+          <div className="grid gap-3 border-t p-4 sm:grid-cols-2">
+            {[
+              ["require_branch", "Branch", "Require a branch before an asset can be saved."],
+              ["require_geography", "Geographic area", "Require a district/county/region and mapped area."],
+              ["require_internal_location", "Internal location", "Require an office, store, room or site."],
+              ["require_gps", "GPS verification", "Require a device GPS capture before saving."],
+            ].map(([key, title, description]) => (
+              <label key={key} className="flex items-start justify-between gap-4 rounded-lg border p-3">
+                <div><p className="text-sm font-medium">{title}</p><p className="text-xs text-muted-foreground">{description}</p></div>
+                <Switch checked={Boolean(form[key as keyof Settings])} onCheckedChange={(v) => set(key as keyof Settings, v as never)} />
+              </label>
+            ))}
+          </div>
+        </details>
+
+        <details className="rounded-xl border bg-card">
+          <summary className="cursor-pointer list-none px-4 py-3 font-medium">Capture preferences</summary>
+          <div className="grid gap-3 border-t p-4 sm:grid-cols-2">
+            {[
+              ["allow_inline_location_create", "Quick add location", "Allow authorised users to add a room, store or site without leaving asset entry."],
+              ["remember_last_selection", "Remember last selection", "Reuse the previous branch/location during repeated capture."],
+              ["allow_custom_area", "Custom area", "Allow organisation-specific site names where needed."],
+              ["show_coordinates", "Show coordinates", "Display raw latitude and longitude to users."],
+            ].map(([key, title, description]) => (
+              <label key={key} className="flex items-start justify-between gap-4 rounded-lg border p-3">
+                <div><p className="text-sm font-medium">{title}</p><p className="text-xs text-muted-foreground">{description}</p></div>
+                <Switch checked={Boolean(form[key as keyof Settings])} onCheckedChange={(v) => set(key as keyof Settings, v as never)} />
+              </label>
+            ))}
+          </div>
+        </details>
+
         <div className="flex justify-end">
-          <Button onClick={save} disabled={saving || !isTenantAdmin}><Save className="mr-2 h-4 w-4" />{saving ? "Saving…" : "Save location setup"}</Button>
+          <Button onClick={save} disabled={saving || !isTenantAdmin}><Save className="mr-2 h-4 w-4" />{saving ? "Saving…" : "Save changes"}</Button>
         </div>
       </fieldset>
     </div>
