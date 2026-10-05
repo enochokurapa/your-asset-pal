@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS public.geo_places (
   longitude double precision,
   population bigint,
   timezone text,
+  display_path text,
   source text NOT NULL DEFAULT 'geonames',
   updated_at timestamptz NOT NULL DEFAULT now()
 );
