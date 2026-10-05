@@ -87,7 +87,7 @@ def build(country: str, rows):
         population = c[14] or "0"
         out.append([
             c[0], c[8], parent_for(c), c[1], c[2], fc, fcode, level,
-            c[10], c[11], c[12], c[13], c[4], c[5], population, c[17],
+            c[10], c[11], c[12], c[13], c[4], c[5], population, c[17], path_for(int(c[0]), c[1]),
         ])
     return out
 
