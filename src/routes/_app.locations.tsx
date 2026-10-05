@@ -6,467 +6,232 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Card } from "@/components/ui/card";
-import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
-} from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, MapPin, Crosshair, Navigation, Globe2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { ResponsiveTabsList as TabsList, ResponsiveTabsTrigger as TabsTrigger } from "@/components/ui/responsive-tabs";
+import { Building2, Globe2, MapPin, Plus, ChevronRight, ChevronLeft, Radar, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { PESAPAL_COUNTRIES, countryByCode } from "@/lib/pesapal-geography";
 
-export const Route = createFileRoute("/_app/locations")({
-  component: LocationsPage,
-});
+export const Route = createFileRoute("/_app/locations")({ component: LocationsPage });
 
-type Loc = {
-  id: string;
-  name: string;
-  address: string | null;
-  parent_id: string | null;
-  is_active: boolean;
-  country_code?: string | null;
-  administrative_area?: string | null;
-  locality?: string | null;
-  custom_area?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-  gps_accuracy_m?: number | null;
-  location_source?: string | null;
-  last_verified_at?: string | null;
-};
-
-type FormState = {
-  id?: string;
-  name: string;
-  address: string;
-  parent_id: string;
-  is_active: boolean;
-  country_code: string;
-  administrative_area: string;
-  locality: string;
-  custom_area: string;
-  latitude: string;
-  longitude: string;
-  gps_accuracy_m: string;
-  location_source: string;
-};
-
-const emptyForm: FormState = {
-  name: "",
-  address: "",
-  parent_id: "",
-  is_active: true,
-  country_code: "UG",
-  administrative_area: "",
-  locality: "",
-  custom_area: "",
-  latitude: "",
-  longitude: "",
-  gps_accuracy_m: "",
-  location_source: "manual",
+const TYPE_LABEL: Record<string,string> = {
+  site:"Site", branch:"Branch", building:"Building", floor:"Floor", department:"Department",
+  office:"Office", room:"Room", store:"Store", warehouse:"Warehouse", archive:"Archive",
+  field_site:"Field site", area:"Area", other:"Other",
 };
 
 function LocationsPage() {
-  const { canWrite, canDo, canView, user } = useAuth();
+  const { canWrite, canDo, canView, isTenantAdmin } = useAuth();
   const canEdit = canWrite || canDo("edit_location");
-  const geolocationEnabled = canView("geolocation");
+  const trackingEnabled = canView("live_tracking");
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [capturing, setCapturing] = useState(false);
-  const [form, setForm] = useState<FormState>(emptyForm);
 
-  const { data = [], isLoading } = useQuery({
-    queryKey: ["locations"],
-    queryFn: async () => (await supabase.from("locations").select("*").order("name")).data ?? [],
+  const { data: locations = [] } = useQuery({
+    queryKey:["locations"],
+    queryFn:async()=> (await (supabase as any).from("locations")
+      .select("*, branches(name,code), geo_places(name,display_path)")
+      .eq("is_active",true).order("name")).data ?? [],
+  });
+  const { data: branches = [] } = useQuery({
+    queryKey:["branches-active"],
+    queryFn:async()=> (await supabase.from("branches").select("id,name,code,is_active").eq("is_active",true).order("name")).data ?? [],
+  });
+  const { data: countries = [] } = useQuery({
+    queryKey:["geo-countries"],
+    queryFn:async()=> (await (supabase as any).from("geo_countries").select("code,name").eq("enabled",true).order("name")).data ?? [],
   });
 
-  const selectedCountry = countryByCode(form.country_code);
-  const districtOptions = Object.keys(selectedCountry?.areas ?? {});
-  const localityOptions = form.administrative_area
-    ? selectedCountry?.areas[form.administrative_area] ?? []
-    : [];
-
-  const { parents, childrenByParent } = useMemo(() => {
-    const all = data as Loc[];
-    const parents = all.filter((l) => !l.parent_id);
-    const childrenByParent: Record<string, Loc[]> = {};
-    all.forEach((l) => {
-      if (l.parent_id) (childrenByParent[l.parent_id] ||= []).push(l);
-    });
-    return { parents, childrenByParent };
-  }, [data]);
-
-  const captureGps = () => {
-    if (!navigator.geolocation) {
-      toast.error("GPS is not available on this device or browser");
-      return;
-    }
-    setCapturing(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setForm((current) => ({
-          ...current,
-          latitude: position.coords.latitude.toFixed(7),
-          longitude: position.coords.longitude.toFixed(7),
-          gps_accuracy_m: Math.round(position.coords.accuracy).toString(),
-          location_source: "device_gps",
-        }));
-        setCapturing(false);
-        toast.success("Current GPS position captured");
-      },
-      (error) => {
-        setCapturing(false);
-        const message =
-          error.code === error.PERMISSION_DENIED
-            ? "Location permission was denied. Allow location access and try again."
-            : "Could not capture the current GPS location.";
-        toast.error(message);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
-    );
-  };
-
-  const save = async () => {
-    if (!form.name.trim()) {
-      toast.error("Name is required");
-      return;
-    }
-    if (form.id && form.parent_id === form.id) {
-      toast.error("A location can't be its own parent");
-      return;
-    }
-
-    const latitude = form.latitude ? Number(form.latitude) : null;
-    const longitude = form.longitude ? Number(form.longitude) : null;
-    if (latitude !== null && (Number.isNaN(latitude) || latitude < -90 || latitude > 90)) {
-      toast.error("Latitude is invalid");
-      return;
-    }
-    if (longitude !== null && (Number.isNaN(longitude) || longitude < -180 || longitude > 180)) {
-      toast.error("Longitude is invalid");
-      return;
-    }
-
-    const payload: any = {
-      name: form.name.trim(),
-      address: form.address.trim() || null,
-      parent_id: form.parent_id || null,
-      is_active: form.is_active,
-    };
-
-    if (geolocationEnabled) {
-      payload.country_code = form.country_code || null;
-      payload.administrative_area = form.administrative_area || null;
-      payload.locality = form.locality || null;
-      payload.custom_area = form.custom_area.trim() || null;
-      payload.latitude = latitude;
-      payload.longitude = longitude;
-      payload.gps_accuracy_m = form.gps_accuracy_m ? Number(form.gps_accuracy_m) : null;
-      payload.location_source = form.location_source || "manual";
-      if (latitude !== null && longitude !== null) {
-        payload.last_verified_at = new Date().toISOString();
-        payload.last_verified_by = user?.id ?? null;
-      }
-    }
-
-    const { error } = form.id
-      ? await supabase.from("locations").update(payload).eq("id", form.id)
-      : await supabase.from("locations").insert(payload);
-
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    toast.success(form.id ? "Location updated" : "Location created");
-    setOpen(false);
-    qc.invalidateQueries({ queryKey: ["locations"] });
-    qc.invalidateQueries({ queryKey: ["locations-list"] });
-  };
-
-  const remove = async (id: string) => {
-    if (!confirm("Delete this location? Sub-locations will become top-level.")) return;
-    const { error } = await supabase.from("locations").delete().eq("id", id);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    toast.success("Deleted");
-    qc.invalidateQueries({ queryKey: ["locations"] });
-  };
-
-  const toggleActive = async (l: Loc) => {
-    const { error } = await supabase.from("locations").update({ is_active: !l.is_active }).eq("id", l.id);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    toast.success(!l.is_active ? "Activated" : "Deactivated");
-    qc.invalidateQueries({ queryKey: ["locations"] });
-  };
-
-  const openNew = () => {
-    setForm(emptyForm);
-    setOpen(true);
-  };
-
-  const openEdit = (l: Loc) => {
-    setForm({
-      id: l.id,
-      name: l.name,
-      address: l.address ?? "",
-      parent_id: l.parent_id ?? "",
-      is_active: l.is_active,
-      country_code: l.country_code ?? "UG",
-      administrative_area: l.administrative_area ?? "",
-      locality: l.locality ?? "",
-      custom_area: l.custom_area ?? "",
-      latitude: l.latitude?.toString() ?? "",
-      longitude: l.longitude?.toString() ?? "",
-      gps_accuracy_m: l.gps_accuracy_m?.toString() ?? "",
-      location_source: l.location_source ?? "manual",
-    });
-    setOpen(true);
-  };
-
-  const renderCard = (l: Loc, isChild = false) => {
-    const country = countryByCode(l.country_code)?.name;
-    const geoLine = [country, l.administrative_area, l.locality, l.custom_area].filter(Boolean).join(" · ");
-    return (
-      <div key={l.id} className={`rounded-xl border bg-card p-4 ${isChild ? "ml-4 border-dashed" : ""}`}>
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="truncate font-semibold">{l.name}</p>
-              {!l.is_active && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
-              {geolocationEnabled && l.latitude != null && l.longitude != null && (
-                <Badge variant="outline" className="gap-1 text-xs"><Navigation className="h-3 w-3" /> GPS mapped</Badge>
-              )}
-            </div>
-            {geoLine && <p className="mt-1 text-sm text-muted-foreground">{geoLine}</p>}
-            {l.address && <p className="mt-1 whitespace-pre-line text-sm text-muted-foreground">{l.address}</p>}
-            {geolocationEnabled && l.latitude != null && l.longitude != null && (
-              <p className="mt-1 font-mono text-xs text-muted-foreground">
-                {Number(l.latitude).toFixed(6)}, {Number(l.longitude).toFixed(6)}
-                {l.gps_accuracy_m ? ` · ±${Math.round(l.gps_accuracy_m)}m` : ""}
-              </p>
-            )}
-          </div>
-          {canEdit && (
-            <div className="flex gap-1">
-              <Button size="icon" variant="ghost" onClick={() => openEdit(l)}><Pencil className="h-4 w-4" /></Button>
-              {canWrite && <Button size="icon" variant="ghost" onClick={() => remove(l.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
-            </div>
-          )}
-        </div>
-        {canEdit && (
-          <div className="mt-3 flex items-center gap-2 border-t pt-2 text-xs">
-            <Switch checked={l.is_active} onCheckedChange={() => toggleActive(l)} />
-            <span className="text-muted-foreground">{l.is_active ? "Active" : "Inactive"}</span>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const parentOptions = useMemo(() => {
-    if (!form.id) return data as Loc[];
-    const blocked = new Set<string>([form.id]);
-    let added = true;
-    while (added) {
-      added = false;
-      (data as Loc[]).forEach((l) => {
-        if (l.parent_id && blocked.has(l.parent_id) && !blocked.has(l.id)) {
-          blocked.add(l.id);
-          added = true;
-        }
-      });
-    }
-    return (data as Loc[]).filter((l) => !blocked.has(l.id));
-  }, [data, form.id]);
+  const mapped = (locations as any[]).filter((l)=>l.geo_place_id || (l.latitude!=null && l.longitude!=null)).length;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Locations</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage company locations, geographic areas and optional GPS coordinates.
-          </p>
-        </div>
-        {canWrite && (
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New location</Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>{form.id ? "Edit" : "New"} location</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-5 py-2">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>Location name *</Label>
-                    <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. PesaPal HQ, Finance Office" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Parent / internal location</Label>
-                    <Select value={form.parent_id || "none"} onValueChange={(v) => setForm({ ...form, parent_id: v === "none" ? "" : v })}>
-                      <SelectTrigger><SelectValue placeholder="Top level" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">— Top level —</SelectItem>
-                        {parentOptions.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {geolocationEnabled && (
-                  <div className="space-y-4 rounded-xl border bg-muted/20 p-4">
-                    <div className="flex items-center gap-2">
-                      <Globe2 className="h-4 w-4 text-primary" />
-                      <div>
-                        <p className="text-sm font-semibold">Geographic location</p>
-                        <p className="text-xs text-muted-foreground">Country, district/city and area are optional but recommended for mapped assets.</p>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      <div className="space-y-2">
-                        <Label>Country</Label>
-                        <Select
-                          value={form.country_code || "UG"}
-                          onValueChange={(v) => setForm({ ...form, country_code: v, administrative_area: "", locality: "" })}
-                        >
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {PESAPAL_COUNTRIES.map((country) => (
-                              <SelectItem key={country.code} value={country.code}>{country.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>District / city</Label>
-                        <Select
-                          value={form.administrative_area || "none"}
-                          onValueChange={(v) => setForm({ ...form, administrative_area: v === "none" ? "" : v, locality: "" })}
-                        >
-                          <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Not specified</SelectItem>
-                            {districtOptions.map((district) => <SelectItem key={district} value={district}>{district}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Area / locality</Label>
-                        <Select
-                          value={form.locality || "none"}
-                          onValueChange={(v) => setForm({ ...form, locality: v === "none" ? "" : v })}
-                        >
-                          <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Not specified</SelectItem>
-                            {localityOptions.map((area) => <SelectItem key={area} value={area}>{area}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Smaller/custom area</Label>
-                      <Input
-                        value={form.custom_area}
-                        onChange={(e) => setForm({ ...form, custom_area: e.target.value })}
-                        placeholder="Optional: building, estate, wing, village, floor, room..."
-                      />
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button type="button" variant="outline" onClick={captureGps} disabled={capturing}>
-                        <Crosshair className="mr-2 h-4 w-4" />
-                        {capturing ? "Capturing GPS…" : "Use Current GPS"}
-                      </Button>
-                      {(form.latitude && form.longitude) && (
-                        <Badge variant="secondary">
-                          {Number(form.latitude).toFixed(6)}, {Number(form.longitude).toFixed(6)}
-                          {form.gps_accuracy_m ? ` · ±${form.gps_accuracy_m}m` : ""}
-                        </Badge>
-                      )}
-                    </div>
-
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>Latitude</Label>
-                        <Input inputMode="decimal" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value, location_source: "manual" })} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Longitude</Label>
-                        <Input inputMode="decimal" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value, location_source: "manual" })} />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <Label>Address / directions</Label>
-                  <Textarea rows={3} value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-                </div>
-
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />
-                  Active
-                </label>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                <Button onClick={save}>Save</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Locations</h1>
+        <p className="text-sm text-muted-foreground">Organisation locations and the global geography used by assets, movements and verification.</p>
       </div>
 
-      {geolocationEnabled && (
-        <div className="grid gap-3 md:grid-cols-3">
-          <Card className="p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Supported countries</p>
-            <p className="mt-1 text-2xl font-bold">{PESAPAL_COUNTRIES.length}</p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">GPS mapped</p>
-            <p className="mt-1 text-2xl font-bold">{(data as Loc[]).filter((l) => l.latitude != null && l.longitude != null).length}</p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Unmapped</p>
-            <p className="mt-1 text-2xl font-bold">{(data as Loc[]).filter((l) => l.latitude == null || l.longitude == null).length}</p>
-          </Card>
-        </div>
-      )}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Metric label="Organisation locations" value={locations.length} />
+        <Metric label="Geo mapped" value={mapped} />
+        <Metric label="Countries loaded" value={countries.length} />
+        <Metric label="Live tracking" value={trackingEnabled ? "Enabled" : "Off"} />
+      </div>
 
-      <Card className="p-4">
-        {isLoading ? (
-          <p className="py-12 text-center text-sm text-muted-foreground">Loading…</p>
-        ) : data.length === 0 ? (
-          <div className="py-12 text-center">
-            <MapPin className="mx-auto h-10 w-10 text-muted-foreground/40" />
-            <p className="mt-3 text-sm text-muted-foreground">No locations yet.</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {parents.map((p) => (
-              <div key={p.id} className="space-y-2">
-                {renderCard(p)}
-                {(childrenByParent[p.id] ?? []).map((c) => renderCard(c, true))}
+      <Tabs defaultValue="organisation">
+        <TabsList>
+          <TabsTrigger value="organisation">Organisation</TabsTrigger>
+          <TabsTrigger value="geography">Geography</TabsTrigger>
+          <TabsTrigger value="tracking">Live tracking</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="organisation" className="pt-4">
+          <OrganisationLocations locations={locations as any[]} branches={branches as any[]} canEdit={canEdit} canWrite={canWrite} onChanged={()=>qc.invalidateQueries({queryKey:["locations"]})} />
+        </TabsContent>
+
+        <TabsContent value="geography" className="pt-4">
+          <GeographyBrowser countries={countries as any[]} />
+        </TabsContent>
+
+        <TabsContent value="tracking" className="pt-4">
+          <Card>
+            <CardContent className="flex min-h-48 items-center justify-center p-6 text-center">
+              <div className="max-w-lg">
+                <Radar className="mx-auto h-9 w-9 text-primary" />
+                <h3 className="mt-3 font-semibold">Live tracking foundation is installed</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Tracker devices, telemetry events and asset links are ready. The module is currently switched off at platform level and cannot collect live tracking data until the SaaS administrator enables it.
+                </p>
+                <Badge variant="outline" className="mt-3">{trackingEnabled ? "Module enabled" : "Module disabled"}</Badge>
               </div>
-            ))}
-          </div>
-        )}
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
+}
+
+function Metric({label,value}:{label:string;value:string|number}) {
+  return <Card className="p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold">{value}</p></Card>;
+}
+
+function OrganisationLocations({locations,branches,canEdit,canWrite,onChanged}:{locations:any[];branches:any[];canEdit:boolean;canWrite:boolean;onChanged:()=>void}) {
+  const [open,setOpen]=useState(false);
+  const [name,setName]=useState("");
+  const [type,setType]=useState("office");
+  const [branch,setBranch]=useState("");
+  const [parent,setParent]=useState("");
+
+  const create=async()=>{
+    if(!name.trim()) return toast.error("Location name is required");
+    const {error}=await (supabase as any).from("locations").insert({
+      name:name.trim(),location_type:type,branch_id:branch||null,parent_id:parent||null,
+      is_active:true,is_structured:true,location_source:"manual",
+    });
+    if(error) return toast.error(error.message);
+    setOpen(false);setName("");setBranch("");setParent("");setType("office");onChanged();toast.success("Location created");
+  };
+
+  const remove=async(id:string)=>{
+    if(!confirm("Deactivate this organisation location? Existing asset history will be kept.")) return;
+    const {error}=await (supabase as any).from("locations").update({is_active:false}).eq("id",id);
+    if(error) return toast.error(error.message);
+    onChanged();toast.success("Location deactivated");
+  };
+
+  const byParent=useMemo(()=>{
+    const m:Record<string,any[]>={};
+    locations.forEach(l=>(m[l.parent_id||"root"] ||= []).push(l));
+    return m;
+  },[locations]);
+
+  const render=(l:any,depth=0):any=>(
+    <div key={l.id}>
+      <div className="flex items-center justify-between gap-3 border-b px-3 py-3 last:border-0" style={{paddingLeft:12+depth*22}}>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-medium">{l.name}</p>
+            <Badge variant="outline">{TYPE_LABEL[l.location_type]||l.location_type}</Badge>
+            {l.geo_place_id && <Badge variant="secondary">Geo mapped</Badge>}
+          </div>
+          <p className="mt-1 truncate text-xs text-muted-foreground">
+            {l.branches?.name ? `${l.branches.name} · ` : ""}{l.geo_places?.display_path || l.address || "Organisation location"}
+          </p>
+        </div>
+        {canWrite && <Button size="icon" variant="ghost" onClick={()=>remove(l.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>}
+      </div>
+      {(byParent[l.id]||[]).map((c)=>render(c,depth+1))}
+    </div>
+  );
+
+  return <Card>
+    <CardHeader className="flex-row items-center justify-between">
+      <div><CardTitle>Organisation structure</CardTitle><p className="text-sm text-muted-foreground">Sites, buildings, offices, stores, archives, rooms and field sites.</p></div>
+      {canEdit && <Button onClick={()=>setOpen(true)}><Plus className="mr-2 h-4 w-4"/>Add location</Button>}
+    </CardHeader>
+    <CardContent className="p-0">
+      {locations.length ? (byParent.root||[]).map((l)=>render(l)) : <p className="p-8 text-center text-sm text-muted-foreground">No organisation locations yet.</p>}
+    </CardContent>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Add organisation location</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-2"><Label>Name</Label><Input value={name} onChange={e=>setName(e.target.value)} placeholder="Finance Store, Floor 2, Kampala HQ…"/></div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2"><Label>Type</Label>
+              <Select value={type} onValueChange={setType}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>
+                {Object.entries(TYPE_LABEL).map(([k,v])=><SelectItem key={k} value={k}>{v}</SelectItem>)}
+              </SelectContent></Select>
+            </div>
+            <div className="space-y-2"><Label>Branch</Label>
+              <Select value={branch||"none"} onValueChange={v=>setBranch(v==="none"?"":v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>
+                <SelectItem value="none">No branch</SelectItem>{branches.map(b=><SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+              </SelectContent></Select>
+            </div>
+          </div>
+          <div className="space-y-2"><Label>Parent location</Label>
+            <Select value={parent||"none"} onValueChange={v=>setParent(v==="none"?"":v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>
+              <SelectItem value="none">Top level</SelectItem>{locations.map(l=><SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+            </SelectContent></Select>
+          </div>
+        </div>
+        <DialogFooter><Button variant="outline" onClick={()=>setOpen(false)}>Cancel</Button><Button onClick={create}>Create</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </Card>;
+}
+
+function GeographyBrowser({countries}:{countries:any[]}) {
+  const [country,setCountry]=useState("UG");
+  const [search,setSearch]=useState("");
+  const [stack,setStack]=useState<any[]>([]);
+  const parent=stack.length?stack[stack.length-1].geoname_id:null;
+
+  const {data:places=[],isLoading}=useQuery({
+    queryKey:["geo-browser",country,parent,search],
+    queryFn:async()=>{
+      let q=(supabase as any).from("geo_places")
+        .select("geoname_id,name,display_path,feature_code,admin_level,population,parent_geoname_id")
+        .eq("country_code",country);
+      if(search.trim().length>=2) q=q.ilike("name",`%${search.trim()}%`).order("population",{ascending:false}).limit(100);
+      else if(parent) q=q.eq("parent_geoname_id",parent).order("admin_level",{ascending:true}).order("name").limit(500);
+      else q=q.is("parent_geoname_id",null).eq("feature_class","A").order("name").limit(500);
+      const {data,error}=await q;if(error) throw error;return data??[];
+    }
+  });
+
+  const enter=(p:any)=>{setStack(s=>[...s,p]);setSearch("");};
+  const back=()=>{setStack(s=>s.slice(0,-1));setSearch("");};
+
+  return <Card>
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2"><Globe2 className="h-5 w-5 text-primary"/>Global geography</CardTitle>
+      <p className="text-sm text-muted-foreground">Browse or search the full imported geography. This data is shared system-wide; organisations only add their own internal sites and rooms.</p>
+    </CardHeader>
+    <CardContent className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-[220px_1fr]">
+        <Select value={country} onValueChange={v=>{setCountry(v);setStack([]);setSearch("");}}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>
+          {countries.map(c=><SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
+        </SelectContent></Select>
+        <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search any district, city, town, locality or village…"/>
+      </div>
+
+      {stack.length>0 && <div className="flex flex-wrap items-center gap-1 text-sm">
+        <Button variant="ghost" size="sm" onClick={back}><ChevronLeft className="mr-1 h-4 w-4"/>Back</Button>
+        {stack.map((p,i)=><span key={p.geoname_id} className="flex items-center gap-1 text-muted-foreground">{i>0&&<ChevronRight className="h-3 w-3"/>}{p.name}</span>)}
+      </div>}
+
+      <div className="max-h-[520px] overflow-y-auto rounded-lg border">
+        {isLoading ? <p className="p-6 text-center text-sm text-muted-foreground">Loading geography…</p> :
+        places.length===0 ? <p className="p-6 text-center text-sm text-muted-foreground">No places found.</p> :
+        places.map((p:any)=><button key={p.geoname_id} type="button" onClick={()=>enter(p)} className="flex w-full items-center justify-between gap-3 border-b px-3 py-3 text-left last:border-0 hover:bg-muted/40">
+          <div className="min-w-0"><p className="font-medium">{p.name}</p><p className="truncate text-xs text-muted-foreground">{p.display_path}</p></div>
+          <div className="flex items-center gap-2"><Badge variant="outline">{p.feature_code}</Badge><ChevronRight className="h-4 w-4 text-muted-foreground"/></div>
+        </button>)}
+      </div>
+    </CardContent>
+  </Card>;
 }
