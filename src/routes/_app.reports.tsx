@@ -51,7 +51,14 @@ type ReportExportMeta = {
 };
 
 async function exportPDF(r: Report, meta: ReportExportMeta) {
-  const template = await loadTemplate();
+  const loadedTemplate = await loadTemplate();
+  const template = {
+    ...loadedTemplate,
+    organization_name:
+      !loadedTemplate.organization_name || loadedTemplate.organization_name === "Your Organization"
+        ? meta.organization
+        : loadedTemplate.organization_name,
+  };
   const reportRef = `AF-${new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14)}`;
   const { doc, startY, pageWidth, pageHeight } = createBrandedPdf({
     template,
