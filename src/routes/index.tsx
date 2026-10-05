@@ -127,6 +127,89 @@ const integrationItems = [
   },
 ];
 
+function HeroAssetScene() {
+  const floatingAssets = [
+    { icon: Laptop, label: "Laptop", className: "left-[3%] top-[20%]", delay: "0s" },
+    { icon: Printer, label: "Printer", className: "right-[3%] top-[18%]", delay: ".8s" },
+    { icon: Server, label: "Server", className: "right-[6%] bottom-[16%]", delay: "1.4s" },
+    { icon: Smartphone, label: "Field device", className: "left-[2%] bottom-[17%]", delay: "2s" },
+  ];
+
+  return (
+    <div className="relative mx-auto aspect-[1.08/1] w-full max-w-[600px] overflow-hidden rounded-[2rem] border bg-card shadow-2xl shadow-primary/10">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,color-mix(in_srgb,var(--primary)_7%,transparent),transparent_62%)]" />
+
+      <svg className="absolute inset-0 h-full w-full" viewBox="0 0 600 560" aria-hidden="true">
+        <path className="af-flow-line" d="M70 150 C166 86, 215 116, 280 225" />
+        <path className="af-flow-line af-delay-1" d="M536 145 C446 86, 389 118, 321 225" />
+        <path className="af-flow-line af-delay-2" d="M527 430 C442 468, 386 400, 326 322" />
+        <path className="af-flow-line af-delay-3" d="M71 437 C159 476, 220 401, 277 326" />
+
+        <path className="af-wave-line" d="M-30 476 C89 410, 184 520, 305 457 C412 401, 496 484, 636 416" />
+        <path className="af-wave-line af-delay-2" d="M-42 516 C92 452, 200 548, 320 493 C438 440, 512 512, 646 459" />
+
+        <circle cx="299" cy="274" r="122" fill="none" stroke="currentColor" strokeOpacity=".08" />
+        <circle cx="299" cy="274" r="88" fill="none" stroke="currentColor" strokeOpacity=".08" />
+      </svg>
+
+      <div className="absolute left-1/2 top-[49%] -translate-x-1/2 -translate-y-1/2">
+        <div className="af-person-float relative">
+          <svg width="218" height="270" viewBox="0 0 218 270" role="img" aria-label="Asset officer using a tablet">
+            <ellipse cx="109" cy="255" rx="72" ry="10" fill="currentColor" opacity=".08" />
+            <circle cx="110" cy="55" r="34" fill="#d8a47f" />
+            <path d="M80 49c7-36 60-43 72-3-15-9-29-13-44-11-9 1-18 5-28 14Z" fill="#282526" />
+            <path d="M69 119c8-31 30-47 59-47 31 0 54 18 63 50l-13 81H81Z" fill="var(--platform-secondary, #4B47DC)" />
+            <path d="M67 126c-23 24-33 55-38 83l22 5c8-31 18-53 35-69Z" fill="#d8a47f" />
+            <path d="M187 124c21 25 29 57 31 84l-22 2c-4-30-11-53-27-69Z" fill="#d8a47f" />
+            <rect x="82" y="133" width="95" height="70" rx="10" fill="#171717" />
+            <rect x="90" y="141" width="79" height="54" rx="6" fill="#faf9f7" />
+            <circle cx="130" cy="168" r="10" fill="var(--platform-primary, #C77435)" />
+            <path d="M125 168h10M130 163v10" stroke="#fff" strokeWidth="3" strokeLinecap="round" />
+            <path d="M89 201h84l12 60H77Z" fill="#2c2a2b" />
+            <path d="M102 201v60M158 201v60" stroke="#222" strokeWidth="10" strokeLinecap="round" />
+          </svg>
+
+          <div className="af-scan-pulse absolute -right-10 top-24 flex items-center gap-1.5 rounded-full border bg-background/95 px-3 py-1.5 text-xs font-semibold shadow-lg">
+            <ScanLine className="h-3.5 w-3.5 text-primary" />
+            Scan
+          </div>
+        </div>
+      </div>
+
+      {floatingAssets.map(({ icon: Icon, label, className, delay }) => (
+        <div
+          key={label}
+          className={"af-orbit-card absolute bg-background/90 text-foreground shadow-lg " + className}
+          style={{ animationDelay: delay }}
+        >
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Icon className="h-4 w-4" />
+          </span>
+          <span className="text-xs font-semibold">{label}</span>
+        </div>
+      ))}
+
+      <div className="af-float absolute left-[12%] top-[46%] rounded-xl border bg-background/90 p-2.5 shadow-lg" style={{ animationDelay: ".5s" }}>
+        <MapPinned className="h-5 w-5 text-primary" />
+      </div>
+      <div className="af-float absolute right-[12%] top-[47%] rounded-xl border bg-background/90 p-2.5 shadow-lg" style={{ animationDelay: "1.3s" }}>
+        <FileCheck2 className="h-5 w-5 text-primary" />
+      </div>
+
+      <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full border bg-background/95 px-4 py-2 text-[11px] font-semibold shadow-lg">
+        <span className="h-2 w-2 rounded-full bg-primary" />
+        Register
+        <ArrowRight className="h-3 w-3 text-muted-foreground" />
+        Locate
+        <ArrowRight className="h-3 w-3 text-muted-foreground" />
+        Verify
+        <ArrowRight className="h-3 w-3 text-muted-foreground" />
+        Report
+      </div>
+    </div>
+  );
+}
+
 function PublicHome() {
   const { user } = useAuth();
 
@@ -212,84 +295,9 @@ function PublicHome() {
               </div>
             </div>
 
-            <div className="relative">
-              <div className="rounded-[1.6rem] border bg-card p-4 shadow-2xl shadow-primary/10">
-                <div className="flex items-center justify-between border-b pb-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Live asset view</p>
-                    <h2 className="mt-1 text-lg font-bold">Know what you own and where it is</h2>
-                  </div>
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    <Boxes className="h-5 w-5" />
-                  </span>
-                </div>
-
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  {assets.map(({ icon: Icon, name, tag, place, status }) => (
-                    <div key={tag} className="rounded-xl border bg-background p-3">
-                      <div className="flex items-start gap-3">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                          <Icon className="h-5 w-5" />
-                        </span>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold">{name}</p>
-                          <p className="text-xs text-muted-foreground">{tag}</p>
-                        </div>
-                        <span className="ml-auto rounded-full border px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                          {status}
-                        </span>
-                      </div>
-                      <div className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <MapPin className="h-3.5 w-3.5 text-primary" />
-                        <span className="truncate">{place}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-3 grid grid-cols-3 gap-3">
-                  <div className="rounded-xl border bg-background p-3">
-                    <p className="text-[11px] text-muted-foreground">Assets</p>
-                    <p className="mt-1 text-xl font-bold">1,284</p>
-                  </div>
-                  <div className="rounded-xl border bg-background p-3">
-                    <p className="text-[11px] text-muted-foreground">Located</p>
-                    <p className="mt-1 text-xl font-bold">1,241</p>
-                  </div>
-                  <div className="rounded-xl border bg-background p-3">
-                    <p className="text-[11px] text-muted-foreground">Verified</p>
-                    <p className="mt-1 text-xl font-bold">96%</p>
-                  </div>
-                </div>
-
-                <div className="mt-3 rounded-xl border bg-background p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold">Asset control flow</p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">Register, locate, verify, move, report</p>
-                    </div>
-                    <div className="flex items-center gap-2 text-primary">
-                      <ScanLine className="h-4 w-4" />
-                      <ArrowRight className="h-3.5 w-3.5" />
-                      <MapPinned className="h-4 w-4" />
-                      <ArrowRight className="h-3.5 w-3.5" />
-                      <FileCheck2 className="h-4 w-4" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="absolute -bottom-5 -left-4 hidden rounded-xl border bg-background px-4 py-3 shadow-xl sm:block">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Wifi className="h-4 w-4" />
-                  </span>
-                  <div>
-                    <p className="text-xs font-semibold">Field ready</p>
-                    <p className="text-[10px] text-muted-foreground">Mobile capture and PWA access</p>
-                  </div>
-                </div>
-              </div>
+            <div className="relative af-reveal">
+              <HeroAssetScene />
+            </div>
             </div>
           </div>
         </section>
@@ -312,7 +320,7 @@ function PublicHome() {
           </div>
         </section>
 
-        <section id="features" className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
+        <section id="features" className="af-reveal mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary">Complete asset lifecycle</p>
             <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
@@ -337,7 +345,7 @@ function PublicHome() {
           </div>
         </section>
 
-        <section id="locations" className="border-y bg-muted/25">
+        <section id="locations" className="af-reveal border-y bg-muted/25">
           <div className="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2 lg:items-center lg:px-8">
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary">Location intelligence</p>
@@ -404,7 +412,7 @@ function PublicHome() {
           </div>
         </section>
 
-        <section id="modules" className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
+        <section id="modules" className="af-reveal mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary">Modules</p>
             <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
@@ -429,7 +437,7 @@ function PublicHome() {
           </div>
         </section>
 
-        <section id="integrations" className="border-y bg-muted/25">
+        <section id="integrations" className="af-reveal border-y bg-muted/25">
           <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
             <div className="grid gap-10 lg:grid-cols-[.8fr_1.2fr] lg:items-start">
               <div>
@@ -462,7 +470,7 @@ function PublicHome() {
           </div>
         </section>
 
-        <section id="security" className="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2 lg:items-center lg:px-8">
+        <section id="security" className="af-reveal mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2 lg:items-center lg:px-8">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary">Security and accountability</p>
             <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
