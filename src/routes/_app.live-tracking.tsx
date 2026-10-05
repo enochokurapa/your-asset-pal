@@ -24,19 +24,22 @@ function LiveTrackingPage() {
   const [label,setLabel]=useState("");
   const [assetId,setAssetId]=useState("");
 
-  if(!canView("live_tracking")) return <Navigate to="/locations"/>;
+  const trackingAllowed = canView("live_tracking");
 
   const {data:assets=[]}=useQuery({
     queryKey:["tracking-assets"],
     queryFn:async()=> (await supabase.from("assets").select("id,asset_tag,name").order("name")).data??[],
+    enabled: trackingAllowed,
   });
   const {data:devices=[]}=useQuery({
     queryKey:["tracking-devices"],
     queryFn:async()=> (await (supabase as any).from("tracking_devices").select("*,assets(asset_tag,name)").order("created_at",{ascending:false})).data??[],
+    enabled: trackingAllowed,
   });
   const {data:events=[]}=useQuery({
     queryKey:["tracking-events"],
     queryFn:async()=> (await (supabase as any).from("tracking_events").select("id,asset_id,device_id,latitude,longitude,accuracy_m,speed_kph,recorded_at").order("recorded_at",{ascending:false}).limit(100)).data??[],
+    enabled: trackingAllowed,
   });
 
   const add=async()=>{
@@ -48,6 +51,15 @@ function LiveTrackingPage() {
     if(error) return toast.error(error.message);
     setOpen(false);setExternalId("");setLabel("");setAssetId("");qc.invalidateQueries({queryKey:["tracking-devices"]});toast.success("Tracker registered");
   };
+
+  const toggleDevice=async(id:string,active:boolean)=>{
+    const {error}=await (supabase as any).from("tracking_devices").update({is_active:active,updated_at:new Date().toISOString()}).eq("id",id);
+    if(error) return toast.error(error.message);
+    qc.invalidateQueries({queryKey:["tracking-devices"]});
+    toast.success(active?"Tracker activated":"Tracker disabled");
+  };
+
+  if(!trackingAllowed) return <Navigate to="/locations"/>;
 
   const latestByDevice=new Map<string,any>();
   (events as any[]).forEach(e=>{if(!latestByDevice.has(e.device_id))latestByDevice.set(e.device_id,e);});
@@ -73,7 +85,10 @@ function LiveTrackingPage() {
               <p className="text-xs text-muted-foreground">{d.provider} · {d.assets?`${d.assets.asset_tag} — ${d.assets.name}`:"Not linked to an asset"}</p>
               {e&&<p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="h-3 w-3"/>{Number(e.latitude).toFixed(6)}, {Number(e.longitude).toFixed(6)} · {new Date(e.recorded_at).toLocaleString()}</p>}
             </div>
-            <Radio className={d.is_active?"h-5 w-5 text-primary":"h-5 w-5 text-muted-foreground"}/>
+            <div className="flex items-center gap-2">
+              {isTenantAdmin&&<Button size="sm" variant="outline" onClick={()=>toggleDevice(d.id,!d.is_active)}>{d.is_active?"Disable":"Activate"}</Button>}
+              <Radio className={d.is_active?"h-5 w-5 text-primary":"h-5 w-5 text-muted-foreground"}/>
+            </div>
           </div>;
         })}
       </CardContent>
