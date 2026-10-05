@@ -38,6 +38,7 @@ export interface DocumentTemplate {
   orientation: Orientation;
   paper_size: PaperSize;
   primary_color: string;
+  generated_by_name?: string;
 }
 
 export const DEFAULT_TEMPLATE: DocumentTemplate = {
@@ -82,13 +83,33 @@ export async function loadTemplate(force = false): Promise<DocumentTemplate> {
     .limit(1)
     .maybeSingle();
   if (error) throw error;
-  const t = (data as any) ? { ...DEFAULT_TEMPLATE, ...(data as any) } : DEFAULT_TEMPLATE;
+  let generatedBy = "";
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+    if (auth.user) {
+      const { data: profile } = await supabase.from("profiles")
+        .select("full_name,email")
+        .eq("id", auth.user.id)
+        .maybeSingle();
+      generatedBy = (profile as any)?.full_name || (profile as any)?.email || auth.user.email || "";
+    }
+  } catch {
+    // Report generation should not fail if the display name cannot be resolved.
+  }
+  const t = ((data as any) ? { ...DEFAULT_TEMPLATE, ...(data as any) } : { ...DEFAULT_TEMPLATE }) as DocumentTemplate;
+  t.generated_by_name = generatedBy;
   cache = { t, at: Date.now() };
   return t;
 }
 
 export function invalidateTemplateCache() {
   cache = null;
+}
+
+function imageFormatFromDataUrl(value: string): "PNG" | "JPEG" | "WEBP" {
+  if (/^data:image\/jpe?g/i.test(value)) return "JPEG";
+  if (/^data:image\/webp/i.test(value)) return "WEBP";
+  return "PNG";
 }
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -127,7 +148,7 @@ export function createBrandedPdf(opts: CreateBrandedPdfOpts): BrandedPdf {
   doc.setFontSize(t.base_font_size);
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const startY = drawHeader(doc, t, opts.title, opts.subtitle, pageWidth, opts.generatedBy, opts.reportRef);
+  const startY = drawHeader(doc, t, opts.title, opts.subtitle, pageWidth, opts.generatedBy || t.generated_by_name, opts.reportRef);
   return { doc, startY, template: t, pageWidth, pageHeight };
 }
 
@@ -180,7 +201,7 @@ function drawHeader(
       let x = left;
       if (t.logo_position === "center") x = (pageWidth - w) / 2;
       else if (t.logo_position === "right") x = right - w;
-      doc.addImage(t.logo_data_url, "PNG", x, y, w, h, undefined, "FAST");
+      doc.addImage(t.logo_data_url, imageFormatFromDataUrl(t.logo_data_url), x, y, w, h, undefined, "FAST");
       logoBottom = y + h;
     } catch {
       /* ignore broken image */
@@ -260,7 +281,7 @@ function drawWatermark(doc: jsPDF, t: DocumentTemplate, pageWidth: number, pageH
       const h = w; // square-ish
       const x = (pageWidth - w) / 2;
       const y = (pageHeight - h) / 2;
-      doc.addImage(t.watermark_image_data_url, "PNG", x, y, w, h, undefined, "SLOW");
+      doc.addImage(t.watermark_image_data_url, imageFormatFromDataUrl(t.watermark_image_data_url), x, y, w, h, undefined, "SLOW");
     } catch {
       /* ignore */
     }
