@@ -149,7 +149,14 @@ function drawHeader(
   if (t.logo_data_url && t.logo_position !== "none") {
     try {
       const h = t.logo_max_height;
-      const w = h * 2.2; // rough; jsPDF stretches—acceptable for branding placeholder
+      let w = h * 2;
+      try {
+        const props = doc.getImageProperties(t.logo_data_url);
+        if (props?.width && props?.height) w = h * (props.width / props.height);
+      } catch {
+        // fall back to a conservative logo width
+      }
+      w = Math.min(w, pageWidth * 0.28);
       let x = left;
       if (t.logo_position === "center") x = (pageWidth - w) / 2;
       else if (t.logo_position === "right") x = right - w;
