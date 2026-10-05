@@ -83,6 +83,10 @@ export function LocationSettingsPanel() {
 
   const save = async () => {
     if (!tenantId || !isTenantAdmin) return;
+    if (["geographic","hybrid"].includes(form.location_mode) && form.allowed_country_codes.length === 0) {
+      toast.error("Select at least one allowed country for this location model");
+      return;
+    }
     setSaving(true);
     try {
       const { data: auth } = await supabase.auth.getUser();
