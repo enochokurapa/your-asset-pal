@@ -80,6 +80,22 @@ def build(country: str, rows):
                 return found
         return None
 
+    name_by_id = {int(c[0]): c[1] for c in rows}
+    parent_cache = {int(c[0]): parent_for(c) for c in rows}
+
+    def path_for(gid, name):
+        parts = [name]
+        seen = {gid}
+        parent = parent_cache.get(gid)
+        while parent and parent not in seen and len(parts) < 8:
+            seen.add(parent)
+            pname = name_by_id.get(parent)
+            if pname:
+                parts.append(pname)
+            parent = parent_cache.get(parent)
+        parts.append(country)
+        return " · ".join(parts)
+
     out = []
     for c in rows:
         fc, fcode = c[6], c[7]
