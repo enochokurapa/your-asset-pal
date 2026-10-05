@@ -3,6 +3,8 @@ import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { startBackupScheduler } from "./lib/backup-core.server";
+import { createHash } from "node:crypto";
+import { supabaseAdmin } from "./integrations/supabase/client.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -155,6 +157,78 @@ async function maybeProxySupabase(request: Request): Promise<Response | null> {
   }
 }
 
+
+const apiAdmin = supabaseAdmin as any;
+
+async function maybeHandlePublicApi(request: Request): Promise<Response | null> {
+  const url = new URL(request.url);
+  if (!url.pathname.startsWith("/api/v1/")) return null;
+
+  if (request.method !== "GET") {
+    return jsonResponse(405, { error: "method_not_allowed", message: "API v1 is read-only in this release." });
+  }
+
+  const auth = request.headers.get("authorization") || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+  if (!token.startsWith("af_live_")) {
+    return jsonResponse(401, { error: "unauthorized", message: "A valid AssetFlow API key is required." });
+  }
+
+  const keyHash = createHash("sha256").update(token).digest("hex");
+  const { data: key, error: keyError } = await apiAdmin
+    .from("api_keys")
+    .select("id,tenant_id,scopes,is_active,expires_at")
+    .eq("key_hash", keyHash)
+    .maybeSingle();
+
+  if (keyError || !key || !key.is_active || (key.expires_at && new Date(key.expires_at).getTime() <= Date.now())) {
+    return jsonResponse(401, { error: "unauthorized", message: "API key is invalid, expired or revoked." });
+  }
+
+  const resource = url.pathname.slice("/api/v1/".length).replace(/\/+$/, "");
+  const config: Record<string, { table: string; scope: string; select: string }> = {
+    assets: {
+      table: "assets",
+      scope: "assets:read",
+      select: "id,asset_tag,serial_number,name,description,status,purchase_value,purchase_date,category_id,location_id,branch_id,created_at,updated_at",
+    },
+    locations: {
+      table: "locations",
+      scope: "locations:read",
+      select: "id,name,address,parent_id,is_active,country_code,administrative_area,locality,custom_area,latitude,longitude,gps_accuracy_m,location_source,last_verified_at,created_at",
+    },
+    branches: {
+      table: "branches",
+      scope: "branches:read",
+      select: "id,name,code,address,is_active,created_at",
+    },
+  };
+
+  const chosen = config[resource];
+  if (!chosen) {
+    return jsonResponse(404, { error: "not_found", message: "Unknown API v1 resource." });
+  }
+
+  const scopes = Array.isArray(key.scopes) ? key.scopes : [];
+  if (!scopes.includes(chosen.scope)) {
+    return jsonResponse(403, { error: "forbidden", message: `API key does not have ${chosen.scope} permission.` });
+  }
+
+  const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || "100"), 1), 500);
+  let query = apiAdmin.from(chosen.table).select(chosen.select).eq("tenant_id", key.tenant_id).limit(limit);
+  const id = url.searchParams.get("id");
+  if (id) query = query.eq("id", id);
+
+  const { data, error } = await query;
+  if (error) return jsonResponse(500, { error: "query_failed", message: error.message });
+
+  await apiAdmin.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", key.id);
+  return jsonResponse(200, {
+    data: data ?? [],
+    meta: { resource, count: data?.length ?? 0, limit, api_version: "v1" },
+  });
+}
+
 function brandedErrorResponse(): Response {
   return new Response(renderErrorPage(), {
     status: 500,
@@ -206,6 +280,9 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const apiResponse = await maybeHandlePublicApi(request);
+      if (apiResponse) return apiResponse;
+
       const proxied = await maybeProxySupabase(request);
       if (proxied) return proxied;
 
