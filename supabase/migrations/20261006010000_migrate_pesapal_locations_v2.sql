@@ -3,6 +3,18 @@
 
 BEGIN;
 
+-- Bulk migration is recorded as one explicit tenant audit event below.
+-- Per-row audit/notification triggers are paused only inside this transaction;
+-- tenant-isolation/reference-validation triggers remain active.
+ALTER TABLE public.locations DISABLE TRIGGER trg_audit_locations;
+ALTER TABLE public.assets DISABLE TRIGGER audit_assets;
+ALTER TABLE public.assets DISABLE TRIGGER trg_audit_assets;
+ALTER TABLE public.asset_movements DISABLE TRIGGER audit_movements;
+ALTER TABLE public.asset_movements DISABLE TRIGGER trg_audit_movements;
+ALTER TABLE public.asset_verifications DISABLE TRIGGER audit_asset_verifications;
+ALTER TABLE public.gate_passes DISABLE TRIGGER trg_gate_passes_audit;
+ALTER TABLE public.gate_passes DISABLE TRIGGER trg_gate_passes_notify;
+
 CREATE TEMP TABLE _legacy_location_plan(
   old_name text PRIMARY KEY,
   new_name text NOT NULL,
@@ -119,6 +131,27 @@ WHERE old.id=m.old_location_id
 UPDATE public.location_migration_map SET migration_status='retired'
 WHERE tenant_id=(SELECT id FROM public.tenants WHERE slug='default' LIMIT 1)
   AND new_location_id IS NOT NULL;
+
+ALTER TABLE public.locations ENABLE TRIGGER trg_audit_locations;
+ALTER TABLE public.assets ENABLE TRIGGER audit_assets;
+ALTER TABLE public.assets ENABLE TRIGGER trg_audit_assets;
+ALTER TABLE public.asset_movements ENABLE TRIGGER audit_movements;
+ALTER TABLE public.asset_movements ENABLE TRIGGER trg_audit_movements;
+ALTER TABLE public.asset_verifications ENABLE TRIGGER audit_asset_verifications;
+ALTER TABLE public.gate_passes ENABLE TRIGGER trg_gate_passes_audit;
+ALTER TABLE public.gate_passes ENABLE TRIGGER trg_gate_passes_notify;
+
+INSERT INTO public.audit_log(tenant_id,entity_type,entity_id,action,actor_user_id,details)
+SELECT
+  t.id,'location_migration',NULL,'migrated',NULL,
+  jsonb_build_object(
+    'engine','location_engine_v2',
+    'source','legacy_manual_locations',
+    'migrated_locations',(SELECT count(*) FROM public.location_migration_map m WHERE m.tenant_id=t.id AND m.migration_status='retired'),
+    'migrated_assets',(SELECT count(*) FROM public.assets a WHERE a.tenant_id=t.id AND a.location_source='migration'),
+    'completed_at',now()
+  )
+FROM public.tenants t WHERE t.slug='default';
 
 NOTIFY pgrst, 'reload schema';
 COMMIT;
