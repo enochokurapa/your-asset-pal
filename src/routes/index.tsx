@@ -298,7 +298,6 @@ function PublicHome() {
             <div className="relative af-reveal">
               <HeroAssetScene />
             </div>
-            </div>
           </div>
         </section>
 
