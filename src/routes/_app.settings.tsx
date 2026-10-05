@@ -24,6 +24,7 @@ import {
 } from "@/lib/theme";
 import { announceBrandingChanged } from "@/lib/branding";
 import { LocationSettingsPanel } from "@/components/location-settings-panel";
+import { AutomationSettingsPanel } from "@/components/automation-settings-panel";
 
 export const Route = createFileRoute("/_app/settings")({
   component: SettingsPage,
@@ -124,7 +125,7 @@ function SettingsPage() {
         </Card>
       )}
 
-      <div className={activeTab === "locations" ? "grid gap-6" : "grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"}>
+      <div className={["locations","automation"].includes(activeTab) ? "grid gap-6" : "grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"}>
         <Card className="p-4">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList>
@@ -134,6 +135,7 @@ function SettingsPage() {
               <TabsTrigger value="layout">Layout</TabsTrigger>
               <TabsTrigger value="appearance">Appearance</TabsTrigger>
               <TabsTrigger value="locations">Asset locations</TabsTrigger>
+              <TabsTrigger value="automation">Automation</TabsTrigger>
               <TabsTrigger value="guides">User guides</TabsTrigger>
             </TabsList>
 
@@ -316,6 +318,10 @@ function SettingsPage() {
               <LocationSettingsPanel />
             </TabsContent>
 
+            <TabsContent value="automation" className="space-y-4 pt-4">
+              <AutomationSettingsPanel />
+            </TabsContent>
+
             <TabsContent value="guides" className="space-y-4 pt-4">
               <UserGuidesPanel />
             </TabsContent>
@@ -323,7 +329,7 @@ function SettingsPage() {
 
         </Card>
 
-        {activeTab !== "locations" && (
+        {!["locations","automation"].includes(activeTab) && (
         <Card className="flex h-[800px] flex-col p-3">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-sm font-medium">Live preview (sample gate pass)</p>
