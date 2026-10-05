@@ -4,7 +4,7 @@ import { useAuth, ModuleKey } from "@/hooks/use-auth";
 import {
   LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X, FileBarChart,
   Building2, History, UserCircle, TrendingDown, DoorOpen, Settings, ClipboardCheck, Download,
-  CreditCard, Globe2, ShieldCheck, LockKeyhole, DatabaseBackup, ImageIcon, PlugZap,
+  CreditCard, Globe2, ShieldCheck, LockKeyhole, DatabaseBackup, ImageIcon, PlugZap, Radar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -32,6 +32,7 @@ const tenantNav: NavItem[] = [
   { to: "/assets", label: "Assets", icon: Package, module: "assets" },
   { to: "/categories", label: "Categories", icon: Tags, module: "categories" },
   { to: "/locations", label: "Locations", icon: MapPin, module: "locations" },
+  { to: "/live-tracking", label: "Live Tracking", icon: Radar, module: "live_tracking" },
   { to: "/branches", label: "Branches", icon: Building2, module: "branches", tenantAdminOnly: true },
   { to: "/depreciation", label: "Depreciation", icon: TrendingDown, module: "depreciation" },
   { to: "/gate-pass", label: "Gate Pass", icon: DoorOpen, module: "gate_pass" },
