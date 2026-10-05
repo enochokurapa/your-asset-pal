@@ -5,7 +5,8 @@ import type { Session, User } from "@supabase/supabase-js";
 export type AppRole = "admin" | "manager" | "staff" | "security";
 export type ModuleKey =
   | "dashboard" | "assets" | "categories" | "locations" | "branches"
-  | "users" | "reports" | "audit" | "depreciation" | "gate_pass" | "settings" | "verification"\n  | "geolocation" | "api_access" | "live_tracking";
+  | "users" | "reports" | "audit" | "depreciation" | "gate_pass" | "settings" | "verification"
+  | "geolocation" | "api_access" | "live_tracking";
 export type ApprovalKind =
   | "movement" | "retirement" | "disposal" | "reactivation" | "set_for_disposal" | "maintenance" | "deletion" | "attachment_deletion";
 export type ActionKind =
