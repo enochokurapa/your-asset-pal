@@ -255,6 +255,25 @@ function AssetsPage() {
     }
   };
 
+  const recordLocationEvent = async (assetId: string, eventType: string, notes?: string) => {
+    if (!tenantId) return;
+    const { error } = await (supabase as any).from("asset_location_events").insert({
+      tenant_id: tenantId,
+      asset_id: assetId,
+      location_id: form.location_id,
+      geo_place_id: form.geo_place_id,
+      latitude: form.location_latitude ? Number(form.location_latitude) : null,
+      longitude: form.location_longitude ? Number(form.location_longitude) : null,
+      gps_accuracy_m: form.location_accuracy_m ? Number(form.location_accuracy_m) : null,
+      source: form.location_source || "manual",
+      event_type: eventType,
+      notes: notes || null,
+      recorded_by: user?.id ?? null,
+      recorded_at: new Date().toISOString(),
+    });
+    if (error) console.error("Unable to record asset location event", error);
+  };
+
   const save = async () => {
     if (saving) return;
     if (!form.asset_tag.trim() || !form.name.trim()) { toast.error("Tag and name are required"); return; }
@@ -327,13 +346,23 @@ function AssetsPage() {
     setSaving(true);
     try {
       if (form.id) {
+        const previous: any = (assets as any[]).find((a) => a.id === form.id);
         const { error } = await supabase.from("assets").update(payload).eq("id", form.id);
         if (error) { toast.error(error.message); return; }
+        const locationChanged =
+          previous?.location_id !== form.location_id ||
+          previous?.geo_place_id !== form.geo_place_id ||
+          Number(previous?.location_latitude ?? 0) !== Number(form.location_latitude || 0) ||
+          Number(previous?.location_longitude ?? 0) !== Number(form.location_longitude || 0);
+        if (locationChanged) await recordLocationEvent(form.id, "updated", "Asset location updated from the asset register.");
         toast.success("Asset updated");
       } else {
         const { data: created, error } = await supabase
           .from("assets").insert({ ...payload, created_by: user?.id ?? null }).select().single();
         if (error || !created) { toast.error(error?.message ?? "Failed"); return; }
+        if (form.location_id || form.geo_place_id || (form.location_latitude && form.location_longitude)) {
+          await recordLocationEvent(created.id, "registered", "Initial asset location recorded during registration.");
+        }
         // Assignment is secondary activity: a failure must not disguise a
         // successfully created asset, but it must be made visible to the user.
         if (form.assigned_to_name.trim() || form.department.trim()) {
