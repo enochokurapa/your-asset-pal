@@ -38,6 +38,7 @@ export function AssetLocationFields({
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickName, setQuickName] = useState("");
   const [quickType, setQuickType] = useState("office");
+  const [selectedCountry, setSelectedCountry] = useState<string>("");
 
   const { data: settings } = useQuery({
     queryKey: ["tenant-location-settings", tenantId],
@@ -48,7 +49,15 @@ export function AssetLocationFields({
     },
   });
 
-  const defaultCountry = settings?.default_country_code || "UG";
+  const allowedCountryCodes: string[] = Array.isArray(settings?.allowed_country_codes)
+    ? settings.allowed_country_codes
+    : [];
+  const { data: countries = [] } = useQuery({
+    queryKey: ["geo-countries-capture"],
+    queryFn: async () => (await (supabase as any).from("geo_countries")
+      .select("code,name").eq("enabled", true).order("name")).data ?? [],
+  });
+
   const showBranch = ["branch", "hybrid"].includes(settings?.location_mode) || settings?.require_branch;
   const showInternal = ["internal", "hybrid"].includes(settings?.location_mode) || settings?.require_internal_location;
   const showGeo = ["geographic", "hybrid"].includes(settings?.location_mode) || settings?.require_geography;
@@ -57,6 +66,21 @@ export function AssetLocationFields({
     () => locations.filter((l: any) => l.is_active !== false && (!value.branch_id || !l.branch_id || l.branch_id === value.branch_id)),
     [locations, value.branch_id],
   );
+
+  useEffect(() => {
+    if (!settings) return;
+    const allowed = allowedCountryCodes;
+    if (!allowed.length) {
+      setSelectedCountry("");
+      return;
+    }
+    const remembered = settings.remember_last_selection ? localStorage.getItem("assetflow:last-country") : null;
+    const next =
+      (settings.default_country_code && allowed.includes(settings.default_country_code) ? settings.default_country_code : null) ||
+      (remembered && allowed.includes(remembered) ? remembered : null) ||
+      (allowed.length === 1 ? allowed[0] : "");
+    setSelectedCountry((current) => current && allowed.includes(current) ? current : next);
+  }, [settings?.tenant_id, settings?.default_country_code, JSON.stringify(settings?.allowed_country_codes)]);
 
   useEffect(() => {
     if (!settings) return;
@@ -138,6 +162,11 @@ export function AssetLocationFields({
     },
   });
 
+  useEffect(() => {
+    const code = (currentGeo as any)?.country_code;
+    if (code && allowedCountryCodes.includes(code)) setSelectedCountry(code);
+  }, [(currentGeo as any)?.country_code]);
+
   const createQuickLocation = async () => {
     if (!quickName.trim()) return toast.error("Location name is required");
     const geo: any = currentGeo;
@@ -146,7 +175,7 @@ export function AssetLocationFields({
       location_type: quickType,
       branch_id: value.branch_id,
       geo_place_id: value.geo_place_id,
-      country_code: geo?.country_code || defaultCountry,
+      country_code: geo?.country_code || selectedCountry || null,
       latitude: geo?.latitude ?? null,
       longitude: geo?.longitude ?? null,
       location_source: value.geo_place_id ? "map" : "manual",
@@ -200,13 +229,51 @@ export function AssetLocationFields({
         )}
 
         {showGeo && (
-          <div className="space-y-2 sm:col-span-2">
-            <GeoCascadeSelector
-              countryCode={defaultCountry}
-              value={value.geo_place_id}
-              required={!!settings?.require_geography}
-              onChange={(place) => patch({ geo_place_id: place ? Number(place.geoname_id) : null })}
-            />
+          <div className="space-y-3 sm:col-span-2">
+            {allowedCountryCodes.length > 1 && (
+              <div className="space-y-2">
+                <Label>Country {settings?.require_geography ? "*" : ""}</Label>
+                <Select
+                  value={selectedCountry || "none"}
+                  onValueChange={(code) => {
+                    const next = code === "none" ? "" : code;
+                    setSelectedCountry(next);
+                    patch({ geo_place_id: null });
+                    if (settings?.remember_last_selection) {
+                      if (next) localStorage.setItem("assetflow:last-country", next);
+                      else localStorage.removeItem("assetflow:last-country");
+                    }
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Select country…" /></SelectTrigger>
+                  <SelectContent>
+                    {!settings?.require_geography && <SelectItem value="none">Not specified</SelectItem>}
+                    {(countries as any[])
+                      .filter((c) => allowedCountryCodes.includes(c.code))
+                      .map((c) => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {allowedCountryCodes.length === 1 && selectedCountry && (
+              <p className="text-xs text-muted-foreground">
+                Country: {(countries as any[]).find((c) => c.code === selectedCountry)?.name ?? selectedCountry}
+              </p>
+            )}
+
+            {selectedCountry ? (
+              <GeoCascadeSelector
+                countryCode={selectedCountry}
+                value={value.geo_place_id}
+                required={!!settings?.require_geography}
+                onChange={(place) => patch({ geo_place_id: place ? Number(place.geoname_id) : null })}
+              />
+            ) : (
+              <p className="rounded-lg border bg-background p-3 text-sm text-muted-foreground">
+                Select a country to continue.
+              </p>
+            )}
           </div>
         )}
 
