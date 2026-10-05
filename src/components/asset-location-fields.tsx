@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Crosshair, MapPin, Plus, X } from "lucide-react";
+import { Crosshair, MapPin, Plus } from "lucide-react";
+import { GeoCascadeSelector } from "@/components/geo-cascade-selector";
 import { toast } from "sonner";
 
 export type AssetLocationValue = {
@@ -34,7 +35,6 @@ export function AssetLocationFields({
 }) {
   const { tenantId, user } = useAuth();
   const qc = useQueryClient();
-  const [geoQuery, setGeoQuery] = useState("");
   const [capturing, setCapturing] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickName, setQuickName] = useState("");
@@ -58,34 +58,6 @@ export function AssetLocationFields({
     () => locations.filter((l: any) => l.is_active !== false && (!value.branch_id || !l.branch_id || l.branch_id === value.branch_id)),
     [locations, value.branch_id],
   );
-
-  const selectedGeoId = value.geo_place_id;
-  const { data: selectedGeo } = useQuery({
-    queryKey: ["geo-place-selected", selectedGeoId],
-    enabled: !!selectedGeoId,
-    queryFn: async () => {
-      const { data } = await (supabase as any).from("geo_places")
-        .select("geoname_id,name,display_path,country_code,latitude,longitude")
-        .eq("geoname_id", selectedGeoId).maybeSingle();
-      return data;
-    },
-  });
-
-  const { data: geoResults = [], isFetching: geoSearching } = useQuery({
-    queryKey: ["geo-place-search", defaultCountry, geoQuery],
-    enabled: showGeo && geoQuery.trim().length >= 2,
-    queryFn: async () => {
-      const q = geoQuery.trim();
-      const { data, error } = await (supabase as any).from("geo_places")
-        .select("geoname_id,name,display_path,country_code,feature_code,latitude,longitude,population")
-        .eq("country_code", defaultCountry)
-        .ilike("name", `%${q}%`)
-        .order("population", { ascending: false })
-        .limit(12);
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
 
   useEffect(() => {
     if (!settings) return;
@@ -133,10 +105,6 @@ export function AssetLocationFields({
     }
   };
 
-  const chooseGeo = (place: any) => {
-    patch({ geo_place_id: Number(place.geoname_id) });
-    setGeoQuery("");
-  };
 
   const captureGps = () => {
     if (!navigator.geolocation) return toast.error("GPS is not available on this device");
@@ -160,9 +128,20 @@ export function AssetLocationFields({
     );
   };
 
+  const { data: currentGeo } = useQuery({
+    queryKey: ["geo-place-current", value.geo_place_id],
+    enabled: !!value.geo_place_id,
+    queryFn: async () => {
+      const { data } = await (supabase as any).from("geo_places")
+        .select("geoname_id,country_code,latitude,longitude")
+        .eq("geoname_id", value.geo_place_id).maybeSingle();
+      return data;
+    },
+  });
+
   const createQuickLocation = async () => {
     if (!quickName.trim()) return toast.error("Location name is required");
-    const geo: any = selectedGeo;
+    const geo: any = currentGeo;
     const { data, error } = await (supabase as any).from("locations").insert({
       name: quickName.trim(),
       location_type: quickType,
@@ -227,32 +206,12 @@ export function AssetLocationFields({
 
         {showGeo && (
           <div className="space-y-2 sm:col-span-2">
-            <Label>Geographic area {settings?.require_geography ? "*" : ""}</Label>
-            {selectedGeo ? (
-              <div className="flex items-center justify-between gap-2 rounded-lg border bg-background px-3 py-2 text-sm">
-                <div className="min-w-0">
-                  <p className="font-medium">{(selectedGeo as any).name}</p>
-                  <p className="truncate text-xs text-muted-foreground">{(selectedGeo as any).display_path}</p>
-                </div>
-                <Button type="button" size="icon" variant="ghost" onClick={() => patch({ geo_place_id: null })}><X className="h-4 w-4" /></Button>
-              </div>
-            ) : (
-              <div className="relative">
-                <Input value={geoQuery} onChange={(e) => setGeoQuery(e.target.value)} placeholder="Search district, town, area or village…" />
-                {geoQuery.trim().length >= 2 && (
-                  <div className="mt-1 max-h-56 overflow-y-auto rounded-lg border bg-popover shadow-sm">
-                    {geoSearching && <p className="p-3 text-xs text-muted-foreground">Searching…</p>}
-                    {!geoSearching && (geoResults as any[]).length === 0 && <p className="p-3 text-xs text-muted-foreground">No matching mapped area. Use a custom organisation location if needed.</p>}
-                    {(geoResults as any[]).map((place) => (
-                      <button key={place.geoname_id} type="button" onClick={() => chooseGeo(place)} className="block w-full border-b px-3 py-2 text-left last:border-0 hover:bg-muted">
-                        <p className="text-sm font-medium">{place.name}</p>
-                        <p className="truncate text-xs text-muted-foreground">{place.display_path}</p>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            <GeoCascadeSelector
+              countryCode={defaultCountry}
+              value={value.geo_place_id}
+              required={!!settings?.require_geography}
+              onChange={(place) => patch({ geo_place_id: place ? Number(place.geoname_id) : null })}
+            />
           </div>
         )}
 
