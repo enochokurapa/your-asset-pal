@@ -48,6 +48,11 @@ interface AssetForm {
   category_id: string | null;
   location_id: string | null;
   branch_id: string | null;
+  geo_place_id: number | null;
+  location_latitude: string;
+  location_longitude: string;
+  location_accuracy_m: string;
+  location_source: string;
   status: Status;
   purchase_value: string;
   purchase_date: string;
@@ -65,7 +70,9 @@ interface AssetForm {
 
 const empty: AssetForm = {
   asset_tag: "", serial_number: "", name: "", description: "",
-  category_id: null, location_id: null, branch_id: null, status: "in_storage",
+  category_id: null, location_id: null, branch_id: null,
+  geo_place_id: null, location_latitude: "", location_longitude: "", location_accuracy_m: "", location_source: "manual",
+  status: "in_storage",
   purchase_value: "", purchase_date: "",
   assigned_to_name: "", department: "",
   depreciation_method: "", useful_life_months: "", residual_value: "",
@@ -73,7 +80,7 @@ const empty: AssetForm = {
 };
 
 function AssetsPage() {
-  const { canWrite, isAdmin, user, canDo, canSeeBranch, canView } = useAuth();
+  const { canWrite, isAdmin, user, canDo, canSeeBranch, canView, tenantId } = useAuth();
   const canAdd = canWrite || canDo("add_asset");
   const canEdit = canWrite || canDo("edit_asset");
   const canRequestRetire = canWrite || canDo("initiate_retirement");
@@ -127,11 +134,16 @@ function AssetsPage() {
   });
   const { data: locations = [] } = useQuery({
     queryKey: ["locations-list"],
-    queryFn: async () => (await supabase.from("locations").select("id,name").order("name")).data ?? [],
+    queryFn: async () => (await (supabase as any).from("locations").select("id,name,is_active,branch_id,geo_place_id,location_type,is_structured").eq("is_active", true).order("name")).data ?? [],
   });
   const { data: branches = [] } = useQuery({
     queryKey: ["branches-active"],
     queryFn: async () => (await supabase.from("branches").select("id,name,code,is_active").eq("is_active", true).order("name")).data ?? [],
+  });
+  const { data: locationSettings } = useQuery({
+    queryKey: ["tenant-location-settings", tenantId],
+    enabled: !!tenantId,
+    queryFn: async () => (await (supabase as any).from("tenant_location_settings").select("*").eq("tenant_id", tenantId).maybeSingle()).data,
   });
   // Pull current assignments (latest per asset) for custodian/department display & filters
   const { data: assignments = [] } = useQuery({
@@ -182,6 +194,11 @@ function AssetsPage() {
       id: a.id, asset_tag: a.asset_tag, serial_number: a.serial_number ?? "",
       name: a.name, description: a.description ?? "",
       category_id: a.category_id, location_id: a.location_id, branch_id: a.branch_id,
+      geo_place_id: a.geo_place_id ?? null,
+      location_latitude: a.location_latitude?.toString() ?? "",
+      location_longitude: a.location_longitude?.toString() ?? "",
+      location_accuracy_m: a.location_accuracy_m?.toString() ?? "",
+      location_source: a.location_source ?? "manual",
       status: a.status,
       purchase_value: a.purchase_value?.toString() ?? "",
       purchase_date: a.purchase_date ?? "",
@@ -241,7 +258,10 @@ function AssetsPage() {
   const save = async () => {
     if (saving) return;
     if (!form.asset_tag.trim() || !form.name.trim()) { toast.error("Tag and name are required"); return; }
-    if (!form.branch_id) { toast.error("Branch is required"); return; }
+    if (locationSettings?.require_branch && !form.branch_id) { toast.error("Branch is required"); return; }
+    if (locationSettings?.require_geography && !form.geo_place_id) { toast.error("Geographic area is required"); return; }
+    if (locationSettings?.require_internal_location && !form.location_id) { toast.error("Office, store or site is required"); return; }
+    if (locationSettings?.require_gps && (!form.location_latitude || !form.location_longitude)) { toast.error("GPS capture is required"); return; }
 
     const tagLower = form.asset_tag.trim().toLowerCase();
     const serialLower = form.serial_number.trim().toLowerCase();
@@ -261,6 +281,13 @@ function AssetsPage() {
       category_id: form.category_id,
       location_id: form.location_id,
       branch_id: form.branch_id,
+      geo_place_id: form.geo_place_id,
+      location_latitude: form.location_latitude ? Number(form.location_latitude) : null,
+      location_longitude: form.location_longitude ? Number(form.location_longitude) : null,
+      location_accuracy_m: form.location_accuracy_m ? Number(form.location_accuracy_m) : null,
+      location_source: form.location_source || "manual",
+      location_verified_at: form.location_latitude && form.location_longitude ? new Date().toISOString() : null,
+      location_verified_by: form.location_latitude && form.location_longitude ? user?.id ?? null : null,
       status: form.status,
       purchase_value: form.purchase_value ? Number(form.purchase_value) : null,
       purchase_date: form.purchase_date || null,
@@ -428,16 +455,7 @@ function AssetsPage() {
                   <Label htmlFor="desc">Description</Label>
                   <Textarea id="desc" rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
                 </div>
-                <div className="space-y-2">
-                  <Label>Branch *</Label>
-                  <Select value={form.branch_id ?? ""} onValueChange={(v) => setForm({ ...form, branch_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
-                    <SelectContent>
-                      {visibleBranches.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.name}{b.code ? ` (${b.code})` : ""}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
+                <div className="space-y-2 sm:col-span-2">
                   <Label>Category</Label>
                   <Select value={form.category_id ?? "none"} onValueChange={(v) => setForm({ ...form, category_id: v === "none" ? null : v })}>
                     <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
@@ -447,16 +465,21 @@ function AssetsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Location</Label>
-                  <Select value={form.location_id ?? "none"} onValueChange={(v) => setForm({ ...form, location_id: v === "none" ? null : v })}>
-                    <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">— None —</SelectItem>
-                      {locations.map((l: any) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
+
+                <AssetLocationFields
+                  value={{
+                    branch_id: form.branch_id,
+                    location_id: form.location_id,
+                    geo_place_id: form.geo_place_id,
+                    location_latitude: form.location_latitude,
+                    location_longitude: form.location_longitude,
+                    location_accuracy_m: form.location_accuracy_m,
+                    location_source: form.location_source,
+                  }}
+                  onChange={(location) => setForm((current) => ({ ...current, ...location }))}
+                  branches={visibleBranches}
+                  locations={locations as any[]}
+                />
                 <div className="space-y-2">
                   <Label>Status</Label>
                   <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as Status })}>
