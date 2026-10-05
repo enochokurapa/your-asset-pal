@@ -137,3 +137,104 @@
   color: #ffffff;
   background: var(--brand-secondary);
 }
+
+/* AssetFlow motion system */
+@keyframes af-float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -9px, 0); }
+}
+
+@keyframes af-soft-pulse {
+  0%, 100% { opacity: .72; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.035); }
+}
+
+@keyframes af-line-flow {
+  0% { stroke-dashoffset: 42; opacity: .35; }
+  50% { opacity: .95; }
+  100% { stroke-dashoffset: 0; opacity: .35; }
+}
+
+@keyframes af-wave-shift {
+  0%, 100% { transform: translateX(-8px); opacity: .22; }
+  50% { transform: translateX(9px); opacity: .52; }
+}
+
+@keyframes af-panel-in {
+  from { opacity: 0; transform: translateY(12px) scale(.992); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes af-orb {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(10px, -8px, 0) scale(1.05); }
+}
+
+.af-orbit-card {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  border: 1px solid rgb(255 255 255 / .13);
+  border-radius: .9rem;
+  background: rgb(0 0 0 / .18);
+  padding: .45rem .65rem;
+  backdrop-filter: blur(12px);
+  animation: af-float 4.8s ease-in-out infinite;
+}
+
+.af-person-float {
+  animation: af-float 5.4s ease-in-out infinite;
+}
+
+.af-scan-pulse {
+  animation: af-soft-pulse 2.8s ease-in-out infinite;
+}
+
+.af-flow-line {
+  fill: none;
+  stroke: color-mix(in srgb, var(--platform-primary, #C77435) 72%, white);
+  stroke-width: 1.7;
+  stroke-dasharray: 7 7;
+  animation: af-line-flow 2.8s linear infinite;
+}
+
+.af-wave-line {
+  fill: none;
+  stroke: rgb(255 255 255 / .34);
+  stroke-width: 1.2;
+  animation: af-wave-shift 6s ease-in-out infinite;
+}
+
+.af-delay-1 { animation-delay: .7s; }
+.af-delay-2 { animation-delay: 1.35s; }
+.af-delay-3 { animation-delay: 2s; }
+
+.af-login-panel {
+  animation: af-panel-in .48s ease-out both;
+}
+
+.af-login-orb {
+  animation: af-orb 8s ease-in-out infinite;
+}
+
+.af-reveal {
+  animation: af-panel-in .56s ease-out both;
+}
+
+.af-float {
+  animation: af-float 5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .af-orbit-card,
+  .af-person-float,
+  .af-scan-pulse,
+  .af-flow-line,
+  .af-wave-line,
+  .af-login-panel,
+  .af-login-orb,
+  .af-reveal,
+  .af-float {
+    animation: none !important;
+  }
+}
