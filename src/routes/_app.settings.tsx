@@ -23,6 +23,7 @@ import {
   THEME_PRESETS, FONT_OPTIONS, loadStoredTheme, saveStoredTheme, type StoredTheme,
 } from "@/lib/theme";
 import { announceBrandingChanged } from "@/lib/branding";
+import { LocationSettingsPanel } from "@/components/location-settings-panel";
 
 export const Route = createFileRoute("/_app/settings")({
   component: SettingsPage,
@@ -131,6 +132,7 @@ function SettingsPage() {
               <TabsTrigger value="watermark">Watermark</TabsTrigger>
               <TabsTrigger value="layout">Layout</TabsTrigger>
               <TabsTrigger value="appearance">Appearance</TabsTrigger>
+              <TabsTrigger value="locations">Asset locations</TabsTrigger>
               <TabsTrigger value="guides">User guides</TabsTrigger>
             </TabsList>
 
@@ -307,6 +309,10 @@ function SettingsPage() {
 
             <TabsContent value="appearance" className="space-y-4 pt-4">
               <AppearancePanel />
+            </TabsContent>
+
+            <TabsContent value="locations" className="space-y-4 pt-4">
+              <LocationSettingsPanel />
             </TabsContent>
 
             <TabsContent value="guides" className="space-y-4 pt-4">
