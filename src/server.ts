@@ -3,6 +3,7 @@ import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { startBackupScheduler } from "./lib/backup-core.server";
+import { startTenantAutomationScheduler } from "./lib/automation-core.server";
 import { createHash } from "node:crypto";
 import { supabaseAdmin } from "./integrations/supabase/client.server";
 
@@ -35,6 +36,7 @@ let serverEntryPromise: Promise<ServerEntry> | undefined;
 // cron service is not required. It checks the saved SaaS policy every five minutes
 // and creates a backup only when the configured 6/24-hour interval has elapsed.
 startBackupScheduler();
+startTenantAutomationScheduler();
 
 async function getServerEntry(): Promise<ServerEntry> {
   if (!serverEntryPromise) {
