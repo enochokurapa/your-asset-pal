@@ -5,7 +5,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Crosshair, MapPin, Plus } from "lucide-react";
@@ -164,12 +163,8 @@ export function AssetLocationFields({
 
   return (
     <div className="sm:col-span-2 rounded-xl border bg-muted/20 p-4">
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="flex items-center gap-2 text-sm font-semibold"><MapPin className="h-4 w-4 text-primary" /> Asset location</p>
-          <p className="text-xs text-muted-foreground">Configured by your administrator. Only the fields your organisation uses are shown.</p>
-        </div>
-        {settings?.location_mode && <Badge variant="outline" className="capitalize">{settings.location_mode}</Badge>}
+      <div className="mb-3">
+        <p className="flex items-center gap-2 text-sm font-semibold"><MapPin className="h-4 w-4 text-primary" /> Asset location</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -221,7 +216,7 @@ export function AssetLocationFields({
               <Crosshair className="mr-2 h-4 w-4" />{capturing ? "Capturing GPS…" : settings?.require_gps ? "Capture GPS *" : "Capture GPS"}
             </Button>
             {value.location_latitude && value.location_longitude && (
-              <Badge variant="secondary">GPS captured{value.location_accuracy_m ? ` · ±${value.location_accuracy_m}m` : ""}</Badge>
+              <span className="text-xs font-medium text-muted-foreground">GPS captured{value.location_accuracy_m ? ` · ±${value.location_accuracy_m}m` : ""}</span>
             )}
             {settings?.show_coordinates && value.location_latitude && (
               <span className="font-mono text-xs text-muted-foreground">{value.location_latitude}, {value.location_longitude}</span>
