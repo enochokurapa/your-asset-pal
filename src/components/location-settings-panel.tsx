@@ -7,12 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { MapPinned, Save } from "lucide-react";
+import { Save } from "lucide-react";
 import { toast } from "sonner";
 
 type Settings = {
   location_mode: "internal" | "branch" | "geographic" | "hybrid";
   default_country_code: string | null;
+  allowed_country_codes: string[];
   default_branch_id: string | null;
   require_branch: boolean;
   require_geography: boolean;
@@ -26,7 +27,8 @@ type Settings = {
 
 const DEFAULTS: Settings = {
   location_mode: "internal",
-  default_country_code: "UG",
+  default_country_code: null,
+  allowed_country_codes: ["UG","KE","TZ","RW","ZM","MW","ZW"],
   default_branch_id: null,
   require_branch: false,
   require_geography: false,
@@ -67,6 +69,18 @@ export function LocationSettingsPanel() {
 
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => setForm((current) => ({ ...current, [key]: value }));
 
+  const toggleCountry = (code: string) => {
+    setForm((current) => {
+      const selected = current.allowed_country_codes.includes(code)
+        ? current.allowed_country_codes.filter((c) => c !== code)
+        : [...current.allowed_country_codes, code];
+      const defaultCountry = current.default_country_code && selected.includes(current.default_country_code)
+        ? current.default_country_code
+        : null;
+      return { ...current, allowed_country_codes: selected, default_country_code: defaultCountry };
+    });
+  };
+
   const save = async () => {
     if (!tenantId || !isTenantAdmin) return;
     setSaving(true);
@@ -103,7 +117,7 @@ export function LocationSettingsPanel() {
 
       <fieldset disabled={!isTenantAdmin} className="space-y-5">
         <Card className="p-4">
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Location model</Label>
               <Select value={form.location_mode} onValueChange={(v) => set("location_mode", v as Settings["location_mode"])}>
@@ -119,23 +133,49 @@ export function LocationSettingsPanel() {
             </div>
 
             <div className="space-y-2">
-              <Label>Default country</Label>
-              <Select value={form.default_country_code || "none"} onValueChange={(v) => set("default_country_code", v === "none" ? null : v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No default</SelectItem>
-                  {(countries as any[]).map((c) => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
               <Label>Default branch</Label>
               <Select value={form.default_branch_id || "none"} onValueChange={(v) => set("default_branch_id", v === "none" ? null : v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No default</SelectItem>
                   {(branches as any[]).map((b) => <SelectItem key={b.id} value={b.id}>{b.name}{b.code ? ` (${b.code})` : ""}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label>Allowed countries</Label>
+              <div className="flex flex-wrap gap-2">
+                {(countries as any[]).map((c) => {
+                  const active = form.allowed_country_codes.includes(c.code);
+                  return (
+                    <button
+                      key={c.code}
+                      type="button"
+                      onClick={() => toggleCountry(c.code)}
+                      className={`rounded-lg border px-3 py-2 text-sm transition-colors ${active ? "border-primary bg-primary/10 text-primary" : "bg-background text-muted-foreground"}`}
+                    >
+                      {c.name}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">Only these countries will appear during asset capture.</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Default country</Label>
+              <Select
+                value={form.default_country_code || "none"}
+                onValueChange={(v) => set("default_country_code", v === "none" ? null : v)}
+                disabled={form.allowed_country_codes.length === 0}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No default — user selects</SelectItem>
+                  {(countries as any[])
+                    .filter((c) => form.allowed_country_codes.includes(c.code))
+                    .map((c) => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
