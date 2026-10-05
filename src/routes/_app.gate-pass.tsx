@@ -89,6 +89,10 @@ function GatePassPage() {
     queryKey: ["gate-pass-branches"],
     queryFn: async () => (await supabase.from("branches").select("id,name")).data ?? [],
   });
+  const locationsQ = useQuery({
+    queryKey: ["gate-pass-locations"],
+    queryFn: async () => (await supabase.from("locations").select("id,name,address,is_active").eq("is_active", true).order("name")).data ?? [],
+  });
   const profilesQ = useQuery({
     queryKey: ["gate-pass-profiles"],
     queryFn: async () => (await supabase.from("profiles").select("id,full_name,email")).data ?? [],
@@ -362,6 +366,7 @@ function GatePassPage() {
           open={createOpen}
           onClose={() => setCreateOpen(false)}
           assets={requestableAssets}
+          locations={locationsQ.data ?? []}
           userId={user!.id}
           onCreated={() => { qc.invalidateQueries({ queryKey: ["gate-passes"] }); }}
         />
@@ -462,13 +467,15 @@ function SummaryCards({ passes }: { passes: GP[] }) {
   );
 }
 
-function CreateDialog({ open, onClose, assets, userId, onCreated }: {
-  open: boolean; onClose: () => void; assets: any[]; userId: string; onCreated: () => void;
+function CreateDialog({ open, onClose, assets, locations, userId, onCreated }: {
+  open: boolean; onClose: () => void; assets: any[]; locations: any[]; userId: string; onCreated: () => void;
 }) {
   const { tenantId } = useAuth();
   const [assetId, setAssetId] = useState("");
   const [reason, setReason] = useState("");
   const [destination, setDestination] = useState("");
+  const [destinationLocationId, setDestinationLocationId] = useState("");
+  const [movementType, setMovementType] = useState("temporary");
   const [expected, setExpected] = useState("");
   const [file, setFile] = useState<File | null>(null);
 
@@ -488,7 +495,10 @@ function CreateDialog({ open, onClose, assets, userId, onCreated }: {
         asset_id: assetId,
         branch_id: asset?.branch_id ?? null,
         requested_by: userId,
-        reason, destination,
+        reason,
+        destination,
+        destination_location_id: destinationLocationId || null,
+        movement_type: movementType,
         expected_return_date: expected,
         attachment_url,
         status: "pending",
@@ -522,6 +532,36 @@ function CreateDialog({ open, onClose, assets, userId, onCreated }: {
           <div>
             <Label>Reason for movement *</Label>
             <Textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label>Movement type *</Label>
+              <Select value={movementType} onValueChange={setMovementType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="temporary">Temporary movement</SelectItem>
+                  <SelectItem value="transfer">Transfer</SelectItem>
+                  <SelectItem value="repair">Repair / service</SelectItem>
+                  <SelectItem value="fieldwork">Field work</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Managed destination</Label>
+              <Select value={destinationLocationId || "external"} onValueChange={(value) => {
+                const id = value === "external" ? "" : value;
+                setDestinationLocationId(id);
+                const loc = locations.find((item: any) => item.id === id);
+                if (loc) setDestination(loc.address ? `${loc.name} — ${loc.address}` : loc.name);
+              }}>
+                <SelectTrigger><SelectValue placeholder="External / other" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="external">External / other</SelectItem>
+                  {locations.map((loc: any) => <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div>
             <Label>Destination *</Label>
