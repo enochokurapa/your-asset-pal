@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -79,7 +79,7 @@ export function AutomationSettingsPanel() {
   const Row = ({
     title, description, checked, onCheckedChange, children,
   }:{
-    title:string; description:string; checked:boolean; onCheckedChange:(v:boolean)=>void; children?:React.ReactNode;
+    title:string; description:string; checked:boolean; onCheckedChange:(v:boolean)=>void; children?:ReactNode;
   }) => (
     <Card className="p-4">
       <div className="flex items-start justify-between gap-4">
