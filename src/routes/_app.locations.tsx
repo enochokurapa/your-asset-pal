@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ResponsiveTabsList as TabsList, ResponsiveTabsTrigger as TabsTrigger } from "@/components/ui/responsive-tabs";
-import { Building2, Globe2, MapPin, Plus, ChevronRight, ChevronLeft, Trash2 } from "lucide-react";
+import { Globe2, Plus, ChevronRight, ChevronLeft, Trash2, Pencil, CornerDownRight } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/locations")({ component: LocationsPage });
@@ -28,11 +28,15 @@ function LocationsPage() {
   const canEdit = canWrite || canDo("edit_location");
   const qc = useQueryClient();
 
-  const { data: locations = [] } = useQuery({
+  const { data: locations = [], isError: locationsError, error: locationsQueryError } = useQuery({
     queryKey:["locations"],
-    queryFn:async()=> (await (supabase as any).from("locations")
-      .select("*, branches(name,code), geo_places(name,display_path)")
-      .eq("is_active",true).order("name")).data ?? [],
+    queryFn:async()=> {
+      const { data, error } = await (supabase as any).from("locations")
+        .select("*, branches(name,code), geo_places(name,display_path)")
+        .eq("is_active",true).order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
   });
   const { data: branches = [] } = useQuery({
     queryKey:["branches-active"],
@@ -59,7 +63,17 @@ function LocationsPage() {
         </TabsList>
 
         <TabsContent value="organisation" className="pt-4">
-          <OrganisationLocations locations={locations as any[]} branches={branches as any[]} canEdit={canEdit} canWrite={canWrite} onChanged={()=>qc.invalidateQueries({queryKey:["locations"]})} />
+          <OrganisationLocations
+            locations={locations as any[]}
+            branches={branches as any[]}
+            canEdit={canEdit}
+            canWrite={canWrite}
+            queryError={locationsError ? locationsQueryError : null}
+            onChanged={() => {
+              qc.invalidateQueries({queryKey:["locations"]});
+              qc.invalidateQueries({queryKey:["locations-list"]});
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="geography" className="pt-4">
@@ -70,87 +84,235 @@ function LocationsPage() {
   );
 }
 
-function OrganisationLocations({locations,branches,canEdit,canWrite,onChanged}:{locations:any[];branches:any[];canEdit:boolean;canWrite:boolean;onChanged:()=>void}) {
+function OrganisationLocations({
+  locations, branches, canEdit, canWrite, queryError, onChanged,
+}:{
+  locations:any[]; branches:any[]; canEdit:boolean; canWrite:boolean; queryError:any; onChanged:()=>void;
+}) {
   const [open,setOpen]=useState(false);
+  const [editingId,setEditingId]=useState<string|null>(null);
   const [name,setName]=useState("");
   const [type,setType]=useState("office");
   const [branch,setBranch]=useState("");
   const [parent,setParent]=useState("");
 
-  const create=async()=>{
+  const byParent=useMemo(()=>{
+    const m:Record<string,any[]>={};
+    locations.forEach(l=>(m[l.parent_id||"root"] ||= []).push(l));
+    Object.values(m).forEach(items=>items.sort((a,b)=>a.name.localeCompare(b.name)));
+    return m;
+  },[locations]);
+
+  const descendantsOf=(id:string)=>{
+    const found=new Set<string>();
+    const visit=(parentId:string)=>{
+      (byParent[parentId]||[]).forEach((child:any)=>{
+        if(!found.has(child.id)){found.add(child.id);visit(child.id);}
+      });
+    };
+    visit(id);
+    return found;
+  };
+
+  const suggestedChildType=(parentLocation:any)=>{
+    switch(parentLocation?.location_type){
+      case "site": case "branch": return "building";
+      case "building": return "floor";
+      case "floor": return "room";
+      case "department": return "office";
+      case "warehouse": case "archive": return "area";
+      default: return "room";
+    }
+  };
+
+  const resetForm=()=>{
+    setEditingId(null);setName("");setType("office");setBranch("");setParent("");
+  };
+
+  const openNew=(parentLocation?:any)=>{
+    setEditingId(null);
+    setName("");
+    if(parentLocation){
+      setParent(parentLocation.id);
+      setBranch(parentLocation.branch_id||"");
+      setType(suggestedChildType(parentLocation));
+    } else {
+      setParent("");setBranch("");setType("site");
+    }
+    setOpen(true);
+  };
+
+  const openEdit=(location:any)=>{
+    setEditingId(location.id);
+    setName(location.name);
+    setType(location.location_type||"other");
+    setBranch(location.branch_id||"");
+    setParent(location.parent_id||"");
+    setOpen(true);
+  };
+
+  const saveLocation=async()=>{
     if(!name.trim()) return toast.error("Location name is required");
-    const {error}=await (supabase as any).from("locations").insert({
-      name:name.trim(),location_type:type,branch_id:branch||null,parent_id:parent||null,
-      is_active:true,is_structured:true,location_source:"manual",
-    });
-    if(error) return toast.error(error.message);
-    setOpen(false);setName("");setBranch("");setParent("");setType("office");onChanged();toast.success("Location created");
+
+    const parentLocation=parent ? locations.find((l:any)=>l.id===parent) : null;
+    if(editingId && parent===editingId) return toast.error("A location cannot be its own parent");
+    if(editingId && parent && descendantsOf(editingId).has(parent)) {
+      return toast.error("A location cannot be moved inside one of its own sub-locations");
+    }
+
+    const payload:any={
+      name:name.trim(),
+      location_type:type,
+      parent_id:parent||null,
+      branch_id:branch || parentLocation?.branch_id || null,
+      is_active:true,
+      is_structured:true,
+      location_source:"manual",
+    };
+
+    // Sub-locations inherit geography from their parent automatically.
+    if(parentLocation){
+      payload.geo_place_id=parentLocation.geo_place_id ?? null;
+      payload.country_code=parentLocation.country_code ?? null;
+      payload.latitude=parentLocation.latitude ?? null;
+      payload.longitude=parentLocation.longitude ?? null;
+      if(parentLocation.geo_place_id) payload.location_source="map";
+    }
+
+    const result=editingId
+      ? await (supabase as any).from("locations").update(payload).eq("id",editingId)
+      : await (supabase as any).from("locations").insert(payload);
+    if(result.error){
+      const message=result.error.code==="23505"
+        ? "A location with this name already exists under the same parent."
+        : result.error.message;
+      return toast.error(message);
+    }
+    setOpen(false);resetForm();onChanged();
+    toast.success(editingId ? "Location updated" : "Location created");
   };
 
   const remove=async(id:string)=>{
-    if(!confirm("Deactivate this organisation location? Existing asset history will be kept.")) return;
+    const children=byParent[id]||[];
+    if(children.length){
+      return toast.error("Move or deactivate the sub-locations first");
+    }
+    if(!confirm("Deactivate this location? Existing asset and history records will be kept.")) return;
     const {error}=await (supabase as any).from("locations").update({is_active:false}).eq("id",id);
     if(error) return toast.error(error.message);
     onChanged();toast.success("Location deactivated");
   };
 
-  const byParent=useMemo(()=>{
-    const m:Record<string,any[]>={};
-    locations.forEach(l=>(m[l.parent_id||"root"] ||= []).push(l));
-    return m;
-  },[locations]);
-
   const render=(l:any,depth=0):any=>(
     <div key={l.id}>
-      <div className="flex items-center justify-between gap-3 border-b px-3 py-3 last:border-0" style={{paddingLeft:12+depth*22}}>
+      <div className="group flex items-center justify-between gap-3 border-b px-3 py-3 last:border-0" style={{paddingLeft:12+depth*22}}>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
+            {depth>0 && <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground"/>}
             <p className="font-medium">{l.name}</p>
             <Badge variant="outline">{TYPE_LABEL[l.location_type]||l.location_type}</Badge>
-            {l.geo_place_id && <Badge variant="secondary">Geo mapped</Badge>}
           </div>
           <p className="mt-1 truncate text-xs text-muted-foreground">
-            {l.branches?.name ? `${l.branches.name} · ` : ""}{l.geo_places?.display_path || l.address || "Organisation location"}
+            {l.branches?.name ? `${l.branches.name} · ` : ""}{l.geo_places?.display_path || l.address || (l.parent_id ? "Sub-location" : "Organisation location")}
           </p>
         </div>
-        {canWrite && <Button size="icon" variant="ghost" onClick={()=>remove(l.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>}
+        {canEdit && (
+          <div className="flex shrink-0 gap-1">
+            <Button size="sm" variant="ghost" onClick={()=>openNew(l)} title="Add sub-location">
+              <Plus className="mr-1 h-4 w-4"/><span className="hidden sm:inline">Sub-location</span>
+            </Button>
+            <Button size="icon" variant="ghost" onClick={()=>openEdit(l)} title="Edit location">
+              <Pencil className="h-4 w-4"/>
+            </Button>
+            {canWrite && (
+              <Button size="icon" variant="ghost" onClick={()=>remove(l.id)} title="Deactivate location">
+                <Trash2 className="h-4 w-4 text-destructive"/>
+              </Button>
+            )}
+          </div>
+        )}
       </div>
-      {(byParent[l.id]||[]).map((c)=>render(c,depth+1))}
+      {(byParent[l.id]||[]).map((c:any)=>render(c,depth+1))}
     </div>
   );
 
   return <Card>
     <CardHeader className="flex-row items-center justify-between">
-      <div><CardTitle>Organisation structure</CardTitle><p className="text-sm text-muted-foreground">Sites, buildings, offices, stores, archives, rooms and field sites.</p></div>
-      {canEdit && <Button onClick={()=>setOpen(true)}><Plus className="mr-2 h-4 w-4"/>Add location</Button>}
+      <div>
+        <CardTitle>Organisation locations</CardTitle>
+        <p className="text-sm text-muted-foreground">Build your real structure: site → building → floor → room/store/office.</p>
+      </div>
+      {canEdit && <Button onClick={()=>openNew()}><Plus className="mr-2 h-4 w-4"/>Add top-level location</Button>}
     </CardHeader>
     <CardContent className="p-0">
-      {locations.length ? (byParent.root||[]).map((l)=>render(l)) : <p className="p-8 text-center text-sm text-muted-foreground">No organisation locations yet.</p>}
-    </CardContent>
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Add organisation location</DialogTitle></DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-2"><Label>Name</Label><Input value={name} onChange={e=>setName(e.target.value)} placeholder="Finance Store, Floor 2, Kampala HQ…"/></div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-2"><Label>Type</Label>
-              <Select value={type} onValueChange={setType}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>
-                {Object.entries(TYPE_LABEL).map(([k,v])=><SelectItem key={k} value={k}>{v}</SelectItem>)}
-              </SelectContent></Select>
-            </div>
-            <div className="space-y-2"><Label>Branch</Label>
-              <Select value={branch||"none"} onValueChange={v=>setBranch(v==="none"?"":v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>
-                <SelectItem value="none">No branch</SelectItem>{branches.map(b=><SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
-              </SelectContent></Select>
-            </div>
-          </div>
-          <div className="space-y-2"><Label>Parent location</Label>
-            <Select value={parent||"none"} onValueChange={v=>setParent(v==="none"?"":v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>
-              <SelectItem value="none">Top level</SelectItem>{locations.map(l=><SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
-            </SelectContent></Select>
-          </div>
+      {queryError ? (
+        <div className="m-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">
+          <p className="font-medium text-destructive">Locations could not be loaded.</p>
+          <p className="mt-1 text-muted-foreground">{queryError?.message || "Please retry."}</p>
         </div>
-        <DialogFooter><Button variant="outline" onClick={()=>setOpen(false)}>Cancel</Button><Button onClick={create}>Create</Button></DialogFooter>
+      ) : locations.length ? (
+        (byParent.root||[]).map((l:any)=>render(l))
+      ) : (
+        <div className="p-8 text-center">
+          <p className="text-sm font-medium">No organisation locations yet.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Start with a site, branch, building or store.</p>
+        </div>
+      )}
+    </CardContent>
+
+    <Dialog open={open} onOpenChange={(next)=>{setOpen(next);if(!next)resetForm();}}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{editingId ? "Edit location" : parent ? "Add sub-location" : "Add location"}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          {parent && !editingId && (
+            <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+              Parent: <strong>{locations.find((l:any)=>l.id===parent)?.name}</strong>
+            </div>
+          )}
+          <div className="space-y-2">
+            <Label>Name</Label>
+            <Input value={name} onChange={e=>setName(e.target.value)} placeholder={type==="room" ? "e.g. Room 204" : "e.g. Main Building, Finance Store"}/>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select value={type} onValueChange={setType}>
+                <SelectTrigger><SelectValue/></SelectTrigger>
+                <SelectContent>{Object.entries(TYPE_LABEL).map(([k,v])=><SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Branch</Label>
+              <Select value={branch||"none"} onValueChange={v=>setBranch(v==="none"?"":v)}>
+                <SelectTrigger><SelectValue/></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{parent ? "Inherit from parent" : "No branch"}</SelectItem>
+                  {branches.map((b:any)=><SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {editingId && (
+            <div className="space-y-2">
+              <Label>Parent location</Label>
+              <Select value={parent||"none"} onValueChange={v=>setParent(v==="none"?"":v)}>
+                <SelectTrigger><SelectValue/></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Top level</SelectItem>
+                  {locations
+                    .filter((l:any)=>l.id!==editingId && !descendantsOf(editingId).has(l.id))
+                    .map((l:any)=><SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={()=>setOpen(false)}>Cancel</Button>
+          <Button onClick={saveLocation}>{editingId ? "Save changes" : "Create location"}</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   </Card>;
