@@ -63,7 +63,7 @@ function AppLayout() {
     mustChangePassword, canExportReports, subscriptionStatus, trialEndsAt, tenantId, tenantName,
   } = useAuth();
   const [open, setOpen] = useState(false);
-  const [branding, setBranding] = useState<DocumentTemplate>(DEFAULT_TEMPLATE);
+  const [branding, setBranding] = useState<DocumentTemplate | null>(null);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
@@ -181,15 +181,15 @@ function AppLayout() {
             <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
               {isSaasAdmin ? (
                 <PlatformLogo className="h-full w-full bg-transparent" imageClassName="bg-white p-0.5" fallbackClassName="bg-sidebar-primary text-sidebar-primary-foreground" />
-              ) : branding.logo_data_url ? (
+              ) : branding?.logo_data_url ? (
                 <img src={branding.logo_data_url} alt="Company logo" className="h-full w-full bg-white object-contain p-0.5" />
               ) : (
-                <Boxes className="h-5 w-5" />
+                <PlatformLogo className="h-full w-full bg-transparent" imageClassName="bg-white p-0.5" />
               )}
             </div>
             <div>
               <p className="max-w-40 truncate text-sm font-semibold leading-none">
-                {isSaasAdmin ? <PlatformName /> : branding.organization_name || tenantName || "AssetFlow"}
+                {isSaasAdmin ? <PlatformName /> : (branding?.organization_name && branding.organization_name !== "Your Organization" ? branding.organization_name : tenantName || "AssetFlow 360")}
               </p>
               <p className="mt-0.5 text-[10px] uppercase tracking-wider text-sidebar-foreground/60">
                 {isSaasAdmin ? "Platform Control" : "Asset Manager"}

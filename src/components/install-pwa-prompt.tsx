@@ -49,15 +49,8 @@ export function InstallPwaPrompt() {
       const promptEvent = e as BeforeInstallPromptEvent;
       setDeferredPrompt(promptEvent);
 
-      // Check if user dismissed previously in last 7 days
-      const dismissedUntil = localStorage.getItem("af_pwa_dismissed_until");
-      const isDismissed = dismissedUntil && Number(dismissedUntil) > Date.now();
-
-      if (!isDismissed) {
-        // Delay 2.5 seconds after page load for better UX
-        const timer = setTimeout(() => setShowPrompt(true), 2500);
-        return () => clearTimeout(timer);
-      }
+      // Installation is offered only when the user explicitly taps Install App.
+      // Do not interrupt login, dashboard entry or normal browsing.
     };
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
@@ -76,16 +69,6 @@ export function InstallPwaPrompt() {
       setShowPrompt(true);
     };
     window.addEventListener("af:open-install-prompt", handleManualTrigger);
-
-    // Show prompt on iOS if not standalone and not dismissed
-    if (iosDevice && !isStandalone) {
-      const dismissedUntil = localStorage.getItem("af_pwa_dismissed_until");
-      const isDismissed = dismissedUntil && Number(dismissedUntil) > Date.now();
-      if (!isDismissed) {
-        const timer = setTimeout(() => setShowPrompt(true), 3000);
-        return () => clearTimeout(timer);
-      }
-    }
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
@@ -144,7 +127,7 @@ export function InstallPwaPrompt() {
 
             <div className="flex items-start gap-3.5 pt-1">
               <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 via-primary/10 to-blue-500/20 p-2.5 shadow-inner">
-                <img src="/icon-192.png" alt="AssetFlow Logo" className="h-full w-full object-contain rounded-lg shadow-sm" />
+                <img src="/assetflow360-mark.svg" alt="AssetFlow 360" className="h-full w-full object-contain rounded-lg" />
                 <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
                   <Sparkles className="h-2.5 w-2.5" />
                 </span>

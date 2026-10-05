@@ -21,7 +21,7 @@ export function announceBrandingChanged(template: DocumentTemplate) {
 }
 
 export function applyBrowserBranding(template: DocumentTemplate) {
-  const company = template.organization_name.trim() || "AssetFlow";
+  const company = template.organization_name.trim() && template.organization_name !== "Your Organization" ? template.organization_name.trim() : "AssetFlow 360";
   document.title = `${company} - Asset Management`;
   setMetaColor(template.primary_color);
 
