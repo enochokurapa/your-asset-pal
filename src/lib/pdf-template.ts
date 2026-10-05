@@ -144,9 +144,29 @@ function drawHeader(
   const left = t.margin_left;
   const right = pageWidth - t.margin_right;
 
-  // Logo
+  // Logo / professional monogram fallback
   let logoBottom = y;
-  if (t.logo_data_url && t.logo_position !== "none") {
+  if (!t.logo_data_url && t.logo_position !== "none" && t.organization_name) {
+    const initials = t.organization_name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "AF";
+    const size = Math.min(13, t.logo_max_height);
+    const [mr, mg, mb] = primaryColorRgb(t);
+    let x = left;
+    if (t.logo_position === "center") x = (pageWidth - size) / 2;
+    else if (t.logo_position === "right") x = right - size;
+    doc.setFillColor(mr, mg, mb);
+    doc.roundedRect(x, y, size, size, 2, 2, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont(t.font_family, "bold");
+    doc.setFontSize(Math.max(8, t.base_font_size));
+    doc.text(initials, x + size / 2, y + size / 2 + 1.7, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+    logoBottom = y + size;
+  } else if (t.logo_data_url && t.logo_position !== "none") {
     try {
       const h = t.logo_max_height;
       let w = h * 2;
