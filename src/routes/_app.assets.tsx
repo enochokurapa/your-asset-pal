@@ -12,7 +12,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Search, Package, ScanLine, Archive, AlertCircle, FilterX, Trash2, Download, Upload, Send, Eye, ArrowRightLeft, Wrench } from "lucide-react";
+import { Plus, Pencil, Search, Package, ScanLine, Archive, AlertCircle, FilterX, Trash2, Download, Upload, Send, Eye, ArrowRightLeft, Wrench, ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { toast } from "sonner";
 import { ScannerDialog } from "@/components/scanner-dialog";
 import { AssetDetailTabs } from "@/components/asset-detail-tabs";
@@ -105,6 +105,8 @@ function AssetsPage() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<AssetForm>(empty);
+  const [wizardStep, setWizardStep] = useState(0);
+  const [financialOpen, setFinancialOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [scanMode, setScanMode] = useState<"lookup" | "tag" | "serial">("lookup");
   const [dupOpen, setDupOpen] = useState(false);
@@ -189,7 +191,7 @@ function AssetsPage() {
 
   const clearFilters = () => { setQ(""); setFBranch(""); setFCategory(""); setFLocation(""); setFStatus(""); setFDept(""); };
 
-  const openNew = () => { setForm(empty); setOpen(true); };
+  const openNew = () => { setForm(empty); setWizardStep(0); setFinancialOpen(false); setOpen(true); };
   const openEdit = (a: any) => {
     setForm({
       id: a.id, asset_tag: a.asset_tag, serial_number: a.serial_number ?? "",
@@ -211,6 +213,8 @@ function AssetsPage() {
       depreciation_frequency: a.depreciation_frequency ?? "monthly",
       total_units: a.total_units?.toString() ?? "",
     });
+    setWizardStep(0);
+    setFinancialOpen(false);
     setOpen(true);
   };
 
@@ -275,7 +279,7 @@ function AssetsPage() {
     if (error) console.error("Unable to record asset location event", error);
   };
 
-  const save = async () => {
+  const save = async (saveAndNext = false) => {
     if (saving) return;
     if (!form.asset_tag.trim() || !form.name.trim()) { toast.error("Tag and name are required"); return; }
     if (locationSettings?.require_branch && !form.branch_id) { toast.error("Branch is required"); return; }
@@ -384,7 +388,23 @@ function AssetsPage() {
           toast.success("Asset created");
         }
       }
-      setOpen(false);
+      if (!form.id && saveAndNext) {
+        setForm((previous) => ({
+          ...empty,
+          category_id: previous.category_id,
+          branch_id: previous.branch_id,
+          location_id: previous.location_id,
+          geo_place_id: previous.geo_place_id,
+          status: previous.status,
+          department: previous.department,
+        }));
+        setWizardStep(0);
+        setFinancialOpen(false);
+        toast.message("Ready for the next asset");
+      } else {
+        setOpen(false);
+        setWizardStep(0);
+      }
       qc.invalidateQueries({ queryKey: ["assets"] });
       qc.invalidateQueries({ queryKey: ["asset-assignments-current"] });
       qc.invalidateQueries({ queryKey: ["dashboard-stats"] }); qc.invalidateQueries({ queryKey: ["tile-assets"] });
@@ -392,6 +412,46 @@ function AssetsPage() {
       setSaving(false);
     }
   };
+
+  const wizardSteps = [
+    { title: "Details", short: "Details" },
+    { title: "Classification", short: "Classify" },
+    { title: "Location", short: "Location" },
+    { title: "Assignment & Value", short: "Assign" },
+    { title: "Review", short: "Review" },
+  ];
+
+  const validateWizardStep = (step: number) => {
+    if (step === 0) {
+      if (!form.asset_tag.trim()) { toast.error("Asset tag is required"); return false; }
+      if (!form.name.trim()) { toast.error("Asset name is required"); return false; }
+      const tagLower = form.asset_tag.trim().toLowerCase();
+      const serialLower = form.serial_number.trim().toLowerCase();
+      const duplicate = (assets as any[]).find((a) =>
+        a.id !== form.id && (
+          a.asset_tag.toLowerCase() === tagLower ||
+          (serialLower && (a.serial_number ?? "").toLowerCase() === serialLower)
+        )
+      );
+      if (duplicate) { setDupAsset(duplicate); setDupOpen(true); return false; }
+    }
+    if (step === 2) {
+      if (locationSettings?.require_branch && !form.branch_id) { toast.error("Select a branch to continue"); return false; }
+      if (locationSettings?.require_geography && !form.geo_place_id) { toast.error("Select the geographic area to continue"); return false; }
+      if (locationSettings?.require_internal_location && !form.location_id) { toast.error("Select the office, store or site to continue"); return false; }
+      if (locationSettings?.require_gps && (!form.location_latitude || !form.location_longitude)) { toast.error("Capture GPS to continue"); return false; }
+    }
+    return true;
+  };
+
+  const nextWizardStep = () => {
+    if (!validateWizardStep(wizardStep)) return;
+    setWizardStep((step) => Math.min(step + 1, wizardSteps.length - 1));
+  };
+
+  const reviewCategory = (categories as any[]).find((c) => c.id === form.category_id)?.name ?? "Not specified";
+  const reviewBranch = (visibleBranches as any[]).find((b) => b.id === form.branch_id)?.name ?? "Not specified";
+  const reviewLocation = (locations as any[]).find((l) => l.id === form.location_id)?.name ?? (form.geo_place_id ? "Geographic area selected" : "Not specified");
 
   const [reqKind, setReqKind] = useState<"retirement" | "disposal" | "deletion" | null>(null);
   const [requestSubmitting, setRequestSubmitting] = useState(false);
