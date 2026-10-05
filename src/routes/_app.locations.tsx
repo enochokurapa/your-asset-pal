@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ResponsiveTabsList as TabsList, ResponsiveTabsTrigger as TabsTrigger } from "@/components/ui/responsive-tabs";
-import { Building2, Globe2, MapPin, Plus, ChevronRight, ChevronLeft, Radar, Trash2 } from "lucide-react";
+import { Building2, Globe2, MapPin, Plus, ChevronRight, ChevronLeft, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/locations")({ component: LocationsPage });
@@ -26,7 +26,6 @@ const TYPE_LABEL: Record<string,string> = {
 function LocationsPage() {
   const { canWrite, canDo, canView, isTenantAdmin } = useAuth();
   const canEdit = canWrite || canDo("edit_location");
-  const trackingEnabled = canView("live_tracking");
   const qc = useQueryClient();
 
   const { data: locations = [] } = useQuery({
@@ -53,18 +52,10 @@ function LocationsPage() {
         <p className="text-sm text-muted-foreground">Organisation locations and the global geography used by assets, movements and verification.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Metric label="Organisation locations" value={locations.length} />
-        <Metric label="Geo mapped" value={mapped} />
-        <Metric label="Countries loaded" value={countries.length} />
-        <Metric label="Live tracking" value={trackingEnabled ? "Enabled" : "Off"} />
-      </div>
-
       <Tabs defaultValue="organisation">
         <TabsList>
           <TabsTrigger value="organisation">Organisation</TabsTrigger>
           <TabsTrigger value="geography">Geography</TabsTrigger>
-          <TabsTrigger value="tracking">Live tracking</TabsTrigger>
         </TabsList>
 
         <TabsContent value="organisation" className="pt-4">
@@ -74,28 +65,9 @@ function LocationsPage() {
         <TabsContent value="geography" className="pt-4">
           <GeographyBrowser countries={countries as any[]} />
         </TabsContent>
-
-        <TabsContent value="tracking" className="pt-4">
-          <Card>
-            <CardContent className="flex min-h-48 items-center justify-center p-6 text-center">
-              <div className="max-w-lg">
-                <Radar className="mx-auto h-9 w-9 text-primary" />
-                <h3 className="mt-3 font-semibold">Live tracking foundation is installed</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Tracker devices, telemetry events and asset links are ready. The module is currently switched off at platform level and cannot collect live tracking data until the SaaS administrator enables it.
-                </p>
-                <Badge variant="outline" className="mt-3">{trackingEnabled ? "Module enabled" : "Module disabled"}</Badge>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </div>
   );
-}
-
-function Metric({label,value}:{label:string;value:string|number}) {
-  return <Card className="p-4"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold">{value}</p></Card>;
 }
 
 function OrganisationLocations({locations,branches,canEdit,canWrite,onChanged}:{locations:any[];branches:any[];canEdit:boolean;canWrite:boolean;onChanged:()=>void}) {
