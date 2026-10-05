@@ -62,8 +62,12 @@ function SettingsPage() {
     setTpl((t) => (t ? { ...t, [k]: v } : t));
 
   const onPickFile = async (key: "logo_data_url" | "watermark_image_data_url", file: File) => {
+    if (!["image/png","image/jpeg","image/webp"].includes(file.type)) {
+      toast.error("Use a PNG, JPG or WebP image.");
+      return;
+    }
     if (file.size > 500_000) {
-      toast.error("Image is too large. Choose a PNG or JPG smaller than 500 KB.");
+      toast.error("Image is too large. Choose a PNG, JPG or WebP smaller than 500 KB.");
       return;
     }
     const dataUrl = await fileToDataUrl(file);
@@ -158,8 +162,8 @@ function SettingsPage() {
                   </div>
                 ) : (
                   <label className="flex cursor-pointer items-center gap-2 rounded border border-dashed p-3 text-sm text-muted-foreground hover:bg-muted/50">
-                    <Upload className="h-4 w-4" /> Upload PNG/JPG (maximum 500 KB)
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && onPickFile("logo_data_url", e.target.files[0])} />
+                    <Upload className="h-4 w-4" /> Upload PNG/JPG/WebP (maximum 500 KB)
+                    <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && onPickFile("logo_data_url", e.target.files[0])} />
                   </label>
                 )}
               </div>
