@@ -264,8 +264,8 @@ export function startTenantAutomationScheduler() {
     console.error("[Automation] Scheduled tenant automation check failed", error),
   );
 
-  const initial = setTimeout(run, 45_000);
-  const recurring = setInterval(run, 15 * 60_000);
+  const initial = setTimeout(run, 15_000);
+  const recurring = setInterval(run, 5 * 60_000);
   initial.unref?.();
   recurring.unref?.();
 }
