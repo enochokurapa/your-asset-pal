@@ -45,19 +45,76 @@ function fmtColumn(row: any, c: Column) {
   if (c.isMultiline && Array.isArray(v)) return v.join("\n");
   return fmtCell(v, c.isCurrency);
 }
-async function exportPDF(r: Report) {
+type ReportExportMeta = {
+  organization: string;
+  generatedBy: string;
+};
+
+async function exportPDF(r: Report, meta: ReportExportMeta) {
   const template = await loadTemplate();
-  const { doc, startY } = createBrandedPdf({
-    template, orientation: "landscape", title: r.title, subtitle: `${r.rows.length} row(s)`,
+  const reportRef = `AF-${new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14)}`;
+  const { doc, startY, pageWidth, pageHeight } = createBrandedPdf({
+    template,
+    orientation: "landscape",
+    title: r.title,
+    subtitle: `${meta.organization} · ${r.rows.length} record(s)`,
+    generatedBy: meta.generatedBy,
+    reportRef,
   });
   autoTable(doc, {
     startY,
     head: [r.columns.map((c) => c.header)],
     body: r.rows.map((row) => r.columns.map((c) => fmtColumn(row, c))),
-    styles: { fontSize: 7, font: template.font_family },
-    headStyles: { fillColor: tableHeadFill(template) },
-    margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
+    styles: {
+      fontSize: 7.2,
+      font: template.font_family,
+      cellPadding: 2,
+      lineColor: [225, 225, 225],
+      lineWidth: 0.1,
+      valign: "middle",
+    },
+    headStyles: {
+      fillColor: tableHeadFill(template),
+      textColor: [255,255,255],
+      fontStyle: "bold",
+    },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom + 4 },
+    showHead: "everyPage",
   });
+
+  let y = ((doc as any).lastAutoTable?.finalY ?? startY) + 12;
+  if (y > pageHeight - 35) {
+    doc.addPage();
+    y = template.margin_top + 10;
+  }
+
+  doc.setFont(template.font_family, "bold");
+  doc.setFontSize(9);
+  doc.text("Report certification", template.margin_left, y);
+  y += 8;
+
+  const usable = pageWidth - template.margin_left - template.margin_right;
+  const col = usable / 3;
+  const labels = [
+    ["Prepared by", meta.generatedBy || "________________"],
+    ["Reviewed by", "________________"],
+    ["Approved by", "________________"],
+  ];
+  labels.forEach(([label,name],i)=>{
+    const x = template.margin_left + i * col;
+    doc.setFont(template.font_family, "normal");
+    doc.setFontSize(8);
+    doc.text(label, x, y);
+    doc.setFont(template.font_family, "bold");
+    doc.text(name, x, y + 5);
+    doc.setDrawColor(130,130,130);
+    doc.line(x, y + 10, x + col - 12, y + 10);
+    doc.setFont(template.font_family, "normal");
+    doc.setFontSize(7);
+    doc.text("Signature / Date", x, y + 14);
+  });
+
   saveBranded(doc, template, `${r.title.replace(/\s+/g, "_")}.pdf`);
 }
 
@@ -122,7 +179,7 @@ function applyText(val: any, q?: string) {
 }
 
 function ReportsPage() {
-  const { canView, loading, canSeeBranch } = useAuth();
+  const { canView, loading, canSeeBranch, user, tenantName } = useAuth();
   const [tab, setTab] = useState("register");
 
   const { data: assets = [] } = useQuery({
@@ -194,6 +251,10 @@ function ReportsPage() {
     if (!id) return "";
     const p = profileMap[id];
     return p?.full_name || p?.email || "";
+  };
+  const reportExportMeta: ReportExportMeta = {
+    organization: tenantName || "AssetFlow 360",
+    generatedBy: userLabel(user?.id) || user?.email || "Authorized user",
   };
 
   const catMap = useMemo(() => Object.fromEntries(categories.map((c: any) => [c.id, c])), [categories]);
@@ -771,42 +832,42 @@ function ReportsPage() {
 
         <TabsContent value="register" className="mt-4">
           <FilterBar defs={registerDefs} values={fRegister} onChange={setFRegister} />
-          <ReportTable r={register} />
+          <ReportTable r={register} exportMeta={reportExportMeta} />
         </TabsContent>
         <TabsContent value="movements" className="mt-4">
           <FilterBar defs={movementDefs} values={fMove} onChange={setFMove} />
-          <ReportTable r={movementReport} />
+          <ReportTable r={movementReport} exportMeta={reportExportMeta} />
         </TabsContent>
         <TabsContent value="assigned" className="mt-4">
           <FilterBar defs={assignDefs} values={fAssign} onChange={setFAssign} />
-          <ReportTable r={assignedReport} />
+          <ReportTable r={assignedReport} exportMeta={reportExportMeta} />
         </TabsContent>
         <TabsContent value="disposals" className="mt-4">
           <FilterBar defs={disposalDefs} values={fDisposal} onChange={setFDisposal} />
-          <ReportTable r={disposalReport} />
+          <ReportTable r={disposalReport} exportMeta={reportExportMeta} />
         </TabsContent>
         <TabsContent value="maintenance" className="mt-4">
           <FilterBar defs={maintenanceDefs} values={fMaint} onChange={setFMaint} />
-          <ReportTable r={maintenanceReport} />
+          <ReportTable r={maintenanceReport} exportMeta={reportExportMeta} />
         </TabsContent>
         <TabsContent value="approvals" className="mt-4">
           <FilterBar defs={approvalDefs} values={fApprov} onChange={setFApprov} />
-          <ReportTable r={approvalReport} />
+          <ReportTable r={approvalReport} exportMeta={reportExportMeta} />
         </TabsContent>
         <TabsContent value="verification" className="mt-4">
           <FilterBar defs={verificationDefs} values={fVerification} onChange={setFVerification} />
-          <ReportTable r={verificationReport} />
+          <ReportTable r={verificationReport} exportMeta={reportExportMeta} />
         </TabsContent>
         <TabsContent value="depreciation" className="mt-4">
           <FilterBar defs={depreciationDefs} values={fDepreciation} onChange={setFDepreciation} />
-          <ReportTable r={depreciationReport} />
+          <ReportTable r={depreciationReport} exportMeta={reportExportMeta} />
         </TabsContent>
         <TabsContent value="gate-pass" className="mt-4">
           <FilterBar defs={gatePassDefs} values={fGatePass} onChange={setFGatePass} />
-          <ReportTable r={gatePassReport} />
+          <ReportTable r={gatePassReport} exportMeta={reportExportMeta} />
         </TabsContent>
-        <TabsContent value="branch" className="mt-4"><ReportTable r={branchReport} /></TabsContent>
-        <TabsContent value="department" className="mt-4"><ReportTable r={departmentReport} /></TabsContent>
+        <TabsContent value="branch" className="mt-4"><ReportTable r={branchReport} exportMeta={reportExportMeta} /></TabsContent>
+        <TabsContent value="department" className="mt-4"><ReportTable r={departmentReport} exportMeta={reportExportMeta} /></TabsContent>
 
         <TabsContent value="condition" className="mt-4">
           <Card className="p-4">
@@ -857,13 +918,13 @@ function ReportsPage() {
   );
 }
 
-function ReportTable({ r }: { r: Report }) {
+function ReportTable({ r, exportMeta }: { r: Report; exportMeta: ReportExportMeta }) {
   return (
     <Card className="p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">{r.title} <span className="ml-2 text-xs font-normal text-muted-foreground">({r.rows.length})</span></h2>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => exportPDF(r)}>
+          <Button size="sm" variant="outline" onClick={() => exportPDF(r, exportMeta)}>
             <FileDown className="mr-1 h-4 w-4" /> PDF
           </Button>
           <Button size="sm" variant="outline" onClick={() => exportXLSX(r)}>
