@@ -54,6 +54,15 @@ function LocationsPage() {
       .select("default_country_code,allowed_country_codes,location_mode")
       .eq("tenant_id",tenantId).maybeSingle()).data ?? null,
   });
+  const { data: locationAssets = [] } = useQuery({
+    queryKey:["location-kpi-assets"],
+    queryFn:async()=>{
+      const {data,error}=await (supabase as any).from("assets")
+        .select("id,name,asset_tag,status,branch_id,location_id,geo_place_id,location_latitude,location_longitude, geo_places!assets_geo_place_id_fkey(geoname_id,name,display_path,country_code)");
+      if(error) throw error;
+      return data ?? [];
+    },
+  });
   const visibleCountries = useMemo(()=>{
     const codes=new Set<string>();
     const allowed=(locationSettings as any)?.allowed_country_codes as string[]|null|undefined;
@@ -67,15 +76,7 @@ function LocationsPage() {
     return (countries as any[]).filter((c:any)=>codes.has(c.code));
   },[countries,locationSettings,locationAssets]);
 
-  const { data: locationAssets = [] } = useQuery({
-    queryKey:["location-kpi-assets"],
-    queryFn:async()=>{
-      const {data,error}=await (supabase as any).from("assets")
-        .select("id,name,asset_tag,status,branch_id,location_id,geo_place_id,location_latitude,location_longitude, geo_places!assets_geo_place_id_fkey(geoname_id,name,display_path,country_code)");
-      if(error) throw error;
-      return data ?? [];
-    },
-  });
+
 
 
   const locatedAssets = (locationAssets as any[]).filter((a)=>a.location_id || a.geo_place_id).length;
@@ -424,8 +425,7 @@ function GeographyBrowser({countries,assets,onViewAssets}:{countries:any[];asset
 
   const places=useMemo(()=>{
     if(!parent) return rawPlaces as any[];
-    const admin=(rawPlaces as any[]).filter((p:any)=>p.feature_class==="A");
-    return admin.length ? admin : (rawPlaces as any[]).filter((p:any)=>p.feature_class==="P");
+    return (rawPlaces as any[]).filter((p:any)=>p.feature_class==="A");
   },[rawPlaces,parent?.geoname_id]);
 
   const countAssets=(p:any)=>assets.filter((a:any)=>{
@@ -528,8 +528,8 @@ function GeographyBrowser({countries,assets,onViewAssets}:{countries:any[];asset
       <div className="grid max-h-[560px] gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
         {isLoading ? <p className="col-span-full p-8 text-center text-sm text-muted-foreground">Loading areas...</p> :
         places.length===0 ? <div className="col-span-full rounded-xl border border-dashed p-8 text-center">
-          <p className="text-sm font-medium">No lower administrative areas available.</p>
-          <p className="mt-1 text-xs text-muted-foreground">Use the current area to view its assets.</p>
+          <p className="text-sm font-medium">This is the lowest supported administrative level.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Use this area for geography. Add the exact site, building, office, room or locally known place under Organisation locations when needed.</p>
           {selected && selectedCount>0 && <Button className="mt-4" onClick={()=>onViewAssets(Number(selected.geoname_id))}>View {selectedCount} assets</Button>}
         </div> :
         places.map((p:any)=>{
