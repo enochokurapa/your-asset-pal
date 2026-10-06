@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ResponsiveTabsList as TabsList, ResponsiveTabsTrigger as TabsTrigger } from "@/components/ui/responsive-tabs";
-import { Globe2, Plus, ChevronRight, ChevronLeft, Trash2, Pencil, CornerDownRight } from "lucide-react";
+import { Globe2, Plus, ChevronRight, ChevronLeft, Trash2, Pencil, CornerDownRight, Package, ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/locations")({ component: LocationsPage });
@@ -25,6 +25,7 @@ const TYPE_LABEL: Record<string,string> = {
 
 function LocationsPage() {
   const { canWrite, canDo, canView, isTenantAdmin } = useAuth();
+  const nav = useNavigate();
   const canEdit = canWrite || canDo("edit_location");
   const qc = useQueryClient();
 
@@ -50,7 +51,7 @@ function LocationsPage() {
     queryKey:["location-kpi-assets"],
     queryFn:async()=>{
       const {data,error}=await (supabase as any).from("assets")
-        .select("id,location_id,geo_place_id,location_latitude,location_longitude");
+        .select("id,name,asset_tag,status,branch_id,location_id,geo_place_id,location_latitude,location_longitude, geo_places!assets_geo_place_id_fkey(geoname_id,name,display_path)");
       if(error) throw error;
       return data ?? [];
     },
@@ -99,6 +100,8 @@ function LocationsPage() {
             canEdit={canEdit}
             canWrite={canWrite}
             queryError={locationsError ? locationsQueryError : null}
+            assets={locationAssets as any[]}
+            onViewAssets={(id:string)=>nav({to:"/assets",search:{location:id} as any})}
             onChanged={() => {
               qc.invalidateQueries({queryKey:["locations"]});
               qc.invalidateQueries({queryKey:["locations-list"]});
@@ -107,7 +110,7 @@ function LocationsPage() {
         </TabsContent>
 
         <TabsContent value="geography" className="pt-4">
-          <GeographyBrowser countries={countries as any[]} />
+          <GeographyBrowser countries={countries as any[]} assets={locationAssets as any[]} onViewAssets={(id:number)=>nav({to:"/assets",search:{geo:String(id)} as any})} />
         </TabsContent>
       </Tabs>
     </div>
@@ -115,9 +118,10 @@ function LocationsPage() {
 }
 
 function OrganisationLocations({
-  locations, branches, canEdit, canWrite, queryError, onChanged,
+  locations, branches, canEdit, canWrite, queryError, assets, onViewAssets, onChanged,
 }:{
-  locations:any[]; branches:any[]; canEdit:boolean; canWrite:boolean; queryError:any; onChanged:()=>void;
+  locations:any[]; branches:any[]; canEdit:boolean; canWrite:boolean; queryError:any; assets:any[];
+  onViewAssets:(id:string)=>void; onChanged:()=>void;
 }) {
   const [open,setOpen]=useState(false);
   const [editingId,setEditingId]=useState<string|null>(null);
@@ -142,6 +146,12 @@ function OrganisationLocations({
     };
     visit(id);
     return found;
+  };
+
+  const assetsForLocation=(id:string)=>{
+    const ids=descendantsOf(id);
+    ids.add(id);
+    return assets.filter((a:any)=>a.location_id && ids.has(a.location_id));
   };
 
   const suggestedChildType=(parentLocation:any)=>{
@@ -246,21 +256,34 @@ function OrganisationLocations({
             {l.branches?.name ? `${l.branches.name} · ` : ""}{l.geo_places?.display_path || l.address || (l.parent_id ? "Sub-location" : "Organisation location")}
           </p>
         </div>
-        {canEdit && (
-          <div className="flex shrink-0 gap-1">
-            <Button size="sm" variant="ghost" onClick={()=>openNew(l)} title="Add sub-location">
-              <Plus className="mr-1 h-4 w-4"/><span className="hidden sm:inline">Sub-location</span>
-            </Button>
-            <Button size="icon" variant="ghost" onClick={()=>openEdit(l)} title="Edit location">
-              <Pencil className="h-4 w-4"/>
-            </Button>
-            {canWrite && (
-              <Button size="icon" variant="ghost" onClick={()=>remove(l.id)} title="Deactivate location">
-                <Trash2 className="h-4 w-4 text-destructive"/>
+        <div className="flex shrink-0 items-center gap-1">
+          <Button
+            size="sm"
+            variant={assetsForLocation(l.id).length ? "outline" : "ghost"}
+            onClick={()=>onViewAssets(l.id)}
+            title="View assets in this location and its sub-locations"
+          >
+            <Package className="mr-1 h-4 w-4"/>
+            {assetsForLocation(l.id).length}
+            <span className="hidden sm:inline ml-1">assets</span>
+            <ArrowUpRight className="ml-1 h-3.5 w-3.5"/>
+          </Button>
+          {canEdit && (
+            <>
+              <Button size="sm" variant="ghost" onClick={()=>openNew(l)} title="Add sub-location">
+                <Plus className="mr-1 h-4 w-4"/><span className="hidden sm:inline">Sub-location</span>
               </Button>
-            )}
-          </div>
-        )}
+              <Button size="icon" variant="ghost" onClick={()=>openEdit(l)} title="Edit location">
+                <Pencil className="h-4 w-4"/>
+              </Button>
+              {canWrite && (
+                <Button size="icon" variant="ghost" onClick={()=>remove(l.id)} title="Deactivate location">
+                  <Trash2 className="h-4 w-4 text-destructive"/>
+                </Button>
+              )}
+            </>
+          )}
+        </div>
       </div>
       {(byParent[l.id]||[]).map((c:any)=>render(c,depth+1))}
     </div>
@@ -348,7 +371,7 @@ function OrganisationLocations({
   </Card>;
 }
 
-function GeographyBrowser({countries}:{countries:any[]}) {
+function GeographyBrowser({countries,assets,onViewAssets}:{countries:any[];assets:any[];onViewAssets:(id:number)=>void}) {
   const [country,setCountry]=useState("UG");
   const [search,setSearch]=useState("");
   const [stack,setStack]=useState<any[]>([]);
@@ -367,7 +390,14 @@ function GeographyBrowser({countries}:{countries:any[]}) {
     }
   });
 
-  const enter=(p:any)=>{setStack(s=>[...s,p]);setSearch("");};
+  const countAssets=(p:any)=>assets.filter((a:any)=>{
+    if(!a.geo_place_id) return false;
+    if(Number(a.geo_place_id)===Number(p.geoname_id)) return true;
+    const assetPath=a.geo_places?.display_path;
+    return !!assetPath && !!p.display_path && String(assetPath).includes(String(p.display_path));
+  }).length;
+
+    const enter=(p:any)=>{setStack(s=>[...s,p]);setSearch("");};
   const back=()=>{setStack(s=>s.slice(0,-1));setSearch("");};
 
   return <Card>
@@ -391,10 +421,22 @@ function GeographyBrowser({countries}:{countries:any[]}) {
       <div className="max-h-[520px] overflow-y-auto rounded-lg border">
         {isLoading ? <p className="p-6 text-center text-sm text-muted-foreground">Loading geography…</p> :
         places.length===0 ? <p className="p-6 text-center text-sm text-muted-foreground">No places found.</p> :
-        places.map((p:any)=><button key={p.geoname_id} type="button" onClick={()=>enter(p)} className="flex w-full items-center justify-between gap-3 border-b px-3 py-3 text-left last:border-0 hover:bg-muted/40">
-          <div className="min-w-0"><p className="font-medium">{p.name}</p><p className="truncate text-xs text-muted-foreground">{p.display_path}</p></div>
-          <div className="flex items-center gap-2"><Badge variant="outline">{p.feature_code}</Badge><ChevronRight className="h-4 w-4 text-muted-foreground"/></div>
-        </button>)}
+        places.map((p:any)=><div key={p.geoname_id} className="flex w-full items-center justify-between gap-3 border-b px-3 py-3 last:border-0 hover:bg-muted/40">
+          <button type="button" onClick={()=>enter(p)} className="min-w-0 flex-1 text-left">
+            <p className="font-medium">{p.name}</p>
+            <p className="truncate text-xs text-muted-foreground">{p.display_path}</p>
+          </button>
+          <div className="flex items-center gap-2">
+            {countAssets(p)>0 && (
+              <Button size="sm" variant="outline" onClick={()=>onViewAssets(Number(p.geoname_id))}>
+                <Package className="mr-1 h-4 w-4"/>{countAssets(p)}
+                <span className="hidden sm:inline ml-1">assets</span>
+              </Button>
+            )}
+            <Badge variant="outline">{p.feature_code}</Badge>
+            <button type="button" onClick={()=>enter(p)} className="rounded p-1 hover:bg-muted"><ChevronRight className="h-4 w-4 text-muted-foreground"/></button>
+          </div>
+        </div>)}
       </div>
     </CardContent>
   </Card>;
