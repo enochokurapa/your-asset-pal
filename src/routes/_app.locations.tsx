@@ -415,8 +415,14 @@ function GeographyBrowser({countries,assets,onViewAssets}:{countries:any[];asset
       let q=(supabase as any).from("geo_places")
         .select("geoname_id,name,display_path,feature_class,feature_code,admin_level,population,parent_geoname_id,country_code")
         .eq("country_code",country);
-      if(parent) q=q.eq("parent_geoname_id",parent.geoname_id).order("feature_class",{ascending:true}).order("name").limit(1500);
-      else q=q.eq("feature_code",`ADM${config.level}`).order("name").limit(1200);
+      if(parent) {
+        if(country==="UG") return [];
+        q=q.eq("parent_geoname_id",parent.geoname_id).order("feature_class",{ascending:true}).order("name").limit(1500);
+      } else {
+        q=q.eq("feature_code",`ADM${config.level}`);
+        if(country==="UG") q=q.eq("source","UBOS NPHC 2024");
+        q=q.order("name").limit(1200);
+      }
       const {data,error}=await q;
       if(error) throw error;
       return data??[];
