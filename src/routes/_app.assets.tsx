@@ -160,6 +160,27 @@ function AssetsPage() {
     },
   });
 
+  const locationFilterIds = useMemo(() => {
+    if (!fLocation) return new Set<string>();
+    const children = new Map<string, string[]>();
+    for (const loc of locations as any[]) {
+      if (!loc.parent_id) continue;
+      const list = children.get(loc.parent_id) ?? [];
+      list.push(loc.id);
+      children.set(loc.parent_id, list);
+    }
+    const ids = new Set<string>([fLocation]);
+    const visit = (id: string) => {
+      for (const child of children.get(id) ?? []) {
+        if (ids.has(child)) continue;
+        ids.add(child);
+        visit(child);
+      }
+    };
+    visit(fLocation);
+    return ids;
+  }, [locations, fLocation]);
+
   const { data: branches = [] } = useQuery({
     queryKey: ["branches-active"],
     queryFn: async () => (await supabase.from("branches").select("id,name,code,is_active").eq("is_active", true).order("name")).data ?? [],
@@ -210,7 +231,7 @@ function AssetsPage() {
     }
     if (fBranch && a.branch_id !== fBranch) return false;
     if (fCategory && a.category_id !== fCategory) return false;
-    if (fLocation && a.location_id !== fLocation) return false;
+    if (fLocation && (!a.location_id || !locationFilterIds.has(a.location_id))) return false;
     if (fGeo) {
       const targetPath = (selectedGeo as any)?.display_path;
       const assetPath = a.geo_places?.display_path;
