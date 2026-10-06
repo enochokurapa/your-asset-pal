@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CURRENT_ADMIN_CONFIG, currentAdminSource } from "@/lib/current-admin-sources";
 
 export type GeoHierarchyPlace = {
   geoname_id: number;
@@ -13,16 +14,6 @@ export type GeoHierarchyPlace = {
   admin_level: number | null;
   parent_geoname_id: number | null;
   country_code: string;
-};
-
-const COUNTRY_ADMIN: Record<string,{level:number;label:string}> = {
-  UG:{level:2,label:"District"},
-  KE:{level:1,label:"County"},
-  TZ:{level:1,label:"Region"},
-  RW:{level:2,label:"District"},
-  ZM:{level:1,label:"Province"},
-  MW:{level:2,label:"District"},
-  ZW:{level:1,label:"Province"},
 };
 
 function nextLabel(depth:number, options:GeoHierarchyPlace[]) {
@@ -60,7 +51,7 @@ export function GeoHierarchyFilter({
 }) {
   const [country,setCountry]=useState(initialCountry || value?.country_code || countries[0]?.code || "UG");
   const [path,setPath]=useState<GeoHierarchyPlace[]>([]);
-  const config=COUNTRY_ADMIN[country] ?? {level:1,label:"Region"};
+  const config=CURRENT_ADMIN_CONFIG[country] ?? {level:1,label:"Region"};
 
   useEffect(()=>{
     const desired=initialCountry || value?.country_code || countries[0]?.code;
@@ -79,7 +70,8 @@ export function GeoHierarchyFilter({
         .select("geoname_id,name,display_path,feature_class,feature_code,admin_level,parent_geoname_id,country_code")
         .eq("country_code",country)
         .eq("feature_code",`ADM${config.level}`);
-      if(country==="UG") q=q.eq("source","UBOS NPHC 2024");
+      const source=currentAdminSource(country);
+      if(source) q=q.eq("source",source);
       const {data,error}=await q.order("name").limit(1200);
       if(error) throw error;
       return (data??[]) as GeoHierarchyPlace[];
@@ -124,7 +116,7 @@ export function GeoHierarchyFilter({
   const parents=[path[0],path[1],path[2],path[3],path[4]];
   const queries=parents.map((parent,index)=>useQuery({
     queryKey:["geo-hierarchy-child",country,parent?.geoname_id,index],
-    enabled:!!parent && country!=="UG",
+    enabled:!!parent && !currentAdminSource(country),
     queryFn:()=>children(parent!.geoname_id),
   }));
   const childSets=queries.map(q=>(q.data??[]) as GeoHierarchyPlace[]);
