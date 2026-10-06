@@ -202,7 +202,7 @@ function ReportsPage() {
   const { data: assets = [] } = useQuery({
     queryKey: ["report-assets"],
     queryFn: async () => (await supabase.from("assets")
-      .select("*, categories(name,parent_id), locations(name,parent_id), branches(name,code), geo_places!assets_geo_place_id_fkey(geoname_id,name,display_path)")
+      .select("*, categories(name,parent_id), locations(name,parent_id), branches(name,code), geo_places!assets_geo_place_id_fkey(geoname_id,name,display_path,country_code)")
       .order("asset_tag")).data ?? [],
   });
   const { data: categories = [] } = useQuery({
@@ -228,12 +228,17 @@ function ReportsPage() {
       .maybeSingle()).data ?? null,
   });
   const reportCountries = useMemo(()=>{
+    const codes=new Set<string>();
     const allowed=(reportLocationSettings as any)?.allowed_country_codes as string[]|null|undefined;
     const fallback=(reportLocationSettings as any)?.default_country_code as string|null|undefined;
-    if(allowed?.length) return (geoCountries as any[]).filter((c:any)=>allowed.includes(c.code));
-    if(fallback) return (geoCountries as any[]).filter((c:any)=>c.code===fallback);
-    return geoCountries as any[];
-  },[geoCountries,reportLocationSettings]);
+    for(const code of allowed ?? []) codes.add(code);
+    if(fallback) codes.add(fallback);
+    for(const asset of enrichedAssets as any[]) {
+      if(asset.geo_places?.country_code) codes.add(asset.geo_places.country_code);
+    }
+    if(!codes.size) return geoCountries as any[];
+    return (geoCountries as any[]).filter((c:any)=>codes.has(c.code));
+  },[geoCountries,reportLocationSettings,enrichedAssets]);
   const { data: assignments = [] } = useQuery({
     queryKey: ["report-assignments"],
     queryFn: async () => (await supabase.from("asset_assignments")
