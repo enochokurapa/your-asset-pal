@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowRight, BarChart3, Boxes, Building2, Check, ClipboardCheck, Cloud, Database,
@@ -136,7 +137,7 @@ function HeroAssetScene() {
   ];
 
   return (
-    <div className="relative mx-auto aspect-[1.08/1] w-full max-w-[600px] overflow-hidden rounded-[2rem] border bg-card shadow-2xl shadow-primary/10">
+    <div className="relative mx-auto aspect-[1.08/1] w-full max-w-[520px] overflow-hidden rounded-[2rem] border bg-card shadow-2xl shadow-primary/10">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,color-mix(in_srgb,var(--primary)_7%,transparent),transparent_62%)]" />
 
       <svg className="absolute inset-0 h-full w-full" viewBox="0 0 600 560" aria-hidden="true">
@@ -213,6 +214,31 @@ function HeroAssetScene() {
 function PublicHome() {
   const { user } = useAuth();
 
+  useEffect(() => {
+    const nodes = Array.from(document.querySelectorAll<HTMLElement>("[data-scroll-reveal]"));
+    if (!nodes.length) return;
+
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) {
+      nodes.forEach((node) => node.classList.add("is-visible"));
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        }
+      },
+      { threshold: 0.16, rootMargin: "0px 0px -8% 0px" },
+    );
+
+    nodes.forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="platform-brand min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur-xl">
@@ -249,31 +275,31 @@ function PublicHome() {
       </header>
 
       <main>
-        <section className="relative overflow-hidden border-b">
+        <section className="relative overflow-hidden border-b" data-scroll-reveal data-reveal="hero">
           <div className="absolute inset-0 -z-20 bg-background" />
           <div className="absolute inset-0 -z-10 opacity-35 [background-image:linear-gradient(to_right,color-mix(in_oklab,var(--border)_60%,transparent)_1px,transparent_1px),linear-gradient(to_bottom,color-mix(in_oklab,var(--border)_60%,transparent)_1px,transparent_1px)] [background-size:46px_46px]" />
           <div className="absolute -right-32 top-12 -z-10 h-80 w-80 rounded-full bg-primary/10 blur-3xl" />
 
-          <div className="mx-auto grid max-w-7xl gap-14 px-4 py-16 sm:px-6 sm:py-24 lg:grid-cols-[1.02fr_.98fr] lg:items-center lg:px-8 lg:py-28">
-            <div>
+          <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 sm:py-20 lg:grid-cols-[1.08fr_.92fr] lg:items-center lg:px-8 lg:py-22">
+            <div className="af-scroll-copy">
               <div className="mb-5 inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground shadow-sm">
                 <Zap className="h-3.5 w-3.5 text-primary" />
                 Fixed asset control from registration to disposal
               </div>
 
-              <h1 className="max-w-3xl text-4xl font-bold tracking-[-0.045em] sm:text-5xl lg:text-[4rem] lg:leading-[1.02]">
+              <h1 className="max-w-3xl text-4xl font-bold tracking-[-0.045em] sm:text-5xl lg:text-[3.65rem] lg:leading-[1.02]">
                 Every asset.
                 <br />
                 <span className="text-primary">One trusted system.</span>
               </h1>
 
-              <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
+              <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
                 AssetFlow 360 helps organisations register, locate, assign, verify, depreciate,
                 move and report on fixed assets from one secure workspace built for daily operations
                 and management decisions.
               </p>
 
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div className="mt-7 flex flex-wrap gap-3">
                 <Button asChild size="lg" className="h-12 px-6">
                   <Link to={user ? "/dashboard" : "/register"}>
                     {user ? "Open dashboard" : "Start free trial"}
@@ -295,15 +321,15 @@ function PublicHome() {
               </div>
             </div>
 
-            <div className="relative af-reveal">
+            <div className="relative af-scroll-visual">
               <HeroAssetScene />
             </div>
           </div>
         </section>
 
-        <section className="border-b bg-muted/25">
+        <section className="border-b bg-muted/25 af-scroll-reveal" data-scroll-reveal data-reveal="up">
           <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
-            <div className="grid gap-4 text-center sm:grid-cols-2 lg:grid-cols-4">
+            <div className="af-stagger grid gap-4 text-center sm:grid-cols-2 lg:grid-cols-4">
               {[
                 ["Register", "Build a clean asset register"],
                 ["Locate", "Know branch, room or field location"],
@@ -319,7 +345,7 @@ function PublicHome() {
           </div>
         </section>
 
-        <section id="features" className="af-reveal mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
+        <section id="features" data-scroll-reveal data-reveal="up" className="af-scroll-reveal mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary">Complete asset lifecycle</p>
             <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
@@ -331,7 +357,7 @@ function PublicHome() {
             </p>
           </div>
 
-          <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="af-stagger mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {coreFeatures.map(({ icon: Icon, title, text }) => (
               <article key={title} className="rounded-2xl border bg-card p-6 shadow-sm">
                 <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -344,7 +370,7 @@ function PublicHome() {
           </div>
         </section>
 
-        <section id="locations" className="af-reveal border-y bg-muted/25">
+        <section id="locations" data-scroll-reveal data-reveal="left" className="af-scroll-reveal border-y bg-muted/25">
           <div className="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2 lg:items-center lg:px-8">
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary">Location intelligence</p>
@@ -411,7 +437,7 @@ function PublicHome() {
           </div>
         </section>
 
-        <section id="modules" className="af-reveal mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
+        <section id="modules" data-scroll-reveal data-reveal="up" className="af-scroll-reveal mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary">Modules</p>
             <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
@@ -419,7 +445,7 @@ function PublicHome() {
             </h2>
           </div>
 
-          <div className="mt-10 grid gap-4 md:grid-cols-2">
+          <div className="af-stagger mt-10 grid gap-4 md:grid-cols-2">
             {moduleGroups.map((group) => (
               <div key={group.title} className="rounded-2xl border bg-card p-6">
                 <h3 className="font-bold">{group.title}</h3>
@@ -436,7 +462,7 @@ function PublicHome() {
           </div>
         </section>
 
-        <section id="integrations" className="af-reveal border-y bg-muted/25">
+        <section id="integrations" data-scroll-reveal data-reveal="right" className="af-scroll-reveal border-y bg-muted/25">
           <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
             <div className="grid gap-10 lg:grid-cols-[.8fr_1.2fr] lg:items-start">
               <div>
@@ -454,7 +480,7 @@ function PublicHome() {
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="af-stagger grid gap-4 sm:grid-cols-2">
                 {integrationItems.map(({ icon: Icon, title, text }) => (
                   <div key={title} className="rounded-2xl border bg-background p-5">
                     <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -469,7 +495,7 @@ function PublicHome() {
           </div>
         </section>
 
-        <section id="security" className="af-reveal mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2 lg:items-center lg:px-8">
+        <section id="security" data-scroll-reveal data-reveal="left" className="af-scroll-reveal mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2 lg:items-center lg:px-8">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary">Security and accountability</p>
             <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
@@ -522,7 +548,7 @@ function PublicHome() {
           </div>
         </section>
 
-        <section className="border-t">
+        <section className="af-scroll-reveal border-t" data-scroll-reveal data-reveal="zoom">
           <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
             <div className="overflow-hidden rounded-3xl bg-primary px-6 py-12 text-center text-primary-foreground shadow-xl sm:px-10">
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
