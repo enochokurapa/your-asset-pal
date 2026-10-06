@@ -26,7 +26,7 @@ INSERT INTO public.geo_places(
 (981000018,'KE',NULL,'Nyandarua','Nyandarua','A','ADM1',1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'Nyandarua County · KE','KNBS current counties'),
 (981000019,'KE',NULL,'Nyeri','Nyeri','A','ADM1',1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'Nyeri County · KE','KNBS current counties'),
 (981000020,'KE',NULL,'Kirinyaga','Kirinyaga','A','ADM1',1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'Kirinyaga County · KE','KNBS current counties'),
-(981000021,'KE',NULL,'Murang''a','Murang''a','A','ADM1',1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'Murang'a County · KE','KNBS current counties'),
+(981000021,'KE',NULL,'Murang''a','Murang''a','A','ADM1',1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'Murang''a County · KE','KNBS current counties'),
 (981000022,'KE',NULL,'Kiambu','Kiambu','A','ADM1',1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'Kiambu County · KE','KNBS current counties'),
 (981000023,'KE',NULL,'Turkana','Turkana','A','ADM1',1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'Turkana County · KE','KNBS current counties'),
 (981000024,'KE',NULL,'West Pokot','West Pokot','A','ADM1',1,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'West Pokot County · KE','KNBS current counties'),
