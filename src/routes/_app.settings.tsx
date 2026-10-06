@@ -81,10 +81,40 @@ function SettingsPage() {
     if (!tpl.organization_name.trim()) { toast.error("Organization name is required."); return; }
     setSaving(true);
     try {
-      const { id, created_at, updated_at, tenant_id, ...rest } = tpl as any;
       const userResult = await supabase.auth.getUser();
       if (userResult.error || !userResult.data.user) throw userResult.error || new Error("Your session expired. Sign in again.");
-      const payload = { ...rest, organization_name: tpl.organization_name.trim(), tenant_id: tenantId, updated_by: userResult.data.user.id };
+
+      // Persist only real document_templates columns. Runtime-only PDF metadata
+      // such as generated_by_name must never be written back to Postgres.
+      const payload = {
+        name: tpl.name,
+        is_active: tpl.is_active,
+        logo_data_url: tpl.logo_data_url,
+        logo_position: tpl.logo_position,
+        logo_max_height: tpl.logo_max_height,
+        organization_name: tpl.organization_name.trim(),
+        header_text: tpl.header_text,
+        header_show: tpl.header_show,
+        footer_text: tpl.footer_text,
+        footer_show: tpl.footer_show,
+        show_page_numbers: tpl.show_page_numbers,
+        show_generated_at: tpl.show_generated_at,
+        watermark_text: tpl.watermark_text,
+        watermark_image_data_url: tpl.watermark_image_data_url,
+        watermark_opacity: tpl.watermark_opacity,
+        watermark_position: tpl.watermark_position,
+        font_family: tpl.font_family,
+        base_font_size: tpl.base_font_size,
+        margin_top: tpl.margin_top,
+        margin_right: tpl.margin_right,
+        margin_bottom: tpl.margin_bottom,
+        margin_left: tpl.margin_left,
+        orientation: tpl.orientation,
+        paper_size: tpl.paper_size,
+        primary_color: tpl.primary_color,
+        tenant_id: tenantId,
+        updated_by: userResult.data.user.id,
+      };
       const query = id && id !== "default"
         ? supabase.from("document_templates" as any).update(payload).eq("id", id).eq("tenant_id", tenantId)
         : supabase.from("document_templates" as any).insert(payload);
