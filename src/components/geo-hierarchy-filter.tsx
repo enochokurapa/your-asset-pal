@@ -88,6 +88,36 @@ export function GeoHierarchyFilter({
   });
 
   useEffect(()=>{
+    if(!value?.geoname_id || !primary.length) return;
+    if(path.some(p=>p.geoname_id===value.geoname_id)) return;
+
+    let cancelled=false;
+    (async()=>{
+      const chain:GeoHierarchyPlace[]=[];
+      let current:GeoHierarchyPlace|null=value;
+      const seen=new Set<number>();
+      for(let i=0;i<8 && current && !seen.has(current.geoname_id);i++){
+        seen.add(current.geoname_id);
+        chain.unshift(current);
+        if(current.feature_code===`ADM${config.level}`) break;
+        if(!current.parent_geoname_id) break;
+        const {data,error}=await (supabase as any).from("geo_places")
+          .select("geoname_id,name,display_path,feature_class,feature_code,admin_level,parent_geoname_id,country_code")
+          .eq("geoname_id",current.parent_geoname_id)
+          .maybeSingle();
+        if(error || !data) break;
+        current=data as GeoHierarchyPlace;
+      }
+      const primaryIndex=chain.findIndex(p=>p.feature_code===`ADM${config.level}`);
+      const normalized=primaryIndex>=0 ? chain.slice(primaryIndex) : chain;
+      if(!cancelled && normalized.length) setPath(normalized);
+    })();
+
+    return ()=>{cancelled=true;};
+  },[value?.geoname_id,primary.length,config.level]);
+
+  useEffect(()=>{
+    if(value?.country_code===country) return;
     setPath([]);
     onChange(null);
   },[country]);
