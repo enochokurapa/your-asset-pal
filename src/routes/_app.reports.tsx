@@ -201,7 +201,7 @@ function ReportsPage() {
   const { data: assets = [] } = useQuery({
     queryKey: ["report-assets"],
     queryFn: async () => (await supabase.from("assets")
-      .select("*, categories(name,parent_id), locations(name,parent_id), branches(name,code)")
+      .select("*, categories(name,parent_id), locations(name,parent_id), branches(name,code), geo_places!assets_geo_place_id_fkey(geoname_id,name,display_path)")
       .order("asset_tag")).data ?? [],
   });
   const { data: categories = [] } = useQuery({
@@ -210,7 +210,7 @@ function ReportsPage() {
   });
   const { data: locationsAll = [] } = useQuery({
     queryKey: ["all-locations"],
-    queryFn: async () => (await supabase.from("locations").select("id,name,parent_id")).data ?? [],
+    queryFn: async () => (await supabase.from("locations").select("id,name,parent_id,location_type,branch_id")).data ?? [],
   });
   const { data: branches = [] } = useQuery({
     queryKey: ["all-branches"],
@@ -298,6 +298,8 @@ function ReportsPage() {
         sub_category: parentCat ? cat?.name : "",
         location: parentLoc?.name ?? loc?.name ?? "",
         sub_location: parentLoc ? loc?.name : "",
+        geography: a.geo_places?.display_path ?? a.geo_places?.name ?? "",
+        geography_name: a.geo_places?.name ?? "",
         assigned_to: assn?.assigned_to_name ?? "",
         department: assn?.department ?? "",
       };
@@ -357,6 +359,56 @@ function ReportsPage() {
     [branches, canSeeBranch],
   );
 
+  const locationChildren = useMemo(() => {
+    const map = new Map<string,string[]>();
+    for (const l of locationsAll as any[]) {
+      if (!l.parent_id) continue;
+      const list = map.get(l.parent_id) ?? [];
+      list.push(l.id);
+      map.set(l.parent_id, list);
+    }
+    return map;
+  }, [locationsAll]);
+
+  const locationDescendants = (rootId:string) => {
+    const ids = new Set<string>([rootId]);
+    const visit = (id:string) => {
+      for (const child of locationChildren.get(id) ?? []) {
+        if (ids.has(child)) continue;
+        ids.add(child);
+        visit(child);
+      }
+    };
+    visit(rootId);
+    return ids;
+  };
+
+  const locationLabel = (loc:any) => {
+    if (!loc) return "";
+    const parent = loc.parent_id ? locMap[loc.parent_id] : null;
+    return parent ? `${parent.name} / ${loc.name}` : loc.name;
+  };
+
+  const locationOpts = (locationsAll as any[])
+    .map((l:any)=>({value:l.id,label:locationLabel(l)}))
+    .sort((a:any,b:any)=>a.label.localeCompare(b.label));
+
+  const geographyOpts = useMemo(() => {
+    const values = new Map<string,string>();
+    for (const a of enrichedAssets as any[]) {
+      const path = String(a.geography || "").trim();
+      if (!path) continue;
+      const parts = path.split(" · ").map((x:string)=>x.trim()).filter(Boolean);
+      for (let i=0;i<parts.length;i++) {
+        const suffix = parts.slice(i).join(" · ");
+        values.set(suffix, suffix);
+      }
+    }
+    return Array.from(values.entries())
+      .map(([value,label])=>({value,label}))
+      .sort((a,b)=>a.label.localeCompare(b.label));
+  }, [enrichedAssets]);
+
   // Shared option lists
   const branchOpts = scopedBranches.map((b: any) => ({ value: b.id, label: b.name }));
   const categoryOpts = categories.filter((c: any) => !c.parent_id).map((c: any) => ({ value: c.id, label: c.name }));
@@ -372,6 +424,7 @@ function ReportsPage() {
 
   /* ----------- Filters state per tab ----------- */
   const [fRegister, setFRegister] = useState<Record<string, string>>({});
+  const [fLocationReport, setFLocationReport] = useState<Record<string, string>>({});
   const [fMove, setFMove] = useState<Record<string, string>>({});
   const [fAssign, setFAssign] = useState<Record<string, string>>({});
   const [fDisposal, setFDisposal] = useState<Record<string, string>>({});
@@ -387,6 +440,8 @@ function ReportsPage() {
     { key: "branch_id", label: "Branch", type: "select", options: branchOpts },
     { key: "category_id", label: "Category", type: "select", options: categoryOpts },
     { key: "status", label: "Status", type: "select", options: statusOpts },
+    { key: "location_id", label: "Organisation location", type: "select", options: locationOpts },
+    { key: "geography", label: "Geographic area", type: "select", options: geographyOpts },
     { key: "from", label: "Purchased from", type: "date" },
     { key: "to", label: "Purchased to", type: "date" },
   ];
@@ -394,6 +449,8 @@ function ReportsPage() {
     (!fRegister.branch_id || a.branch_id === fRegister.branch_id) &&
     (!fRegister.category_id || a.category_id === fRegister.category_id || catMap[a.category_id]?.parent_id === fRegister.category_id) &&
     (!fRegister.status || a.status === fRegister.status) &&
+    (!fRegister.location_id || (a.location_id && locationDescendants(fRegister.location_id).has(a.location_id))) &&
+    (!fRegister.geography || String(a.geography || "").endsWith(fRegister.geography)) &&
     applyDate(a.purchase_date, fRegister.from, fRegister.to) &&
     (!fRegister.q ||
       applyText(a.asset_tag, fRegister.q) || applyText(a.name, fRegister.q) || applyText(a.serial_number, fRegister.q)),
@@ -405,12 +462,90 @@ function ReportsPage() {
       { header: "Name", key: "name" }, { header: "Description", key: "description" },
       { header: "Category", key: "category" }, { header: "Sub-category", key: "sub_category" },
       { header: "Branch", key: "branch" }, { header: "Location", key: "location" },
-      { header: "Sub-location", key: "sub_location" }, { header: "Assigned to", key: "assigned_to" },
+      { header: "Sub-location", key: "sub_location" }, { header: "Geographic Area", key: "geography" },
+      { header: "Assigned to", key: "assigned_to" },
       { header: "Department", key: "department" }, { header: "Status", key: "status" },
       { header: "Purchase Date", key: "purchase_date" },
       { header: "Purchase Value", key: "purchase_value", isCurrency: true },
     ],
     rows: registerRows,
+  };
+
+  /* ----------- Locations ----------- */
+  const latestVerificationByAsset = useMemo(() => {
+    const map: Record<string,any> = {};
+    for (const v of [...scopedVerifications].sort((a:any,b:any)=>new Date(b.verified_at).getTime()-new Date(a.verified_at).getTime())) {
+      if (!map[v.asset_id]) map[v.asset_id] = v;
+    }
+    return map;
+  }, [scopedVerifications]);
+
+  const locationReportDefs: FilterDef[] = [
+    { key: "q", label: "Search asset/tag/location", type: "text" },
+    { key: "branch_id", label: "Branch", type: "select", options: branchOpts },
+    { key: "location_id", label: "Organisation location", type: "select", options: locationOpts },
+    { key: "geography", label: "Geographic area", type: "select", options: geographyOpts },
+    { key: "state", label: "Location status", type: "select", options: [
+      { value: "located", label: "Located" },
+      { value: "unlocated", label: "No location" },
+      { value: "gps", label: "GPS captured" },
+    ]},
+  ];
+
+  const locationReportRows = enrichedAssets.filter((a:any) => {
+    const orgIds = fLocationReport.location_id ? locationDescendants(fLocationReport.location_id) : null;
+    const located = !!(a.location_id || a.geo_place_id);
+    const gps = a.location_latitude != null && a.location_longitude != null;
+    return (
+      (!fLocationReport.branch_id || a.branch_id === fLocationReport.branch_id) &&
+      (!orgIds || (a.location_id && orgIds.has(a.location_id))) &&
+      (!fLocationReport.geography || String(a.geography || "").endsWith(fLocationReport.geography)) &&
+      (!fLocationReport.state ||
+        (fLocationReport.state === "located" && located) ||
+        (fLocationReport.state === "unlocated" && !located) ||
+        (fLocationReport.state === "gps" && gps)) &&
+      (!fLocationReport.q ||
+        applyText(a.asset_tag,fLocationReport.q) ||
+        applyText(a.name,fLocationReport.q) ||
+        applyText(a.location,fLocationReport.q) ||
+        applyText(a.sub_location,fLocationReport.q) ||
+        applyText(a.geography,fLocationReport.q))
+    );
+  }).map((a:any)=>{
+    const verification = latestVerificationByAsset[a.id];
+    return {
+      asset_tag:a.asset_tag,
+      name:a.name,
+      branch:a.branch,
+      location:a.location,
+      sub_location:a.sub_location,
+      geography:a.geography,
+      status:a.status,
+      assigned_to:a.assigned_to,
+      department:a.department,
+      gps:a.location_latitude != null && a.location_longitude != null ? "Yes" : "No",
+      last_verified:verification?.verified_at ? String(verification.verified_at).slice(0,10) : "",
+      verification_status:verification?.status ?? "",
+    };
+  });
+
+  const locationReport: Report = {
+    title: "Asset Location Report",
+    columns: [
+      {header:"Tag",key:"asset_tag"},
+      {header:"Asset",key:"name"},
+      {header:"Branch",key:"branch"},
+      {header:"Organisation Location",key:"location"},
+      {header:"Sub-location",key:"sub_location"},
+      {header:"Geographic Area",key:"geography"},
+      {header:"Status",key:"status"},
+      {header:"Custodian",key:"assigned_to"},
+      {header:"Department",key:"department"},
+      {header:"GPS",key:"gps"},
+      {header:"Last Verified",key:"last_verified"},
+      {header:"Verification",key:"verification_status"},
+    ],
+    rows: locationReportRows,
   };
 
   /* ----------- Movements ----------- */
@@ -832,6 +967,7 @@ function ReportsPage() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="register">Register</TabsTrigger>
+          <TabsTrigger value="locations">Locations</TabsTrigger>
           <TabsTrigger value="movements">Movements</TabsTrigger>
           <TabsTrigger value="assigned">Assigned</TabsTrigger>
           <TabsTrigger value="disposals">Retire/Dispose</TabsTrigger>
@@ -849,6 +985,10 @@ function ReportsPage() {
         <TabsContent value="register" className="mt-4">
           <FilterBar defs={registerDefs} values={fRegister} onChange={setFRegister} />
           <ReportTable r={register} exportMeta={reportExportMeta} />
+        </TabsContent>
+        <TabsContent value="locations" className="mt-4">
+          <FilterBar defs={locationReportDefs} values={fLocationReport} onChange={setFLocationReport} />
+          <ReportTable r={locationReport} exportMeta={reportExportMeta} />
         </TabsContent>
         <TabsContent value="movements" className="mt-4">
           <FilterBar defs={movementDefs} values={fMove} onChange={setFMove} />
