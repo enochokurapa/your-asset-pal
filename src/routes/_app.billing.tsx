@@ -99,7 +99,7 @@ function BillingPage() {
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          {(ctx?.addOns ?? []).filter((a: any) => a.available).map((addon: any) => {
+          {(ctx?.addOns ?? []).map((addon: any) => {
             const enabled = Boolean(ctx?.enabledModules?.includes(addon.key));
             const pending = addonTransaction && addonKey === addon.key;
             return (
