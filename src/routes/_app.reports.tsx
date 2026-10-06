@@ -221,6 +221,19 @@ function ReportsPage() {
     queryKey: ["report-geo-countries"],
     queryFn: async () => (await (supabase as any).from("geo_countries").select("code,name").eq("enabled",true).order("name")).data ?? [],
   });
+  const { data: reportLocationSettings } = useQuery({
+    queryKey: ["report-location-settings"],
+    queryFn: async () => (await (supabase as any).from("tenant_location_settings")
+      .select("default_country_code,allowed_country_codes")
+      .maybeSingle()).data ?? null,
+  });
+  const reportCountries = useMemo(()=>{
+    const allowed=(reportLocationSettings as any)?.allowed_country_codes as string[]|null|undefined;
+    const fallback=(reportLocationSettings as any)?.default_country_code as string|null|undefined;
+    if(allowed?.length) return (geoCountries as any[]).filter((c:any)=>allowed.includes(c.code));
+    if(fallback) return (geoCountries as any[]).filter((c:any)=>c.code===fallback);
+    return geoCountries as any[];
+  },[geoCountries,reportLocationSettings]);
   const { data: assignments = [] } = useQuery({
     queryKey: ["report-assignments"],
     queryFn: async () => (await supabase.from("asset_assignments")
@@ -976,9 +989,10 @@ function ReportsPage() {
           <Card className="p-3">
             <p className="mb-3 text-sm font-semibold">Geographic filter</p>
             <GeoHierarchyFilter
-              countries={geoCountries as any[]}
+              countries={reportCountries as any[]}
               value={registerGeo}
               onChange={setRegisterGeo}
+              initialCountry={(reportLocationSettings as any)?.default_country_code || undefined}
               compact
             />
           </Card>
@@ -992,9 +1006,10 @@ function ReportsPage() {
               <p className="text-xs text-muted-foreground">Choose a country, then drill down only as far as needed.</p>
             </div>
             <GeoHierarchyFilter
-              countries={geoCountries as any[]}
+              countries={reportCountries as any[]}
               value={locationReportGeo}
               onChange={setLocationReportGeo}
+              initialCountry={(reportLocationSettings as any)?.default_country_code || undefined}
               compact
             />
           </Card>
