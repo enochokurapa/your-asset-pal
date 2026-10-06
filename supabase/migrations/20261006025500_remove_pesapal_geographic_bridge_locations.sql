@@ -58,7 +58,7 @@ ALTER TABLE public.assets ENABLE TRIGGER trg_audit_assets;
 ALTER TABLE public.locations ENABLE TRIGGER trg_audit_locations;
 
 INSERT INTO public.audit_log(
-  tenant_id, user_id, action, entity_type, entity_id, details
+  tenant_id, actor_user_id, action, entity_type, entity_id, details
 )
 SELECT
   t.id,
