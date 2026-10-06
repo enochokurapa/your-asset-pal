@@ -227,18 +227,6 @@ function ReportsPage() {
       .select("default_country_code,allowed_country_codes")
       .maybeSingle()).data ?? null,
   });
-  const reportCountries = useMemo(()=>{
-    const codes=new Set<string>();
-    const allowed=(reportLocationSettings as any)?.allowed_country_codes as string[]|null|undefined;
-    const fallback=(reportLocationSettings as any)?.default_country_code as string|null|undefined;
-    for(const code of allowed ?? []) codes.add(code);
-    if(fallback) codes.add(fallback);
-    for(const asset of enrichedAssets as any[]) {
-      if(asset.geo_places?.country_code) codes.add(asset.geo_places.country_code);
-    }
-    if(!codes.size) return geoCountries as any[];
-    return (geoCountries as any[]).filter((c:any)=>codes.has(c.code));
-  },[geoCountries,reportLocationSettings,enrichedAssets]);
   const { data: assignments = [] } = useQuery({
     queryKey: ["report-assignments"],
     queryFn: async () => (await supabase.from("asset_assignments")
@@ -327,6 +315,19 @@ function ReportsPage() {
         department: assn?.department ?? "",
       };
     }), [assets, catMap, locMap, currentAssignment, canSeeBranch]);
+
+  const reportCountries = useMemo(()=>{
+    const codes=new Set<string>();
+    const allowed=(reportLocationSettings as any)?.allowed_country_codes as string[]|null|undefined;
+    const fallback=(reportLocationSettings as any)?.default_country_code as string|null|undefined;
+    for(const code of allowed ?? []) codes.add(code);
+    if(fallback) codes.add(fallback);
+    for(const asset of enrichedAssets as any[]) {
+      if(asset.geo_places?.country_code) codes.add(asset.geo_places.country_code);
+    }
+    if(!codes.size) return geoCountries as any[];
+    return (geoCountries as any[]).filter((c:any)=>codes.has(c.code));
+  },[geoCountries,reportLocationSettings,enrichedAssets]);
 
   const assetMap = useMemo(
     () => Object.fromEntries(enrichedAssets.map((a: any) => [a.id, a])),
@@ -492,7 +493,6 @@ function ReportsPage() {
     { key: "q", label: "Search asset/tag/location", type: "text" },
     { key: "branch_id", label: "Branch", type: "select", options: branchOpts },
     { key: "location_id", label: "Organisation location", type: "select", options: locationOpts },
-    { key: "geography", label: "Geographic area", type: "select", options: geographyOpts },
     { key: "state", label: "Location status", type: "select", options: [
       { value: "located", label: "Located" },
       { value: "unlocated", label: "No location" },
