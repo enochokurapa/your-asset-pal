@@ -115,8 +115,9 @@ function SettingsPage() {
         tenant_id: tenantId,
         updated_by: userResult.data.user.id,
       };
-      const query = id && id !== "default"
-        ? supabase.from("document_templates" as any).update(payload).eq("id", id).eq("tenant_id", tenantId)
+      const templateId = tpl.id;
+      const query = templateId && templateId !== "default"
+        ? supabase.from("document_templates" as any).update(payload).eq("id", templateId).eq("tenant_id", tenantId)
         : supabase.from("document_templates" as any).insert(payload);
       const { data, error } = await query.select("*").maybeSingle();
       if (error) throw error;
