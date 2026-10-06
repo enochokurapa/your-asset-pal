@@ -1,0 +1,139 @@
+services:
+  pesapal-db:
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM postgres:15-alpine
+        COPY complete_init.sql /docker-entrypoint-initdb.d/01-init.sql
+        COPY server_seed.sql /docker-entrypoint-initdb.d/02-seed.sql
+        COPY saas_policy.sql /docker-entrypoint-initdb.d/03-saas-policy.sql
+    container_name: pesapal-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ams
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "super-secret-postgres-password"
+    volumes:
+      - pesapal-db-data:/var/lib/postgresql/data
+    networks:
+      - pesapal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ams"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  pesapal-auth:
+    image: supabase/gotrue:v2.158.1
+    container_name: pesapal-auth
+    restart: unless-stopped
+    depends_on:
+      pesapal-db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: "0.0.0.0"
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: "https://assetflow360.com/auth/v1"
+      GOTRUE_API_EXTERNAL_URL: "https://assetflow360.com/auth/v1"
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_NAMESPACE: auth
+      GOTRUE_DB_DATABASE_URL: "postgres://supabase_auth_admin:super-secret-postgres-password@pesapal-db:5432/ams?sslmode=disable"
+      GOTRUE_SITE_URL: "https://assetflow360.com"
+      GOTRUE_URI_ALLOW_LIST: "*"
+      GOTRUE_JWT_SECRET: "super-secret-jwt-token-with-at-least-32-characters-long"
+      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_DISABLE_SIGNUP: "false"
+    expose:
+      - "9999"
+    # GoTrue is intentionally private. The app proxies /auth/v1 over this network.
+    # This avoids Traefik route collisions that can return plain-text 404 responses.
+    networks:
+      - pesapal
+
+  pesapal-rest:
+    image: postgrest/postgrest:v12.2.0
+    container_name: pesapal-rest
+    restart: unless-stopped
+    depends_on:
+      pesapal-db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: "postgres://authenticator:super-secret-postgres-password@pesapal-db:5432/ams"
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: "super-secret-jwt-token-with-at-least-32-characters-long"
+    expose:
+      - "3000"
+    # PostgREST is intentionally private. The app proxies /rest/v1 internally.
+    networks:
+      - pesapal
+
+  pesapal-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SUPABASE_PROJECT_ID: "ams-self-hosted"
+        SUPABASE_PUBLISHABLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNjAwMDAwMDAwLCJleHAiOjIwMDAwMDAwMDB9.V-Nq7_uazFUYvZFXyq_whGnFkWy4W_3o4k6m04sGc5Q"
+        SUPABASE_URL: "https://assetflow360.com"
+        VITE_SUPABASE_PROJECT_ID: "ams-self-hosted"
+        VITE_SUPABASE_PUBLISHABLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNjAwMDAwMDAwLCJleHAiOjIwMDAwMDAwMDB9.V-Nq7_uazFUYvZFXyq_whGnFkWy4W_3o4k6m04sGc5Q"
+        VITE_SUPABASE_URL: "https://assetflow360.com"
+    container_name: pesapal-app
+    restart: unless-stopped
+    depends_on:
+      pesapal-auth:
+        condition: service_started
+      pesapal-rest:
+        condition: service_started
+    environment:
+      SUPABASE_PROJECT_ID: "ams-self-hosted"
+      SUPABASE_URL: "https://assetflow360.com"
+      SUPABASE_PUBLISHABLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNjAwMDAwMDAwLCJleHAiOjIwMDAwMDAwMDB9.V-Nq7_uazFUYvZFXyq_whGnFkWy4W_3o4k6m04sGc5Q"
+      SUPABASE_SERVICE_ROLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE2MDAwMDAwMCwiZXhwIjoyMDAwMDAwMDAwfQ.oeN2RF9Dij2wbGdSl4SXReFSoKYYZ437UYmF4OG65PM"
+      VITE_SUPABASE_PROJECT_ID: "ams-self-hosted"
+      VITE_SUPABASE_URL: "https://assetflow360.com"
+      VITE_SUPABASE_PUBLISHABLE_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNjAwMDAwMDAwLCJleHAiOjIwMDAwMDAwMDB9.V-Nq7_uazFUYvZFXyq_whGnFkWy4W_3o4k6m04sGc5Q"
+      # Private upstreams used by src/server.ts for same-origin Supabase proxying.
+      SUPABASE_AUTH_INTERNAL_URL: "http://pesapal-auth:9999"
+      SUPABASE_REST_INTERNAL_URL: "http://pesapal-rest:3000"
+      DATABASE_URL: "${DATABASE_URL:-}"
+      R2_ACCOUNT_ID: "${R2_ACCOUNT_ID:-}"
+      R2_ACCESS_KEY_ID: "${R2_ACCESS_KEY_ID:-}"
+      R2_SECRET_ACCESS_KEY: "${R2_SECRET_ACCESS_KEY:-}"
+      R2_BUCKET: "${R2_BUCKET:-}"
+      R2_ENDPOINT: "${R2_ENDPOINT:-}"
+      BACKUP_SCHEDULER_DISABLED: "${BACKUP_SCHEDULER_DISABLED:-false}"
+      RESEND_API_KEY: "${RESEND_API_KEY:-}"
+      BACKUP_EMAIL_FROM: "${BACKUP_EMAIL_FROM:-}"
+      YO_API_USERNAME: "${YO_API_USERNAME:-}"
+      YO_API_PASSWORD: "${YO_API_PASSWORD:-}"
+      YO_API_MODE: "${YO_API_MODE:-production}"
+      YO_API_URL: "${YO_API_URL:-}"
+      MICROSOFT_365_CLIENT_ID: "${MICROSOFT_365_CLIENT_ID:-}"
+      MICROSOFT_365_CLIENT_SECRET: "${MICROSOFT_365_CLIENT_SECRET:-}"
+      MICROSOFT_365_REDIRECT_URI: "${MICROSOFT_365_REDIRECT_URI:-https://assetflow360.com/api/integrations/microsoft/callback}"
+      MICROSOFT_365_TOKEN_ENCRYPTION_KEY: "${MICROSOFT_365_TOKEN_ENCRYPTION_KEY:-}"
+    ports:
+      - "127.0.0.1:4300:3000"
+    expose:
+      - "3000"
+    networks:
+      - pesapal
+      - edge
+
+networks:
+  pesapal:
+    name: pesapal-net
+  edge:
+    external: true
+    name: edge
+
+volumes:
+  pesapal-db-data:
+    external: true
+    name: pesapal-db-data
