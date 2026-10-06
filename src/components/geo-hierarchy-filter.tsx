@@ -27,7 +27,7 @@ const COUNTRY_ADMIN: Record<string,{level:number;label:string}> = {
 
 function nextLabel(depth:number, options:GeoHierarchyPlace[]) {
   const hasAdmin=options.some(p=>p.feature_class==="A");
-  if (!hasAdmin) return depth <= 2 ? "Town / locality" : "Local area";
+  if (!hasAdmin) return "Administrative area";
   if (depth === 1) return "Subdivision";
   if (depth === 2) return "Sub-area";
   return "Local administrative area";
@@ -42,8 +42,7 @@ async function children(parentId:number) {
     .limit(1500);
   if(error) throw error;
   const rows=(data??[]) as GeoHierarchyPlace[];
-  const admin=rows.filter(p=>p.feature_class==="A");
-  return admin.length ? admin : rows.filter(p=>p.feature_class==="P");
+  return rows.filter(p=>p.feature_class==="A");
 }
 
 export function GeoHierarchyFilter({
