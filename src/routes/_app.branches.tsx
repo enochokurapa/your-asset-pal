@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -34,6 +34,7 @@ const empty: BranchForm = { name: "", code: "", address: "", is_active: true };
 
 function BranchesPage() {
   const { isAdmin, user } = useAuth();
+  const nav = useNavigate();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<BranchForm>(empty);
@@ -142,7 +143,9 @@ function BranchesPage() {
                         {!b.is_active && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
                       </div>
                       {b.address && <p className="mt-1 text-xs text-muted-foreground">{b.address}</p>}
-                      <p className="mt-2 text-sm tabular-nums"><span className="font-semibold">{counts[b.id] ?? 0}</span> <span className="text-muted-foreground">assets</span></p>
+                      <button type="button" onClick={()=>nav({to:"/assets",search:{branch:b.id} as any})} className="mt-2 text-sm tabular-nums text-left hover:text-primary">
+                        <span className="font-semibold">{counts[b.id] ?? 0}</span> <span className="text-muted-foreground">assets</span>
+                      </button>
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <Button size="icon" variant="ghost" onClick={() => openEdit(b)}><Pencil className="h-4 w-4" /></Button>
