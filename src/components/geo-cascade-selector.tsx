@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CURRENT_ADMIN_CONFIG, currentAdminSource } from "@/lib/current-admin-sources";
 
 type GeoPlace = {
   geoname_id: number;
@@ -19,16 +20,6 @@ type GeoPlace = {
   longitude: number | null;
   population: number | null;
   parent_geoname_id: number | null;
-};
-
-const COUNTRY_ADMIN: Record<string,{level:number;label:string}> = {
-  UG:{level:2,label:"District"},
-  KE:{level:1,label:"County"},
-  TZ:{level:1,label:"Region"},
-  RW:{level:2,label:"District"},
-  ZM:{level:1,label:"Province"},
-  MW:{level:2,label:"District"},
-  ZW:{level:1,label:"Province"},
 };
 
 function nextLabel(place: GeoPlace | null, hasAdminChildren: boolean, depth: number) {
@@ -64,7 +55,7 @@ export function GeoCascadeSelector({
   onChange:(place:GeoPlace|null)=>void;
   required?:boolean;
 }) {
-  const config = COUNTRY_ADMIN[countryCode] ?? {level:1,label:"Region"};
+  const config = CURRENT_ADMIN_CONFIG[countryCode] ?? {level:1,label:"Region"};
   const [path,setPath]=useState<GeoPlace[]>([]);
 
   const {data:adminAreas=[]}=useQuery({
@@ -74,7 +65,8 @@ export function GeoCascadeSelector({
         .select("geoname_id,name,display_path,feature_class,feature_code,admin_level,admin1_code,admin2_code,admin3_code,admin4_code,latitude,longitude,population,parent_geoname_id")
         .eq("country_code",countryCode)
         .eq("feature_code",`ADM${config.level}`);
-      if(countryCode==="UG") q=q.eq("source","UBOS NPHC 2024");
+      const source=currentAdminSource(countryCode);
+      if(source) q=q.eq("source",source);
       const {data,error}=await q.order("name").limit(1000);
       if(error) throw error;
       return (data??[]) as GeoPlace[];
@@ -117,22 +109,22 @@ export function GeoCascadeSelector({
 
   const {data:level1Children=[]}=useQuery({
     queryKey:["geo-child-options",level1Parent?.geoname_id],
-    enabled:!!level1Parent && countryCode!=="UG",
+    enabled:!!level1Parent && !currentAdminSource(countryCode),
     queryFn:()=>fetchChildren(level1Parent!.geoname_id),
   });
   const {data:level2Children=[]}=useQuery({
     queryKey:["geo-child-options",level2Parent?.geoname_id],
-    enabled:!!level2Parent && countryCode!=="UG",
+    enabled:!!level2Parent && !currentAdminSource(countryCode),
     queryFn:()=>fetchChildren(level2Parent!.geoname_id),
   });
   const {data:level3Children=[]}=useQuery({
     queryKey:["geo-child-options",level3Parent?.geoname_id],
-    enabled:!!level3Parent && countryCode!=="UG",
+    enabled:!!level3Parent && !currentAdminSource(countryCode),
     queryFn:()=>fetchChildren(level3Parent!.geoname_id),
   });
   const {data:level4Children=[]}=useQuery({
     queryKey:["geo-child-options",level4Parent?.geoname_id],
-    enabled:!!level4Parent && countryCode!=="UG",
+    enabled:!!level4Parent && !currentAdminSource(countryCode),
     queryFn:()=>fetchChildren(level4Parent!.geoname_id),
   });
 
