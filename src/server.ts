@@ -6,6 +6,7 @@ import { startBackupScheduler } from "./lib/backup-core.server";
 import { startTenantAutomationScheduler } from "./lib/automation-core.server";
 import { createHash } from "node:crypto";
 import { supabaseAdmin } from "./integrations/supabase/client.server";
+import { completeMicrosoftOAuth } from "./lib/microsoft365.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -161,6 +162,41 @@ async function maybeProxySupabase(request: Request): Promise<Response | null> {
 
 
 const apiAdmin = supabaseAdmin as any;
+
+async function maybeHandleMicrosoftOAuth(request: Request): Promise<Response | null> {
+  const url = new URL(request.url);
+  if (url.pathname !== "/api/integrations/microsoft/callback") return null;
+
+  const state = url.searchParams.get("state") || "";
+  const code = url.searchParams.get("code") || "";
+  const error = url.searchParams.get("error");
+  const errorDescription = url.searchParams.get("error_description");
+
+  const target = new URL("/integrations", url.origin);
+
+  if (error) {
+    target.searchParams.set("microsoft", "error");
+    target.searchParams.set("message", errorDescription || error);
+    return Response.redirect(target.toString(), 302);
+  }
+
+  if (!state || !code) {
+    target.searchParams.set("microsoft", "error");
+    target.searchParams.set("message", "Microsoft did not return a valid authorization response.");
+    return Response.redirect(target.toString(), 302);
+  }
+
+  try {
+    await completeMicrosoftOAuth({ state, code });
+    target.searchParams.set("microsoft", "connected");
+    return Response.redirect(target.toString(), 302);
+  } catch (oauthError: any) {
+    console.error("[Microsoft365] OAuth callback failed", oauthError);
+    target.searchParams.set("microsoft", "error");
+    target.searchParams.set("message", oauthError?.message || "Microsoft 365 connection failed.");
+    return Response.redirect(target.toString(), 302);
+  }
+}
 
 async function maybeHandlePublicApi(request: Request): Promise<Response | null> {
   const url = new URL(request.url);
@@ -364,6 +400,9 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const microsoftResponse = await maybeHandleMicrosoftOAuth(request);
+      if (microsoftResponse) return microsoftResponse;
+
       const apiResponse = await maybeHandlePublicApi(request);
       if (apiResponse) return apiResponse;
 
