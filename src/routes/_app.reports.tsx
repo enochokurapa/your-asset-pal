@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
+import { GeoHierarchyFilter, type GeoHierarchyPlace } from "@/components/geo-hierarchy-filter";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -216,6 +217,10 @@ function ReportsPage() {
     queryKey: ["all-branches"],
     queryFn: async () => (await supabase.from("branches").select("id,name,code")).data ?? [],
   });
+  const { data: geoCountries = [] } = useQuery({
+    queryKey: ["report-geo-countries"],
+    queryFn: async () => (await (supabase as any).from("geo_countries").select("code,name").eq("enabled",true).order("name")).data ?? [],
+  });
   const { data: assignments = [] } = useQuery({
     queryKey: ["report-assignments"],
     queryFn: async () => (await supabase.from("asset_assignments")
@@ -393,22 +398,6 @@ function ReportsPage() {
     .map((l:any)=>({value:l.id,label:locationLabel(l)}))
     .sort((a:any,b:any)=>a.label.localeCompare(b.label));
 
-  const geographyOpts = useMemo(() => {
-    const values = new Map<string,string>();
-    for (const a of enrichedAssets as any[]) {
-      const path = String(a.geography || "").trim();
-      if (!path) continue;
-      const parts = path.split(" · ").map((x:string)=>x.trim()).filter(Boolean);
-      for (let i=0;i<parts.length;i++) {
-        const suffix = parts.slice(i).join(" · ");
-        values.set(suffix, suffix);
-      }
-    }
-    return Array.from(values.entries())
-      .map(([value,label])=>({value,label}))
-      .sort((a,b)=>a.label.localeCompare(b.label));
-  }, [enrichedAssets]);
-
   // Shared option lists
   const branchOpts = scopedBranches.map((b: any) => ({ value: b.id, label: b.name }));
   const categoryOpts = categories.filter((c: any) => !c.parent_id).map((c: any) => ({ value: c.id, label: c.name }));
@@ -424,7 +413,9 @@ function ReportsPage() {
 
   /* ----------- Filters state per tab ----------- */
   const [fRegister, setFRegister] = useState<Record<string, string>>({});
+  const [registerGeo, setRegisterGeo] = useState<GeoHierarchyPlace|null>(null);
   const [fLocationReport, setFLocationReport] = useState<Record<string, string>>({});
+  const [locationReportGeo, setLocationReportGeo] = useState<GeoHierarchyPlace|null>(null);
   const [fMove, setFMove] = useState<Record<string, string>>({});
   const [fAssign, setFAssign] = useState<Record<string, string>>({});
   const [fDisposal, setFDisposal] = useState<Record<string, string>>({});
@@ -441,7 +432,6 @@ function ReportsPage() {
     { key: "category_id", label: "Category", type: "select", options: categoryOpts },
     { key: "status", label: "Status", type: "select", options: statusOpts },
     { key: "location_id", label: "Organisation location", type: "select", options: locationOpts },
-    { key: "geography", label: "Geographic area", type: "select", options: geographyOpts },
     { key: "from", label: "Purchased from", type: "date" },
     { key: "to", label: "Purchased to", type: "date" },
   ];
@@ -450,7 +440,7 @@ function ReportsPage() {
     (!fRegister.category_id || a.category_id === fRegister.category_id || catMap[a.category_id]?.parent_id === fRegister.category_id) &&
     (!fRegister.status || a.status === fRegister.status) &&
     (!fRegister.location_id || (a.location_id && locationDescendants(fRegister.location_id).has(a.location_id))) &&
-    (!fRegister.geography || String(a.geography || "").endsWith(fRegister.geography)) &&
+    (!registerGeo?.display_path || String(a.geography || "").endsWith(String(registerGeo.display_path))) &&
     applyDate(a.purchase_date, fRegister.from, fRegister.to) &&
     (!fRegister.q ||
       applyText(a.asset_tag, fRegister.q) || applyText(a.name, fRegister.q) || applyText(a.serial_number, fRegister.q)),
@@ -499,7 +489,7 @@ function ReportsPage() {
     return (
       (!fLocationReport.branch_id || a.branch_id === fLocationReport.branch_id) &&
       (!orgIds || (a.location_id && orgIds.has(a.location_id))) &&
-      (!fLocationReport.geography || String(a.geography || "").endsWith(fLocationReport.geography)) &&
+      (!locationReportGeo?.display_path || String(a.geography || "").endsWith(String(locationReportGeo.display_path))) &&
       (!fLocationReport.state ||
         (fLocationReport.state === "located" && located) ||
         (fLocationReport.state === "unlocated" && !located) ||
@@ -982,11 +972,32 @@ function ReportsPage() {
           <TabsTrigger value="condition">Condition</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="register" className="mt-4">
+        <TabsContent value="register" className="mt-4 space-y-3">
+          <Card className="p-3">
+            <p className="mb-3 text-sm font-semibold">Geographic filter</p>
+            <GeoHierarchyFilter
+              countries={geoCountries as any[]}
+              value={registerGeo}
+              onChange={setRegisterGeo}
+              compact
+            />
+          </Card>
           <FilterBar defs={registerDefs} values={fRegister} onChange={setFRegister} />
           <ReportTable r={register} exportMeta={reportExportMeta} />
         </TabsContent>
-        <TabsContent value="locations" className="mt-4">
+        <TabsContent value="locations" className="mt-4 space-y-3">
+          <Card className="p-3">
+            <div className="mb-3">
+              <p className="text-sm font-semibold">Geographic area</p>
+              <p className="text-xs text-muted-foreground">Choose a country, then drill down only as far as needed.</p>
+            </div>
+            <GeoHierarchyFilter
+              countries={geoCountries as any[]}
+              value={locationReportGeo}
+              onChange={setLocationReportGeo}
+              compact
+            />
+          </Card>
           <FilterBar defs={locationReportDefs} values={fLocationReport} onChange={setFLocationReport} />
           <ReportTable r={locationReport} exportMeta={reportExportMeta} />
         </TabsContent>
