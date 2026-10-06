@@ -75,12 +75,12 @@ export function GeoHierarchyFilter({
     queryKey:["geo-hierarchy-primary",country,config.level],
     enabled:!!country,
     queryFn:async()=>{
-      const {data,error}=await (supabase as any).from("geo_places")
+      let q=(supabase as any).from("geo_places")
         .select("geoname_id,name,display_path,feature_class,feature_code,admin_level,parent_geoname_id,country_code")
         .eq("country_code",country)
-        .eq("feature_code",`ADM${config.level}`)
-        .order("name")
-        .limit(1200);
+        .eq("feature_code",`ADM${config.level}`);
+      if(country==="UG") q=q.eq("source","UBOS NPHC 2024");
+      const {data,error}=await q.order("name").limit(1200);
       if(error) throw error;
       return (data??[]) as GeoHierarchyPlace[];
     }
@@ -123,8 +123,8 @@ export function GeoHierarchyFilter({
 
   const parents=[path[0],path[1],path[2],path[3],path[4]];
   const queries=parents.map((parent,index)=>useQuery({
-    queryKey:["geo-hierarchy-child",parent?.geoname_id,index],
-    enabled:!!parent,
+    queryKey:["geo-hierarchy-child",country,parent?.geoname_id,index],
+    enabled:!!parent && country!=="UG",
     queryFn:()=>children(parent!.geoname_id),
   }));
   const childSets=queries.map(q=>(q.data??[]) as GeoHierarchyPlace[]);
