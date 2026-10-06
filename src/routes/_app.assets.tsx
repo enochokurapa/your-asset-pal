@@ -26,10 +26,10 @@ export const Route = createFileRoute("/_app/assets")({
   validateSearch: (s: Record<string, unknown>) => ({
     focus: typeof s.focus === "string" ? s.focus : undefined,
     location: typeof s.location === "string" ? s.location : undefined,
-    geo: typeof s.geo === "string" ? s.geo : undefined,
+    geo: typeof s.geo === "string" || typeof s.geo === "number" ? String(s.geo) : undefined,
     branch: typeof s.branch === "string" ? s.branch : undefined,
-    located: s.located === "1" ? "1" : undefined,
-    unlocated: s.unlocated === "1" ? "1" : undefined,
+    located: s.located === "1" || s.located === 1 ? "1" : undefined,
+    unlocated: s.unlocated === "1" || s.unlocated === 1 ? "1" : undefined,
   }),
 });
 
@@ -960,7 +960,14 @@ function AssetsPage() {
                     <td className="px-3 py-3 font-medium">{a.name}{a.serial_number && <span className="ml-2 font-mono text-[10px] text-muted-foreground">SN: {a.serial_number}</span>}</td>
                     <td className="hidden px-3 py-3 text-muted-foreground md:table-cell">{a.branches?.name ?? "-"}</td>
                     <td className="hidden px-3 py-3 text-muted-foreground lg:table-cell">{a.categories?.name ?? "-"}</td>
-                    <td className="hidden px-3 py-3 text-muted-foreground lg:table-cell">{a.locations?.name ?? "-"}</td>
+                    <td className="hidden px-3 py-3 text-muted-foreground lg:table-cell">
+                      <span className="block font-medium text-foreground">{a.locations?.name ?? a.geo_places?.name ?? "-"}</span>
+                      {a.geo_places?.display_path && (
+                        <span className="mt-0.5 block max-w-[260px] truncate text-[11px] text-muted-foreground" title={a.geo_places.display_path}>
+                          {a.geo_places.display_path}
+                        </span>
+                      )}
+                    </td>
                     <td className="hidden px-3 py-3 text-muted-foreground md:table-cell">
                       {a.custodian || "-"}{a.department && <span className="block text-[11px]">{a.department}</span>}
                     </td>
