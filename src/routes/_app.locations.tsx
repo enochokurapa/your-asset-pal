@@ -51,7 +51,7 @@ function LocationsPage() {
     queryKey:["location-kpi-assets"],
     queryFn:async()=>{
       const {data,error}=await (supabase as any).from("assets")
-        .select("id,name,asset_tag,status,branch_id,location_id,geo_place_id,location_latitude,location_longitude, geo_places!assets_geo_place_id_fkey(geoname_id,name,display_path)");
+        .select("id,name,asset_tag,status,branch_id,location_id,geo_place_id,location_latitude,location_longitude, geo_places!assets_geo_place_id_fkey(geoname_id,name,display_path,country_code)");
       if(error) throw error;
       return data ?? [];
     },
@@ -371,73 +371,167 @@ function OrganisationLocations({
   </Card>;
 }
 
-function GeographyBrowser({countries,assets,onViewAssets}:{countries:any[];assets:any[];onViewAssets:(id:number)=>void}) {
-  const [country,setCountry]=useState("UG");
-  const [search,setSearch]=useState("");
-  const [stack,setStack]=useState<any[]>([]);
-  const parent=stack.length?stack[stack.length-1].geoname_id:null;
+const GEO_PRIMARY: Record<string,{level:number;label:string}> = {
+  UG:{level:2,label:"District"},
+  KE:{level:1,label:"County"},
+  TZ:{level:1,label:"Region"},
+  RW:{level:2,label:"District"},
+  ZM:{level:1,label:"Province"},
+  MW:{level:2,label:"District"},
+  ZW:{level:1,label:"Province"},
+};
 
-  const {data:places=[],isLoading}=useQuery({
-    queryKey:["geo-browser",country,parent,search],
+function GeographyBrowser({countries,assets,onViewAssets}:{countries:any[];assets:any[];onViewAssets:(id:number)=>void}) {
+  const [country,setCountry]=useState("");
+  const [stack,setStack]=useState<any[]>([]);
+  const parent=stack.length?stack[stack.length-1]:null;
+  const config=GEO_PRIMARY[country] ?? {level:1,label:"Region"};
+
+  const {data:rawPlaces=[],isLoading}=useQuery({
+    queryKey:["geo-browser-hierarchy",country,parent?.geoname_id,config.level],
+    enabled:!!country,
     queryFn:async()=>{
       let q=(supabase as any).from("geo_places")
-        .select("geoname_id,name,display_path,feature_code,admin_level,population,parent_geoname_id")
+        .select("geoname_id,name,display_path,feature_class,feature_code,admin_level,population,parent_geoname_id,country_code")
         .eq("country_code",country);
-      if(search.trim().length>=2) q=q.ilike("name",`%${search.trim()}%`).order("population",{ascending:false}).limit(100);
-      else if(parent) q=q.eq("parent_geoname_id",parent).order("admin_level",{ascending:true}).order("name").limit(500);
-      else q=q.is("parent_geoname_id",null).eq("feature_class","A").order("name").limit(500);
-      const {data,error}=await q;if(error) throw error;return data??[];
+      if(parent) q=q.eq("parent_geoname_id",parent.geoname_id).order("feature_class",{ascending:true}).order("name").limit(1500);
+      else q=q.eq("feature_code",`ADM${config.level}`).order("name").limit(1200);
+      const {data,error}=await q;
+      if(error) throw error;
+      return data??[];
     }
   });
+
+  const places=useMemo(()=>{
+    if(!parent) return rawPlaces as any[];
+    const admin=(rawPlaces as any[]).filter((p:any)=>p.feature_class==="A");
+    return admin.length ? admin : (rawPlaces as any[]).filter((p:any)=>p.feature_class==="P");
+  },[rawPlaces,parent?.geoname_id]);
 
   const countAssets=(p:any)=>assets.filter((a:any)=>{
     if(!a.geo_place_id) return false;
     if(Number(a.geo_place_id)===Number(p.geoname_id)) return true;
-    const assetPath=a.geo_places?.display_path;
-    return !!assetPath && !!p.display_path && String(assetPath).includes(String(p.display_path));
+    const assetPath=String(a.geo_places?.display_path||"");
+    const target=String(p.display_path||"");
+    return !!assetPath && !!target && assetPath.endsWith(target);
   }).length;
 
-    const enter=(p:any)=>{setStack(s=>[...s,p]);setSearch("");};
-  const back=()=>{setStack(s=>s.slice(0,-1));setSearch("");};
+  const countryCount=(code:string)=>assets.filter((a:any)=>a.geo_place_id && a.geo_places?.country_code===code).length;
+
+  useEffect(()=>{
+    if(!parent || isLoading || places.length!==1) return;
+    const only=places[0];
+    if(only.feature_class!=="A") return;
+    if(stack.some((p:any)=>p.geoname_id===only.geoname_id)) return;
+    setStack(current=>[...current,only]);
+  },[parent?.geoname_id,isLoading,places.length]);
+
+  const chooseCountry=(code:string)=>{setCountry(code);setStack([]);};
+  const enter=(p:any)=>setStack(current=>[...current,p]);
+  const goTo=(index:number)=>setStack(current=>current.slice(0,index+1));
+  const back=()=>setStack(current=>current.slice(0,-1));
+
+  if(!country) {
+    return <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Globe2 className="h-5 w-5 text-primary"/>Geographic locations</CardTitle>
+        <p className="text-sm text-muted-foreground">Choose a country, then drill down to a district, county, region or local area. Asset counts follow you at every level.</p>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {countries.map((c:any)=>(
+            <button key={c.code} type="button" onClick={()=>chooseCountry(c.code)}
+              className="group rounded-xl border bg-background p-4 text-left transition hover:border-primary/40 hover:bg-primary/5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold">{c.name}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Open geographic hierarchy</p>
+                </div>
+                <Badge variant={countryCount(c.code)>0?"default":"outline"}>{countryCount(c.code)} assets</Badge>
+              </div>
+              <div className="mt-4 flex items-center text-xs font-medium text-primary">
+                Browse {c.name}<ChevronRight className="ml-1 h-4 w-4 transition group-hover:translate-x-0.5"/>
+              </div>
+            </button>
+          ))}
+        </div>
+      </CardContent>
+    </Card>;
+  }
+
+  const selectedCountry=countries.find((c:any)=>c.code===country);
+  const selected=stack[stack.length-1]??null;
+  const selectedCount=selected?countAssets(selected):countryCount(country);
 
   return <Card>
-    <CardHeader>
-      <CardTitle className="flex items-center gap-2"><Globe2 className="h-5 w-5 text-primary"/>Global geography</CardTitle>
-      <p className="text-sm text-muted-foreground">Browse or search the full imported geography. This data is shared system-wide; organisations only add their own internal sites and rooms.</p>
-    </CardHeader>
-    <CardContent className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-[220px_1fr]">
-        <Select value={country} onValueChange={v=>{setCountry(v);setStack([]);setSearch("");}}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>
-          {countries.map(c=><SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
-        </SelectContent></Select>
-        <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search any district, city, town, locality or village…"/>
+    <CardHeader className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <CardTitle className="flex items-center gap-2"><Globe2 className="h-5 w-5 text-primary"/>{selectedCountry?.name||country}</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {stack.length ? `Choose a lower area, or use ${selected?.name} at the current level.` : `Choose a ${config.label.toLowerCase()} to continue.`}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {selected && selectedCount>0 && (
+            <Button size="sm" onClick={()=>onViewAssets(Number(selected.geoname_id))}>
+              <Package className="mr-2 h-4 w-4"/>View {selectedCount} assets
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={()=>{setCountry("");setStack([]);}}>Change country</Button>
+        </div>
       </div>
 
-      {stack.length>0 && <div className="flex flex-wrap items-center gap-1 text-sm">
-        <Button variant="ghost" size="sm" onClick={back}><ChevronLeft className="mr-1 h-4 w-4"/>Back</Button>
-        {stack.map((p,i)=><span key={p.geoname_id} className="flex items-center gap-1 text-muted-foreground">{i>0&&<ChevronRight className="h-3 w-3"/>}{p.name}</span>)}
-      </div>}
+      <div className="flex flex-wrap items-center gap-1 rounded-lg bg-muted/35 px-2 py-1.5 text-xs">
+        <button type="button" className="rounded px-2 py-1 font-medium hover:bg-background" onClick={()=>setStack([])}>
+          {selectedCountry?.name||country}
+        </button>
+        {stack.map((p:any,i:number)=>(
+          <span key={p.geoname_id} className="flex items-center gap-1">
+            <ChevronRight className="h-3 w-3 text-muted-foreground"/>
+            <button type="button" onClick={()=>goTo(i)} className="rounded px-2 py-1 font-medium hover:bg-background">{p.name}</button>
+          </span>
+        ))}
+      </div>
+    </CardHeader>
 
-      <div className="max-h-[520px] overflow-y-auto rounded-lg border">
-        {isLoading ? <p className="p-6 text-center text-sm text-muted-foreground">Loading geography…</p> :
-        places.length===0 ? <p className="p-6 text-center text-sm text-muted-foreground">No places found.</p> :
-        places.map((p:any)=><div key={p.geoname_id} className="flex w-full items-center justify-between gap-3 border-b px-3 py-3 last:border-0 hover:bg-muted/40">
-          <button type="button" onClick={()=>enter(p)} className="min-w-0 flex-1 text-left">
-            <p className="font-medium">{p.name}</p>
-            <p className="truncate text-xs text-muted-foreground">{p.display_path}</p>
-          </button>
-          <div className="flex items-center gap-2">
-            {countAssets(p)>0 && (
-              <Button size="sm" variant="outline" onClick={()=>onViewAssets(Number(p.geoname_id))}>
-                <Package className="mr-1 h-4 w-4"/>{countAssets(p)}
-                <span className="hidden sm:inline ml-1">assets</span>
-              </Button>
-            )}
-            <Badge variant="outline">{p.feature_code}</Badge>
-            <button type="button" onClick={()=>enter(p)} className="rounded p-1 hover:bg-muted"><ChevronRight className="h-4 w-4 text-muted-foreground"/></button>
-          </div>
-        </div>)}
+    <CardContent className="space-y-3">
+      {stack.length>0 && <Button variant="ghost" size="sm" onClick={back}><ChevronLeft className="mr-1 h-4 w-4"/>Back one level</Button>}
+
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {stack.length===0?config.label:"Areas inside "+selected?.name}
+        </p>
+        <p className="text-xs text-muted-foreground">{places.length} option{places.length===1?"":"s"}</p>
+      </div>
+
+      <div className="grid max-h-[560px] gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
+        {isLoading ? <p className="col-span-full p-8 text-center text-sm text-muted-foreground">Loading areas...</p> :
+        places.length===0 ? <div className="col-span-full rounded-xl border border-dashed p-8 text-center">
+          <p className="text-sm font-medium">No lower administrative areas available.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Use the current area to view its assets.</p>
+          {selected && selectedCount>0 && <Button className="mt-4" onClick={()=>onViewAssets(Number(selected.geoname_id))}>View {selectedCount} assets</Button>}
+        </div> :
+        places.map((p:any)=>{
+          const count=countAssets(p);
+          return <div key={p.geoname_id} className="group rounded-xl border bg-background p-3 transition hover:border-primary/35 hover:bg-primary/[0.03]">
+            <button type="button" onClick={()=>enter(p)} className="w-full text-left">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">{p.name}</p>
+                  <p className="mt-1 truncate text-[11px] text-muted-foreground">{p.display_path}</p>
+                </div>
+                <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground"/>
+              </div>
+            </button>
+            <div className="mt-3 flex items-center justify-between border-t pt-2">
+              <Badge variant={count>0?"default":"outline"}>{count} asset{count===1?"":"s"}</Badge>
+              {count>0 && <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={()=>onViewAssets(Number(p.geoname_id))}>View assets</Button>}
+            </div>
+          </div>;
+        })}
       </div>
     </CardContent>
   </Card>;
 }
+
