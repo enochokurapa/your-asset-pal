@@ -38,7 +38,7 @@ function nextLabel(place: GeoPlace | null, hasAdminChildren: boolean, depth: num
     if (depth === 1) return "Sub-area";
     return "Local administrative area";
   }
-  return depth <= 1 ? "Town / locality" : "Local area";
+  return "Administrative area";
 }
 
 async function fetchChildren(parentId:number) {
@@ -50,8 +50,7 @@ async function fetchChildren(parentId:number) {
     .limit(1000);
   if (error) throw error;
   const rows = (data ?? []) as GeoPlace[];
-  const admin = rows.filter((p) => p.feature_class === "A");
-  return admin.length ? admin : rows.filter((p) => p.feature_class === "P");
+  return rows.filter((p) => p.feature_class === "A");
 }
 
 export function GeoCascadeSelector({
@@ -205,7 +204,7 @@ export function GeoCascadeSelector({
 
     {primary && (
       <p className="text-xs text-muted-foreground">
-        Stop at any level that is sufficient. A custom organisation site can be added afterwards when needed.
+        Stop at any administrative level that is sufficient. Use a custom organisation place for the exact site, building, office, room or locally known place.
       </p>
     )}
   </div>;
