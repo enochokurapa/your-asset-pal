@@ -55,12 +55,17 @@ function LocationsPage() {
       .eq("tenant_id",tenantId).maybeSingle()).data ?? null,
   });
   const visibleCountries = useMemo(()=>{
+    const codes=new Set<string>();
     const allowed=(locationSettings as any)?.allowed_country_codes as string[]|null|undefined;
     const fallback=(locationSettings as any)?.default_country_code as string|null|undefined;
-    if(allowed?.length) return (countries as any[]).filter((c:any)=>allowed.includes(c.code));
-    if(fallback) return (countries as any[]).filter((c:any)=>c.code===fallback);
-    return countries as any[];
-  },[countries,locationSettings]);
+    for(const code of allowed ?? []) codes.add(code);
+    if(fallback) codes.add(fallback);
+    for(const asset of locationAssets as any[]) {
+      if(asset.geo_places?.country_code) codes.add(asset.geo_places.country_code);
+    }
+    if(!codes.size) return countries as any[];
+    return (countries as any[]).filter((c:any)=>codes.has(c.code));
+  },[countries,locationSettings,locationAssets]);
 
   const { data: locationAssets = [] } = useQuery({
     queryKey:["location-kpi-assets"],
