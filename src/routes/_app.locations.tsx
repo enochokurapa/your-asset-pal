@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,7 +24,7 @@ const TYPE_LABEL: Record<string,string> = {
 };
 
 function LocationsPage() {
-  const { canWrite, canDo, canView, isTenantAdmin } = useAuth();
+  const { canWrite, canDo, canView, isTenantAdmin, tenantId } = useAuth();
   const nav = useNavigate();
   const canEdit = canWrite || canDo("edit_location");
   const qc = useQueryClient();
@@ -47,6 +47,21 @@ function LocationsPage() {
     queryKey:["geo-countries"],
     queryFn:async()=> (await (supabase as any).from("geo_countries").select("code,name").eq("enabled",true).order("name")).data ?? [],
   });
+  const { data: locationSettings } = useQuery({
+    queryKey:["location-country-settings",tenantId],
+    enabled:!!tenantId,
+    queryFn:async()=> (await (supabase as any).from("tenant_location_settings")
+      .select("default_country_code,allowed_country_codes,location_mode")
+      .eq("tenant_id",tenantId).maybeSingle()).data ?? null,
+  });
+  const visibleCountries = useMemo(()=>{
+    const allowed=(locationSettings as any)?.allowed_country_codes as string[]|null|undefined;
+    const fallback=(locationSettings as any)?.default_country_code as string|null|undefined;
+    if(allowed?.length) return (countries as any[]).filter((c:any)=>allowed.includes(c.code));
+    if(fallback) return (countries as any[]).filter((c:any)=>c.code===fallback);
+    return countries as any[];
+  },[countries,locationSettings]);
+
   const { data: locationAssets = [] } = useQuery({
     queryKey:["location-kpi-assets"],
     queryFn:async()=>{
@@ -110,7 +125,7 @@ function LocationsPage() {
         </TabsContent>
 
         <TabsContent value="geography" className="pt-4">
-          <GeographyBrowser countries={countries as any[]} assets={locationAssets as any[]} onViewAssets={(id:number)=>nav({to:"/assets",search:{geo:String(id)} as any})} />
+          <GeographyBrowser countries={visibleCountries as any[]} assets={locationAssets as any[]} onViewAssets={(id:number)=>nav({to:"/assets",search:{geo:String(id)} as any})} />
         </TabsContent>
       </Tabs>
     </div>
