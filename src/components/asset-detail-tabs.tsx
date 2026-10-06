@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ResponsiveTabsList as TabsList, ResponsiveTabsTrigger as TabsTrigger } from "@/components/ui/responsive-tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Download, Upload, FileText, Check, X, History, Send, Eye } from "lucide-react";
+import { Plus, Trash2, Download, Upload, FileText, Check, X, History, Send, Eye, MapPin, Navigation } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { formatUGX } from "@/lib/utils";
@@ -68,6 +69,7 @@ export function AssetDetailTabs({ assetId, defaultTab = "custody" }: { assetId: 
     <Tabs defaultValue={defaultTab} className="mt-2">
       <TabsList>
         <TabsTrigger value="custody">Custody</TabsTrigger>
+        <TabsTrigger value="location">Location</TabsTrigger>
         <TabsTrigger value="movements">Movements</TabsTrigger>
         <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
         <TabsTrigger value="depreciation">Depreciation</TabsTrigger>
@@ -77,6 +79,7 @@ export function AssetDetailTabs({ assetId, defaultTab = "custody" }: { assetId: 
         <TabsTrigger value="activity">Activity</TabsTrigger>
       </TabsList>
       <TabsContent value="custody"><CustodyPanel assetId={assetId} /></TabsContent>
+      <TabsContent value="location"><LocationPanel assetId={assetId} /></TabsContent>
       <TabsContent value="movements"><MovementsPanel assetId={assetId} /></TabsContent>
       <TabsContent value="maintenance"><MaintenancePanel assetId={assetId} /></TabsContent>
       <TabsContent value="depreciation"><DepreciationPanel assetId={assetId} /></TabsContent>
@@ -85,6 +88,83 @@ export function AssetDetailTabs({ assetId, defaultTab = "custody" }: { assetId: 
       <TabsContent value="disposal"><DisposalPanel assetId={assetId} /></TabsContent>
       <TabsContent value="activity"><ActivityPanel assetId={assetId} /></TabsContent>
     </Tabs>
+  );
+}
+
+function LocationPanel({ assetId }: { assetId: string }) {
+  const nav = useNavigate();
+  const { data: asset } = useQuery({
+    queryKey: ["asset-current-location", assetId],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("assets")
+        .select("id,branch_id,location_id,geo_place_id,location_latitude,location_longitude,location_accuracy_m,location_source,location_verified_at, branches(name), locations(name,parent_id), geo_places!assets_geo_place_id_fkey(name,display_path)")
+        .eq("id", assetId).single();
+      if (error) throw error;
+      return data;
+    },
+  });
+  const { data: locations = [] } = useQuery({
+    queryKey: ["location-breadcrumb-list"],
+    queryFn: async () => (await (supabase as any).from("locations").select("id,name,parent_id")).data ?? [],
+  });
+
+  const locationPath = (() => {
+    if (!asset?.location_id) return "";
+    const byId = new Map((locations as any[]).map((l:any)=>[l.id,l]));
+    const names:string[] = [];
+    let current:any = byId.get(asset.location_id);
+    const seen = new Set<string>();
+    while (current && !seen.has(current.id)) {
+      seen.add(current.id);
+      names.unshift(current.name);
+      current = current.parent_id ? byId.get(current.parent_id) : null;
+    }
+    return names.join(" / ");
+  })();
+
+  const gps = asset?.location_latitude != null && asset?.location_longitude != null;
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-lg border p-3">
+          <p className="text-xs font-medium text-muted-foreground">Branch</p>
+          <p className="mt-1 text-sm font-semibold">{asset?.branches?.name ?? "Not assigned"}</p>
+        </div>
+        <div className="rounded-lg border p-3">
+          <p className="text-xs font-medium text-muted-foreground">Organisation location</p>
+          <p className="mt-1 text-sm font-semibold">{locationPath || asset?.locations?.name || "Not assigned"}</p>
+        </div>
+        <div className="rounded-lg border p-3 sm:col-span-2">
+          <p className="text-xs font-medium text-muted-foreground">Geographic area</p>
+          <p className="mt-1 text-sm font-semibold">{asset?.geo_places?.display_path || asset?.geo_places?.name || "Not mapped"}</p>
+        </div>
+        <div className="rounded-lg border p-3">
+          <p className="text-xs font-medium text-muted-foreground">GPS verification</p>
+          <p className="mt-1 text-sm font-semibold">{gps ? "Captured" : "Not captured"}</p>
+          {gps && <p className="mt-1 text-xs text-muted-foreground">{asset.location_latitude}, {asset.location_longitude}{asset.location_accuracy_m ? ` · ±${asset.location_accuracy_m} m` : ""}</p>}
+        </div>
+        <div className="rounded-lg border p-3">
+          <p className="text-xs font-medium text-muted-foreground">Location source</p>
+          <p className="mt-1 text-sm font-semibold">{asset?.location_source ? String(asset.location_source).replace(/_/g," ") : "Not specified"}</p>
+          {asset?.location_verified_at && <p className="mt-1 text-xs text-muted-foreground">Verified {fmtDateTimeEAT(asset.location_verified_at)}</p>}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {asset?.location_id && (
+          <Button size="sm" variant="outline" onClick={()=>nav({to:"/assets",search:{location:asset.location_id} as any})}>
+            <MapPin className="mr-2 h-4 w-4"/>View other assets here
+          </Button>
+        )}
+        {asset?.geo_place_id && (
+          <Button size="sm" variant="outline" onClick={()=>nav({to:"/assets",search:{geo:String(asset.geo_place_id)} as any})}>
+            <Navigation className="mr-2 h-4 w-4"/>View assets in this area
+          </Button>
+        )}
+        <Button size="sm" variant="ghost" onClick={()=>nav({to:"/locations"})}>Open locations</Button>
+      </div>
+    </div>
   );
 }
 
