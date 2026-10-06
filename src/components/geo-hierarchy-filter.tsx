@@ -173,8 +173,11 @@ export function GeoHierarchyFilter({
     })}
 
     {value?.display_path && (
-      <div className={compact?"md:col-span-2 xl:col-span-3":"rounded-lg border bg-muted/30 px-3 py-2"}>
-        <p className="text-xs text-muted-foreground">Selected: <span className="font-medium text-foreground">{value.display_path}</span></p>
+      <div className={compact?"flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2 md:col-span-2 xl:col-span-3":"flex items-center justify-between gap-3 rounded-lg border bg-muted/30 px-3 py-2"}>
+        <p className="min-w-0 truncate text-xs text-muted-foreground">Selected: <span className="font-medium text-foreground">{value.display_path}</span></p>
+        <button type="button" className="shrink-0 text-xs font-semibold text-primary hover:underline" onClick={()=>{setPath([]);onChange(null);}}>
+          Clear geography
+        </button>
       </div>
     )}
   </div>;
