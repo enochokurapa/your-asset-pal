@@ -63,6 +63,15 @@ export function GeoHierarchyFilter({
   const [path,setPath]=useState<GeoHierarchyPlace[]>([]);
   const config=COUNTRY_ADMIN[country] ?? {level:1,label:"Region"};
 
+  useEffect(()=>{
+    const desired=initialCountry || value?.country_code || countries[0]?.code;
+    if(!desired || desired===country) return;
+    if(countries.length && !countries.some(c=>c.code===country)) {
+      setCountry(desired);
+      setPath([]);
+    }
+  },[initialCountry,value?.country_code,countries.map(c=>c.code).join(",")]);
+
   const {data:primary=[]}=useQuery({
     queryKey:["geo-hierarchy-primary",country,config.level],
     enabled:!!country,
