@@ -46,8 +46,7 @@ SET new_location_id = NULL,
       ' ',
       nullif(m.notes, ''),
       'Geographic bridge location removed after geo_place migration completed.'
-    )),
-    updated_at = now()
+    ))
 FROM _pesapal_geo_bridge b
 WHERE m.new_location_id = b.id;
 
