@@ -67,12 +67,17 @@ function LoginPage() {
       <div className="af-login-orb af-delay-2 absolute -left-24 bottom-[8%] h-72 w-72 rounded-full bg-secondary/25 blur-3xl" />
       <div className="absolute inset-0 opacity-[0.32] [background-image:radial-gradient(circle_at_1px_1px,color-mix(in_oklab,var(--border)_75%,transparent)_1px,transparent_0)] [background-size:26px_26px]" />
 
+      <Link to="/" className="af-auth-back absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-lg border bg-background/90 px-3 py-2 text-sm font-medium text-muted-foreground shadow-sm backdrop-blur transition hover:text-foreground sm:left-6 sm:top-6">
+        <ArrowLeft className="h-4 w-4" />
+        Back to website
+      </Link>
+
       <main className="relative z-10 mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-[470px] flex-col justify-center">
-        <Link to="/" className="mx-auto mb-7 inline-flex">
+        <Link to="/" className="af-auth-logo mx-auto mb-7 inline-flex">
           <PlatformLogo variant="lockup" className="h-14 w-[250px] max-w-[78vw]" />
         </Link>
 
-        <div className="af-login-panel rounded-[1.6rem] border bg-card/95 p-6 shadow-[0_28px_80px_-38px_rgba(0,0,0,.34)] backdrop-blur sm:p-8">
+        <div className="af-auth-card rounded-[1.6rem] border bg-card/95 p-6 shadow-[0_28px_80px_-38px_rgba(0,0,0,.34)] backdrop-blur sm:p-8">
           <div className="mb-7 text-center">
             <p className="text-sm font-semibold text-primary">Welcome back</p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Sign in to your workspace</h1>
@@ -152,11 +157,6 @@ function LoginPage() {
             </span>
           ))}
         </div>
-
-        <Link to="/" className="mx-auto mt-5 inline-flex items-center gap-2 text-xs font-medium text-muted-foreground transition hover:text-foreground">
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Back to website
-        </Link>
       </main>
     </div>
   );
