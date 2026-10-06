@@ -321,6 +321,13 @@ export const getSaasContext = createServerFn({ method: "GET" })
       } : null,
       settings: parsedSettings,
       enabledModules,
+      addOns: modules.filter((m: any) => m.billing_model === "add_on").map((m: any) => ({
+        key: m.module_key,
+        name: m.label,
+        price: Number(m.add_on_price ?? 0),
+        currency: parsedSettings.currency,
+        available: Boolean(m.globally_enabled),
+      })),
       canExportReports: paid,
       canUseCustomDomain: paid,
       paymentConfigured: Boolean(process.env.YO_API_USERNAME && process.env.YO_API_PASSWORD),
@@ -356,6 +363,7 @@ export const updateSaasModule = createServerFn({ method: "POST" })
     globally_enabled: z.boolean(),
     trial_enabled: z.boolean(),
     paid_enabled: z.boolean(),
+    add_on_price: z.number().min(0).max(1000000000).optional(),
   }).parse(input))
   .handler(async ({ data, context }) => {
     await assertSaasAdmin(context.userId);
@@ -363,6 +371,7 @@ export const updateSaasModule = createServerFn({ method: "POST" })
       globally_enabled: data.globally_enabled,
       trial_enabled: data.trial_enabled,
       paid_enabled: data.paid_enabled,
+      ...(data.add_on_price !== undefined ? { add_on_price: data.add_on_price } : {}),
       updated_at: new Date().toISOString(),
     }).eq("module_key", data.module_key);
     if (error) throw new Error(error.message);
@@ -882,6 +891,134 @@ export const startYoUpgrade = createServerFn({ method: "POST" })
       await admin.from("billing_transactions").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", tx.id);
       throw e;
     }
+  });
+
+export const startYoAddonPurchase = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({
+    module_key: z.string().min(1).max(100),
+    phone: z.string().min(9).max(20),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const p = await assertTenantAdmin(context.userId);
+    const username = process.env.YO_API_USERNAME;
+    const password = process.env.YO_API_PASSWORD;
+    if (!username || !password) throw new Error("Payment gateway is not configured");
+
+    const { data: module, error: moduleError } = await admin.from("saas_modules")
+      .select("module_key,label,globally_enabled,billing_model,add_on_price")
+      .eq("module_key", data.module_key).single();
+    if (moduleError || !module || module.billing_model !== "add_on" || !module.globally_enabled) {
+      throw new Error("Add-on is not available");
+    }
+    const amount = Number(module.add_on_price);
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error("Add-on price is not set");
+    const { data: settings, error: settingsError } = await admin.from("saas_settings")
+      .select("currency").eq("id", true).single();
+    if (settingsError || !settings?.currency) throw new Error("Billing currency is not configured");
+    const currency = String(settings.currency).toUpperCase();
+
+    const existing = await admin.from("tenant_module_overrides")
+      .select("enabled").eq("tenant_id", p.tenant_id).eq("module_key", data.module_key).maybeSingle();
+    if (existing.data?.enabled === true) throw new Error("This add-on is already active");
+
+    const phone = data.phone.replace(/\s+/g, "").replace(/^\+/, "");
+    if (!/^256\d{9}$/.test(phone)) throw new Error("Use a mobile-money number in format 2567XXXXXXXX");
+
+    const { data: tx, error: txError } = await admin.from("billing_transactions").insert({
+      tenant_id: p.tenant_id,
+      module_key: data.module_key,
+      phone,
+      amount,
+      currency,
+      status: "pending",
+    }).select().single();
+    if (txError) throw new Error(txError.message);
+
+    const xml = '<?xml version="1.0" encoding="UTF-8"?><AutoCreate><Request>' +
+      '<APIUsername>' + xmlEscape(username) + '</APIUsername><APIPassword>' + xmlEscape(password) + '</APIPassword>' +
+      '<Method>acdepositfunds</Method><NonBlocking>TRUE</NonBlocking>' +
+      '<Account>' + xmlEscape(phone) + '</Account><Amount>' + xmlEscape(amount) + '</Amount>' +
+      '<Narrative>' + xmlEscape("AssetFlow " + module.label + " add-on") + '</Narrative>' +
+      '<ExternalReference>' + xmlEscape(tx.id) + '</ExternalReference></Request></AutoCreate>';
+
+    try {
+      const raw = await yoRequest(xml);
+      const response = {
+        Status: xmlTag(raw, "Status"),
+        StatusCode: xmlTag(raw, "StatusCode"),
+        StatusMessage: xmlTag(raw, "StatusMessage"),
+        TransactionStatus: xmlTag(raw, "TransactionStatus"),
+        TransactionReference: xmlTag(raw, "TransactionReference"),
+        ErrorMessage: xmlTag(raw, "ErrorMessage"),
+      };
+      await admin.from("billing_transactions").update({
+        provider_reference: response.TransactionReference || null,
+        raw_response: response,
+        updated_at: new Date().toISOString(),
+      }).eq("id", tx.id);
+      if (response.Status !== "OK") {
+        await admin.from("billing_transactions").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", tx.id);
+        throw new Error(response.ErrorMessage || response.StatusMessage || "Payment request failed");
+      }
+      return { transactionId: tx.id, moduleKey: data.module_key, providerReference: response.TransactionReference, status: response.TransactionStatus || "PENDING" };
+    } catch (e) {
+      await admin.from("billing_transactions").update({ status: "failed", updated_at: new Date().toISOString() }).eq("id", tx.id);
+      throw e;
+    }
+  });
+
+export const checkYoAddonPurchase = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ transaction_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const p = await assertTenantAdmin(context.userId);
+    const username = process.env.YO_API_USERNAME;
+    const password = process.env.YO_API_PASSWORD;
+    if (!username || !password) throw new Error("Payment gateway is not configured");
+
+    const { data: tx, error } = await admin.from("billing_transactions").select("*")
+      .eq("id", data.transaction_id).eq("tenant_id", p.tenant_id).single();
+    if (error || !tx || !tx.module_key) throw new Error("Add-on payment not found");
+    if (!tx.provider_reference) throw new Error("Payment reference is not available");
+
+    const xml = '<?xml version="1.0" encoding="UTF-8"?><AutoCreate><Request>' +
+      '<APIUsername>' + xmlEscape(username) + '</APIUsername><APIPassword>' + xmlEscape(password) + '</APIPassword>' +
+      '<Method>actransactioncheckstatus</Method><TransactionReference>' + xmlEscape(tx.provider_reference) + '</TransactionReference>' +
+      '<PrivateTransactionReference>' + xmlEscape(tx.id) + '</PrivateTransactionReference>' +
+      '<DepositTransactionType>PULL</DepositTransactionType></Request></AutoCreate>';
+    const raw = await yoRequest(xml);
+    const transactionStatus = xmlTag(raw, "TransactionStatus").toUpperCase();
+    const successful = transactionStatus === "SUCCEEDED";
+    const failed = transactionStatus === "FAILED";
+    const response = {
+      Status: xmlTag(raw, "Status"),
+      StatusCode: xmlTag(raw, "StatusCode"),
+      StatusMessage: xmlTag(raw, "StatusMessage"),
+      TransactionStatus: transactionStatus,
+      TransactionReference: xmlTag(raw, "TransactionReference"),
+      Amount: xmlTag(raw, "Amount"),
+      CurrencyCode: xmlTag(raw, "CurrencyCode"),
+      ErrorMessage: xmlTag(raw, "ErrorMessage"),
+    };
+
+    await admin.from("billing_transactions").update({
+      status: successful ? "successful" : failed ? "failed" : "pending",
+      raw_response: response,
+      updated_at: new Date().toISOString(),
+    }).eq("id", tx.id);
+
+    if (successful) {
+      const { error: activateError } = await admin.from("tenant_module_overrides").upsert({
+        tenant_id: p.tenant_id,
+        module_key: tx.module_key,
+        enabled: true,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "tenant_id,module_key" });
+      if (activateError) throw new Error(activateError.message);
+    }
+
+    return { status: transactionStatus || "PENDING", successful, moduleKey: tx.module_key, response };
   });
 
 export const checkYoUpgrade = createServerFn({ method: "POST" })

@@ -6,8 +6,11 @@ import { listSaasModules, updateSaasModule } from "@/lib/saas.functions";
 import { getServerAuthHeaders } from "@/lib/auth-headers";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Boxes } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Boxes, Save } from "lucide-react";
 import { toast } from "sonner";
+import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/_app/saas-admin/modules")({
   component: SaasAdminModulesPage,
@@ -18,6 +21,7 @@ function SaasAdminModulesPage() {
   const qc = useQueryClient();
   const listModules = useServerFn(listSaasModules);
   const saveModule = useServerFn(updateSaasModule);
+  const [prices, setPrices] = useState<Record<string, string>>({});
 
   const authCall = async <T,>(fn: (arg: any) => Promise<T>, arg: any = {}) => {
     const headers = await getServerAuthHeaders();
@@ -29,6 +33,10 @@ function SaasAdminModulesPage() {
     queryFn: () => authCall(listModules),
     enabled: isSaasAdmin,
   });
+
+  useEffect(() => {
+    setPrices(Object.fromEntries(modules.filter((m: any) => m.billing_model === "add_on").map((m: any) => [m.module_key, String(m.add_on_price ?? "")])));
+  }, [modules]);
 
   const toggleModule = async (
     module: any,
@@ -42,6 +50,7 @@ function SaasAdminModulesPage() {
           globally_enabled: field === "globally_enabled" ? value : !!module.globally_enabled,
           trial_enabled: field === "trial_enabled" ? value : !!module.trial_enabled,
           paid_enabled: field === "paid_enabled" ? value : !!module.paid_enabled,
+          add_on_price: Number(prices[module.module_key] ?? module.add_on_price ?? 0),
         },
       });
       await refetch();
@@ -58,9 +67,7 @@ function SaasAdminModulesPage() {
         <Boxes className="mt-0.5 h-5 w-5 text-primary" />
         <div>
           <h2 className="font-semibold">Module control</h2>
-          <p className="text-sm text-muted-foreground">
-            API Access and Live Tracking are optional add-ons and are activated separately per workspace.
-          </p>
+          <p className="text-sm text-muted-foreground">Set add-on prices.</p>
         </div>
       </div>
 
@@ -105,7 +112,24 @@ function SaasAdminModulesPage() {
                   </td>
                   <td className="px-3 text-center">
                     {module.billing_model === "add_on" ? (
-                      <span className="text-xs text-muted-foreground">Activate per workspace</span>
+                      <div className="flex items-center justify-center gap-2">
+                        <Input
+                          className="h-8 w-28 text-right"
+                          type="number"
+                          min="0"
+                          value={prices[module.module_key] ?? String(module.add_on_price ?? "")}
+                          onChange={(e) => setPrices((p) => ({ ...p, [module.module_key]: e.target.value }))}
+                          aria-label={module.label + " price"}
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => toggleModule(module, "globally_enabled", !!module.globally_enabled)}
+                          title="Save price"
+                        >
+                          <Save className="h-4 w-4" />
+                        </Button>
+                      </div>
                     ) : (
                       <div className="flex items-center justify-center gap-3">
                         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">

@@ -3,7 +3,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/hooks/use-auth";
-import { getSaasContext, startYoUpgrade, checkYoUpgrade } from "@/lib/saas.functions";
+import {
+  getSaasContext,
+  startYoUpgrade,
+  checkYoUpgrade,
+  startYoAddonPurchase,
+  checkYoAddonPurchase,
+} from "@/lib/saas.functions";
 import { getServerAuthHeaders } from "@/lib/auth-headers";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,10 +32,14 @@ function BillingPage() {
   const getCtx = useServerFn(getSaasContext);
   const startPay = useServerFn(startYoUpgrade);
   const checkPay = useServerFn(checkYoUpgrade);
+  const startAddonPay = useServerFn(startYoAddonPurchase);
+  const checkAddonPay = useServerFn(checkYoAddonPurchase);
   const [phone, setPhone] = useState("256");
   const [busy, setBusy] = useState(false);
   const [checking, setChecking] = useState(false);
   const [transactionId, setTransactionId] = useState<string | null>(null);
+  const [addonTransaction, setAddonTransaction] = useState<string | null>(null);
+  const [addonKey, setAddonKey] = useState<string | null>(null);
 
   const { data: ctx, refetch } = useQuery({
     queryKey: ["saas-context"],
@@ -80,37 +90,88 @@ function BillingPage() {
       </div>
 
       <Card id="addons" className="p-6">
-        <div className="flex items-start gap-3">
-          <PlugZap className="mt-0.5 h-5 w-5 text-primary" />
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="font-semibold">Optional paid add-ons</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              These modules are separate from the AssetFlow plan and are billed and activated independently.
-            </p>
+            <h2 className="font-semibold">Add-ons</h2>
+            <p className="text-sm text-muted-foreground">Available separately.</p>
           </div>
+          <PlugZap className="h-5 w-5 text-primary" />
         </div>
+
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          {[
-            { key: "api_access", name: "API Access", icon: PlugZap, description: "External system integrations, API keys and Microsoft 365 connectivity." },
-            { key: "live_tracking", name: "Live Tracking", icon: Radar, description: "GPS and IoT telemetry for tracked assets." },
-          ].map((addon) => {
+          {(ctx?.addOns ?? []).filter((a: any) => a.available).map((addon: any) => {
             const enabled = Boolean(ctx?.enabledModules?.includes(addon.key));
-            const Icon = addon.icon;
+            const pending = addonTransaction && addonKey === addon.key;
             return (
               <div key={addon.key} className="rounded-xl border p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <Icon className="h-4 w-4 text-primary" />
-                    <p className="font-semibold">{addon.name}</p>
-                  </div>
-                  <Badge variant={enabled ? "secondary" : "outline"}>{enabled ? "Active" : "Not active"}</Badge>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-semibold">{addon.name}</p>
+                  <Badge variant={enabled ? "secondary" : "outline"}>{enabled ? "Active" : money(addon.price, addon.currency)}</Badge>
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground">{addon.description}</p>
-                {!enabled && <p className="mt-3 text-xs font-medium text-muted-foreground">Activation and billing are separate from the base plan. Contact your AssetFlow account administrator to activate this add-on.</p>}
+                {!enabled && (
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      disabled={busy || !isTenantAdmin || !ctx.paymentConfigured || addon.price <= 0}
+                      onClick={async () => {
+                        setBusy(true);
+                        try {
+                          const headers = await getServerAuthHeaders();
+                          const r = await startAddonPay({ data: { module_key: addon.key, phone }, headers });
+                          setAddonTransaction(r.transactionId);
+                          setAddonKey(addon.key);
+                          toast.success("Payment prompt sent.");
+                        } catch (e: any) {
+                          toast.error(e?.message ?? "Could not start payment");
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      {busy && addonKey === addon.key ? "Sending…" : "Pay & activate"}
+                    </Button>
+                    {pending && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={checking}
+                        onClick={async () => {
+                          setChecking(true);
+                          try {
+                            const headers = await getServerAuthHeaders();
+                            const r = await checkAddonPay({ data: { transaction_id: addonTransaction }, headers });
+                            if (r.successful) {
+                              toast.success("Add-on activated.");
+                              setAddonTransaction(null);
+                              setAddonKey(null);
+                              await refetch();
+                              await qc.invalidateQueries({ queryKey: ["saas-context"] });
+                            } else {
+                              toast.message("Payment: " + (r.status || "PENDING"));
+                            }
+                          } catch (e: any) {
+                            toast.error(e?.message ?? "Could not check payment");
+                          } finally {
+                            setChecking(false);
+                          }
+                        }}
+                      >
+                        {checking ? "Checking…" : "Check payment"}
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
+
+        {(ctx?.addOns ?? []).some((a: any) => a.available && a.price > 0) && (
+          <div className="mt-4 flex max-w-sm items-center gap-2">
+            <Label className="shrink-0">Mobile money</Label>
+            <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="2567XXXXXXXX" disabled={!isTenantAdmin || !ctx?.paymentConfigured} />
+          </div>
+        )}
       </Card>
 
       {subscriptionStatus === "active" ? (
@@ -125,7 +186,7 @@ function BillingPage() {
         </Card>
       )}
 
-      <Card className="p-5 text-sm text-muted-foreground"><strong className="text-foreground">Trial policy:</strong> {trialUserLimit !== null ? `up to ${trialUserLimit} active users` : "user limit loading"} for {trialDays !== null ? `${trialDays} days` : "the configured period"}. These limits are controlled by the SaaS Admin. Features that are not included in the trial remain visible and clearly marked as paid. Reports can be viewed during trial, but built-in PDF/Excel export is a paid feature.</Card>
+      <Card className="p-5 text-sm text-muted-foreground"><strong className="text-foreground">Trial:</strong> {trialDays !== null ? trialDays + " days" : "configured period"}{trialUserLimit !== null ? " · " + trialUserLimit + " users" : ""}</Card>
     </div>
   );
 }
