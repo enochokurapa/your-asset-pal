@@ -9,7 +9,13 @@ import type { Database } from './types'
 export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
   async ({ next }) => {
     
-    const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://assetflow360.com";
+    const request = getRequest();
+    const requestOrigin = request?.url ? new URL(request.url).origin : "";
+    const SUPABASE_URL =
+      requestOrigin ||
+      process.env.SUPABASE_URL ||
+      process.env.VITE_SUPABASE_URL ||
+      "https://assetflow360.com";
     const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNjAwMDAwMDAwLCJleHAiOjIwMDAwMDAwMDB9.V-Nq7_uazFUYvZFXyq_whGnFkWy4W_3o4k6m04sGc5Q";
 
     if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
@@ -22,8 +28,6 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
       throw new Response(message, { status: 500 });
     }
     
-    const request = getRequest();
-
     if (!request?.headers) {
       throw new Response('Unauthorized: No request headers available', { status: 401 });
     }
