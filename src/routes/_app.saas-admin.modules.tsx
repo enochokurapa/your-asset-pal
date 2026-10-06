@@ -59,7 +59,7 @@ function SaasAdminModulesPage() {
         <div>
           <h2 className="font-semibold">Module control</h2>
           <p className="text-sm text-muted-foreground">
-            Global OFF wins over workspace and user permissions. Trial-disabled modules remain visible as paid features.
+            Included modules follow the AssetFlow plan. API Access and Live Tracking are optional paid add-ons and are activated separately per workspace.
           </p>
         </div>
       </div>
@@ -79,8 +79,8 @@ function SaasAdminModulesPage() {
               <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="py-2 pr-4">Module</th>
                 <th className="px-3 py-2 text-center">Platform</th>
-                <th className="px-3 py-2 text-center">Free trial</th>
-                <th className="px-3 py-2 text-center">Paid</th>
+                <th className="px-3 py-2 text-center">Billing</th>
+                <th className="px-3 py-2 text-center">Availability</th>
               </tr>
             </thead>
             <tbody>
@@ -99,22 +99,25 @@ function SaasAdminModulesPage() {
                     </div>
                   </td>
                   <td className="px-3 text-center">
-                    <div className="flex justify-center">
-                      <Switch
-                        checked={!!module.trial_enabled}
-                        disabled={!module.globally_enabled}
-                        onCheckedChange={(value) => toggleModule(module, "trial_enabled", value)}
-                      />
-                    </div>
+                    <span className="inline-flex rounded-full border px-2 py-1 text-xs font-semibold">
+                      {module.billing_model === "add_on" ? "Optional add-on" : "Included in plan"}
+                    </span>
                   </td>
                   <td className="px-3 text-center">
-                    <div className="flex justify-center">
-                      <Switch
-                        checked={!!module.paid_enabled}
-                        disabled={!module.globally_enabled}
-                        onCheckedChange={(value) => toggleModule(module, "paid_enabled", value)}
-                      />
-                    </div>
+                    {module.billing_model === "add_on" ? (
+                      <span className="text-xs text-muted-foreground">Activate per workspace</span>
+                    ) : (
+                      <div className="flex items-center justify-center gap-3">
+                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          Trial
+                          <Switch checked={!!module.trial_enabled} disabled={!module.globally_enabled} onCheckedChange={(value) => toggleModule(module, "trial_enabled", value)} />
+                        </label>
+                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          Paid
+                          <Switch checked={!!module.paid_enabled} disabled={!module.globally_enabled} onCheckedChange={(value) => toggleModule(module, "paid_enabled", value)} />
+                        </label>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

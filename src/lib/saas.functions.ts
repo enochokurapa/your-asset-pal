@@ -296,9 +296,10 @@ export const getSaasContext = createServerFn({ method: "GET" })
     const enabledModules = modules
       .filter((m: any) => {
         if (!m.globally_enabled) return false;
+        if (m.billing_model === "add_on") return overrideMap.get(m.module_key) === true;
         const planEnabled = paid ? m.paid_enabled : m.trial_enabled;
         if (!planEnabled) return false;
-        return overrideMap.has(m.module_key) ? overrideMap.get(m.module_key) !== false : true;
+        return !overrideMap.has(m.module_key) || overrideMap.get(m.module_key) !== false;
       })
       .map((m: any) => m.module_key as string);
 
@@ -650,12 +651,14 @@ export const getSaasTenantDetail = createServerFn({ method: "POST" })
     const paid = status === "active";
     const overrides = new Map((overridesResult.data ?? []).map((row: any) => [row.module_key, row.enabled]));
     const modules = (modulesResult.data ?? []).map((module: any) => {
-      const planEnabled = paid ? module.paid_enabled : module.trial_enabled;
       const override = overrides.has(module.module_key) ? overrides.get(module.module_key) : null;
+      const effectiveEnabled = module.billing_model === "add_on"
+        ? Boolean(module.globally_enabled && override === true)
+        : Boolean(module.globally_enabled && (paid ? module.paid_enabled : module.trial_enabled) && override !== false);
       return {
         ...module,
         override,
-        effectiveEnabled: Boolean(module.globally_enabled && planEnabled && override !== false),
+        effectiveEnabled,
       };
     });
 

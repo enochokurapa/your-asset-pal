@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { CreditCard, CheckCircle2, Clock, LockKeyhole } from "lucide-react";
+import { CreditCard, CheckCircle2, Clock, LockKeyhole, PlugZap, Radar } from "lucide-react";
 
 export const Route = createFileRoute("/_app/billing")({ component: BillingPage });
 
@@ -78,6 +78,40 @@ function BillingPage() {
         <Card className="p-5"><p className="text-xs uppercase tracking-wide text-muted-foreground">Free trial</p><p className="mt-2 text-xl font-semibold">{trialDays !== null ? `${trialDays} days` : "Loading…"}</p>{subscriptionStatus === "trial" && daysLeft !== null && <p className="mt-1 text-xs text-muted-foreground"><strong>{daysLeft} day(s) remaining</strong>{trialEndsAt ? ` · ends ${new Date(trialEndsAt).toLocaleDateString()}` : ""}</p>}</Card>
         <Card className="p-5"><p className="text-xs uppercase tracking-wide text-muted-foreground">Paid plan</p><p className="mt-2 text-xl font-semibold">{price > 0 ? money(price, currency) : "Price not set"}</p><p className="mt-1 text-xs text-muted-foreground">Price is controlled by the SaaS Admin.</p></Card>
       </div>
+
+      <Card id="addons" className="p-6">
+        <div className="flex items-start gap-3">
+          <PlugZap className="mt-0.5 h-5 w-5 text-primary" />
+          <div>
+            <h2 className="font-semibold">Optional paid add-ons</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              These modules are separate from the AssetFlow plan and are billed and activated independently.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {[
+            { key: "api_access", name: "API Access", icon: PlugZap, description: "External system integrations, API keys and Microsoft 365 connectivity." },
+            { key: "live_tracking", name: "Live Tracking", icon: Radar, description: "GPS and IoT telemetry for tracked assets." },
+          ].map((addon) => {
+            const enabled = Boolean(ctx?.enabledModules?.includes(addon.key));
+            const Icon = addon.icon;
+            return (
+              <div key={addon.key} className="rounded-xl border p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Icon className="h-4 w-4 text-primary" />
+                    <p className="font-semibold">{addon.name}</p>
+                  </div>
+                  <Badge variant={enabled ? "secondary" : "outline"}>{enabled ? "Active" : "Not active"}</Badge>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">{addon.description}</p>
+                {!enabled && <p className="mt-3 text-xs font-medium text-muted-foreground">Activation and billing are separate from the base plan. Contact your AssetFlow account administrator to activate this add-on.</p>}
+              </div>
+            );
+          })}
+        </div>
+      </Card>
 
       {subscriptionStatus === "active" ? (
         <Card className="p-6"><div className="flex items-start gap-3"><CheckCircle2 className="mt-0.5 h-5 w-5 text-success" /><div><h2 className="font-semibold">Paid plan active</h2><p className="mt-1 text-sm text-muted-foreground">Paid features, report exports and custom-domain connection are enabled.</p></div></div></Card>

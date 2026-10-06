@@ -165,7 +165,7 @@ function IntegrationsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">API & Integrations</h1>
         <p className="text-sm text-muted-foreground">
-          Connect external systems to AssetFlow using tenant-scoped API keys. API v1 is read-only in this release.
+          API Access is an optional paid add-on, billed separately from your AssetFlow plan. It provides tenant-scoped API keys and external system integrations.
         </p>
       </div>
 

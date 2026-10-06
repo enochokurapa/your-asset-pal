@@ -7,6 +7,16 @@ import { graphRequest, MICROSOFT_SCOPES, microsoftConfig } from "@/lib/microsoft
 
 const admin = supabaseAdmin as any;
 
+async function assertApiAddOnEnabled(tenantId:string) {
+  const [{data:module},{data:override}]=await Promise.all([
+    admin.from("saas_modules").select("globally_enabled,billing_model").eq("module_key","api_access").single(),
+    admin.from("tenant_module_overrides").select("enabled").eq("tenant_id",tenantId).eq("module_key","api_access").maybeSingle(),
+  ]);
+  if(!module?.globally_enabled || module?.billing_model!=="add_on" || override?.enabled!==true) {
+    throw new Error("API Access is an optional paid add-on and is not active for this workspace");
+  }
+}
+
 async function requireTenantAdmin(userId:string) {
   const {data:profile,error}=await admin.from("profiles")
     .select("tenant_id,tenant_role,is_saas_admin")
@@ -25,6 +35,7 @@ export const getMicrosoft365Status=createServerFn({method:"GET"})
   .middleware([requireSupabaseAuth])
   .handler(async({context})=>{
     const tenantId=await requireTenantAdmin(context.userId);
+    await assertApiAddOnEnabled(tenantId);
     const cfg=microsoftConfig();
     const {data,error}=await admin.from("microsoft_365_connections")
       .select("microsoft_tenant_id,microsoft_user_id,account_email,display_name,scopes,status,connected_at,last_sync_at,last_sync_status,directory_user_count,last_error,updated_at")
@@ -51,6 +62,7 @@ export const getMicrosoft365ConnectUrl=createServerFn({method:"POST"})
   .middleware([requireSupabaseAuth])
   .handler(async({context})=>{
     const tenantId=await requireTenantAdmin(context.userId);
+    await assertApiAddOnEnabled(tenantId);
     const cfg=microsoftConfig();
     if(!cfg.configured) {
       throw new Error("Microsoft 365 platform credentials are not configured yet");
@@ -84,6 +96,7 @@ export const syncMicrosoft365Directory=createServerFn({method:"POST"})
   .middleware([requireSupabaseAuth])
   .handler(async({context})=>{
     const tenantId=await requireTenantAdmin(context.userId);
+    await assertApiAddOnEnabled(tenantId);
     const startedAt=new Date().toISOString();
 
     try {
@@ -150,6 +163,7 @@ export const sendMicrosoft365TestEmail=createServerFn({method:"POST"})
   }).parse(input))
   .handler(async({data,context})=>{
     const tenantId=await requireTenantAdmin(context.userId);
+    await assertApiAddOnEnabled(tenantId);
     await graphRequest(tenantId,"/me/sendMail",{
       method:"POST",
       body:JSON.stringify({
@@ -171,6 +185,7 @@ export const disconnectMicrosoft365=createServerFn({method:"POST"})
   .middleware([requireSupabaseAuth])
   .handler(async({context})=>{
     const tenantId=await requireTenantAdmin(context.userId);
+    await assertApiAddOnEnabled(tenantId);
     const {error}=await admin.from("microsoft_365_connections").update({
       refresh_token_ciphertext:null,
       status:"disconnected",

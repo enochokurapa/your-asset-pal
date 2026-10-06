@@ -67,11 +67,13 @@ interface AuthCtx {
   subscriptionEndsAt: string | null;
   enabledModules: Set<ModuleKey>;
   paidOnlyModules: Set<ModuleKey>;
+  addOnModules: Set<ModuleKey>;
   canExportReports: boolean;
   canUseCustomDomain: boolean;
   canWrite: boolean;
   canView: (m: ModuleKey) => boolean;
   isPaidFeature: (m: ModuleKey) => boolean;
+  isAddOnFeature: (m: ModuleKey) => boolean;
   canApprove: (k: ApprovalKind) => boolean;
   canDo: (k: ActionKind) => boolean;
   canSeeBranch: (branchId: string | null | undefined) => boolean;
@@ -98,6 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [subscriptionEndsAt, setSubscriptionEndsAt] = useState<string | null>(null);
   const [enabledModules, setEnabledModules] = useState<Set<ModuleKey>>(new Set(ALL_MODULES));
   const [paidOnlyModules, setPaidOnlyModules] = useState<Set<ModuleKey>>(new Set());
+  const [addOnModules, setAddOnModules] = useState<Set<ModuleKey>>(new Set());
   const [loading, setLoading] = useState(true);
 
   const resetMetadata = () => {
@@ -106,7 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsActive(true); setIsSaasAdmin(false); setTenantRole("member");
     setTenantId(null); setTenantName(null); setSubscriptionStatus("unknown");
     setTrialEndsAt(null); setSubscriptionEndsAt(null); setEnabledModules(new Set(ALL_MODULES));
-    setPaidOnlyModules(new Set());
+    setPaidOnlyModules(new Set()); setAddOnModules(new Set());
   };
 
   const loadFor = async (uid: string) => {
@@ -143,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (prof?.tenant_id) {
         const [{ data: tenant }, { data: modules }, { data: overrides }] = await Promise.all([
           (supabase as any).from("tenants").select("name,subscription_status,trial_ends_at,subscription_ends_at").eq("id", prof.tenant_id).maybeSingle(),
-          (supabase as any).from("saas_modules").select("module_key,globally_enabled,trial_enabled,paid_enabled").order("sort_order"),
+          (supabase as any).from("saas_modules").select("module_key,globally_enabled,trial_enabled,paid_enabled,billing_model").order("sort_order"),
           (supabase as any).from("tenant_module_overrides").select("module_key,enabled").eq("tenant_id", prof.tenant_id),
         ]);
         if (tenant) {
@@ -160,17 +163,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const paid = effective === "active";
           const overrideMap = new Map((overrides ?? []).map((x: any) => [x.module_key, x.enabled]));
           if (modules?.length) {
-            const eligible = modules.filter((m: any) => {
-              if (!m.globally_enabled) return false;
-              return overrideMap.has(m.module_key) ? overrideMap.get(m.module_key) !== false : true;
-            });
-            const allowed = eligible.filter((m: any) => paid ? !!m.paid_enabled : !!m.trial_enabled)
+            const eligible = modules.filter((m: any) => !!m.globally_enabled);
+            const included = eligible.filter((m: any) => m.billing_model !== "add_on");
+            const addOns = eligible.filter((m: any) => m.billing_model === "add_on");
+            const allowedIncluded = included
+              .filter((m: any) => paid ? !!m.paid_enabled : !!m.trial_enabled)
+              .filter((m: any) => !overrideMap.has(m.module_key) || overrideMap.get(m.module_key) !== false)
+              .map((m: any) => m.module_key as ModuleKey);
+            const enabledAddOns = addOns
+              .filter((m: any) => overrideMap.get(m.module_key) === true)
               .map((m: any) => m.module_key as ModuleKey);
             const lockedPaid = effective === "trial"
-              ? eligible.filter((m: any) => !m.trial_enabled && !!m.paid_enabled).map((m: any) => m.module_key as ModuleKey)
+              ? included.filter((m: any) => !m.trial_enabled && !!m.paid_enabled)
+                  .map((m: any) => m.module_key as ModuleKey)
               : [];
-            setEnabledModules(new Set(allowed));
+            const lockedAddOns = addOns
+              .filter((m: any) => overrideMap.get(m.module_key) !== true)
+              .map((m: any) => m.module_key as ModuleKey);
+            setEnabledModules(new Set([...allowedIncluded, ...enabledAddOns]));
             setPaidOnlyModules(new Set(lockedPaid));
+            setAddOnModules(new Set(lockedAddOns));
           }
         }
       }
@@ -203,6 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const canView = (m: ModuleKey) => subscriptionUsable && enabledModules.has(m) && hasUserModuleAccess(m);
   const isPaidFeature = (m: ModuleKey) => subscriptionStatus === "trial" && paidOnlyModules.has(m) && hasUserModuleAccess(m);
+  const isAddOnFeature = (m: ModuleKey) => addOnModules.has(m) && hasUserModuleAccess(m);
   const canApprove = (k: ApprovalKind) => subscriptionUsable && (isAdmin || approvalRights.has(k));
   const canDo = (k: ActionKind) => subscriptionUsable && (isAdmin || isManager || actionRights.has(k));
   const canSeeBranch = (branchId: string | null | undefined) => {
@@ -214,11 +227,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthCtx = {
     user: session?.user ?? null, session, roles, permissions, approvalRights, actionRights, branchScope,
     loading, mustChangePassword, isActive, isAdmin, isTenantAdmin, isSaasAdmin, isManager,
-    tenantId, tenantName, subscriptionStatus, trialEndsAt, subscriptionEndsAt, enabledModules, paidOnlyModules,
+    tenantId, tenantName, subscriptionStatus, trialEndsAt, subscriptionEndsAt, enabledModules, paidOnlyModules, addOnModules,
     canExportReports: subscriptionStatus === "active",
     canUseCustomDomain: subscriptionStatus === "active",
     canWrite: subscriptionUsable && (isAdmin || isManager),
-    canView, isPaidFeature, canApprove, canDo, canSeeBranch,
+    canView, isPaidFeature, isAddOnFeature, canApprove, canDo, canSeeBranch,
     signOut: async () => {
       try { await supabase.auth.signOut(); }
       catch (e) { console.error("[signOut] error:", e); }

@@ -230,15 +230,12 @@ async function maybeHandlePublicApi(request: Request): Promise<Response | null> 
       return jsonResponse(403, { error: "forbidden", message: "API key does not have tracking:write permission." });
     }
 
-    const [{ data: tenant }, { data: module }, { data: override }] = await Promise.all([
-      apiAdmin.from("tenants").select("subscription_status").eq("id", key.tenant_id).single(),
-      apiAdmin.from("saas_modules").select("globally_enabled,trial_enabled,paid_enabled").eq("module_key", "live_tracking").single(),
+    const [{ data: module }, { data: override }] = await Promise.all([
+      apiAdmin.from("saas_modules").select("globally_enabled,billing_model").eq("module_key", "live_tracking").single(),
       apiAdmin.from("tenant_module_overrides").select("enabled").eq("tenant_id", key.tenant_id).eq("module_key", "live_tracking").maybeSingle(),
     ]);
-    const paid = tenant?.subscription_status === "active";
-    const planEnabled = paid ? !!module?.paid_enabled : !!module?.trial_enabled;
-    if (!module?.globally_enabled || !planEnabled || override?.enabled === false) {
-      return jsonResponse(403, { error: "module_disabled", message: "Live Tracking is not enabled for this workspace." });
+    if (!module?.globally_enabled || module?.billing_model !== "add_on" || override?.enabled !== true) {
+      return jsonResponse(403, { error: "module_disabled", message: "Live Tracking is an optional paid add-on and is not active for this workspace." });
     }
 
     let body: any;

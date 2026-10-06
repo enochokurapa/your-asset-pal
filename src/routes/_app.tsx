@@ -58,7 +58,7 @@ const saasAdminNav: NavItem[] = [
 
 function AppLayout() {
   const {
-    user, loading, signOut, isAdmin, isTenantAdmin, isSaasAdmin, roles, canView, isPaidFeature,
+    user, loading, signOut, isAdmin, isTenantAdmin, isSaasAdmin, roles, canView, isPaidFeature, isAddOnFeature,
     mustChangePassword, canExportReports, subscriptionStatus, trialEndsAt, tenantId, tenantName,
   } = useAuth();
   const [open, setOpen] = useState(false);
@@ -112,7 +112,7 @@ function AppLayout() {
   const visibleTenantNav = tenantNav.filter((n) => {
     if (n.tenantAdminOnly && !isTenantAdmin) return false;
     if (n.adminOnly && !isAdmin) return false;
-    if (n.module && !canView(n.module) && !isPaidFeature(n.module)) return false;
+    if (n.module && !canView(n.module) && !isPaidFeature(n.module) && !isAddOnFeature(n.module)) return false;
     return true;
   });
 
@@ -144,6 +144,7 @@ function AppLayout() {
     const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
     const Icon = item.icon;
     const paid = !isSaasAdmin && item.module ? isPaidFeature(item.module) : false;
+    const addOn = !isSaasAdmin && item.module ? isAddOnFeature(item.module) : false;
     return (
       <Link
         key={item.to}
@@ -158,7 +159,12 @@ function AppLayout() {
         <span className="min-w-0 flex-1">{item.label}</span>
         {paid && (
           <span className="flex items-center gap-1 rounded-full border border-current/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide opacity-80">
-            <LockKeyhole className="h-3 w-3" /> Paid
+            <LockKeyhole className="h-3 w-3" /> Included after upgrade
+          </span>
+        )}
+        {addOn && (
+          <span className="flex items-center gap-1 rounded-full border border-current/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide opacity-80">
+            <LockKeyhole className="h-3 w-3" /> Add-on
           </span>
         )}
       </Link>
@@ -253,14 +259,27 @@ function AppLayout() {
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                   <LockKeyhole className="h-7 w-7" />
                 </div>
-                <h1 className="mt-5 text-2xl font-bold">{lockedPaidFeature.label}</h1>
-                <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
-                  This feature is available on the paid plan. It stays visible during your free trial so you can see what becomes available after upgrade.
-                </p>
-                {isTenantAdmin ? (
-                  <Button asChild className="mt-6"><Link to="/billing">Upgrade to unlock</Link></Button>
+                <h1 className="mt-5 text-2xl font-bold">{lockedPaidFeature.item.label}</h1>
+                {lockedPaidFeature.type === "add_on" ? (
+                  <>
+                    <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
+                      This is an optional paid add-on. It is activated and billed separately from your AssetFlow plan.
+                    </p>
+                    <p className="mx-auto mt-3 max-w-lg text-sm font-medium text-muted-foreground">
+                      Ask your account administrator to activate this add-on for the workspace.
+                    </p>
+                  </>
                 ) : (
-                  <p className="mt-6 text-sm font-medium text-muted-foreground">Ask your admin to upgrade the workspace.</p>
+                  <>
+                    <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
+                      This feature is included with the paid AssetFlow plan. It remains visible during your free trial so you can see what is available after upgrading.
+                    </p>
+                    {isTenantAdmin ? (
+                      <Button asChild className="mt-6"><Link to="/billing">Upgrade plan</Link></Button>
+                    ) : (
+                      <p className="mt-6 text-sm font-medium text-muted-foreground">Ask your admin to upgrade the workspace.</p>
+                    )}
+                  </>
                 )}
               </div>
             </div>

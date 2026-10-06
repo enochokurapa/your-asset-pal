@@ -16,7 +16,7 @@ const SECTIONS = [
   { to: "/saas-admin/organizations", title: "Businesses", description: "Open one organization and control plan, modules, users, domains and activity.", icon: Building2 },
   { to: "/saas-admin/branding", title: "Branding", description: "Platform logo, app icon and AssetFlow 360 color palette.", icon: ImageIcon },
   { to: "/saas-admin/policy", title: "Plan & Pricing", description: "Trial duration, trial user limits, paid price and currency.", icon: CreditCard },
-  { to: "/saas-admin/modules", title: "Global Modules", description: "Control feature availability across trial and paid plans.", icon: Boxes },
+  { to: "/saas-admin/modules", title: "Global Modules", description: "Control included modules and optional paid add-ons.", icon: Boxes },
   { to: "/saas-admin/backups", title: "Backup & Restore", description: "R2 backup automation, restore points and manual backups.", icon: DatabaseBackup },
 ] as const;
 

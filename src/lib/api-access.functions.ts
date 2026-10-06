@@ -25,6 +25,7 @@ export const listApiKeys = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const tenantId = await requireTenantAdmin(context.userId);
+    await assertAddOnEnabled(tenantId, "api_access");
     const { data, error } = await admin
       .from("api_keys")
       .select("id,name,key_prefix,scopes,is_active,last_used_at,expires_at,created_at,revoked_at")
@@ -34,16 +35,15 @@ export const listApiKeys = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
-async function assertTrackingModuleEnabled(tenantId: string) {
-  const [{ data: tenant }, { data: module }, { data: override }] = await Promise.all([
-    admin.from("tenants").select("subscription_status").eq("id", tenantId).single(),
-    admin.from("saas_modules").select("globally_enabled,trial_enabled,paid_enabled").eq("module_key", "live_tracking").single(),
-    admin.from("tenant_module_overrides").select("enabled").eq("tenant_id", tenantId).eq("module_key", "live_tracking").maybeSingle(),
+async function assertAddOnEnabled(tenantId: string, moduleKey: "api_access" | "live_tracking") {
+  const [{ data: module }, { data: override }] = await Promise.all([
+    admin.from("saas_modules").select("globally_enabled,billing_model").eq("module_key", moduleKey).single(),
+    admin.from("tenant_module_overrides").select("enabled").eq("tenant_id", tenantId).eq("module_key", moduleKey).maybeSingle(),
   ]);
-  const paid = tenant?.subscription_status === "active";
-  const planEnabled = paid ? !!module?.paid_enabled : !!module?.trial_enabled;
-  if (!module?.globally_enabled || !planEnabled || override?.enabled === false) {
-    throw new Error("Live Tracking is not enabled for this workspace");
+  if (!module?.globally_enabled || module?.billing_model !== "add_on" || override?.enabled !== true) {
+    throw new Error(moduleKey === "live_tracking"
+      ? "Live Tracking is an optional paid add-on and is not active for this workspace"
+      : "API Access is an optional paid add-on and is not active for this workspace");
   }
 }
 
@@ -55,7 +55,8 @@ export const createApiKey = createServerFn({ method: "POST" })
   }).parse(input))
   .handler(async ({ data, context }) => {
     const tenantId = await requireTenantAdmin(context.userId);
-    if (data.key_type === "tracking") await assertTrackingModuleEnabled(tenantId);
+    await assertAddOnEnabled(tenantId, "api_access");
+    if (data.key_type === "tracking") await assertAddOnEnabled(tenantId, "live_tracking");
     const raw = `af_live_${randomBytes(24).toString("hex")}`;
     const hash = createHash("sha256").update(raw).digest("hex");
     const prefix = raw.slice(0, 16);

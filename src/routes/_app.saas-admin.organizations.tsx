@@ -260,15 +260,20 @@ function SaasAdminOrganizationsPage() {
             <Card className="overflow-hidden">
               <div className="border-b p-5">
                 <div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /><h3 className="font-semibold">Business module control</h3></div>
-                <p className="mt-1 text-sm text-muted-foreground">Override a module only for this business, or return it to the global plan default.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Included modules follow the workspace plan. Optional paid add-ons are activated separately for the business.</p>
               </div>
               <div className="divide-y">
                 {(detail.modules ?? []).map((module: any) => (
                   <div key={module.module_key} className="grid gap-3 p-4 sm:grid-cols-[1fr_auto_auto] sm:items-center">
                     <div>
-                      <p className="text-sm font-semibold">{module.label}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold">{module.label}</p>
+                        <Badge variant="outline">{module.billing_model === "add_on" ? "Optional paid add-on" : "Included in plan"}</Badge>
+                      </div>
                       <p className="text-xs text-muted-foreground">
-                        Global {module.globally_enabled ? "on" : "off"} · Effective {module.effectiveEnabled ? "enabled" : "disabled"}
+                        {module.billing_model === "add_on"
+                          ? "Global " + (module.globally_enabled ? "available" : "off") + " · " + (module.effectiveEnabled ? "Active for this business" : "Not active for this business")
+                          : "Global " + (module.globally_enabled ? "on" : "off") + " · Effective " + (module.effectiveEnabled ? "enabled" : "disabled")}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -277,10 +282,14 @@ function SaasAdminOrganizationsPage() {
                         disabled={!module.globally_enabled}
                         onCheckedChange={(checked) => changeModule(module.module_key, checked)}
                       />
-                      <span className="w-16 text-xs text-muted-foreground">{module.override === null ? "Default" : "Override"}</span>
+                      <span className="w-24 text-xs text-muted-foreground">
+                        {module.billing_model === "add_on"
+                          ? (module.effectiveEnabled ? "Activated" : "Activate add-on")
+                          : (module.override === null ? "Plan default" : "Override")}
+                      </span>
                     </div>
                     <Button size="sm" variant="outline" disabled={module.override === null} onClick={() => changeModule(module.module_key, null)}>
-                      Use default
+                      {module.billing_model === "add_on" ? "Deactivate" : "Use default"}
                     </Button>
                   </div>
                 ))}

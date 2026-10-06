@@ -66,7 +66,7 @@ function LiveTrackingPage() {
 
   return <div className="space-y-6">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><h1 className="text-2xl font-bold tracking-tight">Live Tracking</h1><p className="text-sm text-muted-foreground">GPS/IoT tracking for assets that have a compatible tracker or telemetry source.</p></div>
+      <div><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold tracking-tight">Live Tracking</h1><Badge variant="outline">Optional paid add-on</Badge></div><p className="text-sm text-muted-foreground">Live Tracking is billed separately from your AssetFlow plan for assets using compatible GPS, IoT or telemetry sources.</p></div>
       {isTenantAdmin&&<Button onClick={()=>setOpen(true)}><Plus className="mr-2 h-4 w-4"/>Register tracker</Button>}
     </div>
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
@@ -103,7 +103,7 @@ function LiveTrackingPage() {
         <div className="space-y-2"><Label>Asset</Label><Select value={assetId||"none"} onValueChange={v=>setAssetId(v==="none"?"":v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>
           <SelectItem value="none">Not linked yet</SelectItem>{(assets as any[]).map(a=><SelectItem key={a.id} value={a.id}>{a.asset_tag} - {a.name}</SelectItem>)}
         </SelectContent></Select></div>
-        <p className="text-xs text-muted-foreground">New trackers remain disabled until an administrator activates live tracking and configures the provider credentials.</p>
+        <p className="text-xs text-muted-foreground">New trackers remain disabled until the Live Tracking add-on is activated and the provider credentials are configured.</p>
       </div>
       <DialogFooter><Button variant="outline" onClick={()=>setOpen(false)}>Cancel</Button><Button onClick={add}>Register</Button></DialogFooter>
     </DialogContent></Dialog>
