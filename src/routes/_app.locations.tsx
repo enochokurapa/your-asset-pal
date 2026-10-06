@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { CURRENT_ADMIN_CONFIG, currentAdminSource } from "@/lib/current-admin-sources";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -392,21 +393,11 @@ function OrganisationLocations({
   </Card>;
 }
 
-const GEO_PRIMARY: Record<string,{level:number;label:string}> = {
-  UG:{level:2,label:"District"},
-  KE:{level:1,label:"County"},
-  TZ:{level:1,label:"Region"},
-  RW:{level:2,label:"District"},
-  ZM:{level:1,label:"Province"},
-  MW:{level:2,label:"District"},
-  ZW:{level:1,label:"Province"},
-};
-
 function GeographyBrowser({countries,assets,onViewAssets}:{countries:any[];assets:any[];onViewAssets:(id:number)=>void}) {
   const [country,setCountry]=useState("");
   const [stack,setStack]=useState<any[]>([]);
   const parent=stack.length?stack[stack.length-1]:null;
-  const config=GEO_PRIMARY[country] ?? {level:1,label:"Region"};
+  const config=CURRENT_ADMIN_CONFIG[country] ?? {level:1,label:"Region"};
 
   const {data:rawPlaces=[],isLoading}=useQuery({
     queryKey:["geo-browser-hierarchy",country,parent?.geoname_id,config.level],
@@ -416,11 +407,12 @@ function GeographyBrowser({countries,assets,onViewAssets}:{countries:any[];asset
         .select("geoname_id,name,display_path,feature_class,feature_code,admin_level,population,parent_geoname_id,country_code")
         .eq("country_code",country);
       if(parent) {
-        if(country==="UG") return [];
+        if(currentAdminSource(country)) return [];
         q=q.eq("parent_geoname_id",parent.geoname_id).order("feature_class",{ascending:true}).order("name").limit(1500);
       } else {
         q=q.eq("feature_code",`ADM${config.level}`);
-        if(country==="UG") q=q.eq("source","UBOS NPHC 2024");
+        const source=currentAdminSource(country);
+        if(source) q=q.eq("source",source);
         q=q.order("name").limit(1200);
       }
       const {data,error}=await q;
