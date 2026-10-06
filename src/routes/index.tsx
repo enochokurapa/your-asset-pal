@@ -77,6 +77,16 @@ const coreFeatures = [
     title: "Official reporting",
     text: "Generate branded management reports with organisation identity, report metadata, page numbering and approval sign-off space.",
   },
+  {
+    icon: PlugZap,
+    title: "API & integrations",
+    text: "Connect approved systems to asset, branch and location data through scoped API access, with a controlled path for tracking integrations.",
+  },
+  {
+    icon: Smartphone,
+    title: "Mobile & PWA",
+    text: "Use AssetFlow from phones, tablets and desktops, with installable PWA support for compatible browsers and field workflows.",
+  },
 ];
 
 const moduleGroups = [
@@ -249,9 +259,8 @@ function PublicHome() {
 
           <nav className="ml-auto hidden items-center gap-6 text-sm font-medium text-muted-foreground lg:flex">
             <a href="#features" className="transition hover:text-foreground">Features</a>
-            <a href="#locations" className="transition hover:text-foreground">Locations</a>
             <a href="#modules" className="transition hover:text-foreground">Modules</a>
-            <a href="#integrations" className="transition hover:text-foreground">API & Integrations</a>
+            <a href="#locations" className="transition hover:text-foreground">Locations</a>
             <a href="#security" className="transition hover:text-foreground">Security</a>
           </nav>
 
@@ -347,13 +356,12 @@ function PublicHome() {
 
         <section id="features" data-scroll-reveal data-reveal="up" className="af-scroll-reveal mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
-            <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary">Complete asset lifecycle</p>
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary">Product capabilities</p>
             <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-              One operational system instead of disconnected spreadsheets.
+              Core capabilities for the complete asset lifecycle.
             </h2>
             <p className="mt-4 max-w-2xl leading-7 text-muted-foreground">
-              AssetFlow connects the information that normally gets scattered between stores,
-              finance, administration, security, field teams and management.
+              AssetFlow brings registration, location, verification, finance, reporting, mobile access and integrations into one controlled operating platform.
             </p>
           </div>
 
@@ -466,9 +474,9 @@ function PublicHome() {
           <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
             <div className="grid gap-10 lg:grid-cols-[.8fr_1.2fr] lg:items-start">
               <div>
-                <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary">API & integrations</p>
+                <p className="text-sm font-bold uppercase tracking-[0.18em] text-primary">Connected systems</p>
                 <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-                  Asset data should work with the rest of your organisation.
+                  Integrate AssetFlow when your wider systems need the same trusted asset data.
                 </h2>
                 <p className="mt-4 leading-7 text-muted-foreground">
                   AssetFlow provides a controlled API foundation for approved integrations.
