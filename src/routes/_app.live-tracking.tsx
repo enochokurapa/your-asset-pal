@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Radar, Radio, MapPin } from "lucide-react";
+import { Plus, Radar, Radio, MapPin, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/live-tracking")({ component: LiveTrackingPage });
@@ -59,14 +59,14 @@ function LiveTrackingPage() {
     toast.success(active?"Tracker activated":"Tracker disabled");
   };
 
-  if(!trackingAllowed) return <Navigate to="/locations"/>;
+  if(!trackingAllowed) return <div className="space-y-4"><div><h1 className="text-2xl font-bold tracking-tight">Live Tracking</h1><p className="text-sm text-muted-foreground">Optional add-on</p></div><Card className="max-w-xl"><CardContent className="flex items-center gap-4 p-6"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted"><Lock className="h-5 w-5 text-muted-foreground" /></span><div><p className="font-semibold">Live Tracking is locked</p><p className="text-sm text-muted-foreground">Activate the add-on to use GPS and telemetry tracking.</p></div></CardContent></Card></div>;
 
   const latestByDevice=new Map<string,any>();
   (events as any[]).forEach(e=>{if(!latestByDevice.has(e.device_id))latestByDevice.set(e.device_id,e);});
 
   return <div className="space-y-6">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold tracking-tight">Live Tracking</h1><Badge variant="outline">Optional paid add-on</Badge></div><p className="text-sm text-muted-foreground">Live Tracking is billed separately from your AssetFlow plan for assets using compatible GPS, IoT or telemetry sources.</p></div>
+      <div><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold tracking-tight">Live Tracking</h1><Badge variant="outline">Optional add-on</Badge></div><p className="text-sm text-muted-foreground">GPS and telemetry tracking.</p></div>
       {isTenantAdmin&&<Button onClick={()=>setOpen(true)}><Plus className="mr-2 h-4 w-4"/>Register tracker</Button>}
     </div>
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3">

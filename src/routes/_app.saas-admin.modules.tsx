@@ -59,7 +59,7 @@ function SaasAdminModulesPage() {
         <div>
           <h2 className="font-semibold">Module control</h2>
           <p className="text-sm text-muted-foreground">
-            Included modules follow the AssetFlow plan. API Access and Live Tracking are optional paid add-ons and are activated separately per workspace.
+            API Access and Live Tracking are optional add-ons and are activated separately per workspace.
           </p>
         </div>
       </div>

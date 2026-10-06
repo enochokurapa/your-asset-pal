@@ -260,7 +260,7 @@ function SaasAdminOrganizationsPage() {
             <Card className="overflow-hidden">
               <div className="border-b p-5">
                 <div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /><h3 className="font-semibold">Business module control</h3></div>
-                <p className="mt-1 text-sm text-muted-foreground">Included modules follow the workspace plan. Optional paid add-ons are activated separately for the business.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Optional add-ons are activated separately for each business.</p>
               </div>
               <div className="divide-y">
                 {(detail.modules ?? []).map((module: any) => (
@@ -268,7 +268,7 @@ function SaasAdminOrganizationsPage() {
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-semibold">{module.label}</p>
-                        <Badge variant="outline">{module.billing_model === "add_on" ? "Optional paid add-on" : "Included in plan"}</Badge>
+                        <Badge variant="outline">{module.billing_model === "add_on" ? "Optional add-on" : "Included in plan"}</Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {module.billing_model === "add_on"

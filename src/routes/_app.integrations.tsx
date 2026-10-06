@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { KeyRound, Copy, Ban, PlugZap, ShieldCheck, Cloud, Users, RefreshCw, Mail, ExternalLink, Unplug, CheckCircle2, AlertCircle } from "lucide-react";
+import { KeyRound, Copy, Ban, PlugZap, ShieldCheck, Cloud, Users, RefreshCw, Mail, ExternalLink, Unplug, CheckCircle2, AlertCircle, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/integrations")({
@@ -62,7 +62,7 @@ function IntegrationsPage() {
   const { data: microsoftStatus, refetch: refetchMicrosoft, isLoading: microsoftLoading } = useQuery({
     queryKey: ["microsoft-365-status"],
     queryFn: () => authCall(getMicrosoftStatus),
-    enabled: isTenantAdmin,
+    enabled: isTenantAdmin && canView("api_access"),
   });
 
   useEffect(() => {
@@ -77,6 +77,8 @@ function IntegrationsPage() {
   }, [search.microsoft, search.message]);
 
   if (!isTenantAdmin) return <Navigate to="/dashboard" />;
+
+  if (!canView("api_access")) return <div className="space-y-4"><div><h1 className="text-2xl font-bold tracking-tight">API & Integrations</h1><p className="text-sm text-muted-foreground">Optional add-on</p></div><Card className="max-w-xl"><CardContent className="flex items-center gap-4 p-6"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted"><Lock className="h-5 w-5 text-muted-foreground" /></span><div><p className="font-semibold">API Access is locked</p><p className="text-sm text-muted-foreground">Activate the add-on to use API keys and integrations.</p></div></CardContent></Card></div>;
 
   const create = async () => {
     if (!name.trim()) return toast.error("Give the API key a name");
@@ -165,7 +167,7 @@ function IntegrationsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">API & Integrations</h1>
         <p className="text-sm text-muted-foreground">
-          API Access is an optional paid add-on, billed separately from your AssetFlow plan. It provides tenant-scoped API keys and external system integrations.
+          Optional add-on for API keys and integrations.
         </p>
       </div>
 
@@ -309,7 +311,7 @@ function IntegrationsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Key name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. PesaPal ERP integration" />
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. ERP integration" />
             </div>
             <div className="space-y-2">
               <Label>Key type</Label>
