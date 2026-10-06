@@ -12,7 +12,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Search, Package, ScanLine, Archive, AlertCircle, FilterX, Trash2, Download, Upload, Send, Eye, ArrowRightLeft, Wrench, ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { Plus, Pencil, Search, Package, ScanLine, Archive, AlertCircle, FilterX, Trash2, Download, Upload, Send, Eye, ArrowRightLeft, Wrench, ChevronLeft, ChevronRight, Check, MapPin, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { ScannerDialog } from "@/components/scanner-dialog";
 import { AssetDetailTabs } from "@/components/asset-detail-tabs";
@@ -20,6 +20,7 @@ import { formatUGX } from "@/lib/utils";
 import { submitApproval } from "@/lib/approvals";
 import { downloadTemplate, importAssetsFromFile } from "@/lib/bulk-import";
 import { AssetLocationFields } from "@/components/asset-location-fields";
+import { GeoHierarchyFilter, type GeoHierarchyPlace } from "@/components/geo-hierarchy-filter";
 
 export const Route = createFileRoute("/_app/assets")({
   component: AssetsPage,
@@ -109,6 +110,8 @@ function AssetsPage() {
   const [fGeo, setFGeo] = useState("");
   const [fStatus, setFStatus] = useState("");
   const [fDept, setFDept] = useState("");
+  const [locationFiltersOpen, setLocationFiltersOpen] = useState(false);
+  const [geoSelection, setGeoSelection] = useState<GeoHierarchyPlace|null>(null);
 
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -145,14 +148,14 @@ function AssetsPage() {
   });
   const { data: locations = [] } = useQuery({
     queryKey: ["locations-list"],
-    queryFn: async () => (await (supabase as any).from("locations").select("id,name,is_active,branch_id,geo_place_id,location_type,is_structured").eq("is_active", true).order("name")).data ?? [],
+    queryFn: async () => (await (supabase as any).from("locations").select("id,name,is_active,branch_id,geo_place_id,location_type,is_structured,parent_id").eq("is_active", true).order("name")).data ?? [],
   });
   const { data: selectedGeo } = useQuery({
     queryKey: ["selected-geo-filter", search.geo],
     enabled: !!search.geo,
     queryFn: async () => {
       const { data, error } = await (supabase as any).from("geo_places")
-        .select("geoname_id,name,display_path")
+        .select("geoname_id,name,display_path,feature_class,feature_code,admin_level,parent_geoname_id,country_code")
         .eq("geoname_id", Number(search.geo))
         .maybeSingle();
       if (error) throw error;
@@ -190,6 +193,17 @@ function AssetsPage() {
     enabled: !!tenantId,
     queryFn: async () => (await (supabase as any).from("tenant_location_settings").select("*").eq("tenant_id", tenantId).maybeSingle()).data,
   });
+  const { data: geoCountries = [] } = useQuery({
+    queryKey: ["asset-filter-geo-countries"],
+    queryFn: async () => (await (supabase as any).from("geo_countries").select("code,name").eq("enabled",true).order("name")).data ?? [],
+  });
+  const assetFilterCountries = useMemo(()=>{
+    const allowed=(locationSettings as any)?.allowed_country_codes as string[]|undefined;
+    const fallback=(locationSettings as any)?.default_country_code as string|undefined;
+    if(allowed?.length) return (geoCountries as any[]).filter((c:any)=>allowed.includes(c.code));
+    if(fallback) return (geoCountries as any[]).filter((c:any)=>c.code===fallback);
+    return geoCountries as any[];
+  },[geoCountries,locationSettings]);
   // Pull current assignments (latest per asset) for custodian/department display & filters
   const { data: assignments = [] } = useQuery({
     queryKey: ["asset-assignments-current"],
@@ -208,11 +222,32 @@ function AssetsPage() {
     if (search.geo) setFGeo(search.geo);
     if (search.branch) setFBranch(search.branch);
   }, [search.location, search.geo, search.branch]);
+  useEffect(() => {
+    if (selectedGeo) setGeoSelection(selectedGeo as GeoHierarchyPlace);
+    if (search.location || search.geo) setLocationFiltersOpen(true);
+  }, [selectedGeo, search.location, search.geo]);
 
   const visibleBranches = useMemo(
     () => (branches as any[]).filter((b) => canSeeBranch(b.id)),
     [branches, canSeeBranch],
   );
+
+  const visibleOrganisationLocations = useMemo(
+    () => (locations as any[]).filter((l:any)=>!fBranch || !l.branch_id || l.branch_id===fBranch),
+    [locations,fBranch],
+  );
+  const organisationLocationLabel = (loc:any) => {
+    const byId = new Map((locations as any[]).map((x:any)=>[x.id,x]));
+    const names:string[]=[];
+    let current:any=loc;
+    const seen=new Set<string>();
+    while(current && !seen.has(current.id)){
+      seen.add(current.id);
+      names.unshift(current.name);
+      current=current.parent_id ? byId.get(current.parent_id) : null;
+    }
+    return names.join(" / ");
+  };
 
   const enriched = useMemo(() => (assets as any[])
     .filter((a) => canSeeBranch(a.branch_id))
@@ -247,7 +282,7 @@ function AssetsPage() {
   });
 
   const clearFilters = () => {
-    setQ(""); setFBranch(""); setFCategory(""); setFLocation(""); setFGeo(""); setFStatus(""); setFDept("");
+    setQ(""); setFBranch(""); setFCategory(""); setFLocation(""); setFGeo(""); setFStatus(""); setFDept(""); setGeoSelection(null);
     nav({ to: "/assets", search: {} as any, replace: true });
   };
 
@@ -881,7 +916,7 @@ function AssetsPage() {
       )}
 
       <Card className="p-4">
-        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-7">
+        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
           <div className="relative md:col-span-3 lg:col-span-2">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input placeholder="Search name, tag, serial, custodian…" className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -900,23 +935,6 @@ function AssetsPage() {
               {categories.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={fLocation || "all"} onValueChange={(v) => setFLocation(v === "all" ? "" : v)}>
-            <SelectTrigger><SelectValue placeholder="Location" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All locations</SelectItem>
-              {locations.map((l: any) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={fGeo || "all"} onValueChange={(v) => {
-            setFGeo(v === "all" ? "" : v);
-            if (v === "all") nav({ to: "/assets", search: { ...search, geo: undefined } as any, replace: true });
-          }}>
-            <SelectTrigger><SelectValue placeholder="Geographic area" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All geographic areas</SelectItem>
-              {selectedGeo && fGeo && <SelectItem value={fGeo}>{(selectedGeo as any).name}</SelectItem>}
-            </SelectContent>
-          </Select>
           <Select value={fStatus || "all"} onValueChange={(v) => setFStatus(v === "all" ? "" : v)}>
             <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
             <SelectContent>
@@ -924,11 +942,83 @@ function AssetsPage() {
               {Object.entries(STATUS_LABEL).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
             </SelectContent>
           </Select>
+          <Button
+            type="button"
+            variant={fLocation || fGeo ? "secondary" : "outline"}
+            className="justify-start"
+            onClick={()=>setLocationFiltersOpen(v=>!v)}
+          >
+            <MapPin className="mr-2 h-4 w-4"/>
+            {fLocation || fGeo ? "Location filtered" : "Filter location"}
+            <SlidersHorizontal className="ml-auto h-4 w-4"/>
+          </Button>
           <div className="flex gap-2 md:col-span-3 lg:col-span-2">
             <Input placeholder="Department…" value={fDept} onChange={(e) => setFDept(e.target.value)} />
             <Button variant="outline" size="icon" onClick={clearFilters} title="Clear filters"><FilterX className="h-4 w-4" /></Button>
           </div>
         </div>
+
+        {locationFiltersOpen && (
+          <div className="mt-4 rounded-xl border bg-muted/20 p-4">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold">Location filters</p>
+                <p className="text-xs text-muted-foreground">Filter by your organisation structure, geography, or both.</p>
+              </div>
+              {(fLocation || fGeo) && (
+                <Button size="sm" variant="ghost" onClick={()=>{
+                  setFLocation(""); setFGeo(""); setGeoSelection(null);
+                  nav({to:"/assets",search:{...search,location:undefined,geo:undefined} as any,replace:true});
+                }}>
+                  <FilterX className="mr-2 h-4 w-4"/>Clear location
+                </Button>
+              )}
+            </div>
+
+            <div className="grid gap-5 lg:grid-cols-2">
+              {visibleOrganisationLocations.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Organisation location</Label>
+                  <Select value={fLocation || "all"} onValueChange={(v)=>{
+                    const next=v==="all"?"":v;
+                    setFLocation(next);
+                    nav({to:"/assets",search:{...search,location:next||undefined} as any,replace:true});
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="All organisation locations"/></SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      <SelectItem value="all">All organisation locations</SelectItem>
+                      {visibleOrganisationLocations.map((l:any)=>(
+                        <SelectItem key={l.id} value={l.id}>{organisationLocationLabel(l)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Selecting a parent includes its floors, rooms, offices and stores.</p>
+                </div>
+              )}
+
+              {["geographic","hybrid"].includes((locationSettings as any)?.location_mode) && (
+                <div className={visibleOrganisationLocations.length ? "" : "lg:col-span-2"}>
+                  <GeoHierarchyFilter
+                    countries={assetFilterCountries as any[]}
+                    value={(geoSelection || selectedGeo || null) as GeoHierarchyPlace|null}
+                    initialCountry={(locationSettings as any)?.default_country_code || undefined}
+                    onChange={(place)=>{
+                      setGeoSelection(place);
+                      const id=place ? String(place.geoname_id) : "";
+                      setFGeo(id);
+                      nav({to:"/assets",search:{...search,geo:id||undefined} as any,replace:true});
+                    }}
+                    compact
+                  />
+                </div>
+              )}
+
+              {visibleOrganisationLocations.length === 0 && !["geographic","hybrid"].includes((locationSettings as any)?.location_mode) && (
+                <p className="text-sm text-muted-foreground">No location filters are configured for this organisation.</p>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="mt-4 overflow-x-auto">
           {isLoading ? (
