@@ -23,7 +23,14 @@ import { AssetLocationFields } from "@/components/asset-location-fields";
 
 export const Route = createFileRoute("/_app/assets")({
   component: AssetsPage,
-  validateSearch: (s: Record<string, unknown>) => ({ focus: typeof s.focus === "string" ? s.focus : undefined }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    focus: typeof s.focus === "string" ? s.focus : undefined,
+    location: typeof s.location === "string" ? s.location : undefined,
+    geo: typeof s.geo === "string" ? s.geo : undefined,
+    branch: typeof s.branch === "string" ? s.branch : undefined,
+    located: s.located === "1" ? "1" : undefined,
+    unlocated: s.unlocated === "1" ? "1" : undefined,
+  }),
 });
 
 type Status = "in_use" | "in_storage" | "under_repair" | "retired" | "missing" | "disposed";
@@ -99,6 +106,7 @@ function AssetsPage() {
   const [fBranch, setFBranch] = useState("");
   const [fCategory, setFCategory] = useState("");
   const [fLocation, setFLocation] = useState("");
+  const [fGeo, setFGeo] = useState("");
   const [fStatus, setFStatus] = useState("");
   const [fDept, setFDept] = useState("");
 
@@ -125,7 +133,7 @@ function AssetsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("assets")
-        .select("*, categories(name), locations(name), branches(name,code)")
+        .select("*, categories(name), locations(name,parent_id), branches(name,code), geo_places!assets_geo_place_id_fkey(geoname_id,name,display_path)")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -139,6 +147,19 @@ function AssetsPage() {
     queryKey: ["locations-list"],
     queryFn: async () => (await (supabase as any).from("locations").select("id,name,is_active,branch_id,geo_place_id,location_type,is_structured").eq("is_active", true).order("name")).data ?? [],
   });
+  const { data: selectedGeo } = useQuery({
+    queryKey: ["selected-geo-filter", search.geo],
+    enabled: !!search.geo,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("geo_places")
+        .select("geoname_id,name,display_path")
+        .eq("geoname_id", Number(search.geo))
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const { data: branches = [] } = useQuery({
     queryKey: ["branches-active"],
     queryFn: async () => (await supabase.from("branches").select("id,name,code,is_active").eq("is_active", true).order("name")).data ?? [],
@@ -161,6 +182,12 @@ function AssetsPage() {
     return m;
   }, [assignments]);
 
+  useEffect(() => {
+    if (search.location) setFLocation(search.location);
+    if (search.geo) setFGeo(search.geo);
+    if (search.branch) setFBranch(search.branch);
+  }, [search.location, search.geo, search.branch]);
+
   const visibleBranches = useMemo(
     () => (branches as any[]).filter((b) => canSeeBranch(b.id)),
     [branches, canSeeBranch],
@@ -177,19 +204,31 @@ function AssetsPage() {
   const filtered = enriched.filter((a) => {
     if (q) {
       const needle = q.toLowerCase();
-      const hit = [a.name, a.asset_tag, a.serial_number, a.custodian, a.department]
+      const hit = [a.name, a.asset_tag, a.serial_number, a.custodian, a.department, a.locations?.name, a.geo_places?.name, a.geo_places?.display_path]
         .some((v) => (v ?? "").toString().toLowerCase().includes(needle));
       if (!hit) return false;
     }
     if (fBranch && a.branch_id !== fBranch) return false;
     if (fCategory && a.category_id !== fCategory) return false;
     if (fLocation && a.location_id !== fLocation) return false;
+    if (fGeo) {
+      const targetPath = (selectedGeo as any)?.display_path;
+      const assetPath = a.geo_places?.display_path;
+      const exact = String(a.geo_place_id ?? "") === fGeo;
+      const descendant = targetPath && assetPath ? String(assetPath).includes(String(targetPath)) : false;
+      if (!exact && !descendant) return false;
+    }
+    if (search.located === "1" && !a.location_id && !a.geo_place_id) return false;
+    if (search.unlocated === "1" && (a.location_id || a.geo_place_id)) return false;
     if (fStatus && a.status !== fStatus) return false;
     if (fDept && !(a.department ?? "").toLowerCase().includes(fDept.toLowerCase())) return false;
     return true;
   });
 
-  const clearFilters = () => { setQ(""); setFBranch(""); setFCategory(""); setFLocation(""); setFStatus(""); setFDept(""); };
+  const clearFilters = () => {
+    setQ(""); setFBranch(""); setFCategory(""); setFLocation(""); setFGeo(""); setFStatus(""); setFDept("");
+    nav({ to: "/assets", search: {} as any, replace: true });
+  };
 
   const openNew = () => { setForm(empty); setWizardStep(0); setFinancialOpen(false); setOpen(true); };
   const openEdit = (a: any) => {
@@ -803,8 +842,25 @@ function AssetsPage() {
         </div>
       </div>
 
+      {(search.location || search.geo || search.located || search.unlocated || search.branch) && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-primary/5 px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold">
+              {search.unlocated === "1" ? "Assets without a location" :
+               search.located === "1" ? "Assets with a location" :
+               search.geo ? `Assets in ${(selectedGeo as any)?.name || "selected geographic area"}` :
+               search.location ? `Assets in ${(locations as any[]).find((l:any)=>l.id===search.location)?.name || "selected location"}` :
+               search.branch ? `Assets in ${(branches as any[]).find((b:any)=>b.id===search.branch)?.name || "selected branch"}` :
+               "Filtered assets"}
+            </p>
+            <p className="text-xs text-muted-foreground">{filtered.length} matching asset{filtered.length === 1 ? "" : "s"}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={clearFilters}><FilterX className="mr-2 h-4 w-4"/>Clear location filter</Button>
+        </div>
+      )}
+
       <Card className="p-4">
-        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-7">
           <div className="relative md:col-span-3 lg:col-span-2">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input placeholder="Search name, tag, serial, custodian…" className="pl-9" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -828,6 +884,16 @@ function AssetsPage() {
             <SelectContent>
               <SelectItem value="all">All locations</SelectItem>
               {locations.map((l: any) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={fGeo || "all"} onValueChange={(v) => {
+            setFGeo(v === "all" ? "" : v);
+            if (v === "all") nav({ to: "/assets", search: { ...search, geo: undefined } as any, replace: true });
+          }}>
+            <SelectTrigger><SelectValue placeholder="Geographic area" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All geographic areas</SelectItem>
+              {selectedGeo && fGeo && <SelectItem value={fGeo}>{(selectedGeo as any).name}</SelectItem>}
             </SelectContent>
           </Select>
           <Select value={fStatus || "all"} onValueChange={(v) => setFStatus(v === "all" ? "" : v)}>
