@@ -67,6 +67,14 @@ export function AssetLocationFields({
     [locations, value.branch_id],
   );
 
+  const exactPlaceOptions = useMemo(
+    () => eligibleLocations.filter((l:any) =>
+      (value.geo_place_id && Number(l.geo_place_id) === Number(value.geo_place_id)) ||
+      l.id === value.location_id
+    ),
+    [eligibleLocations, value.geo_place_id, value.location_id],
+  );
+
   useEffect(() => {
     if (!settings) return;
     const allowed = allowedCountryCodes;
@@ -257,12 +265,46 @@ export function AssetLocationFields({
             )}
 
             {selectedCountry ? (
-              <GeoCascadeSelector
-                countryCode={selectedCountry}
-                value={value.geo_place_id}
-                required={!!settings?.require_geography}
-                onChange={(place) => patch({ geo_place_id: place ? Number(place.geoname_id) : null })}
-              />
+              <>
+                <GeoCascadeSelector
+                  countryCode={selectedCountry}
+                  value={value.geo_place_id}
+                  required={!!settings?.require_geography}
+                  onChange={(place) => patch({
+                    geo_place_id: place ? Number(place.geoname_id) : null,
+                    location_id: value.location_id && locations.find((l:any)=>l.id===value.location_id)?.geo_place_id === place?.geoname_id
+                      ? value.location_id
+                      : null,
+                  })}
+                />
+
+                {(settings?.allow_custom_area || settings?.allow_inline_location_create) && value.geo_place_id && (
+                  <div className="rounded-lg border bg-background p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <div>
+                        <Label>Exact organisation place <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          Use your own known site, office, building, room, store or client location.
+                        </p>
+                      </div>
+                      {settings?.allow_inline_location_create && (
+                        <Button type="button" size="sm" variant="outline" onClick={() => setQuickOpen(true)}>
+                          <Plus className="mr-1 h-4 w-4" /> Add place
+                        </Button>
+                      )}
+                    </div>
+                    <Select value={value.location_id || "none"} onValueChange={(v)=>chooseLocation(v==="none"?null:v)}>
+                      <SelectTrigger><SelectValue placeholder="No exact place selected" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Use geographic area only</SelectItem>
+                        {exactPlaceOptions.map((l:any)=>(
+                          <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </>
             ) : (
               <p className="rounded-lg border bg-background p-3 text-sm text-muted-foreground">
                 Location countries are not configured for this organisation. Ask an administrator to complete Asset Location Setup.
@@ -288,9 +330,9 @@ export function AssetLocationFields({
 
       <Dialog open={quickOpen} onOpenChange={setQuickOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add organisation location</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Add exact organisation place</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-2"><Label>Name</Label><Input value={quickName} onChange={(e) => setQuickName(e.target.value)} placeholder="e.g. Finance Store, Floor 2, Client Site" /></div>
+            <div className="space-y-2"><Label>Name</Label><Input value={quickName} onChange={(e) => setQuickName(e.target.value)} placeholder="e.g. Kaazi Beach Resort, Finance Store, Floor 2, Client Site" /></div>
             <div className="space-y-2">
               <Label>Type</Label>
               <Select value={quickType} onValueChange={setQuickType}>
