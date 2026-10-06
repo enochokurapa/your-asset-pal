@@ -70,12 +70,12 @@ export function GeoCascadeSelector({
   const {data:adminAreas=[]}=useQuery({
     queryKey:["geo-admin-options",countryCode,config.level],
     queryFn:async()=>{
-      const {data,error}=await (supabase as any).from("geo_places")
+      let q=(supabase as any).from("geo_places")
         .select("geoname_id,name,display_path,feature_class,feature_code,admin_level,admin1_code,admin2_code,admin3_code,admin4_code,latitude,longitude,population,parent_geoname_id")
         .eq("country_code",countryCode)
-        .eq("feature_code",`ADM${config.level}`)
-        .order("name")
-        .limit(1000);
+        .eq("feature_code",`ADM${config.level}`);
+      if(countryCode==="UG") q=q.eq("source","UBOS NPHC 2024");
+      const {data,error}=await q.order("name").limit(1000);
       if(error) throw error;
       return (data??[]) as GeoPlace[];
     }
@@ -117,22 +117,22 @@ export function GeoCascadeSelector({
 
   const {data:level1Children=[]}=useQuery({
     queryKey:["geo-child-options",level1Parent?.geoname_id],
-    enabled:!!level1Parent,
+    enabled:!!level1Parent && countryCode!=="UG",
     queryFn:()=>fetchChildren(level1Parent!.geoname_id),
   });
   const {data:level2Children=[]}=useQuery({
     queryKey:["geo-child-options",level2Parent?.geoname_id],
-    enabled:!!level2Parent,
+    enabled:!!level2Parent && countryCode!=="UG",
     queryFn:()=>fetchChildren(level2Parent!.geoname_id),
   });
   const {data:level3Children=[]}=useQuery({
     queryKey:["geo-child-options",level3Parent?.geoname_id],
-    enabled:!!level3Parent,
+    enabled:!!level3Parent && countryCode!=="UG",
     queryFn:()=>fetchChildren(level3Parent!.geoname_id),
   });
   const {data:level4Children=[]}=useQuery({
     queryKey:["geo-child-options",level4Parent?.geoname_id],
-    enabled:!!level4Parent,
+    enabled:!!level4Parent && countryCode!=="UG",
     queryFn:()=>fetchChildren(level4Parent!.geoname_id),
   });
 
