@@ -238,3 +238,144 @@
     animation: none !important;
   }
 }
+
+
+/* Scroll reveal motion */
+.af-scroll-reveal {
+  opacity: 0;
+  transform: translate3d(0, 38px, 0) scale(.985);
+  filter: blur(7px);
+  transition:
+    opacity .85s cubic-bezier(.22,1,.36,1),
+    transform .9s cubic-bezier(.22,1,.36,1),
+    filter .75s ease;
+  will-change: opacity, transform, filter;
+}
+
+.af-scroll-reveal[data-reveal="left"] {
+  transform: translate3d(-56px, 18px, 0) scale(.985);
+}
+
+.af-scroll-reveal[data-reveal="right"] {
+  transform: translate3d(56px, 18px, 0) scale(.985);
+}
+
+.af-scroll-reveal[data-reveal="zoom"] {
+  transform: translate3d(0, 24px, 0) scale(.955);
+}
+
+.af-scroll-reveal[data-reveal="hero"] {
+  opacity: 1;
+  filter: none;
+  transform: none;
+}
+
+.af-scroll-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+  filter: blur(0);
+}
+
+.af-scroll-copy,
+.af-scroll-visual {
+  opacity: 0;
+  transition:
+    opacity .8s cubic-bezier(.22,1,.36,1),
+    transform .95s cubic-bezier(.22,1,.36,1);
+}
+
+.af-scroll-copy {
+  transform: translate3d(-34px, 16px, 0);
+}
+
+.af-scroll-visual {
+  transform: translate3d(34px, 16px, 0) scale(.97);
+  transition-delay: .12s;
+}
+
+[data-scroll-reveal].is-visible .af-scroll-copy,
+[data-scroll-reveal].is-visible .af-scroll-visual {
+  opacity: 1;
+  transform: none;
+}
+
+.af-stagger > * {
+  opacity: 0;
+  transform: translate3d(0, 24px, 0) scale(.985);
+  transition:
+    opacity .6s cubic-bezier(.22,1,.36,1),
+    transform .7s cubic-bezier(.22,1,.36,1),
+    box-shadow .25s ease,
+    border-color .25s ease;
+}
+
+.af-scroll-reveal.is-visible .af-stagger > *:nth-child(1) { transition-delay: .06s; }
+.af-scroll-reveal.is-visible .af-stagger > *:nth-child(2) { transition-delay: .12s; }
+.af-scroll-reveal.is-visible .af-stagger > *:nth-child(3) { transition-delay: .18s; }
+.af-scroll-reveal.is-visible .af-stagger > *:nth-child(4) { transition-delay: .24s; }
+.af-scroll-reveal.is-visible .af-stagger > *:nth-child(5) { transition-delay: .30s; }
+.af-scroll-reveal.is-visible .af-stagger > *:nth-child(6) { transition-delay: .36s; }
+.af-scroll-reveal.is-visible .af-stagger > * {
+  opacity: 1;
+  transform: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .af-stagger > *:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 18px 50px -28px rgb(0 0 0 / .28);
+  }
+}
+
+/* Auth entrance sequence */
+@keyframes af-auth-logo-in {
+  from { opacity: 0; transform: translateY(-12px) scale(.97); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes af-auth-item-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+.af-auth-logo {
+  animation: af-auth-logo-in .6s cubic-bezier(.22,1,.36,1) both;
+}
+
+.af-auth-back {
+  animation: af-auth-logo-in .5s .06s cubic-bezier(.22,1,.36,1) both;
+}
+
+.af-auth-card {
+  animation: af-panel-in .6s .08s cubic-bezier(.22,1,.36,1) both;
+}
+
+.af-auth-card form > *,
+.af-auth-card > div,
+.af-auth-card > p {
+  animation: af-auth-item-in .5s cubic-bezier(.22,1,.36,1) both;
+}
+
+.af-auth-card form > *:nth-child(1) { animation-delay: .18s; }
+.af-auth-card form > *:nth-child(2) { animation-delay: .24s; }
+.af-auth-card form > *:nth-child(3) { animation-delay: .30s; }
+.af-auth-card form > *:nth-child(4) { animation-delay: .36s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .af-scroll-reveal,
+  .af-scroll-copy,
+  .af-scroll-visual,
+  .af-stagger > *,
+  .af-auth-logo,
+  .af-auth-back,
+  .af-auth-card,
+  .af-auth-card form > *,
+  .af-auth-card > div,
+  .af-auth-card > p {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+}
