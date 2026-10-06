@@ -136,7 +136,7 @@ function AssetsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("assets")
-        .select("*, categories(name), locations(name,parent_id), branches(name,code), geo_places!assets_geo_place_id_fkey(geoname_id,name,display_path)")
+        .select("*, categories(name), locations(name,parent_id), branches(name,code), geo_places!assets_geo_place_id_fkey(geoname_id,name,display_path,country_code)")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -198,12 +198,17 @@ function AssetsPage() {
     queryFn: async () => (await (supabase as any).from("geo_countries").select("code,name").eq("enabled",true).order("name")).data ?? [],
   });
   const assetFilterCountries = useMemo(()=>{
+    const codes=new Set<string>();
     const allowed=(locationSettings as any)?.allowed_country_codes as string[]|undefined;
     const fallback=(locationSettings as any)?.default_country_code as string|undefined;
-    if(allowed?.length) return (geoCountries as any[]).filter((c:any)=>allowed.includes(c.code));
-    if(fallback) return (geoCountries as any[]).filter((c:any)=>c.code===fallback);
-    return geoCountries as any[];
-  },[geoCountries,locationSettings]);
+    for(const code of allowed ?? []) codes.add(code);
+    if(fallback) codes.add(fallback);
+    for(const asset of assets as any[]) {
+      if(asset.geo_places?.country_code) codes.add(asset.geo_places.country_code);
+    }
+    if(!codes.size) return geoCountries as any[];
+    return (geoCountries as any[]).filter((c:any)=>codes.has(c.code));
+  },[geoCountries,locationSettings,assets]);
   // Pull current assignments (latest per asset) for custodian/department display & filters
   const { data: assignments = [] } = useQuery({
     queryKey: ["asset-assignments-current"],
