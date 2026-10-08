@@ -428,7 +428,9 @@ export const updateTenantSubscription = createServerFn({ method: "POST" })
       const { data: settings, error: settingsError } = await admin.from("saas_settings")
         .select("trial_days").eq("id", true).single();
       if (settingsError || !settings) throw new Error(settingsError?.message || "Trial policy is not configured");
-      const trialDays = Number(settings.trial_days);
+      const { data: tenantOverrides, error: overrideError } = await admin.from("tenants").select("trial_days_override").eq("id", data.tenant_id).single();
+      if (overrideError) throw new Error(overrideError.message);
+      const trialDays = Number(tenantOverrides?.trial_days_override ?? settings.trial_days);
       if (!Number.isInteger(trialDays) || trialDays < 1) throw new Error("Trial policy is not configured");
       const startedAt = new Date();
       patch.trial_started_at = startedAt.toISOString();
@@ -439,6 +441,41 @@ export const updateTenantSubscription = createServerFn({ method: "POST" })
     const { error } = await admin.from("tenants").update(patch).eq("id", data.tenant_id);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+export const updateTenantControls = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(input => z.object({
+    tenant_id: z.string().uuid(),
+    trial_days_override: z.number().int().min(1).max(3650).nullable(),
+    trial_user_limit_override: z.number().int().min(1).max(100000).nullable(),
+    paid_price_override: z.number().finite().min(0).max(100000000000).nullable(),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertSaasAdmin(context.userId);
+    const { data: before, error: lookupError } = await admin.from("tenants")
+      .select("id,subscription_status,trial_started_at,trial_ends_at,created_at")
+      .eq("id", data.tenant_id).single();
+    if (lookupError || !before) throw new Error(lookupError?.message || "Business not found");
+    const { data: globalPolicy, error: policyError } = await admin.from("saas_settings")
+      .select("trial_days").eq("id", true).single();
+    if (policyError || !globalPolicy) throw new Error("Global trial policy unavailable");
+    const days = data.trial_days_override ?? Number(globalPolicy.trial_days);
+    const patch: Record<string, unknown> = {
+      trial_days_override: data.trial_days_override,
+      trial_user_limit_override: data.trial_user_limit_override,
+      paid_price_override: data.paid_price_override,
+      updated_at: new Date().toISOString(),
+    };
+    // Keep the original trial start; changing the duration is not a trial restart.
+    if (before.subscription_status === "trial") {
+      const started = before.trial_started_at ?? before.created_at;
+      if (!started) throw new Error("Trial start date is missing");
+      patch.trial_ends_at = new Date(new Date(started).getTime() + days * 86400000).toISOString();
+    }
+    const { error } = await admin.from("tenants").update(patch).eq("id",data.tenant_id);
+    if (error) throw new Error(error.message);
+    return {ok:true};
   });
 
 export const listSaasTenants = createServerFn({ method: "GET" })
