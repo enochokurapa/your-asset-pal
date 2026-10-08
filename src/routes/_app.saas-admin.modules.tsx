@@ -28,11 +28,14 @@ function SaasAdminModulesPage() {
     return fn({ ...arg, headers });
   };
 
-  const { data: modules = [], refetch, isLoading, error } = useQuery({
+  const { data: moduleResponse, refetch, isLoading, error } = useQuery({
     queryKey: ["saas-admin-modules"],
     queryFn: () => authCall(listModules),
     enabled: isSaasAdmin,
   });
+
+  const modules = Array.isArray(moduleResponse) ? moduleResponse : [];
+  const responseError = !isLoading && moduleResponse != null && !Array.isArray(moduleResponse);
 
   useEffect(() => {
     setPrices(Object.fromEntries(modules.filter((m: any) => m.billing_model === "add_on").map((m: any) => [m.module_key, String(m.add_on_price ?? "")])));
@@ -71,9 +74,9 @@ function SaasAdminModulesPage() {
         </div>
       </div>
 
-      {error && (
+      {(error || responseError) && (
         <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-          {(error as Error).message || "Modules could not be loaded."}
+          {error ? (error as Error).message : "Unexpected modules response. Please refresh or check the server."}
         </div>
       )}
 
