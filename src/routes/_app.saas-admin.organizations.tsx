@@ -70,9 +70,10 @@ function SaasAdminOrganizationsPage() {
     enabled: isSaasAdmin,
   });
 
-  const tenants = dashboardQuery.data?.tenants ?? [];
+  const tenants = Array.isArray(dashboardQuery.data?.tenants) ? dashboardQuery.data.tenants : [];
   useEffect(() => {
-    if (!selectedTenantId && tenants.length) setSelectedTenantId(tenants[0].id);
+    if (!tenants.length) { setSelectedTenantId(null); return; }
+    if (!selectedTenantId || !tenants.some((item: any) => item.id === selectedTenantId)) setSelectedTenantId(tenants[0].id);
   }, [selectedTenantId, tenants]);
 
   const detailQuery = useQuery({
@@ -176,6 +177,8 @@ function SaasAdminOrganizationsPage() {
         </Button>
       </div>
 
+      {dashboardQuery.error && <Card className="border-destructive/40 p-4 text-sm text-destructive" role="alert">Businesses could not be loaded: {(dashboardQuery.error as Error).message} <Button variant="outline" size="sm" className="ml-3" onClick={() => dashboardQuery.refetch()}>Retry</Button></Card>}
+      {dashboardQuery.isLoading && <p className="text-sm text-muted-foreground">Loading businesses…</p>}
       <div className="grid gap-5 xl:grid-cols-[330px_1fr]">
         <Card className="h-fit overflow-hidden">
           <div className="border-b p-4">
@@ -207,7 +210,7 @@ function SaasAdminOrganizationsPage() {
                 </button>
               );
             })}
-            {!filteredTenants.length && <p className="p-4 text-sm text-muted-foreground">No businesses match your search.</p>}
+            {!dashboardQuery.isLoading && !dashboardQuery.error && !filteredTenants.length && <p className="p-4 text-sm text-muted-foreground">{search ? "No businesses match your search." : "No registered businesses were returned."}</p>}
           </div>
         </Card>
 
