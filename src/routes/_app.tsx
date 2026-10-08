@@ -110,7 +110,9 @@ function AppLayout() {
   if (!isSaasAdmin && currentNavItem?.tenantAdminOnly && !isTenantAdmin) return <Navigate to="/dashboard" />;
   if (!isSaasAdmin && currentNavItem?.adminOnly && !isAdmin) return <Navigate to="/dashboard" />;
 
+  const builderKeys: ModuleKey[] = ["register_builder", "report_builder", "form_builder", "dashboard_builder", "document_builder"];
   const visibleTenantNav = tenantNav.filter((n) => {
+    if (n.to === "/builders" && !builderKeys.some(k => canView(k) || isPaidFeature(k) || isAddOnFeature(k))) return false;
     if (n.tenantAdminOnly && !isTenantAdmin) return false;
     if (n.adminOnly && !isAdmin) return false;
     if (n.module && !canView(n.module) && !isPaidFeature(n.module) && !isAddOnFeature(n.module)) return false;
