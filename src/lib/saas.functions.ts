@@ -477,14 +477,15 @@ export const getSaasAdminDashboard = createServerFn({ method: "GET" })
       admin.from("saas_settings").select("trial_days,trial_user_limit,paid_price,currency,backup_enabled,backup_interval_hours").eq("id", true).single(),
     ]);
 
-    for (const result of [
-      tenantsResult, profilesResult, assetsResult, branchesResult,
-      transactionsResult, domainsResult, auditResult,
-    ]) {
-      if (result.error) throw new Error(result.error.message);
-    }
-    if (settingsResult.error || !settingsResult.data) {
-      throw new Error(settingsResult.error?.message || "Global SaaS settings are not configured");
+    // Tenant enumeration is essential; secondary analytics must never hide businesses.
+    if (tenantsResult.error) throw new Error(tenantsResult.error.message);
+    for (const [name, result] of [
+      ["profiles", profilesResult], ["assets", assetsResult],
+      ["branches", branchesResult], ["billing", transactionsResult],
+      ["domains", domainsResult], ["audit", auditResult],
+      ["settings", settingsResult],
+    ] as const) {
+      if (result.error) console.error("SaaS dashboard optional query failed:", name, result.error.message);
     }
 
     const tenants = tenantsResult.data ?? [];
@@ -581,10 +582,10 @@ export const getSaasAdminDashboard = createServerFn({ method: "GET" })
       },
       tenants: tenantStats,
       policy: {
-        trialDays: Number(settingsResult.data.trial_days),
-        trialUserLimit: Number(settingsResult.data.trial_user_limit),
-        paidPrice: Number(settingsResult.data.paid_price),
-        currency: String(settingsResult.data.currency || "").toUpperCase(),
+        trialDays: Number(settingsResult.data?.trial_days ?? 14),
+        trialUserLimit: Number(settingsResult.data?.trial_user_limit ?? 5),
+        paidPrice: Number(settingsResult.data?.paid_price ?? 0),
+        currency: String(settingsResult.data?.currency || "").toUpperCase(),
       },
       technical: {
         database: "operational",
@@ -598,8 +599,8 @@ export const getSaasAdminDashboard = createServerFn({ method: "GET" })
           process.env.R2_SECRET_ACCESS_KEY &&
           process.env.R2_BUCKET
         ),
-        backupEnabled: Boolean(settingsResult.data.backup_enabled),
-        backupIntervalHours: Number(settingsResult.data.backup_interval_hours || 24),
+        backupEnabled: Boolean(settingsResult.data?.backup_enabled),
+        backupIntervalHours: Number(settingsResult.data?.backup_interval_hours || 24),
       },
     };
   });
