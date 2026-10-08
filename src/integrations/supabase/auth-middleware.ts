@@ -75,20 +75,38 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
       }
     );
 
-    const { data, error } = await supabase.auth.getClaims(token);
-    if (error || !data?.claims) {
-      throw new Response('Unauthorized: Invalid token', { status: 401 });
-    }
-
-    if (!data.claims.sub) {
-      throw new Response('Unauthorized: No user ID found in token', { status: 401 });
+    // Verify the supplied token against GoTrue directly, explicitly passing the
+    // Bearer header. The supabase-js getClaims fallback previously called /user
+    // without forwarding Authorization on this self-hosted deployment.
+    const authBase = process.env.SUPABASE_AUTH_INTERNAL_URL?.trim();
+    const verifyUrl = authBase ? `${authBase.replace(/\\/$/, "")}/user` : `${SUPABASE_URL.replace(/\\/$/, "")}/auth/v1/user`;
+    let verifiedUserId: string;
+    try {
+      const verified = await fetch(verifyUrl, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          apikey: SUPABASE_PUBLISHABLE_KEY,
+        },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!verified.ok) {
+        throw new Response("Unauthorized: Invalid or expired session", { status: 401 });
+      }
+      const verifiedUser = await verified.json() as { id?: string };
+      if (!verifiedUser.id) throw new Response("Unauthorized: No user ID found", { status: 401 });
+      verifiedUserId = verifiedUser.id;
+    } catch (error) {
+      if (error instanceof Response) throw error;
+      console.error("[Supabase] Authentication service unavailable", error);
+      throw new Response("Authentication service unavailable", { status: 503 });
     }
 
     return next({
       context: {
         supabase,
-        userId: data.claims.sub,
-        claims: data.claims,
+        userId: verifiedUserId,
+        claims: { sub: verifiedUserId },
       },
     })
   }
