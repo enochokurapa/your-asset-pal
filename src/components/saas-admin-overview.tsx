@@ -63,8 +63,12 @@ export function SaasAdminOverview() {
       return getDashboard({ headers });
     },
     enabled: isSaasAdmin,
+    retry: 1,
   });
 
+  const hasData = !!data?.summary && Array.isArray(data?.tenants);
+  const unavailable = !hasData || !!error;
+  const metricValue = (value: string | number) => unavailable ? "—" : value;
   const summary = data?.summary;
   const policy = data?.policy;
   const technical = data?.technical;
@@ -88,17 +92,17 @@ export function SaasAdminOverview() {
         </Button>
       </div>
 
-      {error && (
+      {!isLoading && unavailable && (
         <Card className="border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          {(error as Error).message || "The SaaS dashboard could not be loaded."}
+          {error ? (error as Error).message : "SaaS dashboard data is unavailable. No database records have been deleted. Refresh to retry."}
         </Card>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Organizations" value={isLoading ? "-" : summary?.organizations ?? 0} detail={`${summary?.active ?? 0} active · ${summary?.trials ?? 0} trials`} icon={Building2} />
-        <MetricCard label="Business users" value={isLoading ? "-" : summary?.users ?? 0} detail={`${summary?.newWorkspaces30d ?? 0} new workspaces in 30 days`} icon={Users} />
-        <MetricCard label="Managed assets" value={isLoading ? "-" : format(summary?.assets)} detail={`${format(summary?.assetsAdded30d)} added in the last 30 days`} icon={Boxes} />
-        <MetricCard label="Successful billing" value={isLoading ? "-" : `${currency} ${format(summary?.successfulRevenue)}`} detail={`Current paid price: ${currency} ${format(policy?.paidPrice)}`} icon={CircleDollarSign} />
+        <MetricCard label="Organizations" value={metricValue(summary?.organizations ?? 0)} detail={`${summary?.active ?? 0} active · ${summary?.trials ?? 0} trials`} icon={Building2} />
+        <MetricCard label="Business users" value={metricValue(summary?.users ?? 0)} detail={`${summary?.newWorkspaces30d ?? 0} new workspaces in 30 days`} icon={Users} />
+        <MetricCard label="Managed assets" value={metricValue(format(summary?.assets))} detail={`${format(summary?.assetsAdded30d)} added in the last 30 days`} icon={Boxes} />
+        <MetricCard label="Successful billing" value={metricValue(`${currency} ${format(summary?.successfulRevenue)}`)} detail={`Current paid price: ${currency} ${format(policy?.paidPrice)}`} icon={CircleDollarSign} />
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.35fr_.65fr]">
@@ -113,7 +117,9 @@ export function SaasAdminOverview() {
             </Button>
           </div>
 
-          {!data?.tenants?.length ? (
+          {unavailable ? (
+            <p className="p-6 text-sm text-muted-foreground">Business data is not available from the server. Do not assume the database is empty.</p>
+          ) : !data.tenants.length ? (
             <p className="p-6 text-sm text-muted-foreground">No organizations are available yet.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -153,6 +159,7 @@ export function SaasAdminOverview() {
         </Card>
 
         <Card className="p-5">
+          {unavailable && <p className="mb-3 text-sm text-amber-700">Technical status cannot be determined until the dashboard loads.</p>}
           <div className="flex items-start gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><Database className="h-5 w-5" /></span>
             <div>
