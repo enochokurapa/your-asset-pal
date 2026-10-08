@@ -319,7 +319,12 @@ export const getSaasContext = createServerFn({ method: "GET" })
         trialEndsAt: tenant.trial_ends_at,
         subscriptionEndsAt: tenant.subscription_ends_at,
       } : null,
-      settings: parsedSettings,
+      settings: {
+        ...parsedSettings,
+        trialDays: Number(tenant?.trial_days_override ?? parsedSettings.trialDays),
+        trialUserLimit: Number(tenant?.trial_user_limit_override ?? parsedSettings.trialUserLimit),
+        paidPrice: Number(tenant?.paid_price_override ?? parsedSettings.paidPrice),
+      },
       enabledModules,
       addOns: modules.filter((m: any) => m.billing_model === "add_on").map((m: any) => ({
         key: m.module_key,
@@ -879,7 +884,10 @@ export const startYoUpgrade = createServerFn({ method: "POST" })
     const { data: settings, error: settingsError } = await admin.from("saas_settings")
       .select("paid_price,currency").eq("id", true).single();
     if (settingsError || !settings) throw new Error(settingsError?.message || "Global SaaS pricing is not configured");
-    const amount = Number(settings.paid_price);
+    const { data: tenantPricing, error: pricingError } = await admin.from("tenants")
+      .select("paid_price_override").eq("id",p.tenant_id).single();
+    if (pricingError) throw new Error(pricingError.message);
+    const amount = Number(tenantPricing?.paid_price_override ?? settings.paid_price);
     const currency = String(settings.currency || "").toUpperCase();
     if (!Number.isFinite(amount) || amount <= 0) throw new Error("The SaaS Admin has not set a paid-plan price yet");
     if (!currency) throw new Error("The SaaS Admin has not set a billing currency yet");
