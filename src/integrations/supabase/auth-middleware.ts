@@ -79,7 +79,7 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
     // Bearer header. The supabase-js getClaims fallback previously called /user
     // without forwarding Authorization on this self-hosted deployment.
     const authBase = process.env.SUPABASE_AUTH_INTERNAL_URL?.trim();
-    const verifyUrl = authBase ? `${authBase.replace(/\\/$/, "")}/user` : `${SUPABASE_URL.replace(/\\/$/, "")}/auth/v1/user`;
+    const verifyUrl = authBase ? `${authBase.replace(/\/$/, "")}/user` : `${SUPABASE_URL.replace(/\/$/, "")}/auth/v1/user`;
     let verifiedUserId: string;
     try {
       const verified = await fetch(verifyUrl, {
