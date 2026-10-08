@@ -132,7 +132,7 @@ function BuildersPage(){
            </div>
            <p className="text-xs text-muted-foreground">This saves a configuration template; it does not yet change live forms or reports.</p><div className="flex gap-2"><Button onClick={persist} disabled={busy}><Save className="mr-2 h-4 w-4"/>Save configuration</Button>{selected&&<Button variant="outline" onClick={deactivate} disabled={busy}><Archive className="mr-2 h-4 w-4"/>Archive</Button>}</div>
          </div>
-       </div></div>
+       </div></div>}
      </>}
    </Card>
  </div>;
