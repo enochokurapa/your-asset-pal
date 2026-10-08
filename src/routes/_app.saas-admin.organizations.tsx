@@ -8,6 +8,7 @@ import {
   updateSaasTenantName,
   updateTenantModule,
   updateTenantSubscription,
+  updateTenantControls,
   updateSaasTenantUserStatus,
 } from "@/lib/saas.functions";
 import { getServerAuthHeaders } from "@/lib/auth-headers";
@@ -53,6 +54,11 @@ function SaasAdminOrganizationsPage() {
   const saveNameFn = useServerFn(updateSaasTenantName);
   const saveModule = useServerFn(updateTenantModule);
   const saveUserStatus = useServerFn(updateSaasTenantUserStatus);
+  const saveControls = useServerFn(updateTenantControls);
+  const [trialDays,setTrialDays] = useState("");
+  const [seatLimit,setSeatLimit] = useState("");
+  const [priceOverride,setPriceOverride] = useState("");
+  const [savingControls,setSavingControls] = useState(false);
 
   const [search, setSearch] = useState("");
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
@@ -85,6 +91,14 @@ function SaasAdminOrganizationsPage() {
   useEffect(() => {
     if (detailQuery.data?.tenant?.name) setNameDraft(detailQuery.data.tenant.name);
   }, [detailQuery.data?.tenant?.name]);
+
+  useEffect(() => {
+    const t = detailQuery.data?.tenant;
+    if (!t) return;
+    setTrialDays(t.trial_days_override == null ? "" : String(t.trial_days_override));
+    setSeatLimit(t.trial_user_limit_override == null ? "" : String(t.trial_user_limit_override));
+    setPriceOverride(t.paid_price_override == null ? "" : String(t.paid_price_override));
+  },[detailQuery.data?.tenant]);
 
   const filteredTenants = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -134,6 +148,29 @@ function SaasAdminOrganizationsPage() {
     } finally {
       setSavingName(false);
     }
+  };
+
+  const persistControls = async () => {
+    if (!selectedTenantId) return;
+    const optionalInteger = (raw:string,min:number,max:number) => {
+      if (!raw.trim()) return null;
+      const n=Number(raw);
+      if (!Number.isInteger(n) || n<min || n>max) throw new Error(`Enter a whole number between ${min} and ${max}.`);
+      return n;
+    };
+    setSavingControls(true);
+    try {
+      const days=optionalInteger(trialDays,1,3650);
+      const seats=optionalInteger(seatLimit,1,100000);
+      const price=priceOverride.trim()==="" ? null : Number(priceOverride);
+      if (price!==null && (!Number.isFinite(price)||price<0||price>100000000000))
+        throw new Error("Enter a valid non-negative subscription price.");
+      await authCall(saveControls,{data:{tenant_id:selectedTenantId,
+        trial_days_override:days,trial_user_limit_override:seats,paid_price_override:price}});
+      await Promise.all([detailQuery.refetch(),qc.invalidateQueries({queryKey:["saas-admin-dashboard"]})]);
+      toast.success("Business policy updated without changing other businesses.");
+    } catch(e:any) {toast.error(e?.message||"Unable to save business policy");}
+    finally {setSavingControls(false);}
   };
 
   const changeModule = async (moduleKey: string, enabled: boolean | null) => {
@@ -251,6 +288,23 @@ function SaasAdminOrganizationsPage() {
                 <Input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} placeholder="Business name" />
                 <Button onClick={saveName} disabled={savingName || nameDraft.trim() === tenant.name}>{savingName ? "Saving…" : "Save name"}</Button>
               </div>
+            </Card>
+
+            <Card className="p-5 space-y-4">
+              <div>
+                <h3 className="font-semibold">Business-specific controls</h3>
+                <p className="text-sm text-muted-foreground">Leave a field empty to inherit the global setting. Saving a new trial duration recalculates this business’s expiry from its original trial start, without changing other organizations.</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="space-y-2 text-sm"><span className="font-medium">Trial duration (days)</span>
+                  <Input type="number" min="1" max="3650" step="1" value={trialDays} placeholder="Global default" onChange={e=>setTrialDays(e.target.value)}/></label>
+                <label className="space-y-2 text-sm"><span className="font-medium">Trial user limit</span>
+                  <Input type="number" min="1" max="100000" step="1" value={seatLimit} placeholder="Global default" onChange={e=>setSeatLimit(e.target.value)}/></label>
+                <label className="space-y-2 text-sm"><span className="font-medium">Subscription price (UGX)</span>
+                  <Input type="number" min="0" step="0.01" value={priceOverride} placeholder="Global default" onChange={e=>setPriceOverride(e.target.value)}/></label>
+              </div>
+              <p className="text-xs text-muted-foreground">Current trial expiry: {tenant.trial_ends_at ? new Date(tenant.trial_ends_at).toLocaleString() : "Not set"}. Subscription expiry: {tenant.subscription_ends_at ? new Date(tenant.subscription_ends_at).toLocaleString() : "Not set"}.</p>
+              <Button disabled={savingControls} onClick={persistControls}>{savingControls ? "Saving..." : "Save business controls"}</Button>
             </Card>
 
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
