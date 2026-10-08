@@ -6,7 +6,8 @@ export type AppRole = "admin" | "manager" | "staff" | "security";
 export type ModuleKey =
   | "dashboard" | "assets" | "categories" | "locations" | "branches"
   | "users" | "reports" | "audit" | "depreciation" | "gate_pass" | "settings" | "verification"
-  | "geolocation" | "api_access" | "live_tracking";
+  | "geolocation" | "api_access" | "live_tracking"
+  | "register_builder" | "report_builder" | "form_builder" | "dashboard_builder" | "document_builder";
 export type ApprovalKind =
   | "movement" | "retirement" | "disposal" | "reactivation" | "set_for_disposal" | "maintenance" | "deletion" | "attachment_deletion";
 export type ActionKind =
@@ -25,6 +26,7 @@ export type ActionKind =
 export type SubscriptionStatus = "trial" | "active" | "expired" | "suspended" | "unknown";
 
 export const ALL_MODULES: ModuleKey[] = [
+  "register_builder", "report_builder", "form_builder", "dashboard_builder", "document_builder",
   "dashboard", "assets", "categories", "locations", "branches", "users", "reports", "audit", "depreciation", "gate_pass", "verification", "settings", "geolocation", "api_access", "live_tracking",
 ];
 export const ALL_APPROVAL_KINDS: ApprovalKind[] = [
