@@ -59,7 +59,7 @@ async function assertSameTenant(adminUserId: string, targetUserId: string) {
 
 async function enforceSeatLimit(tenantId: string) {
   const [tenantResult, settingsResult, countResult] = await Promise.all([
-    admin.from("tenants").select("subscription_status,trial_ends_at").eq("id", tenantId).single(),
+    admin.from("tenants").select("subscription_status,trial_ends_at,trial_days_override,trial_user_limit_override").eq("id", tenantId).single(),
     admin.from("saas_settings").select("trial_days,trial_user_limit").eq("id", true).single(),
     admin.from("profiles").select("id", { count: "exact", head: true })
       .eq("tenant_id", tenantId)
@@ -77,8 +77,8 @@ async function enforceSeatLimit(tenantId: string) {
 
   const tenant = tenantResult.data;
   const settings = settingsResult.data;
-  const trialDays = Number(settings.trial_days);
-  const trialUserLimit = Number(settings.trial_user_limit);
+  const trialDays = Number(tenant.trial_days_override ?? settings.trial_days);
+  const trialUserLimit = Number(tenant.trial_user_limit_override ?? settings.trial_user_limit);
   if (!Number.isInteger(trialDays) || trialDays < 1) {
     throw new Error("Global trial duration is invalid");
   }
