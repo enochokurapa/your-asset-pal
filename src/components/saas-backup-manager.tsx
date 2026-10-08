@@ -72,7 +72,7 @@ export function SaasBackupManager() {
     return fn({ ...arg, headers });
   };
 
-  const { data, refetch, isFetching } = useQuery({
+  const { data, refetch, isFetching, error } = useQuery({
     queryKey: ["saas-backups"],
     queryFn: () => authCall(getDashboard),
   });
@@ -180,7 +180,7 @@ export function SaasBackupManager() {
     }
   };
 
-  const ready = Boolean(data?.environment.databaseConfigured && data?.environment.r2Configured);
+  const ready = Boolean(data?.environment?.databaseConfigured && data?.environment?.r2Configured);
 
   return (
     <Card className="space-y-5 p-6">
@@ -195,15 +195,16 @@ export function SaasBackupManager() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge variant={data?.environment.r2Configured ? "default" : "outline"}>
-            <Cloud className="mr-1 h-3 w-3" />R2 {data?.environment.r2Configured ? "connected" : "not configured"}
+          <Badge variant={data?.environment?.r2Configured ? "default" : "outline"}>
+            <Cloud className="mr-1 h-3 w-3" />R2 {data?.environment?.r2Configured ? "connected" : "not configured"}
           </Badge>
-          <Badge variant={data?.environment.databaseConfigured ? "default" : "outline"}>
-            Database {data?.environment.databaseConfigured ? "ready" : "not configured"}
+          <Badge variant={data?.environment?.databaseConfigured ? "default" : "outline"}>
+            Database {data?.environment?.databaseConfigured ? "ready" : "not configured"}
           </Badge>
         </div>
       </div>
 
+      {error && <div role="alert" className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive">{(error as Error).message || "Could not load backup settings."}</div>}
       {data?.configurationError && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
           {data.configurationError}
