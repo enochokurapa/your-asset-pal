@@ -379,3 +379,45 @@
     transition: none !important;
   }
 }
+
+/* Site-wide light surface palette: ~75% white, 15% soft sky blue, 10% pale gold.
+   The existing tenant brand primary, sidebar, status indicators and typography remain intact. */
+:root:not(.dark) {
+  --background: #ffffff;
+  --card: #ffffff;
+  --popover: #ffffff;
+  --secondary: #eaf6ff;
+  --muted: #f2f8fd;
+  --accent: #fff5df;
+  --accent-foreground: #334155;
+  --border: #dfe9f1;
+  --input: #dfe9f1;
+  --af-sky-tint: #eaf7ff;
+  --af-gold-tint: #fff4da;
+}
+:root:not(.dark) body {
+  background-color: #ffffff;
+  background-image:
+    radial-gradient(ellipse 46% 38% at 98% 10%, rgba(159, 219, 252, .26), transparent 85%),
+    radial-gradient(ellipse 34% 35% at 0% 80%, rgba(250, 217, 141, .22), transparent 86%);
+  background-attachment: fixed;
+}
+:root:not(.dark) .bg-background {
+  background-color: transparent;
+}
+:root:not(.dark) main {
+  background-image:
+    radial-gradient(ellipse 45% 32% at 100% 0%, rgba(194, 235, 255, .18), transparent 85%),
+    radial-gradient(ellipse 32% 29% at 0% 100%, rgba(255, 230, 177, .15), transparent 85%);
+}
+:root:not(.dark) main .bg-card,
+:root:not(.dark) main .bg-popover {
+  background-color: #ffffff;
+}
+:root:not(.dark) main .bg-card:nth-child(6n + 2) {
+  background-color: color-mix(in srgb, var(--af-sky-tint) 25%, white);
+}
+:root:not(.dark) main .bg-card:nth-child(10n + 5) {
+  background-color: color-mix(in srgb, var(--af-gold-tint) 24%, white);
+}
+/* Don't tint authentication, alerts, or user-selected dark appearance. */
