@@ -1,3 +1,4 @@
+import {getCustomRegisterHeaders,type RegisterTemplate} from "@/lib/bulk-import";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { formatUGX } from "@/lib/utils";
@@ -41,17 +42,32 @@ function fmt(v: any, currency?: boolean) {
 
 const safe = (s: string) => s.replace(/[^a-z0-9_-]+/gi, "_");
 
-export function exportAssetsXLSX(title: string, assets: any[], customFields: Array<{key:string,label:string}>=[],includeLocation=false) {
-  const useCustom=customFields.length>0;
-  const locationColumn=includeLocation&&!customFields.some(f=>["location","assetlocation"].includes(f.key.toLowerCase()));
-  const columns=[...customFields.map(f=>f.label),...(locationColumn?["Location"]:[])];
-  const rows = useCustom
-    ? assets.map(asset=>Object.fromEntries([...customFields.map(field=>[field.label, String(asset.custom_fields?.[field.key]??"")]),...(locationColumn?[["Location",asset.locations?.name??""]]:[])] as Array<[string,string]>))
-    : assets.map(normalize).map(r=>Object.fromEntries(ASSET_COLUMNS.map(c=>[c.header,fmt((r as any)[c.key],c.currency)])));
-  const ws = useCustom?XLSX.utils.aoa_to_sheet([columns,...rows.map(row=>columns.map(f=>(row as any)[f]))]):XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, title.slice(0, 30) || "Assets");
-  XLSX.writeFile(wb, `${safe(title) || "assets"}.xlsx`);
+export function exportAssetsXLSX(title:string,assets:any[],customFields:Array<{key:string,label:string}>=[],includeLocation=false){
+ const custom=customFields.length>0;
+ const headers=custom?getCustomRegisterHeaders({id:"export",name:title,configuration:{fields:customFields.map(f=>({...f,type:"text",required:false}))}}):ASSET_COLUMNS.map(c=>c.header);
+ const row=(asset:any)=>{
+  const base=normalize(asset);
+  const geoParts=String(asset.geo_places?.display_path??"").split("·").map((v:string)=>v.trim()).filter(Boolean);
+  const lookup:Record<string,any>={
+   "System Asset Tag":asset.asset_tag,"System Asset Name":asset.name,
+   "System Serial Number":asset.serial_number,"System Description":asset.description,
+   "Category":asset.categories?.name,"Sub Category":"","Status":asset.status,
+   "Purchase Date":asset.purchase_date,"Purchase Value":asset.purchase_value,
+   "Custodian":asset.custodian,"Department":asset.department,"Branch":asset.branches?.name,
+   "Country":geoParts.at(-1)??"", "Region":geoParts.at(-2)??"",
+   "District":geoParts.at(-3)??"", "County":geoParts.at(-4)??"",
+   "Sub County":geoParts.at(-5)??"", "Parish":geoParts.at(-6)??"",
+   "Ward":geoParts.at(-7)??"", "Village":geoParts.at(-8)??"",
+   "Location":asset.locations?.name,"Building":"","Floor":"","Office / Room":"",
+   "Custom Area":"","Internal Location ID":asset.location_id,
+   "Geo Place ID":asset.geo_place_id,"Latitude":asset.location_latitude,"Longitude":asset.location_longitude
+  };
+  const customValues=Object.fromEntries(customFields.map(f=>[f.label,asset.custom_fields?.[f.key]??""]));
+  return headers.map(name=>custom?customValues[name]??lookup[name]??"":fmt((base as any)[ASSET_COLUMNS.find(c=>c.header===name)?.key??""]));
+ };
+ const wb=XLSX.utils.book_new();
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([headers,...assets.map(row)]),"Assets");
+ XLSX.writeFile(wb,`${safe(title)||"assets"}.xlsx`);
 }
 
 export async function exportAssetsPDF(title: string, assets: any[]) {
