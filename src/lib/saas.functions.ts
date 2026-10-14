@@ -324,7 +324,7 @@ export const getSaasContext = createServerFn({ method: "GET" })
         trialDays: Number(tenant?.trial_days_override ?? parsedSettings.trialDays),
         trialUserLimit: Number(tenant?.trial_user_limit_override ?? parsedSettings.trialUserLimit),
         paidPrice: Number(tenant?.paid_price_override ?? parsedSettings.paidPrice),
-        includedPaidUsers:Number(tenant?.paid_user_limit_override??settings.included_paid_users),extraUserPrice:Number(settings.extra_user_price),includedAssets:Number(settings.included_assets),purchasedExtraUsers:Number(tenant?.purchased_extra_users??0),
+        includedPaidUsers:Number(tenant?.paid_user_limit_override??settings.included_paid_users),extraUserPrice:Number(settings.extra_user_price),includedAssets:Number(settings.included_assets),purchasedExtraUsers:Number(tenant?.purchased_extra_users??0),extraAssetBlockSize:Number(settings.extra_asset_block_size??2000),extraAssetBlockPrice:Number(settings.extra_asset_block_price??20),purchasedExtraAssets:Number(tenant?.purchased_extra_assets??0),
       },
       enabledModules,
       addOns: modules.filter((m: any) => m.billing_model === "add_on").map((m: any) => ({
@@ -1202,8 +1202,8 @@ export const checkYoSeatPurchase=createServerFn({method:"POST"})
 export const getPricingPlans=createServerFn({method:"GET"}).handler(async()=>{
  const {data,error}=await admin.from("saas_pricing_plans").select("id,name,description,monthly_price,annual_price,included_users,included_assets,features,is_published").eq("is_published",true).order("monthly_price");
  if(error)throw Error(error.message);
- const {data:settings}=await admin.from("saas_settings").select("currency,extra_user_price,trial_days").eq("id",true).single();
- return {currency:settings?.currency??"USD",extraUserPrice:Number(settings?.extra_user_price??0),trialDays:Number(settings?.trial_days??14),plans:(data??[]).map((p:any)=>({...p,monthly_price:Number(p.monthly_price),annual_price:Number(p.annual_price)}))};
+ const {data:settings}=await admin.from("saas_settings").select("currency,extra_user_price,extra_asset_block_size,extra_asset_block_price,trial_days").eq("id",true).single();
+ return {currency:settings?.currency??"USD",extraUserPrice:Number(settings?.extra_user_price??0),extraAssetBlockSize:Number(settings?.extra_asset_block_size??2000),extraAssetBlockPrice:Number(settings?.extra_asset_block_price??20),trialDays:Number(settings?.trial_days??14),plans:(data??[]).map((p:any)=>({...p,monthly_price:Number(p.monthly_price),annual_price:Number(p.annual_price)}))};
 });
 export const getAdminAvailableModules=createServerFn({method:"POST"}).middleware([requireSupabaseAuth]).handler(async({context})=>{
  await assertSaasAdmin(context.userId);
@@ -1225,3 +1225,52 @@ export const saveAdminPricingPlan=createServerFn({method:"POST"}).middleware([re
   if(error||!saved)throw Error(error?.message||"The plan could not be saved");
   return {saved:true,id:saved.id};
  });
+export const startYoAssetCapacityPurchase=createServerFn({method:"POST"})
+ .middleware([requireSupabaseAuth])
+ .inputValidator(input=>z.object({phone:z.string().min(9).max(20),quantity:z.number().int().min(1).max(100)}).parse(input))
+ .handler(async ({data,context})=>{
+  const p=await assertTenantAdmin(context.userId);
+  const username=process.env.YO_API_USERNAME,password=process.env.YO_API_PASSWORD;
+  if(!username||!password)throw Error("Payment gateway is not configured");
+  const {data:tenant,error:te}=await admin.from("tenants").select("subscription_status,subscription_ends_at").eq("id",p.tenant_id).single();
+  if(te||tenant?.subscription_status!=="active"||(tenant.subscription_ends_at&&new Date(tenant.subscription_ends_at)<=new Date()))throw Error("Activate or renew your paid subscription before adding asset blocks.");
+  const {data:settings,error:se}=await admin.from("saas_settings").select("currency,extra_asset_block_price,extra_asset_block_size").eq("id",true).single();
+  if(se||!settings)throw Error("Asset capacity pricing not configured");
+  if(String(settings.currency).toUpperCase()!=="UGX")throw Error("Mobile-money asset capacity checkout requires UGX pricing. Ask SaaS Admin to configure billing currency and seat price.");
+  const unitPrice=Number(settings.extra_asset_block_price),amount=unitPrice*data.quantity;
+  if(!Number.isFinite(amount)||amount<=0)throw Error("SaaS Admin must configure a positive extra-asset block price");
+  const phone=data.phone.replace(/\s+/g,"").replace(/^\+/,"");
+  if(!/^256\d{9}$/.test(phone))throw Error("Use mobile money number 2567XXXXXXXX");
+  const {data:tx,error}=await admin.from("asset_capacity_purchases").insert({tenant_id:p.tenant_id,user_id:context.userId,blocks:data.quantity,block_size:Number(settings.extra_asset_block_size),unit_price:unitPrice,amount,currency:settings.currency,phone}).select("id").single();
+  if(error||!tx)throw Error(error?.message||"Could not create purchase");
+  const xml='<?xml version="1.0" encoding="UTF-8"?><AutoCreate><Request>'+
+   '<APIUsername>'+xmlEscape(username)+'</APIUsername><APIPassword>'+xmlEscape(password)+'</APIPassword>'+
+   '<Method>acdepositfunds</Method><NonBlocking>TRUE</NonBlocking><Account>'+xmlEscape(phone)+'</Account><Amount>'+xmlEscape(amount)+'</Amount>'+
+   '<Narrative>'+xmlEscape("AssetFlow "+data.quantity+" extra user asset blocks")+'</Narrative><ExternalReference>'+xmlEscape(tx.id)+'</ExternalReference></Request></AutoCreate>';
+  try{
+    const raw=await yoRequest(xml),reference=xmlTag(raw,"TransactionReference"),status=xmlTag(raw,"Status");
+    await admin.from("asset_capacity_purchases").update({provider_reference:reference||null,status:status==="OK"?"pending":"failed"}).eq("id",tx.id);
+    if(status!=="OK")throw Error(xmlTag(raw,"ErrorMessage")||xmlTag(raw,"StatusMessage")||"Payment was rejected");
+    return {transactionId:tx.id,status:xmlTag(raw,"TransactionStatus")||"PENDING"};
+  }catch(e){await admin.from("asset_capacity_purchases").update({status:"failed"}).eq("id",tx.id);throw e}
+ });
+
+export const checkYoAssetCapacityPurchase=createServerFn({method:"POST"})
+ .middleware([requireSupabaseAuth])
+ .inputValidator(input=>z.object({transactionId:z.string().uuid()}).parse(input))
+ .handler(async ({data,context})=>{
+  const p=await assertTenantAdmin(context.userId),username=process.env.YO_API_USERNAME,password=process.env.YO_API_PASSWORD;
+  if(!username||!password)throw Error("Payment gateway unavailable");
+  const {data:tx,error}=await admin.from("asset_capacity_purchases").select("*").eq("id",data.transactionId).eq("tenant_id",p.tenant_id).single();
+  if(error||!tx)throw Error("Asset capacity purchase not found");
+  if(tx.status==="successful")return {successful:true,status:"SUCCEEDED"};
+  if(tx.status!=="pending"||!tx.provider_reference)throw Error("Payment is not pending");
+  const xml='<?xml version="1.0" encoding="UTF-8"?><AutoCreate><Request><APIUsername>'+xmlEscape(username)+'</APIUsername><APIPassword>'+xmlEscape(password)+'</APIPassword><Method>actransactioncheckstatus</Method><TransactionReference>'+xmlEscape(tx.provider_reference)+'</TransactionReference><PrivateTransactionReference>'+xmlEscape(tx.id)+'</PrivateTransactionReference><DepositTransactionType>PULL</DepositTransactionType></Request></AutoCreate>';
+  const raw=await yoRequest(xml),status=xmlTag(raw,"TransactionStatus").toUpperCase();
+  if(status==="SUCCEEDED"){
+   const {error:activationError}=await admin.rpc("activate_asset_capacity_purchase",{p_id:tx.id,p_tenant:p.tenant_id});
+   if(activationError)throw Error(activationError.message);
+  }else if(status==="FAILED")await admin.from("asset_capacity_purchases").update({status:"failed"}).eq("id",tx.id);
+  return {successful:status==="SUCCEEDED",status};
+ });
+
