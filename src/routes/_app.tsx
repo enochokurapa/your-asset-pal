@@ -125,7 +125,7 @@ function AppLayout() {
   const lockedPaidFeature = currentModuleItem?.module && (isPaidFeature(currentModuleItem.module) || isAddOnFeature(currentModuleItem.module))
     ? {item:currentModuleItem,type:isAddOnFeature(currentModuleItem.module)?"add_on":"paid"}
     : null;
-  const workspaceLocked = !isSaasAdmin && (subscriptionStatus==="expired"||subscriptionStatus==="suspended") && !pathname.startsWith("/billing") && !pathname.startsWith("/profile");
+  const workspaceLocked = !isSaasAdmin && (subscriptionStatus==="expired"||subscriptionStatus==="suspended") && !pathname.startsWith("/billing") && !pathname.startsWith("/profile") && pathname!=="/dashboard";
 
   const trialDaysLeft = trialEndsAt
     ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000))
@@ -149,7 +149,7 @@ function AppLayout() {
     const Icon = item.icon;
     const paid = !isSaasAdmin && item.module ? isPaidFeature(item.module) : false;
     const addOn = !isSaasAdmin && item.module ? isAddOnFeature(item.module) : false;
-    const expiredLock = workspaceLocked && item.to!=="/billing" && item.to!=="/profile";
+    const expiredLock = workspaceLocked && item.to!=="/billing" && item.to!=="/profile" && item.to!=="/dashboard" && !addOn;
     return (
       <Link
         key={item.to}
@@ -168,7 +168,7 @@ function AppLayout() {
             <LockKeyhole className="h-3 w-3" /> Included after upgrade
           </span>
         )}
-        {!expiredLock&&addOn && (
+        {addOn && (
           <span className="flex items-center gap-1 rounded-full border border-current/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide opacity-80">
             <LockKeyhole className="h-3 w-3" /> Add-on
           </span>
