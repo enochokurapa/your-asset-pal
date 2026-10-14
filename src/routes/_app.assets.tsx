@@ -118,7 +118,7 @@ function AssetsPage() {
   const [geoSelection, setGeoSelection] = useState<GeoHierarchyPlace|null>(null);
 
   const catalogFn=useServerFn(getRegisterCatalog);
-  const {data:catalog}=useQuery({queryKey:["register-catalog",tenantId],enabled:!!tenantId,queryFn:async()=>catalogFn({headers:await getServerAuthHeaders()})});
+  const {data:catalog,refetch:refreshRegisterCatalog,isPending:registerCatalogPending,error:registerCatalogError}=useQuery({queryKey:["register-catalog",tenantId],enabled:!!tenantId,staleTime:0,refetchOnMount:"always",queryFn:async()=>catalogFn({headers:await getServerAuthHeaders()})});
   const [registerChoice,setRegisterChoice]=useState("default");
   const [customValues,setCustomValues]=useState<Record<string,string>>({});
   const registers=(catalog?.definitions??[]) as Array<{id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean,options?:string[]}>}} >;
@@ -303,7 +303,7 @@ function AssetsPage() {
     nav({ to: "/assets", search: {} as any, replace: true });
   };
 
-  const openNew = () => { setCustomValues({}); setForm(empty); setWizardStep(0); setFinancialOpen(false); setOpen(true); };
+  const openNew = async () => { const result=await refreshRegisterCatalog();if(result.error||!result.data){toast.error("Cannot load your company register. Try again.");return;}const preferred=result.data.primaryId??"default";if(preferred!=="default"&&!result.data.definitions.some((d:any)=>d.id===preferred)){toast.error("Your active register is unavailable. Please contact your administrator.");return;}setRegisterChoice(preferred);setCustomValues({});setForm(empty);setWizardStep(0);setFinancialOpen(false);setOpen(true); };
   const openEdit = (a: any) => {
     setRegisterChoice(a.register_definition_id??catalog?.primaryId??"default");
     setCustomValues(Object.fromEntries(Object.entries(a.custom_fields??{}).map(([k,v])=>[k,String(v??"")])));
@@ -395,6 +395,7 @@ function AssetsPage() {
 
   const save = async (saveAndNext = false) => {
     if (saving) return;
+    if(registerCatalogPending||registerCatalogError||!catalog){toast.error("The business register has not loaded. Please retry.");return;}
     const customRegister=registerChoice!=="default";
     const findCustom=(aliases:string[])=>registerFields.find(f=>aliases.includes((f.label||f.key).toLowerCase().replace(/[^a-z0-9]/g,"")));
     const tagField=findCustom(["assettag","tagnumber","tag","tagno","serialnumber","engravenumber"]);
@@ -410,7 +411,7 @@ function AssetsPage() {
     if (locationSettings?.require_internal_location && !form.location_id) { toast.error("Office, store or site is required"); return; }
     if (locationSettings?.require_gps && (!form.location_latitude || !form.location_longitude)) { toast.error("GPS capture is required"); return; }
 
-    for(const field of registerFields){const value=String(customValues[field.key]??"").trim();if(field.required&&!value){toast.error(`${field.label} is required`);return;}if(value&&(field.type==="number"||field.type==="currency")&&!Number.isFinite(Number(value))){toast.error(`${field.label} must be a valid number`);return;}if(value&&field.type==="select"&&field.options?.length&&!field.options.includes(value)){toast.error(`${field.label} has an invalid option`);return;}}
+    for(const field of registerFields){const value=String(customValues[field.key]??"").trim();if(field.required&&!value&&field.id!==tagField?.id){toast.error(`${field.label} is required`);return;}if(value&&(field.type==="number"||field.type==="currency")&&!Number.isFinite(Number(value))){toast.error(`${field.label} must be a valid number`);return;}if(value&&field.type==="select"&&field.options?.length&&!field.options.includes(value)){toast.error(`${field.label} has an invalid option`);return;}}
     const tagLower = effectiveTag.toLowerCase();
     const serialLower = form.serial_number.trim().toLowerCase();
     const dup = (assets as any[]).find((a) =>
@@ -623,7 +624,7 @@ function AssetsPage() {
           <p className="text-sm text-muted-foreground">Manage your organization's fixed assets. Assets are retired (with admin approval), never deleted.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Select value={registerChoice} onValueChange={setRegisterChoice}><SelectTrigger className="w-52"><SelectValue placeholder="Select register"/></SelectTrigger><SelectContent><SelectItem value="default">Default register</SelectItem>{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select>
+          <Select value={registerChoice} onValueChange={setRegisterChoice}><SelectTrigger className="w-52"><SelectValue placeholder="Select register"/></SelectTrigger><SelectContent>{(!catalog?.primaryId||!!form.id)&&<SelectItem value="default">Default register</SelectItem>}{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select>
           <Button variant="outline" onClick={() => { setScanMode("lookup"); setScanOpen(true); }}>
             <ScanLine className="mr-2 h-4 w-4" /> Scan
           </Button>
@@ -645,8 +646,8 @@ function AssetsPage() {
             <DialogTrigger asChild><Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New asset</Button></DialogTrigger>
             <DialogContent className="flex max-h-[92vh] max-w-3xl flex-col overflow-hidden p-0">
               <DialogHeader className="border-b px-5 pb-4 pt-5 sm:px-6">
-                <DialogTitle>{form.id ? "Edit asset" : "Register asset"}</DialogTitle>
-                <div className="flex flex-wrap items-center gap-2"><Label className="whitespace-nowrap text-xs">Asset register</Label><Select value={registerChoice} onValueChange={setRegisterChoice}><SelectTrigger className="h-9 flex-1"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="default">Default register</SelectItem>{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select></div>
+                <DialogTitle>{form.id ? "Edit asset" : registerChoice!=="default" ? `New ${registers.find(r=>r.id===registerChoice)?.name??"asset"}` : "Register asset"}</DialogTitle>
+                <div className="flex flex-wrap items-center gap-2"><Label className="whitespace-nowrap text-xs">Asset register</Label><Select value={registerChoice} onValueChange={setRegisterChoice}><SelectTrigger className="h-9 flex-1"><SelectValue/></SelectTrigger><SelectContent>{(!catalog?.primaryId||!!form.id)&&<SelectItem value="default">Default register</SelectItem>}{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select></div>
                 {registerChoice==="default"&&<DialogDescription className="sm:hidden">Step {wizardStep + 1} of {wizardSteps.length} · {wizardSteps[wizardStep].title}</DialogDescription>}
 
                 {registerChoice==="default"&&<div className="hidden pt-4 sm:block">
