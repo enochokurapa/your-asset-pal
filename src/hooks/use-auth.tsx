@@ -173,16 +173,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .filter((m: any) => !overrideMap.has(m.module_key) || overrideMap.get(m.module_key) !== false)
               .map((m: any) => m.module_key as ModuleKey);
             const enabledAddOns = addOns
-              .filter((m: any) => overrideMap.get(m.module_key) === true)
+              .filter((m: any) => paid && overrideMap.get(m.module_key) === true)
               .map((m: any) => m.module_key as ModuleKey);
             const lockedPaid = effective === "trial"
               ? included.filter((m: any) => !m.trial_enabled && !!m.paid_enabled)
                   .map((m: any) => m.module_key as ModuleKey)
               : [];
             const lockedAddOns = addOns
-              .filter((m: any) => overrideMap.get(m.module_key) !== true)
+              .filter((m: any) => !paid || overrideMap.get(m.module_key) !== true)
               .map((m: any) => m.module_key as ModuleKey);
-            setEnabledModules(new Set([...allowedIncluded, ...enabledAddOns]));
+            setEnabledModules(new Set([...allowedIncluded, ...enabledAddOns,...(effective==="expired"||effective==="suspended"?eligible.filter((m:any)=>m.billing_model!=="add_on").map((m:any)=>m.module_key as ModuleKey):[])]));
             setPaidOnlyModules(new Set(lockedPaid));
             setAddOnModules(new Set(lockedAddOns));
           }
@@ -215,7 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const subscriptionUsable = subscriptionStatus === "active" || subscriptionStatus === "trial" || subscriptionStatus === "unknown";
   const hasUserModuleAccess = (m: ModuleKey) => isAdmin || permissions.has(m);
 
-  const canView = (m: ModuleKey) => subscriptionUsable && enabledModules.has(m) && hasUserModuleAccess(m);
+  const canView = (m: ModuleKey) => enabledModules.has(m) && hasUserModuleAccess(m);
   const isPaidFeature = (m: ModuleKey) => subscriptionStatus === "trial" && paidOnlyModules.has(m) && hasUserModuleAccess(m);
   const isAddOnFeature = (m: ModuleKey) => addOnModules.has(m) && hasUserModuleAccess(m);
   const canApprove = (k: ApprovalKind) => subscriptionUsable && (isAdmin || approvalRights.has(k));
