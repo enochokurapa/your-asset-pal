@@ -170,7 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const included = eligible.filter((m: any) => m.billing_model !== "add_on");
             const addOns = eligible.filter((m: any) => m.billing_model === "add_on");
             const chosenPlan=(pricingPlans??[]).find((p:any)=>p.id===tenant.plan_code);
-            const planModules=chosenPlan?new Set(chosenPlan.enabled_modules??[]):null;
+            const planModules=["starter","business","enterprise"].includes(tenant.plan_code)?new Set(chosenPlan?.enabled_modules??[]):null;
             const allowedIncluded = included
               .filter((m: any) => paid ? !!m.paid_enabled && (!planModules||planModules.has(m.module_key)) : !!m.trial_enabled)
               .filter((m: any) => !overrideMap.has(m.module_key) || overrideMap.get(m.module_key) !== false)
