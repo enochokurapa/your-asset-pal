@@ -28,7 +28,7 @@ const SAMPLE_ROW: Record<string, any> = {
   department: "Finance",
 };
 
-export type RegisterTemplate={id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean}>}};
+export type RegisterTemplate={id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean,options?:string[]}>}};
 export function downloadTemplate(register?:RegisterTemplate) {
   const wb = XLSX.utils.book_new();
   const extra=register?.configuration?.fields??[];
@@ -52,7 +52,7 @@ export function downloadTemplate(register?:RegisterTemplate) {
     ["custodian", "No", "Person responsible (creates an assignment record)"],
     ["department", "No", "Department of the custodian"],
   ];
-  extra.forEach(f=>notes.push([f.key,f.required?"Yes":"No",`${f.label} (${f.type})`]));
+  extra.forEach(f=>notes.push([f.key,f.required?"Yes":"No",`${f.label} (${f.type}${f.options?.length?": "+f.options.join(" / "):""})`]));
   const wsNotes = XLSX.utils.aoa_to_sheet(notes);
   XLSX.utils.book_append_sheet(wb, ws, "Assets");
   XLSX.utils.book_append_sheet(wb, wsNotes, "Instructions");
@@ -120,7 +120,7 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
     try {
       const extra=register?.configuration?.fields??[];
       const custom:Record<string,string|number|boolean|null>={};
-      for(const field of extra){const raw=r[field.key];const value=raw==null?"":String(raw).trim();if(field.required&&!value)throw Error(`${field.label} is required`);if(!value){custom[field.key]=null;continue;}if(field.type==="number"||field.type==="currency"){const n=Number(value);if(!Number.isFinite(n))throw Error(`${field.label} must be a number`);custom[field.key]=n;}else if(field.type==="boolean"){if(!["true","false","yes","no","1","0"].includes(value.toLowerCase()))throw Error(`${field.label} must be true or false`);custom[field.key]=["true","yes","1"].includes(value.toLowerCase());}else if(field.type==="date"){if(!/^\d{4}-\d{2}-\d{2}$/.test(value))throw Error(`${field.label} must use YYYY-MM-DD`);custom[field.key]=value;}else custom[field.key]=value;}
+      for(const field of extra){const raw=r[field.key];const value=raw==null?"":String(raw).trim();if(field.required&&!value)throw Error(`${field.label} is required`);if(!value){custom[field.key]=null;continue;}if(field.type==="number"||field.type==="currency"){const n=Number(value);if(!Number.isFinite(n))throw Error(`${field.label} must be a number`);custom[field.key]=n;}else if(field.type==="boolean"){if(!["true","false","yes","no","1","0"].includes(value.toLowerCase()))throw Error(`${field.label} must be true or false`);custom[field.key]=["true","yes","1"].includes(value.toLowerCase());}else if(field.type==="date"){if(!/^\d{4}-\d{2}-\d{2}$/.test(value))throw Error(`${field.label} must use YYYY-MM-DD`);custom[field.key]=value;}else if(field.type==="select"&&field.options?.length&&!field.options.includes(value))throw Error(`${field.label}: invalid option ${value}`);else custom[field.key]=value;}
       const tag = String(r.asset_tag ?? "").trim();
       const name = String(r.name ?? "").trim();
       const branchName = String(r.branch ?? "").trim();
