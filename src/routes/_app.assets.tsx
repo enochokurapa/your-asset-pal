@@ -411,6 +411,8 @@ function AssetsPage() {
     if (dup) { setDupAsset(dup); setDupOpen(true); return; }
 
     const payload: any = {
+      register_definition_id:registerChoice==="default"?null:registerChoice,
+      custom_fields:customValues,
       asset_tag: form.asset_tag.trim(),
       serial_number: form.serial_number.trim() || null,
       name: form.name.trim(),
