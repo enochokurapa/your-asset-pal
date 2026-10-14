@@ -324,6 +324,7 @@ export const getSaasContext = createServerFn({ method: "GET" })
         trialDays: Number(tenant?.trial_days_override ?? parsedSettings.trialDays),
         trialUserLimit: Number(tenant?.trial_user_limit_override ?? parsedSettings.trialUserLimit),
         paidPrice: Number(tenant?.paid_price_override ?? parsedSettings.paidPrice),
+        includedPaidUsers:Number(tenant?.paid_user_limit_override??settings.included_paid_users),extraUserPrice:Number(settings.extra_user_price),includedAssets:Number(settings.included_assets),purchasedExtraUsers:Number(tenant?.purchased_extra_users??0),
       },
       enabledModules,
       addOns: modules.filter((m: any) => m.billing_model === "add_on").map((m: any) => ({
@@ -1139,4 +1140,60 @@ export const updateSaasTenantTagSettings=createServerFn({method:"POST"})
    const {error}=await admin.from("tenant_asset_tag_settings").upsert({...data,updated_at:new Date().toISOString()},{onConflict:"tenant_id"});
    if(error)throw new Error(error.message);
    return {ok:true};
+ });
+
+export const getPublicPricing=createServerFn({method:"GET"}).handler(async()=>{
+ const {data:settings,error}=await admin.from("saas_settings").select("paid_price,currency,included_paid_users,extra_user_price,included_assets,trial_days").eq("id",true).single();
+ if(error||!settings)throw new Error("Pricing unavailable");
+ const {data:modules,error:modulesError}=await admin.from("saas_modules").select("module_key,label,add_on_price").eq("billing_model","add_on").eq("globally_enabled",true);
+ if(modulesError)throw new Error(modulesError.message);
+ return {price:Number(settings.paid_price),currency:settings.currency,users:Number(settings.included_paid_users),extraUserPrice:Number(settings.extra_user_price),assets:Number(settings.included_assets),trialDays:Number(settings.trial_days),addOns:(modules??[]).map((m:any)=>({label:m.label,price:Number(m.add_on_price)}))};
+});
+
+export const startYoSeatPurchase=createServerFn({method:"POST"})
+ .middleware([requireSupabaseAuth])
+ .inputValidator(input=>z.object({phone:z.string().min(9).max(20),quantity:z.number().int().min(1).max(100)}).parse(input))
+ .handler(async ({data,context})=>{
+  const p=await assertTenantAdmin(context.userId);
+  const username=process.env.YO_API_USERNAME,password=process.env.YO_API_PASSWORD;
+  if(!username||!password)throw Error("Payment gateway is not configured");
+  const {data:tenant,error:te}=await admin.from("tenants").select("subscription_status,subscription_ends_at").eq("id",p.tenant_id).single();
+  if(te||tenant?.subscription_status!=="active"||(tenant.subscription_ends_at&&new Date(tenant.subscription_ends_at)<=new Date()))throw Error("Activate or renew your paid subscription before adding seats.");
+  const {data:settings,error:se}=await admin.from("saas_settings").select("currency,extra_user_price").eq("id",true).single();
+  if(se||!settings)throw Error("Seat pricing not configured");
+  const unitPrice=Number(settings.extra_user_price),amount=unitPrice*data.quantity;
+  if(!Number.isFinite(amount)||amount<=0)throw Error("SaaS Admin must configure a positive extra-user price");
+  const phone=data.phone.replace(/\s+/g,"").replace(/^\+/,"");
+  if(!/^256\d{9}$/.test(phone))throw Error("Use mobile money number 2567XXXXXXXX");
+  const {data:tx,error}=await admin.from("seat_purchase_transactions").insert({tenant_id:p.tenant_id,user_id:context.userId,quantity:data.quantity,unit_price:unitPrice,amount,currency:settings.currency,phone}).select("id").single();
+  if(error||!tx)throw Error(error?.message||"Could not create purchase");
+  const xml='<?xml version="1.0" encoding="UTF-8"?><AutoCreate><Request>'+
+   '<APIUsername>'+xmlEscape(username)+'</APIUsername><APIPassword>'+xmlEscape(password)+'</APIPassword>'+
+   '<Method>acdepositfunds</Method><NonBlocking>TRUE</NonBlocking><Account>'+xmlEscape(phone)+'</Account><Amount>'+xmlEscape(amount)+'</Amount>'+
+   '<Narrative>'+xmlEscape("AssetFlow "+data.quantity+" extra user seats")+'</Narrative><ExternalReference>'+xmlEscape(tx.id)+'</ExternalReference></Request></AutoCreate>';
+  try{
+    const raw=await yoRequest(xml),reference=xmlTag(raw,"TransactionReference"),status=xmlTag(raw,"Status");
+    await admin.from("seat_purchase_transactions").update({provider_reference:reference||null,status:status==="OK"?"pending":"failed"}).eq("id",tx.id);
+    if(status!=="OK")throw Error(xmlTag(raw,"ErrorMessage")||xmlTag(raw,"StatusMessage")||"Payment was rejected");
+    return {transactionId:tx.id,status:xmlTag(raw,"TransactionStatus")||"PENDING"};
+  }catch(e){await admin.from("seat_purchase_transactions").update({status:"failed"}).eq("id",tx.id);throw e}
+ });
+
+export const checkYoSeatPurchase=createServerFn({method:"POST"})
+ .middleware([requireSupabaseAuth])
+ .inputValidator(input=>z.object({transactionId:z.string().uuid()}).parse(input))
+ .handler(async ({data,context})=>{
+  const p=await assertTenantAdmin(context.userId),username=process.env.YO_API_USERNAME,password=process.env.YO_API_PASSWORD;
+  if(!username||!password)throw Error("Payment gateway unavailable");
+  const {data:tx,error}=await admin.from("seat_purchase_transactions").select("*").eq("id",data.transactionId).eq("tenant_id",p.tenant_id).single();
+  if(error||!tx)throw Error("Seat purchase not found");
+  if(tx.status==="successful")return {successful:true,status:"SUCCEEDED"};
+  if(tx.status!=="pending"||!tx.provider_reference)throw Error("Payment is not pending");
+  const xml='<?xml version="1.0" encoding="UTF-8"?><AutoCreate><Request><APIUsername>'+xmlEscape(username)+'</APIUsername><APIPassword>'+xmlEscape(password)+'</APIPassword><Method>actransactioncheckstatus</Method><TransactionReference>'+xmlEscape(tx.provider_reference)+'</TransactionReference><PrivateTransactionReference>'+xmlEscape(tx.id)+'</PrivateTransactionReference><DepositTransactionType>PULL</DepositTransactionType></Request></AutoCreate>';
+  const raw=await yoRequest(xml),status=xmlTag(raw,"TransactionStatus").toUpperCase();
+  if(status==="SUCCEEDED"){
+   const {error:activationError}=await admin.rpc("activate_seat_purchase",{p_id:tx.id,p_tenant:p.tenant_id});
+   if(activationError)throw Error(activationError.message);
+  }else if(status==="FAILED")await admin.from("seat_purchase_transactions").update({status:"failed"}).eq("id",tx.id);
+  return {successful:status==="SUCCEEDED",status};
  });
