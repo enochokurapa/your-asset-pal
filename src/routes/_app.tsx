@@ -122,9 +122,10 @@ function AppLayout() {
   const visibleNav = isSaasAdmin ? saasAdminNav : visibleTenantNav;
 
   const currentModuleItem = !isSaasAdmin && currentNavItem?.module ? currentNavItem : undefined;
-  const lockedPaidFeature = currentModuleItem?.module && isPaidFeature(currentModuleItem.module)
-    ? currentModuleItem
+  const lockedPaidFeature = currentModuleItem?.module && (isPaidFeature(currentModuleItem.module) || isAddOnFeature(currentModuleItem.module))
+    ? {item:currentModuleItem,type:isAddOnFeature(currentModuleItem.module)?"add_on":"paid"}
     : null;
+  const workspaceLocked = !isSaasAdmin && (subscriptionStatus==="expired"||subscriptionStatus==="suspended") && !pathname.startsWith("/billing") && !pathname.startsWith("/profile");
 
   const trialDaysLeft = trialEndsAt
     ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000))
@@ -148,6 +149,7 @@ function AppLayout() {
     const Icon = item.icon;
     const paid = !isSaasAdmin && item.module ? isPaidFeature(item.module) : false;
     const addOn = !isSaasAdmin && item.module ? isAddOnFeature(item.module) : false;
+    const expiredLock = workspaceLocked && item.to!=="/billing" && item.to!=="/profile";
     return (
       <Link
         key={item.to}
@@ -160,12 +162,13 @@ function AppLayout() {
       >
         <Icon className="h-4 w-4" />
         <span className="min-w-0 flex-1">{item.label}</span>
-        {paid && (
+        {expiredLock && <LockKeyhole className="h-3.5 w-3.5 opacity-70"/>}
+        {!expiredLock&&paid && (
           <span className="flex items-center gap-1 rounded-full border border-current/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide opacity-80">
             <LockKeyhole className="h-3 w-3" /> Included after upgrade
           </span>
         )}
-        {addOn && (
+        {!expiredLock&&addOn && (
           <span className="flex items-center gap-1 rounded-full border border-current/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide opacity-80">
             <LockKeyhole className="h-3 w-3" /> Add-on
           </span>
@@ -252,11 +255,13 @@ function AppLayout() {
           )}
           {!isSaasAdmin && (subscriptionStatus === "expired" || subscriptionStatus === "suspended") && !pathname.startsWith("/billing") && (
             <div className="mb-5 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
-              <strong>{subscriptionStatus === "expired" ? "Trial/subscription expired." : "Workspace suspended."}</strong> Application modules are unavailable until the workspace is reactivated.{isTenantAdmin && <> <Link to="/billing" className="font-semibold text-primary underline">Open billing</Link>.</>}
+              <strong>{subscriptionStatus === "expired" ? "Trial/subscription expired." : "Workspace suspended."}</strong> Features remain visible but are locked until the workspace is reactivated.{isTenantAdmin && <> <Link to="/billing" className="font-semibold text-primary underline">Open billing</Link>.</>}
             </div>
           )}
 
-          {lockedPaidFeature ? (
+          {workspaceLocked ? (
+            <div className="relative min-h-[65vh]"><div className="pointer-events-none select-none opacity-45" aria-hidden="true"><Outlet /></div><div className="absolute inset-0 z-20 flex items-start justify-center bg-background/35 pt-12"><div className="sticky top-24 mx-3 max-w-md rounded-2xl border bg-card p-7 text-center shadow-xl"><LockKeyhole className="mx-auto mb-3 h-8 w-8 text-primary"/><h2 className="text-xl font-bold">Workspace locked</h2><p className="mt-2 text-sm text-muted-foreground">Your features and existing records are preserved. Renew your subscription to use them again.</p>{isTenantAdmin?<Button asChild className="mt-5"><Link to="/billing">Renew or upgrade</Link></Button>:<p className="mt-4 text-sm">Contact your business administrator to renew access.</p>}</div></div></div>
+          ) : lockedPaidFeature ? (
             <div className="mx-auto max-w-2xl py-8">
               <div className="rounded-2xl border bg-card p-8 text-center shadow-sm">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -269,8 +274,9 @@ function AppLayout() {
                       This is an optional paid add-on. It is activated and billed separately from your AssetFlow plan.
                     </p>
                     <p className="mx-auto mt-3 max-w-lg text-sm font-medium text-muted-foreground">
-                      Ask your account administrator to activate this add-on for the workspace.
+                      Activate this paid add-on from Plan & Billing. The price is set by the SaaS administrator.
                     </p>
+                    {isTenantAdmin&&<Button asChild className="mt-5"><Link to="/billing">View add-on pricing & pay</Link></Button>}
                   </>
                 ) : (
                   <>
