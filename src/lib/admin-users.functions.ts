@@ -99,7 +99,8 @@ async function enforceSeatLimit(tenantId: string) {
   }
   if(tenant.subscription_status==="active"){
     if(tenant.subscription_ends_at&&new Date(tenant.subscription_ends_at).getTime()<=Date.now())throw new Error("Your subscription expired. Renew before adding users.");
-    const included=Number(tenant.paid_user_limit_override??settings.included_paid_users);
+    let included=Number(tenant.paid_user_limit_override??settings.included_paid_users);
+    if(["starter","business","enterprise"].includes(tenant.plan_code)){const {data:plan,error:planError}=await admin.from("saas_pricing_plans").select("included_users").eq("id",tenant.plan_code).single();if(planError||!plan)throw Error("Assigned plan not found");included=Number(tenant.paid_user_limit_override??plan.included_users);}
     const allowance=included+Number(tenant.purchased_extra_users??0);
     if((countResult.count??0)>=allowance)throw new Error(`You have reached your ${allowance}-user allowance. Purchase additional user seats from Plan & Billing before adding another user.`);
   }
