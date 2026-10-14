@@ -120,6 +120,7 @@ function AssetsPage() {
   const catalogFn=useServerFn(getRegisterCatalog);
   const {data:catalog,refetch:refreshRegisterCatalog,isPending:registerCatalogPending,error:registerCatalogError}=useQuery({queryKey:["register-catalog",tenantId],enabled:!!tenantId,staleTime:0,refetchOnMount:"always",queryFn:async()=>catalogFn({headers:await getServerAuthHeaders()})});
   const [registerChoice,setRegisterChoice]=useState("default");
+  const [importBranchId,setImportBranchId]=useState("");
   const [customValues,setCustomValues]=useState<Record<string,string>>({});
   const registers=(catalog?.definitions??[]) as Array<{id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean,options?:string[]}>}} >;
   const registerFields=registers.find(r=>r.id===registerChoice)?.configuration?.fields??[];
@@ -609,7 +610,8 @@ function AssetsPage() {
     setImporting(true);
     try {
       if(registerCatalogPending||registerCatalogError||!catalog)throw new Error("The company register has not finished loading.");
-      const r = await importAssetsFromFile(f, user?.id ?? null,registers.find(r=>r.id===registerChoice));
+      if(registerChoice!=="default"&&visibleBranches.length>1&&!importBranchId)throw new Error("Choose the destination branch before importing.");
+      const r = await importAssetsFromFile(f, user?.id ?? null,registers.find(r=>r.id===registerChoice),importBranchId||undefined);
       if(r.success===0){toast.error(`No assets imported. ${r.errors[0]?.error??"Check the selected register and spreadsheet."}`);return;}
       toast.success(`Imported ${r.success} of ${r.total} rows`, { description: r.errors.length ? `${r.errors.length} rows failed. First error (row ${r.errors[0].row}): ${r.errors[0].error}` : undefined });
       qc.invalidateQueries({ queryKey: ["assets"] });
@@ -634,6 +636,7 @@ function AssetsPage() {
           <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError} onClick={()=>downloadTemplate(registers.find(r=>r.id===registerChoice))} title="Download Excel import template">
             <Download className="mr-2 h-4 w-4" /> Template
           </Button>
+          {canAdd&&registerChoice!=="default"&&visibleBranches.length>1&&<Select value={importBranchId||"choose"} onValueChange={v=>setImportBranchId(v==="choose"?"":v)}><SelectTrigger className="w-52"><SelectValue placeholder="Import into branch"/></SelectTrigger><SelectContent><SelectItem value="choose">Choose import branch</SelectItem>{visibleBranches.map(branch=><SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}</SelectContent></Select>}
           {canAdd && (
             <label className="inline-flex">
               <input type="file" accept=".xlsx,.xls" className="hidden" disabled={importing||registerCatalogPending||!!registerCatalogError}
