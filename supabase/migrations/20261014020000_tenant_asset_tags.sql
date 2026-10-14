@@ -27,7 +27,7 @@ END $$;
 REVOKE ALL ON FUNCTION public.generate_asset_tag_for_tenant(uuid) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.generate_asset_tag_for_tenant(uuid) TO service_role;
 CREATE OR REPLACE FUNCTION public.assign_custom_asset_tag()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 BEGIN
  IF NEW.asset_tag IS NULL OR NEW.asset_tag='' OR NEW.asset_tag LIKE 'AUTO-%' THEN
    NEW.asset_tag:=public.generate_asset_tag_for_tenant(NEW.tenant_id);
