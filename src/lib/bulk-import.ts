@@ -29,22 +29,27 @@ const SAMPLE_ROW: Record<string, any> = {
 };
 
 export type RegisterTemplate={id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean,options?:string[]}>}};
+export type RegisterLocationConfig={location_mode?:"internal"|"branch"|"geographic"|"hybrid",show_in_custom_register?:boolean,show_coordinates?:boolean,allow_custom_area?:boolean};
 export const CUSTOM_SYSTEM_COLUMNS=[
  "System Asset Tag","System Asset Name","System Serial Number","System Description",
  "Category","Sub Category","Status","Purchase Date","Purchase Value","Custodian","Department","Branch",
  "Country","Region","District","County","Sub County","Parish","Ward","Village",
  "Location","Building","Floor","Office / Room","Custom Area","Internal Location ID","Geo Place ID","Latitude","Longitude"
 ] as const;
+const COMMON_SYSTEM_COLUMNS=["System Asset Tag","System Asset Name","System Serial Number","System Description","Category","Sub Category","Status","Purchase Date","Purchase Value","Custodian","Department"];
+const INTERNAL_COLUMNS=["Branch","Location","Building","Floor","Office / Room","Custom Area","Internal Location ID"];
+const GEOGRAPHIC_COLUMNS=["Country","Region","District","County","Sub County","Parish","Ward","Village","Geo Place ID"];
+export function locationColumns(config?:RegisterLocationConfig){if(config?.show_in_custom_register===false)return [];const mode=config?.location_mode??"internal";const out=mode==="branch"?["Branch"]:mode==="geographic"?GEOGRAPHIC_COLUMNS:mode==="hybrid"?[...INTERNAL_COLUMNS,...GEOGRAPHIC_COLUMNS]:INTERNAL_COLUMNS;return [...out.filter(x=>x!=="Custom Area"||config?.allow_custom_area!==false),...(config?.show_coordinates?["Latitude","Longitude"]:[])];}
 const normalizeHeader=(name:string)=>name.trim().toLowerCase().replace(/[^a-z0-9]/g,"");
-export function getCustomRegisterHeaders(register:RegisterTemplate){
+export function getCustomRegisterHeaders(register:RegisterTemplate,config?:RegisterLocationConfig){
  const labels=(register.configuration.fields??[]).map(f=>f.label.trim());
  const used=new Set(labels.map(normalizeHeader));
- return [...labels,...CUSTOM_SYSTEM_COLUMNS.filter(name=>!used.has(normalizeHeader(name)))];
+ return [...labels,...[...COMMON_SYSTEM_COLUMNS,...locationColumns(config)].filter(name=>!used.has(normalizeHeader(name)))];
 }
-export function downloadTemplate(register?:RegisterTemplate, includeLocation=false) {
+export function downloadTemplate(register?:RegisterTemplate, config?:RegisterLocationConfig) {
   const wb = XLSX.utils.book_new();
   const extra=register?.configuration?.fields??[];
-  const columns=register?getCustomRegisterHeaders(register):TEMPLATE_COLUMNS;
+  const columns=register?getCustomRegisterHeaders(register,config):TEMPLATE_COLUMNS;
   if(!columns.length)throw new Error("Add at least one field before downloading this custom template.");
   const ws=register?XLSX.utils.aoa_to_sheet([columns]):XLSX.utils.json_to_sheet([SAMPLE_ROW],{header:columns});
   // Append an "instructions" sheet
@@ -68,7 +73,7 @@ export function downloadTemplate(register?:RegisterTemplate, includeLocation=fal
   if(register){notes.splice(1);extra.forEach(f=>notes.push([f.label,f.required?"Yes":"No",`${f.type}${f.options?.length?": "+f.options.join(" / "):""}`]));}
   const wsNotes = XLSX.utils.aoa_to_sheet(notes);
   XLSX.utils.book_append_sheet(wb, ws, "Assets");
-  if(register){CUSTOM_SYSTEM_COLUMNS.forEach(name=>{if(columns.includes(name))notes.push([name,"No","Built-in asset form field. Fill when available. Geographic values must match recognised locations."])});XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(notes),"Field Guide");}else XLSX.utils.book_append_sheet(wb, wsNotes, "Instructions");
+  if(register){const info=[["1. SETUP","Open Settings > Asset locations and choose Internal, Branch, Geographic or Hybrid before downloading."],["2. COMPLETE","Fill whichever columns you have; leave unknown location and other optional details blank."],["3. IMPORT","Select the same register in Assets > Import. The system validates matching locations and reports errors."]];const guide=XLSX.utils.aoa_to_sheet([...info,[],...notes,...columns.filter(name=>!extra.some(f=>normalizeHeader(f.label)===normalizeHeader(name))).map(name=>[name,"Optional","Built-in form field. Match your configured locations."])]);guide["!cols"]=[{wch:26},{wch:100},{wch:60}];XLSX.utils.book_append_sheet(wb,guide,"Read Me");}else XLSX.utils.book_append_sheet(wb, wsNotes, "Instructions");
   XLSX.writeFile(wb, `${register?.name.replace(/[^a-z0-9]+/gi,"_")??"assetflow"}-import-template.xlsx`);
 }
 
@@ -78,7 +83,7 @@ export type ImportResult = {
   errors: { row: number; tag?: string; error: string }[];
 };
 
-export async function importAssetsFromFile(file: File, userId: string | null,register?:RegisterTemplate, importBranchId?:string,includeLocation=false): Promise<ImportResult> {
+export async function importAssetsFromFile(file: File, userId: string | null,register?:RegisterTemplate, importBranchId?:string,config?:RegisterLocationConfig): Promise<ImportResult> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array" });
   const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -90,7 +95,7 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
   };
   const textValue=(r:Record<string,any>,...names:string[])=>String(getValue(r,...names)).trim();
   if(register){
-    const known=new Set([...getCustomRegisterHeaders(register),...TEMPLATE_COLUMNS,"Asset Name","Asset Tag","Serial Number","Country Code"].map(normalizeHeader));
+    const known=new Set([...getCustomRegisterHeaders(register,config),...TEMPLATE_COLUMNS,"Asset Name","Asset Tag","Serial Number","Country Code"].map(normalizeHeader));
     const unknown=Object.keys(rows[0]??{}).filter(k=>!known.has(normalizeHeader(k)));
     if(unknown.length)throw Error("Unmapped spreadsheet columns: "+unknown.join(", ")+". Add matching fields in Register Builder or rename these columns.");
   }
