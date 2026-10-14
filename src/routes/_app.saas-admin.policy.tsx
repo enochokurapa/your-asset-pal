@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Save, Settings2 } from "lucide-react";
+import {getAdminPricingPlans,saveAdminPricingPlan} from "@/lib/saas.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/saas-admin/policy")({
@@ -36,6 +37,12 @@ function SaasAdminPolicyPage() {
   const savePolicy = useServerFn(updateGlobalSaasPolicy);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<SettingsForm | null>(null);
+  const listPlans=useServerFn(getAdminPricingPlans),updatePlan=useServerFn(saveAdminPricingPlan);
+  const [plans,setPlans]=useState<any[]>([]),[savingPlan,setSavingPlan]=useState<string|null>(null);
+  useEffect(()=>{if(!isSaasAdmin)return;getServerAuthHeaders().then(headers=>listPlans({headers})).then(rows=>setPlans(rows as any[])).catch(e=>toast.error(e.message||"Cannot load plans"))},[isSaasAdmin]);
+  const changePlan=(id:string,patch:any)=>setPlans(old=>old.map(p=>p.id===id?{...p,...patch}:p));
+  const persistPlan=async(p:any)=>{setSavingPlan(p.id);try{await updatePlan({headers:await getServerAuthHeaders(),data:{id:p.id,name:p.name,description:p.description,monthly_price:Number(p.monthly_price),annual_price:Number(p.annual_price),included_users:Number(p.included_users),included_assets:Number(p.included_assets),features:p.features,is_published:p.is_published}});toast.success("Plan saved");qc.invalidateQueries({queryKey:["pricing-plans"]})}catch(e:any){toast.error(e.message||"Save failed")}finally{setSavingPlan(null)}};
+
 
   const authCall = async <T,>(fn: (arg: any) => Promise<T>, arg: any = {}) => {
     const headers = await getServerAuthHeaders();
@@ -83,7 +90,7 @@ function SaasAdminPolicyPage() {
   };
 
   return (
-    <Card className="space-y-5 p-6">
+    <div className="space-y-5"><Card className="space-y-5 p-6">
       <div className="flex items-start gap-3">
         <Settings2 className="mt-0.5 h-5 w-5 text-primary" />
         <div>
@@ -155,5 +162,7 @@ function SaasAdminPolicyPage() {
         </>
       )}
     </Card>
+    <Card className="space-y-4 p-6"><div><h2 className="text-lg font-semibold">Public pricing packages</h2><p className="text-sm text-muted-foreground">Edit package prices, included users, assets and features shown on the public Pricing page.</p></div><div className="grid gap-4 lg:grid-cols-3">{plans.map(p=><div key={p.id} className="space-y-3 rounded-xl border p-4"><Label>Package name</Label><Input value={p.name} onChange={e=>changePlan(p.id,{name:e.target.value})}/><Label>Description</Label><Input value={p.description} onChange={e=>changePlan(p.id,{description:e.target.value})}/><div className="grid grid-cols-2 gap-3">{[["monthly_price","Monthly price"],["annual_price","Annual price"],["included_users","Included users"],["included_assets","Included assets"]].map(([key,label])=><div key={key} className="space-y-1"><Label>{label}</Label><Input type="number" min={0} value={p[key]} onChange={e=>changePlan(p.id,{[key]:Number(e.target.value)})}/></div>)}</div><Label>Included features (one per line)</Label><textarea className="min-h-32 w-full rounded-md border bg-background p-3 text-sm" value={(p.features??[]).join("\n")} onChange={e=>changePlan(p.id,{features:e.target.value.split("\n").map((x:string)=>x.trim()).filter(Boolean)})}/><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={p.is_published} onChange={e=>changePlan(p.id,{is_published:e.target.checked})}/>Visible on public pricing</label><Button className="w-full" disabled={savingPlan===p.id} onClick={()=>persistPlan(p)}><Save className="mr-2 h-4 w-4"/>{savingPlan===p.id?"Saving…":"Save package"}</Button></div>)}</div></Card>
+    </div>
   );
 }
