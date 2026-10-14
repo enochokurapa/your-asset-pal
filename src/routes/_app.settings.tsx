@@ -161,8 +161,8 @@ function SettingsPage() {
         </Card>
       )}
 
-      <div className={["locations","automation","numbering","guides","appearance"].includes(activeTab) ? "grid items-start gap-4 lg:grid-cols-[220px_minmax(0,1fr)]" : "grid items-start gap-4 lg:grid-cols-[220px_minmax(0,1fr)_minmax(360px,.9fr)]"}>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className={["locations","automation","numbering","guides","appearance"].includes(activeTab) ? "grid items-start gap-4 lg:grid-cols-[220px_minmax(0,1fr)]" : "grid items-start gap-4 lg:grid-cols-[220px_minmax(0,1fr)_minmax(360px,.9fr)]"}>
           <Card className="p-2 lg:sticky lg:top-4">
             <p className="px-3 pb-2 pt-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Settings sections</p>
             <TabsList className="flex h-auto w-full flex-col items-stretch gap-1 bg-transparent p-0">
