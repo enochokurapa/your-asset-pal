@@ -28,6 +28,8 @@ type SettingsForm = {
   included_paid_users:number;
   extra_user_price:number;
   included_assets:number;
+  extra_asset_block_size:number;
+  extra_asset_block_price:number;
 };
 
 function SaasAdminPolicyPage() {
@@ -62,7 +64,7 @@ function SaasAdminPolicyPage() {
       trial_user_limit: policy.trialUserLimit,
       paid_price: policy.paidPrice,
       currency: policy.currency,
-      included_paid_users:policy.includedPaidUsers,extra_user_price:policy.extraUserPrice,included_assets:policy.includedAssets,
+      included_paid_users:policy.includedPaidUsers,extra_user_price:policy.extraUserPrice,included_assets:policy.includedAssets,extra_asset_block_size:policy.extraAssetBlockSize,extra_asset_block_price:policy.extraAssetBlockPrice,
     });
   }, [policy]);
 
@@ -113,7 +115,7 @@ function SaasAdminPolicyPage() {
         <>
           <div className="grid gap-4 sm:grid-cols-2">
 
-            <div className="space-y-2"><Label>Price per extra user ({form.currency})</Label><Input type="number" min={0} value={form.extra_user_price} onChange={e=>setForm({...form,extra_user_price:Number(e.target.value)})}/></div>
+            <div className="space-y-2"><Label>Price per extra user ({form.currency})</Label><Input type="number" min={0} value={form.extra_user_price} onChange={e=>setForm({...form,extra_user_price:Number(e.target.value)})}/></div><div className="space-y-2"><Label>Assets in one additional block</Label><Input type="number" min={1} value={form.extra_asset_block_size} onChange={e=>setForm({...form,extra_asset_block_size:Number(e.target.value)})}/></div><div className="space-y-2"><Label>Price per asset block ({form.currency})</Label><Input type="number" min={0} value={form.extra_asset_block_price} onChange={e=>setForm({...form,extra_asset_block_price:Number(e.target.value)})}/></div>
 
           </div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
