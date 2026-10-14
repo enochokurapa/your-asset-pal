@@ -1,3 +1,4 @@
+import {PublishedCanvases} from "@/components/visual-canvas-builder";
 import { useMemo, useState } from "react";
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
@@ -967,6 +968,7 @@ function ReportsPage() {
 
   return (
     <div className="space-y-6">
+      <PublishedCanvases kind="report_builder"/>
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
         <p className="text-sm text-muted-foreground">Filter, visualise and export operational reports.</p>
