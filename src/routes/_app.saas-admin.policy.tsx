@@ -24,6 +24,9 @@ type SettingsForm = {
   trial_user_limit: number;
   paid_price: number;
   currency: string;
+  included_paid_users:number;
+  extra_user_price:number;
+  included_assets:number;
 };
 
 function SaasAdminPolicyPage() {
@@ -52,6 +55,7 @@ function SaasAdminPolicyPage() {
       trial_user_limit: policy.trialUserLimit,
       paid_price: policy.paidPrice,
       currency: policy.currency,
+      included_paid_users:policy.includedPaidUsers,extra_user_price:policy.extraUserPrice,included_assets:policy.includedAssets,
     });
   }, [policy]);
 
@@ -100,6 +104,11 @@ function SaasAdminPolicyPage() {
         <p className="text-sm text-muted-foreground">Loading the saved global policy…</p>
       ) : (
         <>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2"><Label>Users included in paid plan</Label><Input type="number" min={1} value={form.included_paid_users} onChange={e=>setForm({...form,included_paid_users:Number(e.target.value)})}/></div>
+            <div className="space-y-2"><Label>Price per extra user ({form.currency})</Label><Input type="number" min={0} value={form.extra_user_price} onChange={e=>setForm({...form,extra_user_price:Number(e.target.value)})}/></div>
+            <div className="space-y-2"><Label>Assets included</Label><Input type="number" min={1} value={form.included_assets} onChange={e=>setForm({...form,included_assets:Number(e.target.value)})}/></div>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <div className="space-y-2">
               <Label>Trial days</Label>
