@@ -1161,6 +1161,7 @@ export const startYoSeatPurchase=createServerFn({method:"POST"})
   if(te||tenant?.subscription_status!=="active"||(tenant.subscription_ends_at&&new Date(tenant.subscription_ends_at)<=new Date()))throw Error("Activate or renew your paid subscription before adding seats.");
   const {data:settings,error:se}=await admin.from("saas_settings").select("currency,extra_user_price").eq("id",true).single();
   if(se||!settings)throw Error("Seat pricing not configured");
+  if(String(settings.currency).toUpperCase()!=="UGX")throw Error("Mobile-money seat checkout requires UGX pricing. Ask SaaS Admin to configure billing currency and seat price.");
   const unitPrice=Number(settings.extra_user_price),amount=unitPrice*data.quantity;
   if(!Number.isFinite(amount)||amount<=0)throw Error("SaaS Admin must configure a positive extra-user price");
   const phone=data.phone.replace(/\s+/g,"").replace(/^\+/,"");
