@@ -129,3 +129,21 @@ export const getRegisterCatalog = createServerFn({method:"POST"})
    if(primary.error)throw new Error(primary.error.message);
    return {definitions:defs.data??[],primaryId:primary.data?.definition_id??null};
  });
+
+export const getAssetTagSettings=createServerFn({method:"POST"})
+ .middleware([requireSupabaseAuth])
+ .handler(async ({context})=>{
+  const tenantId=await authorize(context.userId,"register_builder");
+  const {data,error}=await db.from("tenant_asset_tag_settings").select("prefix,separator,padding,next_number").eq("tenant_id",tenantId).maybeSingle();
+  if(error)throw new Error(error.message);
+  return data??{prefix:"AST",separator:"-",padding:5,next_number:1};
+ });
+export const saveAssetTagSettings=createServerFn({method:"POST"})
+ .middleware([requireSupabaseAuth])
+ .inputValidator(input=>z.object({prefix:z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,10}$/),separator:z.enum(["","-","/"]),padding:z.number().int().min(2).max(12)}).parse(input))
+ .handler(async ({data,context})=>{
+  const tenantId=await authorize(context.userId,"register_builder");
+  const {error}=await db.from("tenant_asset_tag_settings").upsert({tenant_id:tenantId,...data,updated_at:new Date().toISOString()},{onConflict:"tenant_id"});
+  if(error)throw new Error(error.message);
+  return {ok:true};
+ });
