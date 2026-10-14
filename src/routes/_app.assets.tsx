@@ -405,12 +405,30 @@ function AssetsPage() {
     if (saving) return;
     if(registerCatalogPending||registerCatalogError||!catalog){toast.error("The business register has not loaded. Please retry.");return;}
     const customRegister=registerChoice!=="default";
-    const findCustom=(aliases:string[])=>registerFields.find(f=>aliases.includes((f.label||f.key).toLowerCase().replace(/[^a-z0-9]/g,"")));
-    const tagField=findCustom(["assettag","tagnumber","tag","tagno","serialnumber","engravenumber"]);
-    const nameField=findCustom(["assetname","itemname","name","itemdescription","itemcode"]);
-    const enteredTag=tagField?String(customValues[tagField.key]??"").trim():"";
-    const enteredName=nameField?String(customValues[nameField.key]??"").trim():String(Object.values(customValues).find(v=>String(v).trim())??"").trim();
-    const effectiveTag=form.asset_tag.trim()||(form.id?"":`AUTO-${crypto.randomUUID()}`);
+    const normalizeField=(v:string)=>v.toLowerCase().replace(/[^a-z0-9]/g,"");
+    const findCustom=(aliases:string[])=>aliases.map(alias=>registerFields.find(f=>normalizeField(f.label)===alias||normalizeField(f.key)===alias)).find(Boolean);
+    const tagField=findCustom(["tagnumber","assettag","tag","tagno"]);
+    const nameField=findCustom(["assetname","name","itemname","itemdescription","itemcode"]);
+    const resolvedCustomValues={...customValues};
+    const existingCategory=(categories as any[]).find(c=>c.id===form.category_id)?.name||"";
+    const existingLocation=(locations as any[]).find(l=>l.id===form.location_id)?.name||"";
+    const existingBranch=(visibleBranches as any[]).find(b=>b.id===form.branch_id)?.name||"";
+    for(const field of registerFields){
+      if(String(resolvedCustomValues[field.key]??"").trim())continue;
+      const normalized=normalizeField(field.label||field.key);
+      const match:Record<string,string>={
+        assetname:form.name,itemname:form.name,name:form.name,
+        serialnumber:form.serial_number,manufacturerserial:form.serial_number,
+        description:form.description,assetdescription:form.description,
+        category:existingCategory,location:existingLocation,branch:existingBranch,
+        purchasevalue:form.purchase_value,purchasevalueugx:form.purchase_value,
+        purchasedate:form.purchase_date,department:form.department,custodian:form.assigned_to_name
+      };
+      if(match[normalized])resolvedCustomValues[field.key]=match[normalized];
+    }
+    const enteredTag=tagField?String(resolvedCustomValues[tagField.key]??"").trim():"";
+    const enteredName=nameField?String(resolvedCustomValues[nameField.key]??"").trim():String(Object.values(resolvedCustomValues).find(v=>String(v).trim())??"").trim();
+    const effectiveTag=form.asset_tag.trim()||enteredTag||(form.id?"":`AUTO-${crypto.randomUUID()}`);
     const effectiveName=customRegister?(enteredName||form.name.trim()||enteredTag||"Registered asset"):form.name.trim();
     if(!effectiveTag||!effectiveName){toast.error("Enter an asset name or item description.");return;}
 
@@ -419,7 +437,7 @@ function AssetsPage() {
     if (locationSettings?.require_internal_location && !form.location_id) { toast.error("Office, store or site is required"); return; }
     if (locationSettings?.require_gps && (!form.location_latitude || !form.location_longitude)) { toast.error("GPS capture is required"); return; }
 
-    for(const field of registerFields){const value=String(customValues[field.key]??"").trim();if(field.required&&!value&&field.id!==tagField?.id){toast.error(`${field.label} is required`);return;}if(value&&(field.type==="number"||field.type==="currency")&&!Number.isFinite(Number(value))){toast.error(`${field.label} must be a valid number`);return;}if(value&&field.type==="select"&&field.options?.length&&!field.options.includes(value)){toast.error(`${field.label} has an invalid option`);return;}}
+    for(const field of registerFields){const value=String(resolvedCustomValues[field.key]??"").trim();if(field.required&&!value&&field.id!==tagField?.id){toast.error(`${field.label} is required`);return;}if(value&&(field.type==="number"||field.type==="currency")&&!Number.isFinite(Number(value))){toast.error(`${field.label} must be a valid number`);return;}if(value&&field.type==="select"&&field.options?.length&&!field.options.includes(value)){toast.error(`${field.label} has an invalid option`);return;}}
     const tagLower = effectiveTag.toLowerCase();
     const serialLower = form.serial_number.trim().toLowerCase();
     const dup = (assets as any[]).find((a) =>
@@ -432,7 +450,7 @@ function AssetsPage() {
 
     const payload: any = {
       register_definition_id:registerChoice==="default"?null:registerChoice,
-      custom_fields:{...customValues,...Object.fromEntries(registerFields.map(field=>{const raw=customValues[field.key]??"";return [field.key,!raw?null:field.type==="number"||field.type==="currency"?Number(raw):field.type==="boolean"?raw==="true":raw];}))},
+      custom_fields:{...resolvedCustomValues,...Object.fromEntries(registerFields.map(field=>{const raw=resolvedCustomValues[field.key]??"";return [field.key,!raw?null:field.type==="number"||field.type==="currency"?Number(raw):field.type==="boolean"?raw==="true":raw];}))},
       asset_tag: effectiveTag,
       serial_number: form.serial_number.trim() || null,
       name: effectiveName,
