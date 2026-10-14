@@ -877,7 +877,7 @@ async function yoRequest(body: string) {
 
 export const startYoUpgrade = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ phone: z.string().min(9).max(20) }).parse(input))
+  .inputValidator((input) => z.object({phone:z.string().min(9).max(20),plan_id:z.enum(["starter","business","enterprise"]),period:z.enum(["monthly","annual"])}).parse(input))
   .handler(async ({ data, context }) => {
     const p = await assertTenantAdmin(context.userId);
     const username = process.env.YO_API_USERNAME;
@@ -887,13 +887,12 @@ export const startYoUpgrade = createServerFn({ method: "POST" })
     const { data: settings, error: settingsError } = await admin.from("saas_settings")
       .select("paid_price,currency").eq("id", true).single();
     if (settingsError || !settings) throw new Error(settingsError?.message || "Global SaaS pricing is not configured");
-    const { data: tenantPricing, error: pricingError } = await admin.from("tenants")
-      .select("paid_price_override").eq("id",p.tenant_id).single();
-    if (pricingError) throw new Error(pricingError.message);
-    const amount = Number(tenantPricing?.paid_price_override ?? settings.paid_price);
-    const currency = String(settings.currency || "").toUpperCase();
-    if (!Number.isFinite(amount) || amount <= 0) throw new Error("The SaaS Admin has not set a paid-plan price yet");
-    if (!currency) throw new Error("The SaaS Admin has not set a billing currency yet");
+    const {data:plan,error:planError}=await admin.from("saas_pricing_plans").select("id,monthly_price,annual_price,is_published").eq("id",data.plan_id).single();
+    if(planError||!plan||!plan.is_published)throw Error("Selected subscription package is unavailable");
+    const amount=Number(data.period==="annual"?plan.annual_price:plan.monthly_price);
+    const currency=String(settings.currency||"").toUpperCase();
+    if(currency!=="UGX")throw Error("Mobile-money checkout requires UGX pricing. SaaS Admin must set billing currency and package prices in UGX before collecting payment.");
+    if(!Number.isFinite(amount)||amount<=0)throw Error("Selected package requires a positive price");
 
     const phone = data.phone.replace(/\s+/g, "").replace(/^\+/, "");
     if (!/^256\d{9}$/.test(phone)) throw new Error("Use a mobile-money number in format 2567XXXXXXXX");
@@ -904,6 +903,7 @@ export const startYoUpgrade = createServerFn({ method: "POST" })
       amount,
       currency,
       status: "pending",
+      plan_code:data.plan_id,billing_period:data.period,
     }).select().single();
     if (txError) throw new Error(txError.message);
 
@@ -912,7 +912,7 @@ export const startYoUpgrade = createServerFn({ method: "POST" })
       `<APIPassword>${xmlEscape(password)}</APIPassword>` +
       `<Method>acdepositfunds</Method><NonBlocking>TRUE</NonBlocking>` +
       `<Account>${xmlEscape(phone)}</Account><Amount>${xmlEscape(amount)}</Amount>` +
-      `<Narrative>${xmlEscape("AssetFlow paid plan upgrade")}</Narrative>` +
+      `<Narrative>${xmlEscape("AssetFlow "+data.plan_id+" "+data.period+" subscription")}</Narrative>` +
       `<ExternalReference>${xmlEscape(tx.id)}</ExternalReference>` +
       `</Request></AutoCreate>`;
 
@@ -1103,20 +1103,14 @@ export const checkYoUpgrade = createServerFn({ method: "POST" })
     };
     const successful = transactionStatus === "SUCCEEDED";
     const failed = transactionStatus === "FAILED";
-    await admin.from("billing_transactions").update({
-      status: successful ? "successful" : failed ? "failed" : "pending",
-      raw_response: response,
-      updated_at: new Date().toISOString(),
-    }).eq("id", tx.id);
-
-    if (successful) {
-      await admin.from("tenants").update({
-        subscription_status: "active",
-        plan_code: "paid",
-        subscription_started_at: new Date().toISOString(),
-        subscription_ends_at: new Date(Date.now() + 30 * 86400000).toISOString(),
-        updated_at: new Date().toISOString(),
-      }).eq("id", p.tenant_id);
+    if(successful){
+      const {error:activationError}=await admin.rpc("activate_paid_plan_transaction",{p_id:tx.id,p_tenant:p.tenant_id});
+      if(activationError)throw Error(activationError.message);
+    }else{
+      const {error:updateError}=await admin.from("billing_transactions").update({
+        status:failed?"failed":"pending",raw_response:response,updated_at:new Date().toISOString()
+      }).eq("id",tx.id);
+      if(updateError)throw Error(updateError.message);
     }
     return { status: transactionStatus || "PENDING", successful, response };
   });
