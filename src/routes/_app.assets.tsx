@@ -644,7 +644,7 @@ function AssetsPage() {
     try {
       if(registerCatalogPending||registerCatalogError||!catalog)throw new Error("The company register has not finished loading.");
       if(registerChoice!=="default"&&visibleBranches.length>1&&!importBranchId)throw new Error("Choose the destination branch before importing.");
-      const r = await importAssetsFromFile(f, user?.id ?? null,registers.find(r=>r.id===registerChoice),importBranchId||undefined,catalog?.includeLocation??false);
+      const r = await importAssetsFromFile(f, user?.id ?? null,registers.find(r=>r.id===registerChoice),importBranchId||undefined,locationSettings as any);
       if(r.success===0){toast.error(`No assets imported. ${r.errors[0]?.error??"Check the selected register and spreadsheet."}`);return;}
       toast.success(`Imported ${r.success} of ${r.total} rows`, { description: r.errors.length ? `${r.errors.length} rows failed. First error (row ${r.errors[0].row}): ${r.errors[0].error}` : undefined });
       qc.invalidateQueries({ queryKey: ["assets"] });
@@ -665,8 +665,8 @@ function AssetsPage() {
           <Button variant="outline" onClick={() => { setScanMode("lookup"); setScanOpen(true); }}>
             <ScanLine className="mr-2 h-4 w-4" /> Scan
           </Button>
-          <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError} onClick={()=>exportAssetsXLSX(registers.find(r=>r.id===registerChoice)?.name??"Default Asset Register", (assets as any[]).filter(a=>registerChoice==="default"||a.register_definition_id===registerChoice),registerFields,catalog?.includeLocation??false)} title="Export assets for selected register"><Download className="mr-2 h-4 w-4"/> Export register</Button>
-          <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError} onClick={()=>downloadTemplate(registers.find(r=>r.id===registerChoice),catalog?.includeLocation??false)} title="Download Excel import template">
+          <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError} onClick={()=>exportAssetsXLSX(registers.find(r=>r.id===registerChoice)?.name??"Default Asset Register", (assets as any[]).filter(a=>registerChoice==="default"||a.register_definition_id===registerChoice),registerFields,locationSettings as any)} title="Export assets for selected register"><Download className="mr-2 h-4 w-4"/> Export register</Button>
+          <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError} onClick={()=>downloadTemplate(registers.find(r=>r.id===registerChoice),locationSettings as any)} title="Download Excel import template">
             <Download className="mr-2 h-4 w-4" /> Template
           </Button>
           {canAdd&&registerChoice!=="default"&&visibleBranches.length>1&&<Select value={importBranchId||"choose"} onValueChange={v=>setImportBranchId(v==="choose"?"":v)}><SelectTrigger className="w-52"><SelectValue placeholder="Import into branch"/></SelectTrigger><SelectContent><SelectItem value="choose">Choose import branch</SelectItem>{visibleBranches.map(branch=><SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}</SelectContent></Select>}
