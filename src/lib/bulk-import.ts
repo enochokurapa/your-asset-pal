@@ -29,7 +29,7 @@ const SAMPLE_ROW: Record<string, any> = {
 };
 
 export type RegisterTemplate={id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean,options?:string[]}>}};
-export type RegisterLocationConfig={location_mode?:"internal"|"branch"|"geographic"|"hybrid",show_in_custom_register?:boolean,show_coordinates?:boolean,allow_custom_area?:boolean};
+export type RegisterLocationConfig={location_mode?:"internal"|"branch"|"geographic"|"hybrid",show_in_custom_register?:boolean,show_coordinates?:boolean,require_gps?:boolean,allow_custom_area?:boolean};
 export const CUSTOM_SYSTEM_COLUMNS=[
  "System Asset Tag","System Asset Name","System Serial Number","System Description",
  "Category","Sub Category","Status","Purchase Date","Purchase Value","Custodian","Department","Branch",
@@ -39,7 +39,7 @@ export const CUSTOM_SYSTEM_COLUMNS=[
 const COMMON_SYSTEM_COLUMNS=["System Asset Tag","System Asset Name","System Serial Number","System Description","Category","Sub Category","Status","Purchase Date","Purchase Value","Custodian","Department"];
 const INTERNAL_COLUMNS=["Branch","Location","Building","Floor","Office / Room","Custom Area","Internal Location ID"];
 const GEOGRAPHIC_COLUMNS=["Country","Region","District","County","Sub County","Parish","Ward","Village","Geo Place ID"];
-export function locationColumns(config?:RegisterLocationConfig){if(config?.show_in_custom_register===false)return [];const mode=config?.location_mode??"internal";const out=mode==="branch"?["Branch"]:mode==="geographic"?GEOGRAPHIC_COLUMNS:mode==="hybrid"?[...INTERNAL_COLUMNS,...GEOGRAPHIC_COLUMNS]:INTERNAL_COLUMNS;return [...out.filter(x=>x!=="Custom Area"||config?.allow_custom_area!==false),...(config?.show_coordinates?["Latitude","Longitude"]:[])];}
+export function locationColumns(config?:RegisterLocationConfig){if(config?.show_in_custom_register===false)return [];const mode=config?.location_mode??"internal";const out=mode==="branch"?["Branch"]:mode==="geographic"?GEOGRAPHIC_COLUMNS:mode==="hybrid"?[...INTERNAL_COLUMNS,...GEOGRAPHIC_COLUMNS]:INTERNAL_COLUMNS;return [...out.filter(x=>x!=="Custom Area"||config?.allow_custom_area!==false),...(config?.show_coordinates||config?.require_gps?["Latitude","Longitude"]:[])];}
 const normalizeHeader=(name:string)=>name.trim().toLowerCase().replace(/[^a-z0-9]/g,"");
 export function getCustomRegisterHeaders(register:RegisterTemplate,config?:RegisterLocationConfig){
  const labels=(register.configuration.fields??[]).map(f=>f.label.trim());
