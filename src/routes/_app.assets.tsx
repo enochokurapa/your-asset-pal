@@ -306,6 +306,11 @@ function AssetsPage() {
     if (fStatus && a.status !== fStatus) return false;
     if (fDept && !(a.department ?? "").toLowerCase().includes(fDept.toLowerCase())) return false;
     return true;
+  }).sort((a,b)=>{
+    const extract=(tag:string)=>{const m=String(tag??"").match(/(\\d+)$/);return m?Number(m[1]):null};
+    const first=extract(a.asset_tag),second=extract(b.asset_tag);
+    if(first!==null&&second!==null&&first!==second)return first-second;
+    return String(a.asset_tag??"").localeCompare(String(b.asset_tag??""),undefined,{numeric:true,sensitivity:"base"});
   });
 
   const clearFilters = () => {
