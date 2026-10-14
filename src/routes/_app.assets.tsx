@@ -121,7 +121,7 @@ function AssetsPage() {
   const {data:catalog}=useQuery({queryKey:["register-catalog",tenantId],enabled:!!tenantId,queryFn:async()=>catalogFn({headers:await getServerAuthHeaders()})});
   const [registerChoice,setRegisterChoice]=useState("default");
   const [customValues,setCustomValues]=useState<Record<string,string>>({});
-  const registers=(catalog?.definitions??[]) as Array<{id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean}>}} >;
+  const registers=(catalog?.definitions??[]) as Array<{id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean,options?:string[]}>}} >;
   const registerFields=registers.find(r=>r.id===registerChoice)?.configuration?.fields??[];
   useEffect(()=>{if(catalog)setRegisterChoice(catalog.primaryId??"default");},[catalog]);
   const [open, setOpen] = useState(false);
@@ -305,7 +305,7 @@ function AssetsPage() {
   const openNew = () => { setCustomValues({}); setForm(empty); setWizardStep(0); setFinancialOpen(false); setOpen(true); };
   const openEdit = (a: any) => {
     setRegisterChoice(a.register_definition_id??catalog?.primaryId??"default");
-    setCustomValues(a.custom_fields??{});
+    setCustomValues(Object.fromEntries(Object.entries(a.custom_fields??{}).map(([k,v])=>[k,String(v??"")])));
     setForm({
       id: a.id, asset_tag: a.asset_tag, serial_number: a.serial_number ?? "",
       name: a.name, description: a.description ?? "",
@@ -400,7 +400,7 @@ function AssetsPage() {
     if (locationSettings?.require_internal_location && !form.location_id) { toast.error("Office, store or site is required"); return; }
     if (locationSettings?.require_gps && (!form.location_latitude || !form.location_longitude)) { toast.error("GPS capture is required"); return; }
 
-    for(const field of registerFields){if(field.required&&!String(customValues[field.key]??"").trim()){toast.error(`${field.label} is required`);return;}}
+    for(const field of registerFields){const value=String(customValues[field.key]??"").trim();if(field.required&&!value){toast.error(`${field.label} is required`);return;}if(value&&(field.type==="number"||field.type==="currency")&&!Number.isFinite(Number(value))){toast.error(`${field.label} must be a valid number`);return;}if(value&&field.type==="select"&&field.options?.length&&!field.options.includes(value)){toast.error(`${field.label} has an invalid option`);return;}}
     const tagLower = form.asset_tag.trim().toLowerCase();
     const serialLower = form.serial_number.trim().toLowerCase();
     const dup = (assets as any[]).find((a) =>
@@ -413,7 +413,7 @@ function AssetsPage() {
 
     const payload: any = {
       register_definition_id:registerChoice==="default"?null:registerChoice,
-      custom_fields:customValues,
+      custom_fields:{...customValues,...Object.fromEntries(registerFields.map(field=>{const raw=customValues[field.key]??"";return [field.key,!raw?null:field.type==="number"||field.type==="currency"?Number(raw):field.type==="boolean"?raw==="true":raw];}))},
       asset_tag: form.asset_tag.trim(),
       serial_number: form.serial_number.trim() || null,
       name: form.name.trim(),
@@ -505,6 +505,7 @@ function AssetsPage() {
         }
       }
       if (!form.id && saveAndNext) {
+        setCustomValues({});
         setForm((previous) => ({
           ...empty,
           category_id: previous.category_id,
@@ -635,7 +636,7 @@ function AssetsPage() {
             <DialogContent className="flex max-h-[92vh] max-w-3xl flex-col overflow-hidden p-0">
               <DialogHeader className="border-b px-5 pb-4 pt-5 sm:px-6">
                 <DialogTitle>{form.id ? "Edit asset" : "Register asset"}</DialogTitle>
-                <div className="space-y-2"><Label>Asset register</Label><Select value={registerChoice} onValueChange={setRegisterChoice}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="default">Default register</SelectItem>{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select>{registerFields.length>0&&<div className="grid gap-2 sm:grid-cols-2">{registerFields.map(field=><div className="space-y-1" key={field.key}><Label>{field.label}{field.required?" *":""}</Label><Input type={field.type==="number"||field.type==="currency"?"number":field.type==="date"?"date":"text"} value={customValues[field.key]??""} onChange={e=>setCustomValues(p=>({...p,[field.key]:e.target.value}))}/></div>)}</div>}</div>
+                <div className="flex flex-wrap items-center gap-2"><Label className="whitespace-nowrap text-xs">Asset register</Label><Select value={registerChoice} onValueChange={setRegisterChoice}><SelectTrigger className="h-9 flex-1"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="default">Default register</SelectItem>{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select></div>
                 <DialogDescription className="sm:hidden">Step {wizardStep + 1} of {wizardSteps.length} · {wizardSteps[wizardStep].title}</DialogDescription>
 
                 <div className="hidden pt-4 sm:block">
@@ -705,6 +706,15 @@ function AssetsPage() {
                         <Textarea id="desc" rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Optional notes or identifying details" />
                       </div>
                     </div>
+                    {registerFields.length>0&&<section className="space-y-3 rounded-lg border bg-muted/20 p-4">
+                      <div><h3 className="text-sm font-semibold">Custom register fields</h3><p className="text-xs text-muted-foreground">These fields are saved with this asset.</p></div>
+                      <div className="grid gap-3 sm:grid-cols-2">{registerFields.map(field=><div className="min-w-0 space-y-1.5" key={field.key}>
+                        <Label>{field.label}{field.required?" *":""}</Label>
+                        {field.type==="boolean"?<Select value={customValues[field.key]??""} onValueChange={value=>setCustomValues(p=>({...p,[field.key]:value}))}><SelectTrigger><SelectValue placeholder="Choose Yes or No"/></SelectTrigger><SelectContent><SelectItem value="true">Yes</SelectItem><SelectItem value="false">No</SelectItem></SelectContent></Select>:
+                        field.type==="select"&&field.options?.length?<Select value={customValues[field.key]??""} onValueChange={value=>setCustomValues(p=>({...p,[field.key]:value}))}><SelectTrigger><SelectValue placeholder="Choose an option"/></SelectTrigger><SelectContent>{field.options.map(option=><SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>:
+                        <Input type={field.type==="number"||field.type==="currency"?"number":field.type==="date"?"date":"text"} placeholder={field.type==="attachment"?"File reference or URL":field.label} value={customValues[field.key]??""} onChange={e=>setCustomValues(p=>({...p,[field.key]:e.target.value}))}/>}
+                      </div>)}</div>
+                    </section>}
                   </div>
                 )}
 
