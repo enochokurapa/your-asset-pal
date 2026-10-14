@@ -126,7 +126,8 @@ function AssetsPage() {
   const registerFields=registers.find(r=>r.id===registerChoice)?.configuration?.fields??[];
   const sectionForField=(field:{section?:string,label:string,key:string})=>{
     if(field.section==="assignment"||field.section==="assign")return "assignment";
-    if(["identify","classify","location"].includes(field.section||""))return field.section!;
+    if(field.section==="identify")return "classify";
+    if(["classify","location"].includes(field.section||""))return field.section!;
     return "classify";
   };
   const fieldsInStep=(step:number)=>registerFields.filter(f=>sectionForField(f)===(["identify","classify","location","assignment"][step]||""));
@@ -748,15 +749,6 @@ function AssetsPage() {
                         <Textarea id="desc" rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Optional notes or identifying details" />
                       </div>
                     </div>
-                    {registerChoice!=="default"&&fieldsInStep(0).length>0&&<div className="space-y-3">
-                      
-                      <div className="grid gap-3 sm:grid-cols-2">{fieldsInStep(0).map(field=><div className="min-w-0 space-y-1.5" key={field.key}>
-                        <Label>{field.label}{field.required?" *":""}</Label>
-                        {field.type==="boolean"?<Select value={customValues[field.key]??""} onValueChange={value=>setCustomValues(p=>({...p,[field.key]:value}))}><SelectTrigger><SelectValue placeholder="Choose Yes or No"/></SelectTrigger><SelectContent><SelectItem value="true">Yes</SelectItem><SelectItem value="false">No</SelectItem></SelectContent></Select>:
-                        field.type==="select"&&field.options?.length?<Select value={customValues[field.key]??""} onValueChange={value=>setCustomValues(p=>({...p,[field.key]:value}))}><SelectTrigger><SelectValue placeholder="Choose an option"/></SelectTrigger><SelectContent>{field.options.map(option=><SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>:
-                        <Input type={field.type==="number"||field.type==="currency"?"number":field.type==="date"?"date":"text"} placeholder={field.type==="attachment"?"File reference or URL":field.label} value={customValues[field.key]??""} onChange={e=>setCustomValues(p=>({...p,[field.key]:e.target.value}))}/>}
-                      </div>)}</div>
-                    </div>}
                   </div>
                 )}
 
