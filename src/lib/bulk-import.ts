@@ -28,9 +28,12 @@ const SAMPLE_ROW: Record<string, any> = {
   department: "Finance",
 };
 
-export function downloadTemplate() {
+export type RegisterTemplate={id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean}>}};
+export function downloadTemplate(register?:RegisterTemplate) {
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet([SAMPLE_ROW], { header: TEMPLATE_COLUMNS });
+  const extra=register?.configuration?.fields??[];
+  const columns=[...TEMPLATE_COLUMNS,...extra.map(field=>field.key)];
+  const ws = XLSX.utils.json_to_sheet([{...SAMPLE_ROW,...Object.fromEntries(extra.map(field=>[field.key,""]))}], { header: columns });
   // Append an "instructions" sheet
   const notes = [
     ["Column", "Required?", "Notes"],
@@ -49,10 +52,11 @@ export function downloadTemplate() {
     ["custodian", "No", "Person responsible (creates an assignment record)"],
     ["department", "No", "Department of the custodian"],
   ];
+  extra.forEach(f=>notes.push([f.key,f.required?"Yes":"No",`${f.label} (${f.type})`]));
   const wsNotes = XLSX.utils.aoa_to_sheet(notes);
   XLSX.utils.book_append_sheet(wb, ws, "Assets");
   XLSX.utils.book_append_sheet(wb, wsNotes, "Instructions");
-  XLSX.writeFile(wb, "assetflow-import-template.xlsx");
+  XLSX.writeFile(wb, `${register?.name.replace(/[^a-z0-9]+/gi,"_")??"assetflow"}-import-template.xlsx`);
 }
 
 export type ImportResult = {
@@ -61,7 +65,7 @@ export type ImportResult = {
   errors: { row: number; tag?: string; error: string }[];
 };
 
-export async function importAssetsFromFile(file: File, userId: string | null): Promise<ImportResult> {
+export async function importAssetsFromFile(file: File, userId: string | null,register?:RegisterTemplate): Promise<ImportResult> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array" });
   const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -114,6 +118,9 @@ export async function importAssetsFromFile(file: File, userId: string | null): P
     const r = rows[i];
     const rowNum = i + 2; // header is row 1
     try {
+      const extra=register?.configuration?.fields??[];
+      const custom:Record<string,string|number|boolean|null>={};
+      for(const field of extra){const raw=r[field.key];const value=raw==null?"":String(raw).trim();if(field.required&&!value)throw Error(`${field.label} is required`);if(!value){custom[field.key]=null;continue;}if(field.type==="number"||field.type==="currency"){const n=Number(value);if(!Number.isFinite(n))throw Error(`${field.label} must be a number`);custom[field.key]=n;}else if(field.type==="boolean"){if(!["true","false","yes","no","1","0"].includes(value.toLowerCase()))throw Error(`${field.label} must be true or false`);custom[field.key]=["true","yes","1"].includes(value.toLowerCase());}else if(field.type==="date"){if(!/^\d{4}-\d{2}-\d{2}$/.test(value))throw Error(`${field.label} must use YYYY-MM-DD`);custom[field.key]=value;}else custom[field.key]=value;}
       const tag = String(r.asset_tag ?? "").trim();
       const name = String(r.name ?? "").trim();
       const branchName = String(r.branch ?? "").trim();
@@ -159,6 +166,7 @@ export async function importAssetsFromFile(file: File, userId: string | null): P
       const purchaseValue = r.purchase_value_ugx !== "" && r.purchase_value_ugx != null ? Number(r.purchase_value_ugx) : null;
 
       const { data: created, error: insErr } = await supabase.from("assets").insert({
+        register_definition_id:register?.id??null,custom_fields:custom,
         asset_tag: tag,
         serial_number: r.serial_number ? String(r.serial_number).trim() : null,
         name,
