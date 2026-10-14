@@ -313,7 +313,7 @@ export function AssetLocationFields({
           </div>
         )}
 
-        {(
+        {(settings?.require_gps || ["branch","geographic","hybrid"].includes(settings?.location_mode??"internal")) && (
           <div className="sm:col-span-2 flex flex-wrap items-center gap-2">
             <Button type="button" variant="outline" onClick={captureGps} disabled={capturing}>
               <Crosshair className="mr-2 h-4 w-4" />{capturing ? "Capturing GPS…" : settings?.require_gps ? "Capture GPS *" : "Capture GPS"}
