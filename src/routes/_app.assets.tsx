@@ -394,14 +394,23 @@ function AssetsPage() {
 
   const save = async (saveAndNext = false) => {
     if (saving) return;
-    if (!form.asset_tag.trim() || !form.name.trim()) { toast.error("Tag and name are required"); return; }
+    const customRegister=registerChoice!=="default";
+    const findCustom=(aliases:string[])=>registerFields.find(f=>aliases.includes((f.label||f.key).toLowerCase().replace(/[^a-z0-9]/g,"")));
+    const tagField=findCustom(["assettag","tagnumber","tag","tagno","serialnumber","engravenumber"]);
+    const nameField=findCustom(["assetname","itemname","name","itemdescription","itemcode"]);
+    const enteredTag=tagField?String(customValues[tagField.key]??"").trim():"";
+    const enteredName=nameField?String(customValues[nameField.key]??"").trim():String(Object.values(customValues).find(v=>String(v).trim())??"").trim();
+    const effectiveTag=customRegister?(form.id?(enteredTag||form.asset_tag):(enteredTag||`AUTO-${crypto.randomUUID()}`)):form.asset_tag.trim();
+    const effectiveName=customRegister?(enteredName||form.name.trim()):form.name.trim();
+    if(!effectiveTag||!effectiveName){toast.error("Enter an asset name or item description.");return;}
+
     if (locationSettings?.require_branch && !form.branch_id) { toast.error("Branch is required"); return; }
     if (locationSettings?.require_geography && !form.geo_place_id) { toast.error("Geographic area is required"); return; }
     if (locationSettings?.require_internal_location && !form.location_id) { toast.error("Office, store or site is required"); return; }
     if (locationSettings?.require_gps && (!form.location_latitude || !form.location_longitude)) { toast.error("GPS capture is required"); return; }
 
     for(const field of registerFields){const value=String(customValues[field.key]??"").trim();if(field.required&&!value){toast.error(`${field.label} is required`);return;}if(value&&(field.type==="number"||field.type==="currency")&&!Number.isFinite(Number(value))){toast.error(`${field.label} must be a valid number`);return;}if(value&&field.type==="select"&&field.options?.length&&!field.options.includes(value)){toast.error(`${field.label} has an invalid option`);return;}}
-    const tagLower = form.asset_tag.trim().toLowerCase();
+    const tagLower = effectiveTag.toLowerCase();
     const serialLower = form.serial_number.trim().toLowerCase();
     const dup = (assets as any[]).find((a) =>
       a.id !== form.id && (
@@ -414,9 +423,9 @@ function AssetsPage() {
     const payload: any = {
       register_definition_id:registerChoice==="default"?null:registerChoice,
       custom_fields:{...customValues,...Object.fromEntries(registerFields.map(field=>{const raw=customValues[field.key]??"";return [field.key,!raw?null:field.type==="number"||field.type==="currency"?Number(raw):field.type==="boolean"?raw==="true":raw];}))},
-      asset_tag: form.asset_tag.trim(),
+      asset_tag: effectiveTag,
       serial_number: form.serial_number.trim() || null,
-      name: form.name.trim(),
+      name: effectiveName,
       description: form.description || null,
       category_id: form.category_id,
       location_id: form.location_id,
@@ -637,9 +646,9 @@ function AssetsPage() {
               <DialogHeader className="border-b px-5 pb-4 pt-5 sm:px-6">
                 <DialogTitle>{form.id ? "Edit asset" : "Register asset"}</DialogTitle>
                 <div className="flex flex-wrap items-center gap-2"><Label className="whitespace-nowrap text-xs">Asset register</Label><Select value={registerChoice} onValueChange={setRegisterChoice}><SelectTrigger className="h-9 flex-1"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="default">Default register</SelectItem>{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select></div>
-                <DialogDescription className="sm:hidden">Step {wizardStep + 1} of {wizardSteps.length} · {wizardSteps[wizardStep].title}</DialogDescription>
+                {registerChoice==="default"&&<DialogDescription className="sm:hidden">Step {wizardStep + 1} of {wizardSteps.length} · {wizardSteps[wizardStep].title}</DialogDescription>}
 
-                <div className="hidden pt-4 sm:block">
+                {registerChoice==="default"&&<div className="hidden pt-4 sm:block">
                   <div className="grid grid-cols-5 gap-2">
                     {wizardSteps.map((step, index) => {
                       const done = index < wizardStep;
@@ -672,6 +681,17 @@ function AssetsPage() {
               </DialogHeader>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+                {registerChoice!=="default"?<div className="space-y-5">
+                  <div><h3 className="text-lg font-semibold">{registers.find(r=>r.id===registerChoice)?.name??"Custom register"}</h3><p className="text-sm text-muted-foreground">Only your custom fields are shown. Asset identifiers are handled automatically when not supplied.</p></div>
+                  <div className="grid gap-4 sm:grid-cols-2">{registerFields.map(field=><div key={field.key} className="space-y-2">
+                    <Label className="text-sm font-medium">{field.label}{field.required?" *":""}</Label>
+                    {field.type==="boolean"?<Select value={customValues[field.key]??""} onValueChange={value=>setCustomValues(v=>({...v,[field.key]:value}))}><SelectTrigger className="h-11"><SelectValue placeholder="Choose"/></SelectTrigger><SelectContent><SelectItem value="true">Yes</SelectItem><SelectItem value="false">No</SelectItem></SelectContent></Select>:
+                    field.type==="select"&&field.options?.length?<Select value={customValues[field.key]??""} onValueChange={value=>setCustomValues(v=>({...v,[field.key]:value}))}><SelectTrigger className="h-11"><SelectValue placeholder="Choose"/></SelectTrigger><SelectContent>{field.options.map(option=><SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>:
+                    <Input className="h-11 text-base" type={field.type==="date"?"date":field.type==="number"||field.type==="currency"?"number":"text"} value={customValues[field.key]??""} onChange={event=>setCustomValues(v=>({...v,[field.key]:event.target.value}))}/>}
+                  </div>)}</div>
+                  {locationSettings?.require_branch&&<div className="space-y-2"><Label>Branch *</Label><Select value={form.branch_id??""} onValueChange={value=>setForm(p=>({...p,branch_id:value}))}><SelectTrigger className="h-11"><SelectValue placeholder="Choose branch"/></SelectTrigger><SelectContent>{visibleBranches.map(b=><SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent></Select></div>}
+                  {(locationSettings?.require_geography||locationSettings?.require_internal_location||locationSettings?.require_gps)&&<AssetLocationFields value={{branch_id:form.branch_id,location_id:form.location_id,geo_place_id:form.geo_place_id,location_latitude:form.location_latitude,location_longitude:form.location_longitude,location_accuracy_m:form.location_accuracy_m,location_source:form.location_source}} onChange={location=>setForm(p=>({...p,...location}))} branches={visibleBranches} locations={locations as any[]}/>}
+                </div>:<>
                 {wizardStep === 0 && (
                   <div className="space-y-5">
                     <div>
@@ -896,12 +916,13 @@ function AssetsPage() {
                     </div>
                   </div>
                 )}
+                </>}
               </div>
 
               <DialogFooter className="border-t bg-background px-5 py-4 sm:justify-between sm:px-6">
                 <div className="flex gap-2">
                   <Button type="button" variant="ghost" onClick={() => { setOpen(false); setWizardStep(0); }}>Cancel</Button>
-                  {wizardStep > 0 && (
+                  {registerChoice==="default"&&wizardStep > 0 && (
                     <Button type="button" variant="outline" onClick={() => setWizardStep((step) => Math.max(0, step - 1))}>
                       <ChevronLeft className="mr-2 h-4 w-4" /> Back
                     </Button>
@@ -909,7 +930,7 @@ function AssetsPage() {
                 </div>
 
                 <div className="flex flex-1 justify-end gap-2">
-                  {wizardStep < wizardSteps.length - 1 ? (
+                  {registerChoice!=="default"?<><Button type="button" variant="outline" disabled={saving||!!form.id} onClick={()=>save(true)}>Save & add next</Button><Button type="button" disabled={saving} onClick={()=>save(false)}>{saving?"Saving…":form.id?"Update asset":"Save asset"}</Button></>:wizardStep < wizardSteps.length - 1 ? (
                     <Button type="button" onClick={nextWizardStep}>
                       Next <ChevronRight className="ml-2 h-4 w-4" />
                     </Button>
