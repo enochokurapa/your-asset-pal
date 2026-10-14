@@ -42,11 +42,10 @@ function fmt(v: any, currency?: boolean) {
 const safe = (s: string) => s.replace(/[^a-z0-9_-]+/gi, "_");
 
 export function exportAssetsXLSX(title: string, assets: any[], customFields: Array<{key:string,label:string}>=[]) {
-  const rows = assets.map(normalize).map((r) =>
-    Object.fromEntries(ASSET_COLUMNS.map((c) => [c.header, fmt((r as any)[c.key], c.currency)])),
-  );
-  if(customFields.length)rows.forEach((row,index)=>customFields.forEach(field=>(row as any)[field.label]=String(assets[index]?.custom_fields?.[field.key]??"")));
-  const ws = XLSX.utils.json_to_sheet(rows);
+  const rows = customFields.length
+    ? assets.map(asset=>Object.fromEntries(customFields.map(field=>[field.label, String(asset.custom_fields?.[field.key]??"")])))
+    : assets.map(normalize).map(r=>Object.fromEntries(ASSET_COLUMNS.map(c=>[c.header,fmt((r as any)[c.key],c.currency)])));
+  const ws = customFields.length?XLSX.utils.aoa_to_sheet([customFields.map(f=>f.label),...rows.map(row=>customFields.map(f=>(row as any)[f.label]))]):XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, title.slice(0, 30) || "Assets");
   XLSX.writeFile(wb, `${safe(title) || "assets"}.xlsx`);
