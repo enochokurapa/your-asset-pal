@@ -23,6 +23,7 @@ type Settings = {
   allow_inline_location_create: boolean;
   remember_last_selection: boolean;
   show_coordinates: boolean;
+  show_in_custom_register: boolean;
 };
 
 const DEFAULTS: Settings = {
@@ -38,6 +39,7 @@ const DEFAULTS: Settings = {
   allow_inline_location_create: true,
   remember_last_selection: true,
   show_coordinates: false,
+  show_in_custom_register: true,
 };
 
 export function LocationSettingsPanel() {
@@ -214,6 +216,7 @@ export function LocationSettingsPanel() {
           </div>
         </Card>
 
+        <Card className="flex items-center justify-between gap-4 p-4"><div><p className="font-semibold">Location in every custom register</p><p className="text-sm text-muted-foreground">Automatically include the selected asset location as a native column in custom register templates and exports.</p></div><Switch aria-label="Location in custom registers" checked={form.show_in_custom_register} onCheckedChange={v=>set("show_in_custom_register",v)}/></Card>
         <details className="rounded-xl border bg-card" open>
           <summary className="cursor-pointer list-none px-4 py-3 font-medium">Required fields</summary>
           <div className="grid gap-3 border-t p-4 sm:grid-cols-2">
