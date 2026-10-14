@@ -59,8 +59,8 @@ async function assertSameTenant(adminUserId: string, targetUserId: string) {
 
 async function enforceSeatLimit(tenantId: string) {
   const [tenantResult, settingsResult, countResult] = await Promise.all([
-    admin.from("tenants").select("subscription_status,trial_ends_at,trial_days_override,trial_user_limit_override").eq("id", tenantId).single(),
-    admin.from("saas_settings").select("trial_days,trial_user_limit").eq("id", true).single(),
+    admin.from("tenants").select("subscription_status,trial_ends_at,trial_days_override,trial_user_limit_override,purchased_extra_users,paid_user_limit_override,subscription_ends_at").eq("id", tenantId).single(),
+    admin.from("saas_settings").select("trial_days,trial_user_limit,included_paid_users").eq("id", true).single(),
     admin.from("profiles").select("id", { count: "exact", head: true })
       .eq("tenant_id", tenantId)
       .eq("is_active", true)
@@ -97,6 +97,13 @@ async function enforceSeatLimit(tenantId: string) {
   if (trialStillValid && (countResult.count ?? 0) >= trialUserLimit) {
     throw new Error(`Free trial is limited to ${trialUserLimit} active users. Upgrade to add more users.`);
   }
+  if(tenant.subscription_status==="active"){
+    if(tenant.subscription_ends_at&&new Date(tenant.subscription_ends_at).getTime()<=Date.now())throw new Error("Your subscription expired. Renew before adding users.");
+    const included=Number(tenant.paid_user_limit_override??settings.included_paid_users);
+    const allowance=included+Number(tenant.purchased_extra_users??0);
+    if((countResult.count??0)>=allowance)throw new Error(`You have reached your ${allowance}-user allowance. Purchase additional user seats from Plan & Billing before adding another user.`);
+  }
+  if(!trialStillValid&&tenant.subscription_status!=="active")throw new Error("Renew or activate your subscription before adding users.");
 }
 
 export const createUserAccount = createServerFn({ method: "POST" })
