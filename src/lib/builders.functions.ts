@@ -192,3 +192,14 @@ export const listRegisterMigrations=createServerFn({method:"POST"}).middleware([
    if(error)throw Error(error.message);
    return data??[];
  });
+
+export const getPublishedCanvasLayouts=createServerFn({method:"POST"})
+ .middleware([requireSupabaseAuth])
+ .inputValidator(input=>z.object({kind:z.enum(["dashboard_builder","report_builder"])}).parse(input))
+ .handler(async ({data,context})=>{
+   const {data:profile,error:pe}=await db.from("profiles").select("tenant_id,is_active").eq("id",context.userId).single();
+   if(pe||!profile?.tenant_id||!profile.is_active)throw new Error("Active business account required");
+   const {data:layouts,error}=await db.from("builder_definitions").select("id,name,configuration,is_active").eq("tenant_id",profile.tenant_id).eq("builder_key",data.kind).eq("is_active",true).order("updated_at",{ascending:false});
+   if(error)throw new Error(error.message);
+   return layouts??[];
+ });
