@@ -274,6 +274,7 @@ function AssetsPage() {
     })), [assets, currentBy, canSeeBranch]);
 
   const filtered = enriched.filter((a) => {
+    if(registerChoice!=="default"&&a.register_definition_id!==registerChoice)return false;
     if (q) {
       const needle = q.toLowerCase();
       const hit = [a.name, a.asset_tag, a.serial_number, a.custodian, a.department, a.locations?.name, a.geo_places?.name, a.geo_places?.display_path]
