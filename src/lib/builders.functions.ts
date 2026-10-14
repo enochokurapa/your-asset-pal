@@ -89,6 +89,10 @@ export const archiveBuilderDefinition = createServerFn({method:"POST"})
       .eq("id",data.id).eq("tenant_id",tenantId).eq("builder_key",data.kind).select("id").maybeSingle();
     if(error) throw new Error(error.message);
     if(!updated) throw new Error("Builder definition not found.");
+    if(data.kind==="register_builder"){
+      const {error:primaryError}=await db.from("tenant_primary_registers").update({definition_id:null,updated_at:new Date().toISOString()}).eq("tenant_id",tenantId).eq("definition_id",data.id);
+      if(primaryError)throw new Error(primaryError.message);
+    }
     return {ok:true};
   });
 
