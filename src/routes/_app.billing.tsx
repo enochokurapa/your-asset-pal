@@ -9,6 +9,7 @@ import {
   checkYoUpgrade,
   startYoAddonPurchase,
   checkYoAddonPurchase,
+  startYoSeatPurchase,checkYoSeatPurchase,
 } from "@/lib/saas.functions";
 import { getServerAuthHeaders } from "@/lib/auth-headers";
 import { Card } from "@/components/ui/card";
@@ -34,6 +35,8 @@ function BillingPage() {
   const checkPay = useServerFn(checkYoUpgrade);
   const startAddonPay = useServerFn(startYoAddonPurchase);
   const checkAddonPay = useServerFn(checkYoAddonPurchase);
+  const startSeatPay=useServerFn(startYoSeatPurchase),checkSeatPay=useServerFn(checkYoSeatPurchase);
+  const [seatQuantity,setSeatQuantity]=useState(1),[seatTx,setSeatTx]=useState<string|null>(null);
   const [phone, setPhone] = useState("256");
   const [busy, setBusy] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -46,6 +49,8 @@ function BillingPage() {
     queryFn: async () => getCtx({ headers: await getServerAuthHeaders() }),
   });
   const price = ctx?.settings?.paidPrice ?? 0;
+  const extraUserPrice=ctx?.settings?.extraUserPrice??0;
+  const totalSeats=(ctx?.settings?.includedPaidUsers??0)+(ctx?.settings?.purchasedExtraUsers??0);
   const currency = ctx?.settings?.currency ?? "UGX";
   const trialDays = ctx?.settings?.trialDays ?? null;
   const trialUserLimit = ctx?.settings?.trialUserLimit ?? null;
@@ -83,6 +88,11 @@ function BillingPage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <div><h1 className="text-2xl font-bold tracking-tight">Plan & billing</h1><p className="text-sm text-muted-foreground">Manage the subscription for {tenantName || "this workspace"}.</p></div>
 
+      <Card className="space-y-4 border-primary/20 p-5">
+        <div><h2 className="text-lg font-semibold">Team seats</h2><p className="text-sm text-muted-foreground">Your paid plan includes {ctx?.settings?.includedPaidUsers??"—"} users. Purchased additional seats: {ctx?.settings?.purchasedExtraUsers??0}. Total capacity: {totalSeats}.</p></div>
+        <div className="flex flex-wrap items-end gap-3"><div className="space-y-2"><Label>Additional users</Label><Input className="w-28" type="number" min={1} max={100} value={seatQuantity} onChange={e=>setSeatQuantity(Math.max(1,Math.min(100,Number(e.target.value)||1)))}/></div><div className="space-y-1"><p className="text-sm text-muted-foreground">Price per user: {money(extraUserPrice,currency)}</p><p className="text-lg font-semibold">{money(extraUserPrice*seatQuantity,currency)}</p></div><Button disabled={busy||!isTenantAdmin||subscriptionStatus!=="active"||extraUserPrice<=0||!ctx?.paymentConfigured} onClick={async()=>{setBusy(true);try{const result=await startSeatPay({headers:await getServerAuthHeaders(),data:{phone,quantity:seatQuantity}});setSeatTx(result.transactionId);toast.success("Payment request sent. Approve on your phone.")}catch(e:any){toast.error(e.message||"Could not purchase seats")}finally{setBusy(false)}}}>Buy extra users</Button>{seatTx&&<Button variant="outline" disabled={checking} onClick={async()=>{setChecking(true);try{const result=await checkSeatPay({headers:await getServerAuthHeaders(),data:{transactionId:seatTx}});if(result.successful){toast.success("Extra user seats activated");setSeatTx(null);await refetch()}else toast.message("Payment: "+result.status)}catch(e:any){toast.error(e.message||"Could not check payment")}finally{setChecking(false)}}}>Check seat payment</Button>}</div>
+        <p className="text-xs text-muted-foreground">Paid seats are enabled only after confirmed payment. Then open Users to add team members.</p>
+      </Card>
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="p-5"><p className="text-xs uppercase tracking-wide text-muted-foreground">Current status</p><div className="mt-2 flex items-center gap-2"><Badge className="capitalize">{subscriptionStatus}</Badge>{subscriptionStatus === "active" && <CheckCircle2 className="h-4 w-4 text-success" />}</div></Card>
         <Card className="p-5"><p className="text-xs uppercase tracking-wide text-muted-foreground">Free trial</p><p className="mt-2 text-xl font-semibold">{trialDays !== null ? `${trialDays} days` : "Loading…"}</p>{subscriptionStatus === "trial" && daysLeft !== null && <p className="mt-1 text-xs text-muted-foreground"><strong>{daysLeft} day(s) remaining</strong>{trialEndsAt ? ` · ends ${new Date(trialEndsAt).toLocaleDateString()}` : ""}</p>}</Card>
