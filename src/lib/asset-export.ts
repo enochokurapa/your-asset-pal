@@ -41,10 +41,11 @@ function fmt(v: any, currency?: boolean) {
 
 const safe = (s: string) => s.replace(/[^a-z0-9_-]+/gi, "_");
 
-export function exportAssetsXLSX(title: string, assets: any[]) {
+export function exportAssetsXLSX(title: string, assets: any[], customFields: Array<{key:string,label:string}>=[]) {
   const rows = assets.map(normalize).map((r) =>
     Object.fromEntries(ASSET_COLUMNS.map((c) => [c.header, fmt((r as any)[c.key], c.currency)])),
   );
+  if(customFields.length)rows.forEach((row,index)=>customFields.forEach(field=>(row as any)[field.label]=String(assets[index]?.custom_fields?.[field.key]??"")));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, title.slice(0, 30) || "Assets");
@@ -86,6 +87,7 @@ function detailPairs(a: any): [string, string][] {
     ["Purchase date", n.purchase_date],
     ["Purchase value", n.purchase_value ? formatUGX(n.purchase_value) : ""],
     ["Description", a.description ?? ""],
+    ...Object.entries(a.custom_fields??{}).map(([key,value]):[string,string]=>[key,String(value??"")]),
     ["Set for disposal", a.set_for_disposal ? "Yes" : "No"],
     ["Created", a.created_at ? new Date(a.created_at).toLocaleString() : ""],
   ];
