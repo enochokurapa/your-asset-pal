@@ -1198,3 +1198,24 @@ export const checkYoSeatPurchase=createServerFn({method:"POST"})
   }else if(status==="FAILED")await admin.from("seat_purchase_transactions").update({status:"failed"}).eq("id",tx.id);
   return {successful:status==="SUCCEEDED",status};
  });
+
+export const getPricingPlans=createServerFn({method:"GET"}).handler(async()=>{
+ const {data,error}=await admin.from("saas_pricing_plans").select("id,name,description,monthly_price,annual_price,included_users,included_assets,features,is_published").eq("is_published",true).order("monthly_price");
+ if(error)throw Error(error.message);
+ const {data:settings}=await admin.from("saas_settings").select("currency,extra_user_price,trial_days").eq("id",true).single();
+ return {currency:settings?.currency??"USD",extraUserPrice:Number(settings?.extra_user_price??0),trialDays:Number(settings?.trial_days??14),plans:(data??[]).map((p:any)=>({...p,monthly_price:Number(p.monthly_price),annual_price:Number(p.annual_price)}))};
+});
+export const getAdminPricingPlans=createServerFn({method:"POST"}).middleware([requireSupabaseAuth]).handler(async({context})=>{
+ await assertSaasAdmin(context.userId);
+ const {data,error}=await admin.from("saas_pricing_plans").select("*").order("monthly_price");
+ if(error)throw Error(error.message);
+ return data??[];
+});
+export const saveAdminPricingPlan=createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
+ .inputValidator(input=>z.object({id:z.enum(["starter","business","enterprise"]),name:z.string().min(2).max(60),description:z.string().max(300),monthly_price:z.number().finite().min(0),annual_price:z.number().finite().min(0),included_users:z.number().int().min(1),included_assets:z.number().int().min(1),features:z.array(z.string().min(1).max(100)).max(30),is_published:z.boolean()}).parse(input))
+ .handler(async({context,data})=>{
+  await assertSaasAdmin(context.userId);
+  const {error}=await admin.from("saas_pricing_plans").update({...data,updated_at:new Date().toISOString()}).eq("id",data.id);
+  if(error)throw Error(error.message);
+  return {saved:true};
+ });
