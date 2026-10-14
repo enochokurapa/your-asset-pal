@@ -91,3 +91,23 @@ export const archiveBuilderDefinition = createServerFn({method:"POST"})
     if(!updated) throw new Error("Builder definition not found.");
     return {ok:true};
   });
+
+/** One primary register per tenant, without deleting any register definitions. */
+export const setActiveRegisterDefinition = createServerFn({method:"POST"})
+  .middleware([requireSupabaseAuth])
+  .inputValidator(input=>z.object({definitionId:idSchema.nullable()}).parse(input))
+  .handler(async ({data,context})=>{
+    const tenantId=await authorize(context.userId,"register_builder");
+    if(data.definitionId){
+      const {data:definition,error:lookupError}=await db.from("builder_definitions")
+        .select("id").eq("id",data.definitionId).eq("tenant_id",tenantId)
+        .eq("builder_key","register_builder").eq("is_active",true).maybeSingle();
+      if(lookupError)throw new Error(lookupError.message);
+      if(!definition)throw new Error("Active register not found for this business.");
+    }
+    const {error}=await db.from("tenant_primary_registers").upsert({
+      tenant_id:tenantId,definition_id:data.definitionId,updated_at:new Date().toISOString(),
+    },{onConflict:"tenant_id"});
+    if(error)throw new Error(error.message);
+    return {ok:true};
+  });
