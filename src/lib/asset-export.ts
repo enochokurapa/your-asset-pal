@@ -1,4 +1,4 @@
-import {getCustomRegisterHeaders,type RegisterTemplate} from "@/lib/bulk-import";
+import {getCustomRegisterHeaders,type RegisterTemplate,type RegisterLocationConfig} from "@/lib/bulk-import";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { formatUGX } from "@/lib/utils";
@@ -42,9 +42,9 @@ function fmt(v: any, currency?: boolean) {
 
 const safe = (s: string) => s.replace(/[^a-z0-9_-]+/gi, "_");
 
-export function exportAssetsXLSX(title:string,assets:any[],customFields:Array<{key:string,label:string}>=[],includeLocation=false){
+export function exportAssetsXLSX(title:string,assets:any[],customFields:Array<{key:string,label:string}>=[],locationConfig?:RegisterLocationConfig){
  const custom=customFields.length>0;
- const headers=custom?getCustomRegisterHeaders({id:"export",name:title,configuration:{fields:customFields.map(f=>({...f,type:"text",required:false}))}}):ASSET_COLUMNS.map(c=>c.header);
+ const headers=custom?getCustomRegisterHeaders({id:"export",name:title,configuration:{fields:customFields.map(f=>({...f,type:"text",required:false}))}},locationConfig):ASSET_COLUMNS.map(c=>c.header);
  const row=(asset:any)=>{
   const base=normalize(asset);
   const geoParts=String(asset.geo_places?.display_path??"").split("·").map((v:string)=>v.trim()).filter(Boolean);
