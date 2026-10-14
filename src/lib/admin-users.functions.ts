@@ -59,7 +59,7 @@ async function assertSameTenant(adminUserId: string, targetUserId: string) {
 
 async function enforceSeatLimit(tenantId: string) {
   const [tenantResult, settingsResult, countResult] = await Promise.all([
-    admin.from("tenants").select("subscription_status,trial_ends_at,trial_days_override,trial_user_limit_override,purchased_extra_users,paid_user_limit_override,subscription_ends_at").eq("id", tenantId).single(),
+    admin.from("tenants").select("subscription_status,trial_ends_at,trial_days_override,trial_user_limit_override,purchased_extra_users,paid_user_limit_override,subscription_ends_at,plan_code").eq("id", tenantId).single(),
     admin.from("saas_settings").select("trial_days,trial_user_limit,included_paid_users").eq("id", true).single(),
     admin.from("profiles").select("id", { count: "exact", head: true })
       .eq("tenant_id", tenantId)
