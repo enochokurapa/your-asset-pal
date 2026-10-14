@@ -66,7 +66,7 @@ export type ImportResult = {
   errors: { row: number; tag?: string; error: string }[];
 };
 
-export async function importAssetsFromFile(file: File, userId: string | null,register?:RegisterTemplate): Promise<ImportResult> {
+export async function importAssetsFromFile(file: File, userId: string | null,register?:RegisterTemplate, importBranchId?:string): Promise<ImportResult> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array" });
   const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -133,8 +133,8 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
       if(!tag)throw new Error("Asset tag is required");
       if(!name)throw new Error("A text/name field must contain an asset name");
       if(!register&&!branchName)throw new Error("branch is required");
-      const branch=branchName?await ensureBranch(branchName):brs?.length===1?(brs as any[])[0]:null;
-      if(register&&!branch&&(brs?.length??0)>1)throw new Error("This company has multiple branches. Choose a branch for this import first.");
+      const branch=branchName?await ensureBranch(branchName):importBranchId?(brs as any[]).find(b=>b.id===importBranchId):brs?.length===1?(brs as any[])[0]:null;
+      if(register&&!branch&&(brs?.length??0)>1)throw new Error("Choose an import branch before uploading to this register.");
 
       let categoryId: string | null = null;
       if (r.category) {
