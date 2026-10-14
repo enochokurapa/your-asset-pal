@@ -259,6 +259,7 @@ function PublicHome() {
 
           <nav className="ml-auto hidden items-center gap-6 text-sm font-medium text-muted-foreground lg:flex">
             <a href="#features" className="transition hover:text-foreground">Features</a>
+            <Link to="/pricing" className="transition hover:text-foreground">Pricing</Link>
             <a href="#modules" className="transition hover:text-foreground">Modules</a>
             <a href="#locations" className="transition hover:text-foreground">Locations</a>
             <a href="#security" className="transition hover:text-foreground">Security</a>
@@ -284,8 +285,8 @@ function PublicHome() {
       </header>
 
       <main>
-        <section className="relative overflow-hidden border-b" data-scroll-reveal data-reveal="hero">
-          <div className="absolute inset-0 -z-20 bg-background" />
+        <section className="relative overflow-hidden border-b bg-[linear-gradient(125deg,color-mix(in_srgb,var(--primary)_14%,var(--background))_0%,var(--background)_57%,color-mix(in_srgb,var(--platform-secondary)_12%,var(--background))_100%)]" data-scroll-reveal data-reveal="hero">
+          <div className="absolute inset-0 -z-20 bg-transparent" />
           <div className="absolute inset-0 -z-10 opacity-35 [background-image:linear-gradient(to_right,color-mix(in_oklab,var(--border)_60%,transparent)_1px,transparent_1px),linear-gradient(to_bottom,color-mix(in_oklab,var(--border)_60%,transparent)_1px,transparent_1px)] [background-size:46px_46px]" />
           <div className="absolute -right-32 top-12 -z-10 h-80 w-80 rounded-full bg-primary/10 blur-3xl" />
 
@@ -316,7 +317,7 @@ function PublicHome() {
                   </Link>
                 </Button>
                 <Button asChild variant="outline" size="lg" className="h-12 px-6">
-                  <a href="#features">Explore features</a>
+                  <Link to="/pricing">See plans & pricing</Link>
                 </Button>
               </div>
 
@@ -336,7 +337,7 @@ function PublicHome() {
           </div>
         </section>
 
-        <section className="border-b bg-muted/25 af-scroll-reveal" data-scroll-reveal data-reveal="up">
+        <section className="border-b bg-[color-mix(in_srgb,var(--primary)_5%,var(--background))] af-scroll-reveal" data-scroll-reveal data-reveal="up">
           <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
             <div className="af-stagger grid gap-4 text-center sm:grid-cols-2 lg:grid-cols-4">
               {[
@@ -556,6 +557,7 @@ function PublicHome() {
           </div>
         </section>
 
+        <section className="border-t bg-[color-mix(in_srgb,var(--platform-secondary)_8%,var(--background))] px-4 py-20 sm:px-6"><div className="mx-auto grid max-w-7xl items-center gap-8 lg:grid-cols-[1fr_auto]"><div><p className="text-sm font-bold uppercase tracking-[.15em] text-primary">Pricing that scales</p><h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Start with the essentials. Expand without rebuilding.</h2><p className="mt-4 max-w-2xl text-muted-foreground">Your subscription includes user and asset allowances. Purchase extra users as your team grows, or activate advanced paid integrations only when needed.</p></div><Button asChild size="lg" className="h-12 px-8"><Link to="/pricing">Explore pricing <ArrowRight className="ml-2 h-4 w-4"/></Link></Button></div></section>
         <section className="af-scroll-reveal border-t" data-scroll-reveal data-reveal="zoom">
           <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
             <div className="overflow-hidden rounded-3xl bg-primary px-6 py-12 text-center text-primary-foreground shadow-xl sm:px-10">
@@ -589,6 +591,7 @@ function PublicHome() {
             <a href="#features" className="hover:text-foreground">Features</a>
             <a href="#modules" className="hover:text-foreground">Modules</a>
             <a href="#integrations" className="hover:text-foreground">Integrations</a>
+            <Link to="/pricing" className="hover:text-foreground">Pricing</Link>
             <Link to="/login" className="hover:text-foreground">Sign in</Link>
           </div>
         </div>
