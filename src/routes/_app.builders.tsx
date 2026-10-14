@@ -54,7 +54,7 @@ function BuildersPage(){
  const archive=useServerFn(archiveBuilderDefinition);
  const activate=useServerFn(setActiveRegisterDefinition);
  const [activationPrompt,setActivationPrompt]=useState<string|null>(null);
- const [activeRegister,setActiveRegister]=useState<string|null>(null);
+ const [,setActiveRegister]=useState<string|null>(null);
  const allowed=canView(kind);
  const locked=isPaidFeature(kind)||isAddOnFeature(kind);
  useEffect(()=>{setKind(initial)},[initial]);
@@ -123,6 +123,7 @@ function BuildersPage(){
        </div>
        {error&&<p className="rounded border border-destructive p-2 text-xs text-destructive" role="alert">{error}</p>}
        <div className="flex items-center gap-2"><Label className="whitespace-nowrap text-xs">Saved layouts</Label><Select value={selected??"new"} onValueChange={id=>{if(id==="new"){setSelected(null);setName("");setDescription("");setFields([])}else{const item=items.find(x=>x.id===id);if(item)choose(item)}}}><SelectTrigger className="h-8 flex-1"><SelectValue placeholder="New template"/></SelectTrigger><SelectContent><SelectItem value="new">New template</SelectItem>{items.map(item=><SelectItem key={item.id} value={item.id}>{item.name}{item.is_active?"":" (archived)"}</SelectItem>)}</SelectContent></Select></div>
+       {kind==="register_builder"&&<div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-2 text-xs"><span className="flex-1">Default register is preserved. Select any saved register, then make it primary or download its template.</span><Button size="sm" variant="outline" disabled={busy} onClick={()=>confirmActive(null)}>Use default</Button>{selected&&<Button size="sm" variant="outline" disabled={busy} onClick={()=>setActivationPrompt(selected)}>Make selected primary</Button>}</div>}
        <div className="space-y-1"><Label className="text-xs">Template name</Label><Input className="h-9" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Hospital equipment register"/></div>
        <div className="grid grid-cols-2 gap-2"><div className="min-w-0 space-y-1"><Label className="text-xs">Data source</Label><Select value={source} onValueChange={setSource}><SelectTrigger className="h-9"><SelectValue/></SelectTrigger><SelectContent>{["assets","verification","depreciation","maintenance","movements","disposals"].map(x=><SelectItem key={x} value={x}>{x}</SelectItem>)}</SelectContent></Select></div><div className="min-w-0 space-y-1"><Label className="text-xs">Description (optional)</Label><Input className="h-9" value={description} onChange={e=>setDescription(e.target.value)} placeholder="Purpose"/></div></div>
        <div className="flex items-center justify-between border-t pt-3"><h3 className="text-sm font-semibold">Custom fields <span className="text-muted-foreground">({fields.length})</span></h3><span className="text-xs text-muted-foreground">See spreadsheet below ↓</span></div>
