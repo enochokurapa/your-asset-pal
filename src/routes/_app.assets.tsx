@@ -638,7 +638,7 @@ function AssetsPage() {
     try {
       if(registerCatalogPending||registerCatalogError||!catalog)throw new Error("The company register has not finished loading.");
       if(registerChoice!=="default"&&visibleBranches.length>1&&!importBranchId)throw new Error("Choose the destination branch before importing.");
-      const r = await importAssetsFromFile(f, user?.id ?? null,registers.find(r=>r.id===registerChoice),importBranchId||undefined);
+      const r = await importAssetsFromFile(f, user?.id ?? null,registers.find(r=>r.id===registerChoice),importBranchId||undefined,catalog?.includeLocation??false);
       if(r.success===0){toast.error(`No assets imported. ${r.errors[0]?.error??"Check the selected register and spreadsheet."}`);return;}
       toast.success(`Imported ${r.success} of ${r.total} rows`, { description: r.errors.length ? `${r.errors.length} rows failed. First error (row ${r.errors[0].row}): ${r.errors[0].error}` : undefined });
       qc.invalidateQueries({ queryKey: ["assets"] });
@@ -659,8 +659,8 @@ function AssetsPage() {
           <Button variant="outline" onClick={() => { setScanMode("lookup"); setScanOpen(true); }}>
             <ScanLine className="mr-2 h-4 w-4" /> Scan
           </Button>
-          <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError} onClick={()=>exportAssetsXLSX(registers.find(r=>r.id===registerChoice)?.name??"Default Asset Register", (assets as any[]).filter(a=>registerChoice==="default"||a.register_definition_id===registerChoice),registerFields)} title="Export assets for selected register"><Download className="mr-2 h-4 w-4"/> Export register</Button>
-          <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError} onClick={()=>downloadTemplate(registers.find(r=>r.id===registerChoice))} title="Download Excel import template">
+          <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError} onClick={()=>exportAssetsXLSX(registers.find(r=>r.id===registerChoice)?.name??"Default Asset Register", (assets as any[]).filter(a=>registerChoice==="default"||a.register_definition_id===registerChoice),registerFields,catalog?.includeLocation??false)} title="Export assets for selected register"><Download className="mr-2 h-4 w-4"/> Export register</Button>
+          <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError} onClick={()=>downloadTemplate(registers.find(r=>r.id===registerChoice),catalog?.includeLocation??false)} title="Download Excel import template">
             <Download className="mr-2 h-4 w-4" /> Template
           </Button>
           {canAdd&&registerChoice!=="default"&&visibleBranches.length>1&&<Select value={importBranchId||"choose"} onValueChange={v=>setImportBranchId(v==="choose"?"":v)}><SelectTrigger className="w-52"><SelectValue placeholder="Import into branch"/></SelectTrigger><SelectContent><SelectItem value="choose">Choose import branch</SelectItem>{visibleBranches.map(branch=><SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}</SelectContent></Select>}
@@ -1104,7 +1104,7 @@ function AssetsPage() {
               <thead>
                 <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
                   {registerChoice==="default"&&<><th className="px-3 py-3 font-medium">Tag</th><th className="px-3 py-3 font-medium">Name</th></>}
-                  {registerFields.map(field=><th key={field.key} className="px-3 py-3 font-medium">{field.label}</th>)}
+                  {registerFields.map(field=><th key={field.key} className="px-3 py-3 font-medium">{field.label}</th>)}{registerChoice!=="default"&&catalog?.includeLocation&&!registerFields.some(f=>f.key.toLowerCase()==="location")&&<th className="px-3 py-3 font-medium">Location</th>}
                   {registerChoice==="default"&&<><th className="hidden px-3 py-3 font-medium md:table-cell">Branch</th><th className="hidden px-3 py-3 font-medium lg:table-cell">Category</th><th className="hidden px-3 py-3 font-medium lg:table-cell">Location</th><th className="hidden px-3 py-3 font-medium md:table-cell">Custodian</th><th className="px-3 py-3 font-medium">Status</th><th className="hidden px-3 py-3 text-right font-medium sm:table-cell">Value</th></>}
                   <th className="px-3 py-3" />
                 </tr>
@@ -1134,7 +1134,7 @@ function AssetsPage() {
                     </td>
                     <td className="hidden px-3 py-3 text-right tabular-nums sm:table-cell">{formatUGX(a.purchase_value)}</td>
                     </>}
-                    {registerChoice!=="default"&&registerFields.map(field=><td key={field.key} className="px-3 py-3 text-sm">{String(a.custom_fields?.[field.key]??"—")}</td>)}
+                    {registerChoice!=="default"&&registerFields.map(field=><td key={field.key} className="px-3 py-3 text-sm">{String(a.custom_fields?.[field.key]??"—")}</td>)}{registerChoice!=="default"&&catalog?.includeLocation&&!registerFields.some(f=>f.key.toLowerCase()==="location")&&<td className="px-3 py-3 text-sm">{a.locations?.name??"—"}</td>}
                     <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-end gap-1">
                         <Button size="icon" variant="ghost" title="View details & history" onClick={() => openView(a, "activity")}>
