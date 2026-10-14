@@ -5,7 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "@/hooks/use-auth";
 import {
   getSaasContext,
-  startYoUpgrade,
+  startYoUpgrade,getPricingPlans,
   checkYoUpgrade,
   startYoAddonPurchase,
   checkYoAddonPurchase,
@@ -31,6 +31,9 @@ function BillingPage() {
   const { isTenantAdmin, subscriptionStatus, tenantName, trialEndsAt } = useAuth();
   const qc = useQueryClient();
   const getCtx = useServerFn(getSaasContext);
+  const getPlans=useServerFn(getPricingPlans);
+  const {data:publicPlans}=useQuery({queryKey:["pricing-plans"],queryFn:()=>getPlans()});
+  const [selectedPlan,setSelectedPlan]=useState("business"),[period,setPeriod]=useState<"monthly"|"annual">("monthly");
   const startPay = useServerFn(startYoUpgrade);
   const checkPay = useServerFn(checkYoUpgrade);
   const startAddonPay = useServerFn(startYoAddonPurchase);
@@ -50,7 +53,8 @@ function BillingPage() {
     queryKey: ["saas-context"],
     queryFn: async () => getCtx({ headers: await getServerAuthHeaders() }),
   });
-  const price = ctx?.settings?.paidPrice ?? 0;
+  const choice=publicPlans?.plans.find((p:any)=>p.id===selectedPlan);
+  const price=Number(choice?(period==="monthly"?choice.monthly_price:choice.annual_price):0);
   const extraUserPrice=ctx?.settings?.extraUserPrice??0;
   const totalSeats=(ctx?.settings?.includedPaidUsers??0)+(ctx?.settings?.purchasedExtraUsers??0);
   const currency = ctx?.settings?.currency ?? "UGX";
@@ -65,7 +69,7 @@ function BillingPage() {
     setBusy(true);
     try {
       const headers = await getServerAuthHeaders();
-      const r = await startPay({ data: { phone }, headers });
+      const r = await startPay({ data: { phone,plan_id:selectedPlan as "starter"|"business"|"enterprise",period }, headers });
       setTransactionId(r.transactionId);
       toast.success("Payment request sent. Approve the prompt on your phone.");
     } catch (e: any) { toast.error(e?.message ?? "Could not start payment"); }
@@ -79,7 +83,7 @@ function BillingPage() {
       const headers = await getServerAuthHeaders();
       const r = await checkPay({ data: { transaction_id: transactionId }, headers });
       if (r.successful) {
-        toast.success("Payment confirmed. Your workspace is now on the paid plan.");
+        toast.success("Payment confirmed. Your selected subscription plan is active.");
         await refetch();
         await qc.invalidateQueries({ queryKey: ["saas-context"] });
         window.location.reload();
@@ -101,9 +105,10 @@ function BillingPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="p-5"><p className="text-xs uppercase tracking-wide text-muted-foreground">Current status</p><div className="mt-2 flex items-center gap-2"><Badge className="capitalize">{subscriptionStatus}</Badge>{subscriptionStatus === "active" && <CheckCircle2 className="h-4 w-4 text-success" />}</div></Card>
         <Card className="p-5"><p className="text-xs uppercase tracking-wide text-muted-foreground">Free trial</p><p className="mt-2 text-xl font-semibold">{trialDays !== null ? `${trialDays} days` : "Loading…"}</p>{subscriptionStatus === "trial" && daysLeft !== null && <p className="mt-1 text-xs text-muted-foreground"><strong>{daysLeft} day(s) remaining</strong>{trialEndsAt ? ` · ends ${new Date(trialEndsAt).toLocaleDateString()}` : ""}</p>}</Card>
-        <Card className="p-5"><p className="text-xs uppercase tracking-wide text-muted-foreground">Paid plan</p><p className="mt-2 text-xl font-semibold">{price > 0 ? money(price, currency) : "Price not set"}</p><p className="mt-1 text-xs text-muted-foreground">Price is controlled by the SaaS Admin.</p></Card>
+        <Card className="p-5"><p className="text-xs uppercase tracking-wide text-muted-foreground">Your active package</p><p className="mt-2 text-xl font-semibold capitalize">{ctx?.tenant?.planCode??"Trial"}</p><p className="mt-1 text-xs text-muted-foreground">Package features are set by SaaS Admin.</p></Card>
       </div>
 
+      <Card className="space-y-4 p-5"><div><h2 className="text-lg font-semibold">Choose your paid package</h2><p className="text-sm text-muted-foreground">The package you select controls user limits, asset capacity and available modules. The free trial remains separate.</p></div><div className="flex flex-wrap gap-2">{(publicPlans?.plans??[]).map((p:any)=><Button key={p.id} variant={selectedPlan===p.id?"default":"outline"} onClick={()=>setSelectedPlan(p.id)}>{p.name}</Button>)}</div><div className="flex gap-2"><Button size="sm" variant={period==="monthly"?"secondary":"outline"} onClick={()=>setPeriod("monthly")}>Monthly</Button><Button size="sm" variant={period==="annual"?"secondary":"outline"} onClick={()=>setPeriod("annual")}>Annual</Button></div><p className="text-xl font-bold">{choice?money(price,currency):"Select a package"} <span className="text-xs font-normal text-muted-foreground">/{period==="monthly"?"month":"year"}</span></p><p className="text-xs text-muted-foreground">Mobile-money payments require matching UGX pricing. Only a confirmed payment activates the package.</p></Card>
       <Card id="addons" className="p-6">
         <div className="flex items-center justify-between gap-3">
           <div>
