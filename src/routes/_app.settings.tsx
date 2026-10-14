@@ -161,11 +161,12 @@ function SettingsPage() {
         </Card>
       )}
 
-      <div className={["locations","automation"].includes(activeTab) ? "grid gap-6" : "grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"}>
-        <Card className="p-4">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList>
-              <TabsTrigger value="brand">Branding</TabsTrigger>
+      <div className={["locations","automation","numbering","guides","appearance"].includes(activeTab) ? "grid items-start gap-4 lg:grid-cols-[220px_minmax(0,1fr)]" : "grid items-start gap-4 lg:grid-cols-[220px_minmax(0,1fr)_minmax(360px,.9fr)]"}>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Card className="p-2 lg:sticky lg:top-4">
+            <p className="px-3 pb-2 pt-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Settings sections</p>
+            <TabsList className="flex h-auto w-full flex-col items-stretch gap-1 bg-transparent p-0">
+              <TabsTrigger className="w-full justify-start px-3 py-2.5 text-left data-[state=active]:bg-primary/10 data-[state=active]:text-primary" value="brand">Branding</TabsTrigger>
               <TabsTrigger value="header">Header / Footer</TabsTrigger>
               <TabsTrigger value="watermark">Watermark</TabsTrigger>
               <TabsTrigger value="layout">Layout</TabsTrigger>
@@ -174,9 +175,8 @@ function SettingsPage() {
               <TabsTrigger value="numbering">Asset tag numbering</TabsTrigger>
               <TabsTrigger value="automation">Automation</TabsTrigger>
               <TabsTrigger value="guides">User guides</TabsTrigger>
-            </TabsList>
-
-
+            </TabsList></Card>
+          <Card className="min-w-0 p-4 sm:p-6">
             <fieldset disabled={!canManage} className="space-y-4">
 
             <TabsContent value="brand" className="space-y-4 pt-4">
@@ -364,14 +364,13 @@ function SettingsPage() {
             <TabsContent value="guides" className="space-y-4 pt-4">
               <UserGuidesPanel />
             </TabsContent>
+          </Card>
           </Tabs>
 
-        </Card>
-
-        {!["locations","automation","numbering"].includes(activeTab) && (
-        <Card className="flex h-[800px] flex-col p-3">
+        {!["locations","automation","numbering","guides","appearance"].includes(activeTab) && (
+        <Card className="flex h-[740px] min-w-0 flex-col p-3 lg:sticky lg:top-4">
           <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-medium">Live preview (sample gate pass)</p>
+            <p className="text-sm font-medium">Live document preview</p>
             <p className="text-xs text-muted-foreground">Updates as you type</p>
           </div>
           {previewUrl ? (
