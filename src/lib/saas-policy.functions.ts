@@ -20,7 +20,7 @@ async function assertSaasAdmin(userId: string) {
 async function readGlobalPolicy() {
   const { data, error } = await admin
     .from("saas_settings")
-    .select("trial_days,trial_user_limit,paid_price,currency,included_paid_users,extra_user_price,included_assets,updated_at")
+    .select("trial_days,trial_user_limit,paid_price,currency,included_paid_users,extra_user_price,included_assets,extra_asset_block_size,extra_asset_block_price,updated_at")
     .eq("id", true)
     .single();
 
@@ -49,7 +49,7 @@ async function readGlobalPolicy() {
     trialDays,
     trialUserLimit,
     paidPrice,
-    includedPaidUsers:Number(data.included_paid_users),extraUserPrice:Number(data.extra_user_price),includedAssets:Number(data.included_assets),
+    includedPaidUsers:Number(data.included_paid_users),extraUserPrice:Number(data.extra_user_price),includedAssets:Number(data.included_assets),extraAssetBlockSize:Number(data.extra_asset_block_size),extraAssetBlockPrice:Number(data.extra_asset_block_price),
     currency: String(data.currency).toUpperCase(),
     updatedAt: data.updated_at ?? null,
   };
@@ -70,7 +70,7 @@ export const updateGlobalSaasPolicy = createServerFn({ method: "POST" })
         trial_days: z.number().int().min(1).max(365),
         trial_user_limit: z.number().int().min(1).max(10000),
         paid_price: z.number().min(0),
-        included_paid_users:z.number().int().min(1).max(100000),extra_user_price:z.number().min(0),included_assets:z.number().int().min(1).max(1000000000),
+        included_paid_users:z.number().int().min(1).max(100000),extra_user_price:z.number().min(0),included_assets:z.number().int().min(1).max(1000000000),extra_asset_block_size:z.number().int().min(1).max(10000000),extra_asset_block_price:z.number().min(0),
         currency: z.string().trim().min(3).max(8),
       })
       .parse(input),
@@ -84,7 +84,7 @@ export const updateGlobalSaasPolicy = createServerFn({ method: "POST" })
         trial_days: data.trial_days,
         trial_user_limit: data.trial_user_limit,
         paid_price: data.paid_price,
-        included_paid_users:data.included_paid_users,extra_user_price:data.extra_user_price,included_assets:data.included_assets,
+        included_paid_users:data.included_paid_users,extra_user_price:data.extra_user_price,included_assets:data.included_assets,extra_asset_block_size:data.extra_asset_block_size,extra_asset_block_price:data.extra_asset_block_price,
         currency: data.currency.toUpperCase(),
         updated_at: new Date().toISOString(),
         updated_by: context.userId,
