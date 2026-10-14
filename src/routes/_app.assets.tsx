@@ -608,8 +608,10 @@ function AssetsPage() {
   const onImport = async (f: File) => {
     setImporting(true);
     try {
+      if(registerCatalogPending||registerCatalogError||!catalog)throw new Error("The company register has not finished loading.");
       const r = await importAssetsFromFile(f, user?.id ?? null,registers.find(r=>r.id===registerChoice));
-      toast.success(`Imported ${r.success} of ${r.total} rows`, { description: r.errors.length ? `${r.errors.length} rows had errors - check the asset_imports record.` : undefined });
+      if(r.success===0){toast.error(`No assets imported. ${r.errors[0]?.error??"Check the selected register and spreadsheet."}`);return;}
+      toast.success(`Imported ${r.success} of ${r.total} rows`, { description: r.errors.length ? `${r.errors.length} rows failed. First error (row ${r.errors[0].row}): ${r.errors[0].error}` : undefined });
       qc.invalidateQueries({ queryKey: ["assets"] });
     } catch (e: any) { toast.error(e?.message ?? "Import failed"); }
     finally { setImporting(false); }
@@ -628,13 +630,13 @@ function AssetsPage() {
           <Button variant="outline" onClick={() => { setScanMode("lookup"); setScanOpen(true); }}>
             <ScanLine className="mr-2 h-4 w-4" /> Scan
           </Button>
-          <Button variant="outline" onClick={()=>exportAssetsXLSX(registers.find(r=>r.id===registerChoice)?.name??"Default Asset Register", (assets as any[]).filter(a=>registerChoice==="default"||a.register_definition_id===registerChoice),registerFields)} title="Export assets for selected register"><Download className="mr-2 h-4 w-4"/> Export register</Button>
-          <Button variant="outline" onClick={()=>downloadTemplate(registers.find(r=>r.id===registerChoice))} title="Download Excel import template">
+          <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError} onClick={()=>exportAssetsXLSX(registers.find(r=>r.id===registerChoice)?.name??"Default Asset Register", (assets as any[]).filter(a=>registerChoice==="default"||a.register_definition_id===registerChoice),registerFields)} title="Export assets for selected register"><Download className="mr-2 h-4 w-4"/> Export register</Button>
+          <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError} onClick={()=>downloadTemplate(registers.find(r=>r.id===registerChoice))} title="Download Excel import template">
             <Download className="mr-2 h-4 w-4" /> Template
           </Button>
           {canAdd && (
             <label className="inline-flex">
-              <input type="file" accept=".xlsx,.xls" className="hidden" disabled={importing}
+              <input type="file" accept=".xlsx,.xls" className="hidden" disabled={importing||registerCatalogPending||!!registerCatalogError}
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ""; }} />
               <Button variant="outline" disabled={importing} type="button" asChild>
                 <span><Upload className="mr-2 h-4 w-4" /> {importing ? "Importing…" : "Import"}</span>
@@ -643,7 +645,7 @@ function AssetsPage() {
           )}
           {canAdd && (
           <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) setWizardStep(0); }}>
-            <DialogTrigger asChild><Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New asset</Button></DialogTrigger>
+            <Button onClick={openNew} disabled={registerCatalogPending}><Plus className="mr-2 h-4 w-4" /> {registerCatalogPending?"Loading register…":"New asset"}</Button>
             <DialogContent className="flex max-h-[92vh] max-w-3xl flex-col overflow-hidden p-0">
               <DialogHeader className="border-b px-5 pb-4 pt-5 sm:px-6">
                 <DialogTitle>{form.id ? "Edit asset" : registerChoice!=="default" ? `New ${registers.find(r=>r.id===registerChoice)?.name??"asset"}` : "Register asset"}</DialogTitle>
