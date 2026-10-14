@@ -33,7 +33,7 @@ export const CUSTOM_SYSTEM_COLUMNS=[
  "System Asset Tag","System Asset Name","System Serial Number","System Description",
  "Category","Sub Category","Status","Purchase Date","Purchase Value","Custodian","Department","Branch",
  "Country","Region","District","County","Sub County","Parish","Ward","Village",
- "Location","Building","Floor","Office / Room","Custom Area","Latitude","Longitude"
+ "Location","Building","Floor","Office / Room","Custom Area","Internal Location ID","Geo Place ID","Latitude","Longitude"
 ] as const;
 const normalizeHeader=(name:string)=>name.trim().toLowerCase().replace(/[^a-z0-9]/g,"");
 export function getCustomRegisterHeaders(register:RegisterTemplate){
@@ -174,10 +174,18 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
         [textValue(r,"location"),textValue(r,"sub_location")].filter(Boolean);
       let parent:string|null=null;
       for(const segment of segments){const resolved=await ensureLocation(segment,parent);parent=resolved.id;locationId=resolved.id;}
+      const selectedLocationId=textValue(r,"Internal Location ID");
+      if(register&&selectedLocationId){
+        const {data:known,error:knownError}=await supabase.from("locations").select("id,name").eq("id",selectedLocationId).maybeSingle();
+        if(knownError||!known)throw Error("Internal Location ID not found in this business.");
+        locationId=known.id;
+      }
       const geoLevels=["Country","Region","District","County","Sub County","Parish","Ward","Village"];
       const geographic=register?geoLevels.map(level=>textValue(r,level)).filter(Boolean):[];
       let geoPlaceId:number|null=null;
-      if(geographic.length){
+      const explicitGeoId=textValue(r,"Geo Place ID");
+      if(explicitGeoId){const numericId=Number(explicitGeoId);if(!Number.isSafeInteger(numericId))throw Error("Geo Place ID must be a valid number");const {data:geo,error:ge}=await (supabase as any).from("geo_places").select("geoname_id,name,display_path").eq("geoname_id",numericId).maybeSingle();if(ge||!geo)throw Error("Geo Place ID not found");const path=String(geo.display_path??"").toLowerCase();if(geographic.some(x=>!path.includes(x.toLowerCase())&&!String(geo.name).toLowerCase().includes(x.toLowerCase())))throw Error("Geo Place ID does not match supplied geographic columns");geoPlaceId=numericId;}
+      else if(geographic.length){
         const deepest=geographic[geographic.length-1];
         const {data:matches,error:geoError}=await (supabase as any).from("geo_places")
          .select("geoname_id,name,display_path").ilike("name",deepest).limit(200);
@@ -194,7 +202,8 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
       if(latitude!==null&&(!Number.isFinite(latitude)||latitude < -90||latitude>90))throw Error("Latitude must be between -90 and 90.");
       if(longitude!==null&&(!Number.isFinite(longitude)||longitude < -180||longitude>180))throw Error("Longitude must be between -180 and 180.");
       const statusRaw = (textValue(r,"Status","status")||"in_storage").toLowerCase().replace(/\s+/g, "_");
-      const status = STATUS_VALUES.includes(statusRaw) ? statusRaw : "in_storage";
+      if(statusRaw&&!STATUS_VALUES.includes(statusRaw))throw Error("Invalid Status: "+statusRaw);
+      const status = statusRaw;
 
       let purchaseDate: string | null = null;
       if (getValue(r,"Purchase Date","purchase_date")) {
@@ -208,6 +217,7 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
       }
       const purchaseRaw=getValue(r,"Purchase Value","purchase_value_ugx");
       const purchaseValue = purchaseRaw!=="" ? Number(purchaseRaw) : null;
+      if(purchaseRaw!==""&&!Number.isFinite(purchaseValue))throw Error("Purchase Value must be numeric");
 
       const { data: created, error: insErr } = await supabase.from("assets").insert({
         register_definition_id:register?.id??null,custom_fields:custom,
