@@ -292,13 +292,15 @@ export const getSaasContext = createServerFn({ method: "GET" })
     const parsedSettings = parseSaasSettings(settings);
     const status = computeStatus(tenant);
     const paid = status === "active";
+    const {data:assignedPlan}=tenant?.plan_code&&["starter","business","enterprise"].includes(tenant.plan_code)?await admin.from("saas_pricing_plans").select("included_assets,included_users,enabled_modules").eq("id",tenant.plan_code).maybeSingle():{data:null};
+    const planAllowed=assignedPlan?new Set(assignedPlan.enabled_modules??[]):null;
     const overrideMap = new Map(overrides.map((x: any) => [x.module_key, x.enabled]));
     const enabledModules = modules
       .filter((m: any) => {
         if (!m.globally_enabled) return false;
         if (m.billing_model === "add_on") return overrideMap.get(m.module_key) === true;
         const planEnabled = paid ? m.paid_enabled : m.trial_enabled;
-        if (!planEnabled) return false;
+        if (!planEnabled || (paid && planAllowed && !planAllowed.has(m.module_key))) return false;
         return !overrideMap.has(m.module_key) || overrideMap.get(m.module_key) !== false;
       })
       .map((m: any) => m.module_key as string);
@@ -324,7 +326,7 @@ export const getSaasContext = createServerFn({ method: "GET" })
         trialDays: Number(tenant?.trial_days_override ?? parsedSettings.trialDays),
         trialUserLimit: Number(tenant?.trial_user_limit_override ?? parsedSettings.trialUserLimit),
         paidPrice: Number(tenant?.paid_price_override ?? parsedSettings.paidPrice),
-        includedPaidUsers:Number(tenant?.paid_user_limit_override??settings.included_paid_users),extraUserPrice:Number(settings.extra_user_price),includedAssets:Number(settings.included_assets),purchasedExtraUsers:Number(tenant?.purchased_extra_users??0),extraAssetBlockSize:Number(settings.extra_asset_block_size??2000),extraAssetBlockPrice:Number(settings.extra_asset_block_price??20),purchasedExtraAssets:Number(tenant?.purchased_extra_assets??0),
+        includedPaidUsers:Number(tenant?.paid_user_limit_override??assignedPlan?.included_users??settings.included_paid_users),extraUserPrice:Number(settings.extra_user_price),includedAssets:Number(assignedPlan?.included_assets??settings.included_assets),purchasedExtraUsers:Number(tenant?.purchased_extra_users??0),extraAssetBlockSize:Number(settings.extra_asset_block_size??2000),extraAssetBlockPrice:Number(settings.extra_asset_block_price??20),purchasedExtraAssets:Number(tenant?.purchased_extra_assets??0),
       },
       enabledModules,
       addOns: modules.filter((m: any) => m.billing_model === "add_on").map((m: any) => ({
@@ -1203,7 +1205,8 @@ export const getPricingPlans=createServerFn({method:"GET"}).handler(async()=>{
  const {data,error}=await admin.from("saas_pricing_plans").select("id,name,description,monthly_price,annual_price,included_users,included_assets,features,is_published").eq("is_published",true).order("monthly_price");
  if(error)throw Error(error.message);
  const {data:settings}=await admin.from("saas_settings").select("currency,extra_user_price,extra_asset_block_size,extra_asset_block_price,trial_days").eq("id",true).single();
- return {currency:settings?.currency??"USD",extraUserPrice:Number(settings?.extra_user_price??0),extraAssetBlockSize:Number(settings?.extra_asset_block_size??2000),extraAssetBlockPrice:Number(settings?.extra_asset_block_price??20),trialDays:Number(settings?.trial_days??14),plans:(data??[]).map((p:any)=>({...p,monthly_price:Number(p.monthly_price),annual_price:Number(p.annual_price)}))};
+ const {data:modules}=await admin.from("saas_modules").select("module_key,label").eq("globally_enabled",true);const moduleNames=new Map((modules??[]).map((m:any)=>[m.module_key,m.label]));
+ return {currency:settings?.currency??"USD",extraUserPrice:Number(settings?.extra_user_price??0),extraAssetBlockSize:Number(settings?.extra_asset_block_size??2000),extraAssetBlockPrice:Number(settings?.extra_asset_block_price??20),trialDays:Number(settings?.trial_days??14),plans:(data??[]).map((p:any)=>({...p,monthly_price:Number(p.monthly_price),annual_price:Number(p.annual_price),module_labels:(p.enabled_modules??[]).map((k:string)=>moduleNames.get(k)||k)}))};
 });
 export const getAdminAvailableModules=createServerFn({method:"POST"}).middleware([requireSupabaseAuth]).handler(async({context})=>{
  await assertSaasAdmin(context.userId);
