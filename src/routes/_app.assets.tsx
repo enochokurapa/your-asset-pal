@@ -19,6 +19,9 @@ import { AssetDetailTabs } from "@/components/asset-detail-tabs";
 import { formatUGX } from "@/lib/utils";
 import { submitApproval } from "@/lib/approvals";
 import { downloadTemplate, importAssetsFromFile } from "@/lib/bulk-import";
+import {getRegisterCatalog} from "@/lib/builders.functions";
+import {getServerAuthHeaders} from "@/lib/auth-headers";
+import {useServerFn} from "@tanstack/react-start";
 import { AssetLocationFields } from "@/components/asset-location-fields";
 import { GeoHierarchyFilter, type GeoHierarchyPlace } from "@/components/geo-hierarchy-filter";
 
@@ -113,6 +116,13 @@ function AssetsPage() {
   const [locationFiltersOpen, setLocationFiltersOpen] = useState(false);
   const [geoSelection, setGeoSelection] = useState<GeoHierarchyPlace|null>(null);
 
+  const catalogFn=useServerFn(getRegisterCatalog);
+  const {data:catalog}=useQuery({queryKey:["register-catalog",tenantId],enabled:!!tenantId,queryFn:async()=>catalogFn({headers:await getServerAuthHeaders()})});
+  const [registerChoice,setRegisterChoice]=useState("default");
+  const [customValues,setCustomValues]=useState<Record<string,string>>({});
+  const registers=(catalog?.definitions??[]) as Array<{id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean}>}} >;
+  const registerFields=registers.find(r=>r.id===registerChoice)?.configuration?.fields??[];
+  useEffect(()=>{if(catalog)setRegisterChoice(catalog.primaryId??"default");},[catalog]);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<AssetForm>(empty);
@@ -291,8 +301,10 @@ function AssetsPage() {
     nav({ to: "/assets", search: {} as any, replace: true });
   };
 
-  const openNew = () => { setForm(empty); setWizardStep(0); setFinancialOpen(false); setOpen(true); };
+  const openNew = () => { setCustomValues({}); setForm(empty); setWizardStep(0); setFinancialOpen(false); setOpen(true); };
   const openEdit = (a: any) => {
+    setRegisterChoice(a.register_definition_id??catalog?.primaryId??"default");
+    setCustomValues(a.custom_fields??{});
     setForm({
       id: a.id, asset_tag: a.asset_tag, serial_number: a.serial_number ?? "",
       name: a.name, description: a.description ?? "",
@@ -387,6 +399,7 @@ function AssetsPage() {
     if (locationSettings?.require_internal_location && !form.location_id) { toast.error("Office, store or site is required"); return; }
     if (locationSettings?.require_gps && (!form.location_latitude || !form.location_longitude)) { toast.error("GPS capture is required"); return; }
 
+    for(const field of registerFields){if(field.required&&!String(customValues[field.key]??"").trim()){toast.error(`${field.label} is required`);return;}}
     const tagLower = form.asset_tag.trim().toLowerCase();
     const serialLower = form.serial_number.trim().toLowerCase();
     const dup = (assets as any[]).find((a) =>
@@ -580,7 +593,7 @@ function AssetsPage() {
   const onImport = async (f: File) => {
     setImporting(true);
     try {
-      const r = await importAssetsFromFile(f, user?.id ?? null);
+      const r = await importAssetsFromFile(f, user?.id ?? null,registers.find(r=>r.id===registerChoice));
       toast.success(`Imported ${r.success} of ${r.total} rows`, { description: r.errors.length ? `${r.errors.length} rows had errors - check the asset_imports record.` : undefined });
       qc.invalidateQueries({ queryKey: ["assets"] });
     } catch (e: any) { toast.error(e?.message ?? "Import failed"); }
@@ -596,10 +609,11 @@ function AssetsPage() {
           <p className="text-sm text-muted-foreground">Manage your organization's fixed assets. Assets are retired (with admin approval), never deleted.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Select value={registerChoice} onValueChange={setRegisterChoice}><SelectTrigger className="w-52"><SelectValue placeholder="Select register"/></SelectTrigger><SelectContent><SelectItem value="default">Default register</SelectItem>{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select>
           <Button variant="outline" onClick={() => { setScanMode("lookup"); setScanOpen(true); }}>
             <ScanLine className="mr-2 h-4 w-4" /> Scan
           </Button>
-          <Button variant="outline" onClick={downloadTemplate} title="Download Excel import template">
+          <Button variant="outline" onClick={()=>downloadTemplate(registers.find(r=>r.id===registerChoice))} title="Download Excel import template">
             <Download className="mr-2 h-4 w-4" /> Template
           </Button>
           {canAdd && (
@@ -617,6 +631,7 @@ function AssetsPage() {
             <DialogContent className="flex max-h-[92vh] max-w-3xl flex-col overflow-hidden p-0">
               <DialogHeader className="border-b px-5 pb-4 pt-5 sm:px-6">
                 <DialogTitle>{form.id ? "Edit asset" : "Register asset"}</DialogTitle>
+                <div className="space-y-2"><Label>Asset register</Label><Select value={registerChoice} onValueChange={setRegisterChoice}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="default">Default register</SelectItem>{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select>{registerFields.length>0&&<div className="grid gap-2 sm:grid-cols-2">{registerFields.map(field=><div className="space-y-1" key={field.key}><Label>{field.label}{field.required?" *":""}</Label><Input type={field.type==="number"||field.type==="currency"?"number":field.type==="date"?"date":"text"} value={customValues[field.key]??""} onChange={e=>setCustomValues(p=>({...p,[field.key]:e.target.value}))}/></div>)}</div>}</div>
                 <DialogDescription className="sm:hidden">Step {wizardStep + 1} of {wizardSteps.length} · {wizardSteps[wizardStep].title}</DialogDescription>
 
                 <div className="hidden pt-4 sm:block">
