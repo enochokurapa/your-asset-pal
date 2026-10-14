@@ -124,6 +124,17 @@ function AssetsPage() {
   const [customValues,setCustomValues]=useState<Record<string,string>>({});
   const registers=(catalog?.definitions??[]) as Array<{id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean,options?:string[],section?:string}>}} >;
   const registerFields=registers.find(r=>r.id===registerChoice)?.configuration?.fields??[];
+  const sectionForField=(field:{section?:string,label:string,key:string})=>{
+    if(field.section==="assignment"||field.section==="assign")return "assignment";
+    if(["identify","classify","location"].includes(field.section||""))return field.section!;
+    const label=(field.label||field.key).toLowerCase().replace(/[^a-z0-9]/g,"");
+    if(/category|subcategory|class|assettype|condition|status/.test(label))return "classify";
+    if(/branch|location|office|floor|site|room|region|district|country|address|gps/.test(label))return "location";
+    if(/custodian|assigned|department|price|value|amount|purchase|cost|dateacquired|supplier|owner/.test(label))return "assignment";
+    return "identify";
+  };
+  const fieldsInStep=(step:number)=>registerFields.filter(f=>sectionForField(f)===(["identify","classify","location","assignment"][step]||""));
+
   useEffect(()=>{if(catalog)setRegisterChoice(catalog.primaryId??"default");},[catalog]);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -574,7 +585,8 @@ function AssetsPage() {
   };
 
   const nextWizardStep = () => {
-    if (!validateWizardStep(wizardStep)) return;
+    if(registerChoice!=="default"){for(const field of fieldsInStep(wizardStep)){const value=String(customValues[field.key]??"").trim();const label=(field.label||field.key).toLowerCase().replace(/[^a-z0-9]/g,"");if(field.required&&!value&&!["tagnumber","assettag","tag"].includes(label)){toast.error(`${field.label} is required`);return;}}}
+    if(registerChoice==="default"&&!validateWizardStep(wizardStep)) return;
     setWizardStep((step) => Math.min(step + 1, wizardSteps.length - 1));
   };
 
@@ -722,9 +734,9 @@ function AssetsPage() {
                         <Textarea id="desc" rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Optional notes or identifying details" />
                       </div>
                     </div>
-                    {registerFields.length>0&&<section className="space-y-3 rounded-lg border bg-muted/20 p-4">
+                    {registerChoice!=="default"&&fieldsInStep(0).length>0&&<section className="space-y-3 rounded-lg border bg-muted/20 p-4">
                       <div><h3 className="text-sm font-semibold">Custom register fields</h3><p className="text-xs text-muted-foreground">These fields are saved with this asset.</p></div>
-                      <div className="grid gap-3 sm:grid-cols-2">{registerFields.map(field=><div className="min-w-0 space-y-1.5" key={field.key}>
+                      <div className="grid gap-3 sm:grid-cols-2">{fieldsInStep(0).map(field=><div className="min-w-0 space-y-1.5" key={field.key}>
                         <Label>{field.label}{field.required?" *":""}</Label>
                         {field.type==="boolean"?<Select value={customValues[field.key]??""} onValueChange={value=>setCustomValues(p=>({...p,[field.key]:value}))}><SelectTrigger><SelectValue placeholder="Choose Yes or No"/></SelectTrigger><SelectContent><SelectItem value="true">Yes</SelectItem><SelectItem value="false">No</SelectItem></SelectContent></Select>:
                         field.type==="select"&&field.options?.length?<Select value={customValues[field.key]??""} onValueChange={value=>setCustomValues(p=>({...p,[field.key]:value}))}><SelectTrigger><SelectValue placeholder="Choose an option"/></SelectTrigger><SelectContent>{field.options.map(option=><SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>:
@@ -885,7 +897,7 @@ function AssetsPage() {
                   </div>
                 )}
 
-                {registerChoice!=="default" && wizardStep>0 && wizardStep<4 && registerFields.filter(field=>(field.section??"classify")===({1:"classify",2:"location",3:"assign"} as Record<number,string>)[wizardStep]).length>0&&<section className="space-y-3 rounded-xl border p-4"><h3 className="text-base font-semibold">Additional details</h3><div className="grid gap-4 sm:grid-cols-2">{registerFields.filter(field=>(field.section??"classify")===({1:"classify",2:"location",3:"assign"} as Record<number,string>)[wizardStep]).map(field=><div key={field.key} className="space-y-2"><Label>{field.label}{field.required?" *":""}</Label>{field.type==="select"&&field.options?.length?<Select value={customValues[field.key]??""} onValueChange={value=>setCustomValues(v=>({...v,[field.key]:value}))}><SelectTrigger><SelectValue placeholder="Choose"/></SelectTrigger><SelectContent>{field.options.map(option=><SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>:field.type==="boolean"?<Select value={customValues[field.key]??""} onValueChange={value=>setCustomValues(v=>({...v,[field.key]:value}))}><SelectTrigger><SelectValue placeholder="Choose"/></SelectTrigger><SelectContent><SelectItem value="true">Yes</SelectItem><SelectItem value="false">No</SelectItem></SelectContent></Select>:<Input className="h-11" type={field.type==="date"?"date":field.type==="number"||field.type==="currency"?"number":"text"} value={customValues[field.key]??""} onChange={event=>setCustomValues(v=>({...v,[field.key]:event.target.value}))}/>}</div>)}</div></section>}
+                {registerChoice!=="default" && wizardStep>0 && wizardStep<4 && fieldsInStep(wizardStep).length>0&&<section className="space-y-3 rounded-xl border p-4"><h3 className="text-base font-semibold">Additional details</h3><div className="grid gap-4 sm:grid-cols-2">{fieldsInStep(wizardStep).map(field=><div key={field.key} className="space-y-2"><Label>{field.label}{field.required?" *":""}</Label>{field.type==="select"&&field.options?.length?<Select value={customValues[field.key]??""} onValueChange={value=>setCustomValues(v=>({...v,[field.key]:value}))}><SelectTrigger><SelectValue placeholder="Choose"/></SelectTrigger><SelectContent>{field.options.map(option=><SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>:field.type==="boolean"?<Select value={customValues[field.key]??""} onValueChange={value=>setCustomValues(v=>({...v,[field.key]:value}))}><SelectTrigger><SelectValue placeholder="Choose"/></SelectTrigger><SelectContent><SelectItem value="true">Yes</SelectItem><SelectItem value="false">No</SelectItem></SelectContent></Select>:<Input className="h-11" type={field.type==="date"?"date":field.type==="number"||field.type==="currency"?"number":"text"} value={customValues[field.key]??""} onChange={event=>setCustomValues(v=>({...v,[field.key]:event.target.value}))}/>}</div>)}</div></section>}
                 {wizardStep === 4 && (
                   <div className="space-y-5">
                     <div>
