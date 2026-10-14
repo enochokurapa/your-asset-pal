@@ -10,6 +10,8 @@ import {
   updateTenantSubscription,
   updateTenantControls,
   updateSaasTenantUserStatus,
+  getSaasTenantTagSettings,
+  updateSaasTenantTagSettings,
 } from "@/lib/saas.functions";
 import { getServerAuthHeaders } from "@/lib/auth-headers";
 import { useAuth } from "@/hooks/use-auth";
@@ -55,6 +57,12 @@ function SaasAdminOrganizationsPage() {
   const saveModule = useServerFn(updateTenantModule);
   const saveUserStatus = useServerFn(updateSaasTenantUserStatus);
   const saveControls = useServerFn(updateTenantControls);
+  const getTags=useServerFn(getSaasTenantTagSettings);
+  const setTags=useServerFn(updateSaasTenantTagSettings);
+  const [tagPrefix,setTagPrefix]=useState("AST");
+  const [tagSeparator,setTagSeparator]=useState("-");
+  const [tagDigits,setTagDigits]=useState(5);
+  const [tagSaving,setTagSaving]=useState(false);
   const [trialDays,setTrialDays] = useState("");
   const [seatLimit,setSeatLimit] = useState("");
   const [priceOverride,setPriceOverride] = useState("");
@@ -88,6 +96,9 @@ function SaasAdminOrganizationsPage() {
     enabled: !!selectedTenantId && isSaasAdmin,
   });
 
+  const tagQuery=useQuery({queryKey:["saas-tenant-asset-tags",selectedTenantId],enabled:!!selectedTenantId&&isSaasAdmin,queryFn:()=>authCall(getTags,{data:{tenant_id:selectedTenantId}})});
+  useEffect(()=>{if(!tagQuery.data)return;setTagPrefix(tagQuery.data.prefix);setTagSeparator(tagQuery.data.separator);setTagDigits(tagQuery.data.padding)},[tagQuery.data]);
+  const persistTags=async()=>{if(!selectedTenantId)return;setTagSaving(true);try{await authCall(setTags,{data:{tenant_id:selectedTenantId,prefix:tagPrefix,separator:tagSeparator,padding:tagDigits}});await tagQuery.refetch();toast.success("Asset tag settings saved for this business");}catch(e:any){toast.error(e?.message||"Unable to save tag settings")}finally{setTagSaving(false)}};
   useEffect(() => {
     if (detailQuery.data?.tenant?.name) setNameDraft(detailQuery.data.tenant.name);
   }, [detailQuery.data?.tenant?.name]);
@@ -307,6 +318,15 @@ function SaasAdminOrganizationsPage() {
               <Button disabled={savingControls} onClick={persistControls}>{savingControls ? "Saving..." : "Save business controls"}</Button>
             </Card>
 
+            <Card className="space-y-4 p-5">
+              <div><h3 className="text-base font-semibold">Asset tag numbering</h3><p className="text-sm text-muted-foreground">Set the prefix used when this company registers or imports assets without an existing tag. Existing tag numbers are not changed.</p></div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="space-y-2 text-sm"><span className="font-medium">Company initials</span><Input maxLength={10} value={tagPrefix} onChange={e=>setTagPrefix(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,""))}/></label>
+                <label className="space-y-2 text-sm"><span className="font-medium">Separator</span><Select value={tagSeparator||"none"} onValueChange={value=>setTagSeparator(value==="none"?"":value)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="-">Dash</SelectItem><SelectItem value="/">Slash</SelectItem><SelectItem value="none">None</SelectItem></SelectContent></Select></label>
+                <label className="space-y-2 text-sm"><span className="font-medium">Number of digits</span><Select value={String(tagDigits)} onValueChange={value=>setTagDigits(Number(value))}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{[2,3,4,5,6,7,8,9,10,11,12].map(n=><SelectItem key={n} value={String(n)}>{n}</SelectItem>)}</SelectContent></Select></label>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-medium">Example: {tagPrefix}{tagSeparator}{String(tagQuery.data?.next_number??1).padStart(tagDigits,"0")}</p><Button disabled={tagSaving||!tagPrefix} onClick={persistTags}>{tagSaving?"Saving…":"Save numbering"}</Button></div>
+            </Card>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <SmallMetric label="Users" value={metrics?.users ?? 0} icon={Users} />
               <SmallMetric label="Assets" value={metrics?.assets ?? 0} icon={Boxes} />
