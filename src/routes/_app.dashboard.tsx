@@ -1,3 +1,4 @@
+import {PublishedCanvases} from "@/components/visual-canvas-builder";
 import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -191,6 +192,7 @@ function TenantDashboard() {
 
   return (
     <div className="space-y-6">
+      <PublishedCanvases kind="dashboard_builder"/>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
