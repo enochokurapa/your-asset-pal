@@ -1,3 +1,4 @@
+import {AssetNumberingSettings} from "@/components/asset-numbering-settings";
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
@@ -170,6 +171,7 @@ function SettingsPage() {
               <TabsTrigger value="layout">Layout</TabsTrigger>
               <TabsTrigger value="appearance">Appearance</TabsTrigger>
               <TabsTrigger value="locations">Asset locations</TabsTrigger>
+              <TabsTrigger value="numbering">Asset tag numbering</TabsTrigger>
               <TabsTrigger value="automation">Automation</TabsTrigger>
               <TabsTrigger value="guides">User guides</TabsTrigger>
             </TabsList>
@@ -353,6 +355,8 @@ function SettingsPage() {
               <LocationSettingsPanel />
             </TabsContent>
 
+            <TabsContent value="numbering" className="space-y-4 pt-4"><AssetNumberingSettings/></TabsContent>
+
             <TabsContent value="automation" className="space-y-4 pt-4">
               <AutomationSettingsPanel />
             </TabsContent>
@@ -364,7 +368,7 @@ function SettingsPage() {
 
         </Card>
 
-        {!["locations","automation"].includes(activeTab) && (
+        {!["locations","automation","numbering"].includes(activeTab) && (
         <Card className="flex h-[800px] flex-col p-3">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-sm font-medium">Live preview (sample gate pass)</p>
