@@ -2,7 +2,7 @@ import {useEffect,useMemo,useState} from "react";
 import {useServerFn} from "@tanstack/react-start";
 import {useQuery,useQueryClient} from "@tanstack/react-query";
 import {getServerAuthHeaders} from "@/lib/auth-headers";
-import {listBuilderDefinitions,saveBuilderDefinition,archiveBuilderDefinition} from "@/lib/builders.functions";
+import {listBuilderDefinitions,saveBuilderDefinition,archiveBuilderDefinition,getPublishedCanvasLayouts} from "@/lib/builders.functions";
 import {supabase} from "@/integrations/supabase/client";
 import {useAuth} from "@/hooks/use-auth";
 import {Button} from "@/components/ui/button";
@@ -107,7 +107,7 @@ export function VisualCanvasBuilder({kind}:{kind:CanvasKind}){
  </div>;
 }
 export function PublishedCanvases({kind}:{kind:CanvasKind}){
- const {tenantId}=useAuth();const {data:layouts=[],isLoading}=useQuery({queryKey:["published-canvas",tenantId,kind],enabled:!!tenantId,queryFn:async()=>{const {data,error}=await (supabase as any).from("builder_definitions").select("id,name,configuration").eq("tenant_id",tenantId).eq("builder_key",kind).eq("is_active",true).order("updated_at",{ascending:false});if(error)throw error;return data as Saved[];}});
+ const {tenantId}=useAuth();const getPublished=useServerFn(getPublishedCanvasLayouts);const {data:layouts=[],isLoading}=useQuery({queryKey:["published-canvas",tenantId,kind],enabled:!!tenantId,queryFn:async()=>await getPublished({headers:await getServerAuthHeaders(),data:{kind}}) as Saved[]});
  const assets=useCanvasAssets(layouts.length>0);
  const [selected,setSelected]=useState("");
  useEffect(()=>{if(layouts.length&&!layouts.some(x=>x.id===selected))setSelected(layouts[0].id)},[layouts,selected]);
