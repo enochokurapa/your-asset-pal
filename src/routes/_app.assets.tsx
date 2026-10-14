@@ -127,11 +127,7 @@ function AssetsPage() {
   const sectionForField=(field:{section?:string,label:string,key:string})=>{
     if(field.section==="assignment"||field.section==="assign")return "assignment";
     if(["identify","classify","location"].includes(field.section||""))return field.section!;
-    const label=(field.label||field.key).toLowerCase().replace(/[^a-z0-9]/g,"");
-    if(/category|subcategory|class|assettype|condition|status/.test(label))return "classify";
-    if(/branch|location|office|floor|site|room|region|district|country|address|gps/.test(label))return "location";
-    if(/custodian|assigned|department|price|value|amount|purchase|cost|dateacquired|supplier|owner/.test(label))return "assignment";
-    return "identify";
+    return "classify";
   };
   const fieldsInStep=(step:number)=>registerFields.filter(f=>sectionForField(f)===(["identify","classify","location","assignment"][step]||""));
 
