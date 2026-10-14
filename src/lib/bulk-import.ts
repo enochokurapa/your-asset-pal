@@ -29,10 +29,22 @@ const SAMPLE_ROW: Record<string, any> = {
 };
 
 export type RegisterTemplate={id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean,options?:string[]}>}};
+export const CUSTOM_SYSTEM_COLUMNS=[
+ "System Asset Tag","System Asset Name","System Serial Number","System Description",
+ "Category","Sub Category","Status","Purchase Date","Purchase Value","Custodian","Department","Branch",
+ "Country","Region","District","County","Sub County","Parish","Ward","Village",
+ "Location","Building","Floor","Office / Room","Custom Area","Latitude","Longitude"
+] as const;
+const normalizeHeader=(name:string)=>name.trim().toLowerCase().replace(/[^a-z0-9]/g,"");
+export function getCustomRegisterHeaders(register:RegisterTemplate){
+ const labels=(register.configuration.fields??[]).map(f=>f.label.trim());
+ const used=new Set(labels.map(normalizeHeader));
+ return [...labels,...CUSTOM_SYSTEM_COLUMNS.filter(name=>!used.has(normalizeHeader(name)))];
+}
 export function downloadTemplate(register?:RegisterTemplate, includeLocation=false) {
   const wb = XLSX.utils.book_new();
   const extra=register?.configuration?.fields??[];
-  const columns=register?[...extra.map(field=>field.label),...(includeLocation&&!extra.some(f=>["location","assetlocation"].includes(f.key.toLowerCase()))?["Location"]:[])]:TEMPLATE_COLUMNS;
+  const columns=register?getCustomRegisterHeaders(register):TEMPLATE_COLUMNS;
   if(!columns.length)throw new Error("Add at least one field before downloading this custom template.");
   const ws=register?XLSX.utils.aoa_to_sheet([columns]):XLSX.utils.json_to_sheet([SAMPLE_ROW],{header:columns});
   // Append an "instructions" sheet
@@ -56,7 +68,7 @@ export function downloadTemplate(register?:RegisterTemplate, includeLocation=fal
   if(register){notes.splice(1);extra.forEach(f=>notes.push([f.label,f.required?"Yes":"No",`${f.type}${f.options?.length?": "+f.options.join(" / "):""}`]));}
   const wsNotes = XLSX.utils.aoa_to_sheet(notes);
   XLSX.utils.book_append_sheet(wb, ws, "Assets");
-  if(!register)XLSX.utils.book_append_sheet(wb, wsNotes, "Instructions");
+  if(register){CUSTOM_SYSTEM_COLUMNS.forEach(name=>{if(columns.includes(name))notes.push([name,"No","Built-in asset form field. Fill when available. Geographic values must match recognised locations."])});XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(notes),"Field Guide");}else XLSX.utils.book_append_sheet(wb, wsNotes, "Instructions");
   XLSX.writeFile(wb, `${register?.name.replace(/[^a-z0-9]+/gi,"_")??"assetflow"}-import-template.xlsx`);
 }
 
@@ -71,6 +83,17 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
   const wb = XLSX.read(buf, { type: "array" });
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: "" });
+  const getValue=(r:Record<string,any>,...names:string[])=>{
+    const keys=new Map(Object.keys(r).map(k=>[normalizeHeader(k),k]));
+    for(const name of names){const key=keys.get(normalizeHeader(name));if(key!==undefined&&r[key]!==""&&r[key]!=null)return r[key];}
+    return "";
+  };
+  const textValue=(r:Record<string,any>,...names:string[])=>String(getValue(r,...names)).trim();
+  if(register){
+    const known=new Set([...getCustomRegisterHeaders(register),...TEMPLATE_COLUMNS,"Asset Name","Asset Tag","Serial Number","Country Code"].map(normalizeHeader));
+    const unknown=Object.keys(rows[0]??{}).filter(k=>!known.has(normalizeHeader(k)));
+    if(unknown.length)throw Error("Unmapped spreadsheet columns: "+unknown.join(", ")+". Add matching fields in Register Builder or rename these columns.");
+  }
 
   // Preload lookup data
   const [{ data: cats = [] }, { data: locs = [] }, { data: brs = [] }] = await Promise.all([
@@ -125,11 +148,11 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
       const customTagField=findField("assettag","tagnumber","tag","tagno");
       const customNameField=findField("assetname","itemname","name","itemdescription","itemcode");
       const custom:Record<string,string|number|boolean|null>={};
-      for(const field of extra){const raw=r[field.label]??r[field.key];const value=raw==null?"":String(raw).trim();if(field.required&&!value&&field.key!==customTagField?.key)throw Error(`${field.label} is required`);if(!value){custom[field.key]=null;continue;}if(field.type==="number"||field.type==="currency"){const n=Number(value);if(!Number.isFinite(n))throw Error(`${field.label} must be a number`);custom[field.key]=n;}else if(field.type==="boolean"){if(!["true","false","yes","no","1","0"].includes(value.toLowerCase()))throw Error(`${field.label} must be true or false`);custom[field.key]=["true","yes","1"].includes(value.toLowerCase());}else if(field.type==="date"){if(!/^\d{4}-\d{2}-\d{2}$/.test(value))throw Error(`${field.label} must use YYYY-MM-DD`);custom[field.key]=value;}else if(["select","radio"].includes(field.type)&&field.options?.length&&!field.options.includes(value))throw Error(`${field.label}: invalid option ${value}`);else custom[field.key]=value;}
-      const explicitTag=customTagField?String(custom[customTagField.key]??"").trim():"";
+      for(const field of extra){const raw=getValue(r,field.label,field.key);const value=raw==null?"":String(raw).trim();if(field.required&&!value&&field.key!==customTagField?.key)throw Error(`${field.label} is required`);if(!value){custom[field.key]=null;continue;}if(field.type==="number"||field.type==="currency"){const n=Number(value);if(!Number.isFinite(n))throw Error(`${field.label} must be a number`);custom[field.key]=n;}else if(field.type==="boolean"){if(!["true","false","yes","no","1","0"].includes(value.toLowerCase()))throw Error(`${field.label} must be true or false`);custom[field.key]=["true","yes","1"].includes(value.toLowerCase());}else if(field.type==="date"){if(!/^\d{4}-\d{2}-\d{2}$/.test(value))throw Error(`${field.label} must use YYYY-MM-DD`);custom[field.key]=value;}else if(["select","radio"].includes(field.type)&&field.options?.length&&!field.options.includes(value))throw Error(`${field.label}: invalid option ${value}`);else custom[field.key]=value;}
+      const explicitTag=textValue(r,"System Asset Tag","asset_tag")||(customTagField?String(custom[customTagField.key]??"").trim():"");
       const tag=register?(explicitTag||`AUTO-${crypto.randomUUID()}`):String(r.asset_tag??"").trim();
-      const name=register?(String(customNameField?custom[customNameField.key]??"":Object.values(custom).find(v=>typeof v==="string"&&v.trim())??"").trim()||explicitTag||"Registered asset"):String(r.name??"").trim();
-      const branchName=String(r.branch??"").trim();
+      const name=register?(textValue(r,"System Asset Name","name")||String(customNameField?custom[customNameField.key]??"":Object.values(custom).find(v=>typeof v==="string"&&v.trim())??"").trim()||explicitTag||"Registered asset"):String(r.name??"").trim();
+      const branchName=textValue(r,"Branch","branch");
       if(!tag)throw new Error("Asset tag is required");
       if(!name)throw new Error("A text/name field must contain an asset name");
       if(!register&&!branchName)throw new Error("branch is required");
@@ -137,31 +160,45 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
       if(register&&!branch&&(brs?.length??0)>1)throw new Error("Choose an import branch before uploading to this register.");
 
       let categoryId: string | null = null;
-      if (r.category) {
-        const cat = await ensureCategory(String(r.category));
+      if (textValue(r,"Category","category")) {
+        const cat = await ensureCategory(textValue(r,"Category","category"));
         categoryId = cat.id;
-        if (r.sub_category) {
-          const sub = await ensureCategory(String(r.sub_category), cat.id);
+        if (textValue(r,"Sub Category","sub_category")) {
+          const sub = await ensureCategory(textValue(r,"Sub Category","sub_category"), cat.id);
           categoryId = sub.id;
         }
       }
 
       let locationId: string | null = null;
-      if (r.location || (register&&includeLocation&&r.Location)) {
-        const loc = await ensureLocation(String(r.location||r.Location));
-        locationId = loc.id;
-        if (r.sub_location) {
-          const sub = await ensureLocation(String(r.sub_location), loc.id);
-          locationId = sub.id;
-        }
+      const segments=register?["Location","Building","Floor","Office / Room","Custom Area"].map(k=>textValue(r,k)).filter(Boolean):
+        [textValue(r,"location"),textValue(r,"sub_location")].filter(Boolean);
+      let parent:string|null=null;
+      for(const segment of segments){const resolved=await ensureLocation(segment,parent);parent=resolved.id;locationId=resolved.id;}
+      const geoLevels=["Country","Region","District","County","Sub County","Parish","Ward","Village"];
+      const geographic=register?geoLevels.map(level=>textValue(r,level)).filter(Boolean):[];
+      let geoPlaceId:number|null=null;
+      if(geographic.length){
+        const deepest=geographic[geographic.length-1];
+        const {data:matches,error:geoError}=await (supabase as any).from("geo_places")
+         .select("geoname_id,name,display_path").ilike("name",deepest).limit(200);
+        if(geoError)throw geoError;
+        const candidates=(matches??[]).filter((place:any)=>{
+          const levels=String(place.display_path??"").split("·").map((v:string)=>v.trim().toLowerCase());
+          return geographic.every(name=>levels.includes(name.toLowerCase())||String(place.name).toLowerCase()===name.toLowerCase());
+        });
+        if(candidates.length!==1)throw Error(candidates.length?"Geographic location is ambiguous: include more geographic levels.":"Geographic place not found: verify country, district, ward and other supplied levels.");
+        geoPlaceId=Number(candidates[0].geoname_id);
       }
-
-      const statusRaw = String(r.status ?? "in_storage").trim().toLowerCase().replace(/\s+/g, "_");
+      const latRaw=textValue(r,"Latitude"),lngRaw=textValue(r,"Longitude");
+      const latitude=latRaw?Number(latRaw):null,longitude=lngRaw?Number(lngRaw):null;
+      if(latitude!==null&&(!Number.isFinite(latitude)||latitude < -90||latitude>90))throw Error("Latitude must be between -90 and 90.");
+      if(longitude!==null&&(!Number.isFinite(longitude)||longitude < -180||longitude>180))throw Error("Longitude must be between -180 and 180.");
+      const statusRaw = (textValue(r,"Status","status")||"in_storage").toLowerCase().replace(/\s+/g, "_");
       const status = STATUS_VALUES.includes(statusRaw) ? statusRaw : "in_storage";
 
       let purchaseDate: string | null = null;
-      if (r.purchase_date) {
-        const d = r.purchase_date;
+      if (getValue(r,"Purchase Date","purchase_date")) {
+        const d = getValue(r,"Purchase Date","purchase_date");
         if (typeof d === "number") {
           const dd = XLSX.SSF.parse_date_code(d);
           if (dd) purchaseDate = `${dd.y}-${String(dd.m).padStart(2,"0")}-${String(dd.d).padStart(2,"0")}`;
@@ -169,16 +206,21 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
           purchaseDate = String(d).slice(0, 10);
         }
       }
-      const purchaseValue = r.purchase_value_ugx !== "" && r.purchase_value_ugx != null ? Number(r.purchase_value_ugx) : null;
+      const purchaseRaw=getValue(r,"Purchase Value","purchase_value_ugx");
+      const purchaseValue = purchaseRaw!=="" ? Number(purchaseRaw) : null;
 
       const { data: created, error: insErr } = await supabase.from("assets").insert({
         register_definition_id:register?.id??null,custom_fields:custom,
         asset_tag: tag,
-        serial_number: r.serial_number ? String(r.serial_number).trim() : null,
+        serial_number: textValue(r,"System Serial Number","serial_number")||null,
         name,
-        description: r.description ? String(r.description) : null,
+        description: textValue(r,"System Description","description")||null,
         category_id: categoryId,
         location_id: locationId,
+        geo_place_id:geoPlaceId,
+        location_latitude:latitude,
+        location_longitude:longitude,
+        location_source:latitude!==null&&longitude!==null?"manual":"import",
         branch_id: branch?.id??null,
         status: status as any,
         purchase_value: Number.isFinite(purchaseValue as number) ? purchaseValue : null,
@@ -187,11 +229,11 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
       }).select().single();
       if (insErr) throw insErr;
 
-      if ((r.custodian || r.department) && created) {
+      if ((textValue(r,"Custodian","custodian") || textValue(r,"Department","department")) && created) {
         await supabase.from("asset_assignments").insert({
           asset_id: created.id,
-          assigned_to_name: r.custodian ? String(r.custodian).trim() : null,
-          department: r.department ? String(r.department).trim() : null,
+          assigned_to_name: textValue(r,"Custodian","custodian")||null,
+          department: textValue(r,"Department","department")||null,
           branch_id: branch?.id??null,
           assignment_date: new Date().toISOString().slice(0, 10),
           created_by: userId,
