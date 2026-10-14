@@ -97,7 +97,7 @@ export function LocationSettingsPanel() {
         require_branch: usesBranch ? form.require_branch : false,
         require_geography: usesGeography ? form.require_geography : false,
         require_internal_location: usesInternal ? form.require_internal_location : false,
-        require_gps: form.require_gps,
+        require_gps: form.location_mode !== "internal" && form.require_gps,
       };
       const { error } = await (supabase as any).from("tenant_location_settings").upsert({
         tenant_id: tenantId,
@@ -125,7 +125,7 @@ export function LocationSettingsPanel() {
       require_branch: ["branch", "hybrid"].includes(mode) ? current.require_branch : false,
       require_geography: ["geographic", "hybrid"].includes(mode) ? current.require_geography : false,
       require_internal_location: ["internal", "hybrid"].includes(mode) ? current.require_internal_location : false,
-      require_gps: current.require_gps,
+      require_gps: mode !== "internal" && current.require_gps,
     }));
   };
 
@@ -226,7 +226,7 @@ export function LocationSettingsPanel() {
                 ["require_geography", "Geographic area", "Require a district, county or region and mapped area."],
 
               ] : []),
-              ["require_gps", "GPS verification", "Require a device GPS capture before saving, regardless of location model."],
+              ...(form.location_mode !== "internal" ? [["require_gps", "GPS verification", "Require a device GPS capture before saving."]] : []),
               ...(usesInternal ? [["require_internal_location", "Internal location", "Require an office, store, room or site."]] : []),
             ].map(([key, title, description]) => (
               <label key={key} className="flex items-start justify-between gap-4 rounded-lg border p-3">
