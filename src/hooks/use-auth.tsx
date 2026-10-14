@@ -146,10 +146,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setTenantId(prof?.tenant_id ?? null);
 
       if (prof?.tenant_id) {
-        const [{ data: tenant }, { data: modules }, { data: overrides }] = await Promise.all([
-          (supabase as any).from("tenants").select("name,subscription_status,trial_ends_at,subscription_ends_at").eq("id", prof.tenant_id).maybeSingle(),
+        const [{ data: tenant }, { data: modules }, { data: overrides },{data: pricingPlans}] = await Promise.all([
+          (supabase as any).from("tenants").select("name,subscription_status,trial_ends_at,subscription_ends_at,plan_code").eq("id", prof.tenant_id).maybeSingle(),
           (supabase as any).from("saas_modules").select("module_key,globally_enabled,trial_enabled,paid_enabled,billing_model").order("sort_order"),
           (supabase as any).from("tenant_module_overrides").select("module_key,enabled").eq("tenant_id", prof.tenant_id),
+          (supabase as any).from("saas_pricing_plans").select("id,enabled_modules").eq("is_published",true),
         ]);
         if (tenant) {
           setTenantName(tenant.name ?? null);
@@ -168,8 +169,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const eligible = modules.filter((m: any) => !!m.globally_enabled);
             const included = eligible.filter((m: any) => m.billing_model !== "add_on");
             const addOns = eligible.filter((m: any) => m.billing_model === "add_on");
+            const chosenPlan=(pricingPlans??[]).find((p:any)=>p.id===tenant.plan_code);
+            const planModules=chosenPlan?new Set(chosenPlan.enabled_modules??[]):null;
             const allowedIncluded = included
-              .filter((m: any) => paid ? !!m.paid_enabled : !!m.trial_enabled)
+              .filter((m: any) => paid ? !!m.paid_enabled && (!planModules||planModules.has(m.module_key)) : !!m.trial_enabled)
               .filter((m: any) => !overrideMap.has(m.module_key) || overrideMap.get(m.module_key) !== false)
               .map((m: any) => m.module_key as ModuleKey);
             const enabledAddOns = addOns
@@ -182,7 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const lockedAddOns = addOns
               .filter((m: any) => !paid || overrideMap.get(m.module_key) !== true)
               .map((m: any) => m.module_key as ModuleKey);
-            setEnabledModules(new Set([...allowedIncluded, ...enabledAddOns,...(effective==="expired"||effective==="suspended"?eligible.filter((m:any)=>m.billing_model!=="add_on").map((m:any)=>m.module_key as ModuleKey):[])]));
+            setEnabledModules(new Set([...allowedIncluded, ...enabledAddOns,...(effective==="expired"||effective==="suspended"?eligible.filter((m:any)=>m.billing_model!=="add_on"&&(!planModules||planModules.has(m.module_key))).map((m:any)=>m.module_key as ModuleKey):[])]));
             setPaidOnlyModules(new Set(lockedPaid));
             setAddOnModules(new Set(lockedAddOns));
           }
