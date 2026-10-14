@@ -147,3 +147,46 @@ export const saveAssetTagSettings=createServerFn({method:"POST"})
   if(error)throw new Error(error.message);
   return {ok:true};
  });
+
+const migrationInput=z.object({sourceId:idSchema.nullable(),targetId:idSchema,policy:z.enum(["preserve","skip"]),mapping:z.record(z.string(),z.string())});
+export const previewRegisterMigration=createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
+ .inputValidator(input=>migrationInput.parse(input))
+ .handler(async ({data,context})=>{
+   const tenantId=await authorize(context.userId,"register_builder");
+   const {data:defs,error:de}=await db.from("builder_definitions").select("id,configuration").eq("tenant_id",tenantId).eq("builder_key","register_builder");
+   if(de)throw new Error(de.message);
+   const target=(defs??[]).find((x:any)=>x.id===data.targetId),source=data.sourceId?(defs??[]).find((x:any)=>x.id===data.sourceId):null;
+   if(!target||(data.sourceId&&!source)||data.sourceId===data.targetId)throw new Error("Choose two different registers belonging to your business.");
+   const destKeys=new Set((target.configuration?.fields??[]).map((f:any)=>f.key));
+   const sourceKeys=new Set((source?.configuration?.fields??[]).map((f:any)=>f.key));
+   const core=new Set(["asset_tag","name","serial_number","description","purchase_date","purchase_value","status"]);
+   for(const [dest,from] of Object.entries(data.mapping)){if(!destKeys.has(dest)||!(from.startsWith("custom:")?sourceKeys.has(from.slice(7)):from.startsWith("core:")&&core.has(from.slice(5))))throw Error("Invalid migration mapping. Refresh and retry.");}
+   const {count,error}=await db.from("assets").select("id",{count:"exact",head:true}).eq("tenant_id",tenantId).is("register_definition_id",null);
+   const query=db.from("assets").select("id",{count:"exact",head:true}).eq("tenant_id",tenantId);
+   const result=data.sourceId?await query.eq("register_definition_id",data.sourceId):{count,error};
+   if(result.error)throw Error(result.error.message);
+   return {count:result.count??0,sourceName:source?.name??"Original register",targetName:target.name,unmapped:(target.configuration?.fields??[]).filter((f:any)=>!data.mapping[f.key]).map((f:any)=>f.label)};
+ });
+export const executeRegisterMigration=createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
+ .inputValidator(input=>migrationInput.parse(input))
+ .handler(async ({data,context})=>{
+   const tenantId=await authorize(context.userId,"register_builder");
+   const {data:rows,error}=await db.rpc("run_asset_register_migration",{p_tenant:tenantId,p_source:data.sourceId,p_target:data.targetId,p_mapping:data.mapping,p_policy:data.policy,p_actor:context.userId});
+   if(error)throw Error(error.message);
+   return rows?.[0]??{affected_count:0};
+ });
+export const reverseRegisterMigration=createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
+ .inputValidator(input=>z.object({migrationId:idSchema}).parse(input))
+ .handler(async ({data,context})=>{
+   const tenantId=await authorize(context.userId,"register_builder");
+   const {data:count,error}=await db.rpc("undo_asset_register_migration",{p_tenant:tenantId,p_migration:data.migrationId});
+   if(error)throw Error(error.message);
+   return {count};
+ });
+export const listRegisterMigrations=createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
+ .handler(async ({context})=>{
+   const tenantId=await authorize(context.userId,"register_builder");
+   const {data,error}=await db.from("asset_register_migrations").select("id,created_at,affected_count,status").eq("tenant_id",tenantId).order("created_at",{ascending:false}).limit(10);
+   if(error)throw Error(error.message);
+   return data??[];
+ });
