@@ -20,6 +20,7 @@ import { formatUGX } from "@/lib/utils";
 import { submitApproval } from "@/lib/approvals";
 import { downloadTemplate, importAssetsFromFile } from "@/lib/bulk-import";
 import {getRegisterCatalog} from "@/lib/builders.functions";
+import {exportAssetsXLSX} from "@/lib/asset-export";
 import {getServerAuthHeaders} from "@/lib/auth-headers";
 import {useServerFn} from "@tanstack/react-start";
 import { AssetLocationFields } from "@/components/asset-location-fields";
@@ -615,6 +616,7 @@ function AssetsPage() {
           <Button variant="outline" onClick={() => { setScanMode("lookup"); setScanOpen(true); }}>
             <ScanLine className="mr-2 h-4 w-4" /> Scan
           </Button>
+          <Button variant="outline" onClick={()=>exportAssetsXLSX(registers.find(r=>r.id===registerChoice)?.name??"Default Asset Register", (assets as any[]).filter(a=>registerChoice==="default"||a.register_definition_id===registerChoice),registerFields)} title="Export assets for selected register"><Download className="mr-2 h-4 w-4"/> Export register</Button>
           <Button variant="outline" onClick={()=>downloadTemplate(registers.find(r=>r.id===registerChoice))} title="Download Excel import template">
             <Download className="mr-2 h-4 w-4" /> Template
           </Button>
