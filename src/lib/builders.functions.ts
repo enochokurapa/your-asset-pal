@@ -89,5 +89,43 @@ export const archiveBuilderDefinition = createServerFn({method:"POST"})
       .eq("id",data.id).eq("tenant_id",tenantId).eq("builder_key",data.kind).select("id").maybeSingle();
     if(error) throw new Error(error.message);
     if(!updated) throw new Error("Builder definition not found.");
+    if(data.kind==="register_builder"){
+      const {error:primaryError}=await db.from("tenant_primary_registers").update({definition_id:null,updated_at:new Date().toISOString()}).eq("tenant_id",tenantId).eq("definition_id",data.id);
+      if(primaryError)throw new Error(primaryError.message);
+    }
     return {ok:true};
   });
+
+/** One primary register per tenant, without deleting any register definitions. */
+export const setActiveRegisterDefinition = createServerFn({method:"POST"})
+  .middleware([requireSupabaseAuth])
+  .inputValidator(input=>z.object({definitionId:idSchema.nullable()}).parse(input))
+  .handler(async ({data,context})=>{
+    const tenantId=await authorize(context.userId,"register_builder");
+    if(data.definitionId){
+      const {data:definition,error:lookupError}=await db.from("builder_definitions")
+        .select("id").eq("id",data.definitionId).eq("tenant_id",tenantId)
+        .eq("builder_key","register_builder").eq("is_active",true).maybeSingle();
+      if(lookupError)throw new Error(lookupError.message);
+      if(!definition)throw new Error("Active register not found for this business.");
+    }
+    const {error}=await db.from("tenant_primary_registers").upsert({
+      tenant_id:tenantId,definition_id:data.definitionId,updated_at:new Date().toISOString(),
+    },{onConflict:"tenant_id"});
+    if(error)throw new Error(error.message);
+    return {ok:true};
+  });
+
+export const getRegisterCatalog = createServerFn({method:"POST"})
+ .middleware([requireSupabaseAuth])
+ .handler(async ({context})=>{
+   const {data:p,error:pe}=await db.from("profiles").select("tenant_id,is_active").eq("id",context.userId).single();
+   if(pe||!p?.tenant_id||!p.is_active)throw new Error("Business membership is required.");
+   const [defs,primary]=await Promise.all([
+     db.from("builder_definitions").select("id,name,configuration,is_active").eq("tenant_id",p.tenant_id).eq("builder_key","register_builder").eq("is_active",true).order("name"),
+     db.from("tenant_primary_registers").select("definition_id").eq("tenant_id",p.tenant_id).maybeSingle()
+   ]);
+   if(defs.error)throw new Error(defs.error.message);
+   if(primary.error)throw new Error(primary.error.message);
+   return {definitions:defs.data??[],primaryId:primary.data?.definition_id??null};
+ });

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute, useSearch, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useSearch, useNavigate, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -19,6 +19,10 @@ import { AssetDetailTabs } from "@/components/asset-detail-tabs";
 import { formatUGX } from "@/lib/utils";
 import { submitApproval } from "@/lib/approvals";
 import { downloadTemplate, importAssetsFromFile } from "@/lib/bulk-import";
+import {getRegisterCatalog} from "@/lib/builders.functions";
+import {exportAssetsXLSX} from "@/lib/asset-export";
+import {getServerAuthHeaders} from "@/lib/auth-headers";
+import {useServerFn} from "@tanstack/react-start";
 import { AssetLocationFields } from "@/components/asset-location-fields";
 import { GeoHierarchyFilter, type GeoHierarchyPlace } from "@/components/geo-hierarchy-filter";
 
@@ -113,6 +117,13 @@ function AssetsPage() {
   const [locationFiltersOpen, setLocationFiltersOpen] = useState(false);
   const [geoSelection, setGeoSelection] = useState<GeoHierarchyPlace|null>(null);
 
+  const catalogFn=useServerFn(getRegisterCatalog);
+  const {data:catalog}=useQuery({queryKey:["register-catalog",tenantId],enabled:!!tenantId,queryFn:async()=>catalogFn({headers:await getServerAuthHeaders()})});
+  const [registerChoice,setRegisterChoice]=useState("default");
+  const [customValues,setCustomValues]=useState<Record<string,string>>({});
+  const registers=(catalog?.definitions??[]) as Array<{id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean}>}} >;
+  const registerFields=registers.find(r=>r.id===registerChoice)?.configuration?.fields??[];
+  useEffect(()=>{if(catalog)setRegisterChoice(catalog.primaryId??"default");},[catalog]);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<AssetForm>(empty);
@@ -291,8 +302,10 @@ function AssetsPage() {
     nav({ to: "/assets", search: {} as any, replace: true });
   };
 
-  const openNew = () => { setForm(empty); setWizardStep(0); setFinancialOpen(false); setOpen(true); };
+  const openNew = () => { setCustomValues({}); setForm(empty); setWizardStep(0); setFinancialOpen(false); setOpen(true); };
   const openEdit = (a: any) => {
+    setRegisterChoice(a.register_definition_id??catalog?.primaryId??"default");
+    setCustomValues(a.custom_fields??{});
     setForm({
       id: a.id, asset_tag: a.asset_tag, serial_number: a.serial_number ?? "",
       name: a.name, description: a.description ?? "",
@@ -387,6 +400,7 @@ function AssetsPage() {
     if (locationSettings?.require_internal_location && !form.location_id) { toast.error("Office, store or site is required"); return; }
     if (locationSettings?.require_gps && (!form.location_latitude || !form.location_longitude)) { toast.error("GPS capture is required"); return; }
 
+    for(const field of registerFields){if(field.required&&!String(customValues[field.key]??"").trim()){toast.error(`${field.label} is required`);return;}}
     const tagLower = form.asset_tag.trim().toLowerCase();
     const serialLower = form.serial_number.trim().toLowerCase();
     const dup = (assets as any[]).find((a) =>
@@ -398,6 +412,8 @@ function AssetsPage() {
     if (dup) { setDupAsset(dup); setDupOpen(true); return; }
 
     const payload: any = {
+      register_definition_id:registerChoice==="default"?null:registerChoice,
+      custom_fields:customValues,
       asset_tag: form.asset_tag.trim(),
       serial_number: form.serial_number.trim() || null,
       name: form.name.trim(),
@@ -580,7 +596,7 @@ function AssetsPage() {
   const onImport = async (f: File) => {
     setImporting(true);
     try {
-      const r = await importAssetsFromFile(f, user?.id ?? null);
+      const r = await importAssetsFromFile(f, user?.id ?? null,registers.find(r=>r.id===registerChoice));
       toast.success(`Imported ${r.success} of ${r.total} rows`, { description: r.errors.length ? `${r.errors.length} rows had errors - check the asset_imports record.` : undefined });
       qc.invalidateQueries({ queryKey: ["assets"] });
     } catch (e: any) { toast.error(e?.message ?? "Import failed"); }
@@ -589,16 +605,19 @@ function AssetsPage() {
 
   return (
     <div className="space-y-6">
+      {canView("register_builder") && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3"><div><p className="text-sm font-medium">Missing columns in your asset register?</p><p className="text-xs text-muted-foreground">Build a named custom register, preview its Excel columns and download its template. Your default register is retained.</p></div><Button asChild size="sm" variant="outline"><Link to="/builders" search={{type:"register_builder"}}>Customize register</Link></Button></div>}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Assets</h1>
           <p className="text-sm text-muted-foreground">Manage your organization's fixed assets. Assets are retired (with admin approval), never deleted.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Select value={registerChoice} onValueChange={setRegisterChoice}><SelectTrigger className="w-52"><SelectValue placeholder="Select register"/></SelectTrigger><SelectContent><SelectItem value="default">Default register</SelectItem>{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select>
           <Button variant="outline" onClick={() => { setScanMode("lookup"); setScanOpen(true); }}>
             <ScanLine className="mr-2 h-4 w-4" /> Scan
           </Button>
-          <Button variant="outline" onClick={downloadTemplate} title="Download Excel import template">
+          <Button variant="outline" onClick={()=>exportAssetsXLSX(registers.find(r=>r.id===registerChoice)?.name??"Default Asset Register", (assets as any[]).filter(a=>registerChoice==="default"||a.register_definition_id===registerChoice),registerFields)} title="Export assets for selected register"><Download className="mr-2 h-4 w-4"/> Export register</Button>
+          <Button variant="outline" onClick={()=>downloadTemplate(registers.find(r=>r.id===registerChoice))} title="Download Excel import template">
             <Download className="mr-2 h-4 w-4" /> Template
           </Button>
           {canAdd && (
@@ -616,6 +635,7 @@ function AssetsPage() {
             <DialogContent className="flex max-h-[92vh] max-w-3xl flex-col overflow-hidden p-0">
               <DialogHeader className="border-b px-5 pb-4 pt-5 sm:px-6">
                 <DialogTitle>{form.id ? "Edit asset" : "Register asset"}</DialogTitle>
+                <div className="space-y-2"><Label>Asset register</Label><Select value={registerChoice} onValueChange={setRegisterChoice}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="default">Default register</SelectItem>{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select>{registerFields.length>0&&<div className="grid gap-2 sm:grid-cols-2">{registerFields.map(field=><div className="space-y-1" key={field.key}><Label>{field.label}{field.required?" *":""}</Label><Input type={field.type==="number"||field.type==="currency"?"number":field.type==="date"?"date":"text"} value={customValues[field.key]??""} onChange={e=>setCustomValues(p=>({...p,[field.key]:e.target.value}))}/></div>)}</div>}</div>
                 <DialogDescription className="sm:hidden">Step {wizardStep + 1} of {wizardSteps.length} · {wizardSteps[wizardStep].title}</DialogDescription>
 
                 <div className="hidden pt-4 sm:block">
@@ -1039,6 +1059,7 @@ function AssetsPage() {
                 <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <th className="px-3 py-3 font-medium">Tag</th>
                   <th className="px-3 py-3 font-medium">Name</th>
+                  {registerFields.map(field=><th key={field.key} className="px-3 py-3 font-medium">{field.label}</th>)}
                   <th className="hidden px-3 py-3 font-medium md:table-cell">Branch</th>
                   <th className="hidden px-3 py-3 font-medium lg:table-cell">Category</th>
                   <th className="hidden px-3 py-3 font-medium lg:table-cell">Location</th>
@@ -1053,6 +1074,7 @@ function AssetsPage() {
                   <tr key={a.id} className="border-b last:border-0 hover:bg-muted/40 cursor-pointer" onClick={() => openView(a, "activity")}>
                     <td className="px-3 py-3 font-mono text-xs">{a.asset_tag}</td>
                     <td className="px-3 py-3 font-medium">{a.name}{a.serial_number && <span className="ml-2 font-mono text-[10px] text-muted-foreground">SN: {a.serial_number}</span>}</td>
+                    {registerFields.map(field=><td key={field.key} className="px-3 py-3 text-sm">{String(a.custom_fields?.[field.key]??"—")}</td>)}
                     <td className="hidden px-3 py-3 text-muted-foreground md:table-cell">{a.branches?.name ?? "-"}</td>
                     <td className="hidden px-3 py-3 text-muted-foreground lg:table-cell">{a.categories?.name ?? "-"}</td>
                     <td className="hidden px-3 py-3 text-muted-foreground lg:table-cell">
