@@ -306,7 +306,7 @@ function AssetsPage() {
 
   const openNew = async () => { const result=await refreshRegisterCatalog();if(result.error||!result.data){toast.error("Cannot load your company register. Try again.");return;}const preferred=result.data.primaryId??"default";if(preferred!=="default"&&!result.data.definitions.some((d:any)=>d.id===preferred)){toast.error("Your active register is unavailable. Please contact your administrator.");return;}setRegisterChoice(preferred);setCustomValues({});setForm(empty);setWizardStep(0);setFinancialOpen(false);setOpen(true); };
   const openEdit = (a: any) => {
-    setRegisterChoice(a.register_definition_id??catalog?.primaryId??"default");
+    setRegisterChoice(a.register_definition_id??"default");
     setCustomValues(Object.fromEntries(Object.entries(a.custom_fields??{}).map(([k,v])=>[k,String(v??"")])));
     setForm({
       id: a.id, asset_tag: a.asset_tag, serial_number: a.serial_number ?? "",
@@ -404,7 +404,7 @@ function AssetsPage() {
     const enteredTag=tagField?String(customValues[tagField.key]??"").trim():"";
     const enteredName=nameField?String(customValues[nameField.key]??"").trim():String(Object.values(customValues).find(v=>String(v).trim())??"").trim();
     const effectiveTag=customRegister?(form.id?(enteredTag||form.asset_tag):(enteredTag||`AUTO-${crypto.randomUUID()}`)):form.asset_tag.trim();
-    const effectiveName=customRegister?(enteredName||form.name.trim()):form.name.trim();
+    const effectiveName=customRegister?(enteredName||form.name.trim()||enteredTag||"Registered asset"):form.name.trim();
     if(!effectiveTag||!effectiveName){toast.error("Enter an asset name or item description.");return;}
 
     if (locationSettings?.require_branch && !form.branch_id) { toast.error("Branch is required"); return; }
