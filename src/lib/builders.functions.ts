@@ -111,3 +111,17 @@ export const setActiveRegisterDefinition = createServerFn({method:"POST"})
     if(error)throw new Error(error.message);
     return {ok:true};
   });
+
+export const getRegisterCatalog = createServerFn({method:"POST"})
+ .middleware([requireSupabaseAuth])
+ .handler(async ({context})=>{
+   const {data:p,error:pe}=await db.from("profiles").select("tenant_id,is_active").eq("id",context.userId).single();
+   if(pe||!p?.tenant_id||!p.is_active)throw new Error("Business membership is required.");
+   const [defs,primary]=await Promise.all([
+     db.from("builder_definitions").select("id,name,configuration,is_active").eq("tenant_id",p.tenant_id).eq("builder_key","register_builder").eq("is_active",true).order("name"),
+     db.from("tenant_primary_registers").select("definition_id").eq("tenant_id",p.tenant_id).maybeSingle()
+   ]);
+   if(defs.error)throw new Error(defs.error.message);
+   if(primary.error)throw new Error(primary.error.message);
+   return {definitions:defs.data??[],primaryId:primary.data?.definition_id??null};
+ });
