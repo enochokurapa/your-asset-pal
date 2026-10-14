@@ -1117,3 +1117,26 @@ export const checkYoUpgrade = createServerFn({ method: "POST" })
     }
     return { status: transactionStatus || "PENDING", successful, response };
   });
+
+export const getSaasTenantTagSettings=createServerFn({method:"POST"})
+ .middleware([requireSupabaseAuth])
+ .inputValidator(input=>z.object({tenant_id:z.string().uuid()}).parse(input))
+ .handler(async ({data,context})=>{
+   await assertSaasAdmin(context.userId);
+   const {data:tenant,error:tenantError}=await admin.from("tenants").select("id").eq("id",data.tenant_id).maybeSingle();
+   if(tenantError||!tenant)throw new Error("Business not found");
+   const {data:settings,error}=await admin.from("tenant_asset_tag_settings").select("prefix,separator,padding,next_number").eq("tenant_id",data.tenant_id).maybeSingle();
+   if(error)throw new Error(error.message);
+   return settings??{prefix:"AST",separator:"-",padding:5,next_number:1};
+ });
+export const updateSaasTenantTagSettings=createServerFn({method:"POST"})
+ .middleware([requireSupabaseAuth])
+ .inputValidator(input=>z.object({tenant_id:z.string().uuid(),prefix:z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,10}$/),separator:z.enum(["","-","/"]),padding:z.number().int().min(2).max(12)}).parse(input))
+ .handler(async ({data,context})=>{
+   await assertSaasAdmin(context.userId);
+   const {data:tenant,error:tenantError}=await admin.from("tenants").select("id").eq("id",data.tenant_id).maybeSingle();
+   if(tenantError||!tenant)throw new Error("Business not found");
+   const {error}=await admin.from("tenant_asset_tag_settings").upsert({...data,updated_at:new Date().toISOString()},{onConflict:"tenant_id"});
+   if(error)throw new Error(error.message);
+   return {ok:true};
+ });
