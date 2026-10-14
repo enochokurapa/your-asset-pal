@@ -12,7 +12,7 @@ import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from "@/compo
 import {Switch} from "@/components/ui/switch";
 import {toast} from "sonner";
 import {Plus,Save,Archive,LockKeyhole,ArrowUp,ArrowDown,Download,CheckCircle2} from "lucide-react";
-import * as XLSX from "xlsx";
+import {downloadTemplate as downloadImportTemplate} from "@/lib/bulk-import";
 import {setActiveRegisterDefinition} from "@/lib/builders.functions";
 
 export const Route=createFileRoute("/_app/builders")({
@@ -83,7 +83,7 @@ function BuildersPage(){
    setDraftLabel("");
  };
  const moveField=(id:string,step:number)=>setFields(previous=>{const next=[...previous];const index=next.findIndex(field=>field.id===id);const target=index+step;if(index<0||target<0||target>=next.length)return previous;[next[index],next[target]]=[next[target],next[index]];return next;});
- const downloadRegister=()=>{const columns=["asset_tag","name",...fields.map(f=>f.key)];const worksheet=XLSX.utils.aoa_to_sheet([columns]);const workbook=XLSX.utils.book_new();XLSX.utils.book_append_sheet(workbook,worksheet,"Assets");XLSX.utils.book_append_sheet(workbook,XLSX.utils.aoa_to_sheet([["Field","Type","Required"],...fields.map(f=>[f.key,f.type,f.required?"Yes":"No"])]),"Field definitions");XLSX.writeFile(workbook,`${slug(name||"custom_register")||"custom_register"}_template.xlsx`);};
+ const downloadRegister=()=>downloadImportTemplate({id:selected??"",name:name.trim()||"Custom Register",configuration:{fields}});
  const confirmActive=async(id:string|null)=>{setBusy(true);try{const headers=await getServerAuthHeaders();await activate({headers,data:{definitionId:id}});setActiveRegister(id);setActivationPrompt(null);toast.success(id?"Custom register set as primary.":"Default register restored.");}catch(e:any){toast.error(e?.message||"Unable to activate register");}finally{setBusy(false);}};
  const persist=async()=>{
    if(name.trim().length<2){toast.error("Enter a name of at least 2 characters.");return;}
