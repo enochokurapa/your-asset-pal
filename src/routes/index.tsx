@@ -2,7 +2,7 @@ import {createFileRoute,Link} from "@tanstack/react-router";
 import {useAuth} from "@/hooks/use-auth";
 import {PlatformLogo} from "@/components/platform-logo";
 import {Button} from "@/components/ui/button";
-import {ArrowRight,Check,ScanLine,MapPinned,ShieldCheck,BarChart3,Boxes,FileSpreadsheet,Users,ChevronRight,LockKeyhole,Layers3,ChartColumnIncreasing,Route,Menu,ClipboardCheck,Settings2,Zap} from "lucide-react";
+import {ArrowRight,Check,ScanLine,MapPinned,ShieldCheck,BarChart3,Boxes,FileSpreadsheet,Users,ChevronRight,LockKeyhole,Layers3,ChartColumnIncreasing,Route as RouteIcon,Menu,ClipboardCheck,Settings2,Zap} from "lucide-react";
 import {useState} from "react";
 
 export const Route=createFileRoute("/")({
@@ -23,7 +23,7 @@ const capabilities=[
  {icon:MapPinned,title:"Location accountability",text:"Track branches and internal locations, with location capture when your workflow requires it."},
  {icon:ScanLine,title:"Fast verification",text:"Verify physical assets with QR and barcode workflows and keep exception records."},
  {icon:ChartColumnIncreasing,title:"Depreciation & reporting",text:"Manage value over time and create operational reports and custom visual layouts."},
- {icon:Route,title:"Controlled movement",text:"Manage transfers, gate passes and important lifecycle decisions."},
+ {icon:RouteIcon,title:"Controlled movement",text:"Manage transfers, gate passes and important lifecycle decisions."},
  {icon:ShieldCheck,title:"Permissions and auditability",text:"Set user permissions, approvals and maintain a record of significant changes."}
 ];
 const processes=[
