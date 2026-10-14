@@ -9,7 +9,7 @@ import {
   checkYoUpgrade,
   startYoAddonPurchase,
   checkYoAddonPurchase,
-  startYoSeatPurchase,checkYoSeatPurchase,
+  startYoSeatPurchase,checkYoSeatPurchase,startYoAssetCapacityPurchase,checkYoAssetCapacityPurchase,
 } from "@/lib/saas.functions";
 import { getServerAuthHeaders } from "@/lib/auth-headers";
 import { Card } from "@/components/ui/card";
@@ -37,6 +37,8 @@ function BillingPage() {
   const checkAddonPay = useServerFn(checkYoAddonPurchase);
   const startSeatPay=useServerFn(startYoSeatPurchase),checkSeatPay=useServerFn(checkYoSeatPurchase);
   const [seatQuantity,setSeatQuantity]=useState(1),[seatTx,setSeatTx]=useState<string|null>(null);
+  const startAssetPay=useServerFn(startYoAssetCapacityPurchase),checkAssetPay=useServerFn(checkYoAssetCapacityPurchase);
+  const [assetBlocks,setAssetBlocks]=useState(1),[assetTx,setAssetTx]=useState<string|null>(null);
   const [phone, setPhone] = useState("256");
   const [busy, setBusy] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -52,6 +54,8 @@ function BillingPage() {
   const extraUserPrice=ctx?.settings?.extraUserPrice??0;
   const totalSeats=(ctx?.settings?.includedPaidUsers??0)+(ctx?.settings?.purchasedExtraUsers??0);
   const currency = ctx?.settings?.currency ?? "UGX";
+  const blockSize=ctx?.settings?.extraAssetBlockSize??2000,blockPrice=ctx?.settings?.extraAssetBlockPrice??20;
+  const assetCapacity=(ctx?.settings?.includedAssets??0)+(ctx?.settings?.purchasedExtraAssets??0);
   const trialDays = ctx?.settings?.trialDays ?? null;
   const trialUserLimit = ctx?.settings?.trialUserLimit ?? null;
   const daysLeft = trialEndsAt ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000)) : null;
@@ -93,6 +97,7 @@ function BillingPage() {
         <div className="flex flex-wrap items-end gap-3"><div className="space-y-2"><Label>Additional users</Label><Input className="w-28" type="number" min={1} max={100} value={seatQuantity} onChange={e=>setSeatQuantity(Math.max(1,Math.min(100,Number(e.target.value)||1)))}/></div><div className="space-y-1"><p className="text-sm text-muted-foreground">Price per user: {money(extraUserPrice,currency)}</p><p className="text-lg font-semibold">{money(extraUserPrice*seatQuantity,currency)}</p></div><Button disabled={busy||!isTenantAdmin||subscriptionStatus!=="active"||extraUserPrice<=0||!ctx?.paymentConfigured} onClick={async()=>{setBusy(true);try{const result=await startSeatPay({headers:await getServerAuthHeaders(),data:{phone,quantity:seatQuantity}});setSeatTx(result.transactionId);toast.success("Payment request sent. Approve on your phone.")}catch(e:any){toast.error(e.message||"Could not purchase seats")}finally{setBusy(false)}}}>Buy extra users</Button>{seatTx&&<Button variant="outline" disabled={checking} onClick={async()=>{setChecking(true);try{const result=await checkSeatPay({headers:await getServerAuthHeaders(),data:{transactionId:seatTx}});if(result.successful){toast.success("Extra user seats activated");setSeatTx(null);await refetch()}else toast.message("Payment: "+result.status)}catch(e:any){toast.error(e.message||"Could not check payment")}finally{setChecking(false)}}}>Check seat payment</Button>}</div>
         <p className="text-xs text-muted-foreground">Paid seats are enabled only after confirmed payment. Then open Users to add team members.</p>
       </Card>
+      <Card className="space-y-4 p-5"><div><h2 className="text-lg font-semibold">Additional asset capacity</h2><p className="text-sm text-muted-foreground">Current allowance: {assetCapacity.toLocaleString()} assets. Purchased expansion: {(ctx?.settings?.purchasedExtraAssets??0).toLocaleString()} assets. Each block adds {blockSize.toLocaleString()} assets.</p></div><div className="flex flex-wrap items-end gap-3"><div className="space-y-1"><Label>Asset blocks</Label><Input className="w-28" type="number" min={1} max={100} value={assetBlocks} onChange={e=>setAssetBlocks(Math.max(1,Math.min(100,Number(e.target.value)||1)))}/></div><div><p className="text-sm text-muted-foreground">Adds {(assetBlocks*blockSize).toLocaleString()} assets</p><p className="font-bold">{money(assetBlocks*blockPrice,currency)}</p></div><Button disabled={busy||!isTenantAdmin||subscriptionStatus!=="active"||blockPrice<=0||!ctx?.paymentConfigured} onClick={async()=>{setBusy(true);try{const r=await startAssetPay({headers:await getServerAuthHeaders(),data:{phone,quantity:assetBlocks}});setAssetTx(r.transactionId);toast.success("Payment request sent. Approve on your phone.")}catch(e:any){toast.error(e.message||"Could not start capacity purchase")}finally{setBusy(false)}}}>Buy additional assets</Button>{assetTx&&<Button variant="outline" disabled={checking} onClick={async()=>{setChecking(true);try{const r=await checkAssetPay({headers:await getServerAuthHeaders(),data:{transactionId:assetTx}});if(r.successful){toast.success("Additional asset capacity activated");setAssetTx(null);await refetch()}else toast.message("Payment: "+r.status)}catch(e:any){toast.error(e.message||"Could not check payment")}finally{setChecking(false)}}}>Check asset payment</Button>}</div><p className="text-xs text-muted-foreground">Asset capacity increases only after confirmed payment. Mobile money checkout currently requires UGX prices.</p></Card>
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="p-5"><p className="text-xs uppercase tracking-wide text-muted-foreground">Current status</p><div className="mt-2 flex items-center gap-2"><Badge className="capitalize">{subscriptionStatus}</Badge>{subscriptionStatus === "active" && <CheckCircle2 className="h-4 w-4 text-success" />}</div></Card>
         <Card className="p-5"><p className="text-xs uppercase tracking-wide text-muted-foreground">Free trial</p><p className="mt-2 text-xl font-semibold">{trialDays !== null ? `${trialDays} days` : "Loading…"}</p>{subscriptionStatus === "trial" && daysLeft !== null && <p className="mt-1 text-xs text-muted-foreground"><strong>{daysLeft} day(s) remaining</strong>{trialEndsAt ? ` · ends ${new Date(trialEndsAt).toLocaleDateString()}` : ""}</p>}</Card>
