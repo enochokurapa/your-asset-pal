@@ -29,10 +29,10 @@ const SAMPLE_ROW: Record<string, any> = {
 };
 
 export type RegisterTemplate={id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean,options?:string[]}>}};
-export function downloadTemplate(register?:RegisterTemplate) {
+export function downloadTemplate(register?:RegisterTemplate, includeLocation=false) {
   const wb = XLSX.utils.book_new();
   const extra=register?.configuration?.fields??[];
-  const columns=register?extra.map(field=>field.label):TEMPLATE_COLUMNS;
+  const columns=register?[...extra.map(field=>field.label),...(includeLocation&&!extra.some(f=>["location","assetlocation"].includes(f.key.toLowerCase()))?["Location"]:[])]:TEMPLATE_COLUMNS;
   if(!columns.length)throw new Error("Add at least one field before downloading this custom template.");
   const ws=register?XLSX.utils.aoa_to_sheet([columns]):XLSX.utils.json_to_sheet([SAMPLE_ROW],{header:columns});
   // Append an "instructions" sheet
@@ -66,7 +66,7 @@ export type ImportResult = {
   errors: { row: number; tag?: string; error: string }[];
 };
 
-export async function importAssetsFromFile(file: File, userId: string | null,register?:RegisterTemplate, importBranchId?:string): Promise<ImportResult> {
+export async function importAssetsFromFile(file: File, userId: string | null,register?:RegisterTemplate, importBranchId?:string,includeLocation=false): Promise<ImportResult> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: "array" });
   const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -147,8 +147,8 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
       }
 
       let locationId: string | null = null;
-      if (r.location) {
-        const loc = await ensureLocation(String(r.location));
+      if (r.location || (register&&includeLocation&&r.Location)) {
+        const loc = await ensureLocation(String(r.location||r.Location));
         locationId = loc.id;
         if (r.sub_location) {
           const sub = await ensureLocation(String(r.sub_location), loc.id);
