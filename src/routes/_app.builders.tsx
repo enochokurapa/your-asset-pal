@@ -77,6 +77,7 @@ function BuildersPage(){
  const [tagPadding,setTagPadding]=useState(5);
  const [activationPrompt,setActivationPrompt]=useState<string|null>(null);
  const [activeRegister,setActiveRegister]=useState<string|null>(null);
+ const [includeLocation,setIncludeLocation]=useState(true);
  const allowed=canView(kind);
  const locked=isPaidFeature(kind)||isAddOnFeature(kind);
  useEffect(()=>{setKind(initial)},[initial]);
@@ -86,7 +87,7 @@ function BuildersPage(){
    if(!allowed||!isTenantAdmin||isSaasAdmin)return;
    setBusy(true);
    getServerAuthHeaders().then(headers=>list({data:{kind},headers})).then(async rows=>{
-     if(valid){if(!Array.isArray(rows))throw Error("Unexpected response from server");setItems(rows as Definition[]);if(kind==="register_builder")catalog({headers:await getServerAuthHeaders()}).then(c=>{if(valid)setActiveRegister(c.primaryId??null)}).catch(()=>{});}
+     if(valid){if(!Array.isArray(rows))throw Error("Unexpected response from server");setItems(rows as Definition[]);if(kind==="register_builder")catalog({headers:await getServerAuthHeaders()}).then(c=>{if(valid){setActiveRegister(c.primaryId??null);setIncludeLocation(c.includeLocation??true)}}).catch(()=>{});}
    }).catch(e=>{if(valid)setError(e?.message||"Unable to load definitions")})
      .finally(()=>{if(valid)setBusy(false)});
    return()=>{valid=false};
@@ -116,7 +117,7 @@ function BuildersPage(){
  };
  const dropField=(source:string,target:string)=>setFields(previous=>{const next=[...previous];const from=next.findIndex(f=>f.id===source),to=next.findIndex(f=>f.id===target);if(from<0||to<0||from===to)return previous;next.splice(to,0,...next.splice(from,1));return next;});
  const moveField=(id:string,step:number)=>setFields(previous=>{const next=[...previous];const index=next.findIndex(field=>field.id===id);const target=index+step;if(index<0||target<0||target>=next.length)return previous;[next[index],next[target]]=[next[target],next[index]];return next;});
- const downloadRegister=()=>downloadImportTemplate({id:selected??"",name:name.trim()||"Custom Register",configuration:{fields}});
+ const downloadRegister=()=>downloadImportTemplate({id:selected??"",name:name.trim()||"Custom Register",configuration:{fields}},includeLocation);
  const confirmActive=async(id:string|null)=>{setBusy(true);try{const headers=await getServerAuthHeaders();await activate({headers,data:{definitionId:id}});setActiveRegister(id);setActivationPrompt(null);toast.success(id?"Custom register set as primary.":"Default register restored.");}catch(e:any){toast.error(e?.message||"Unable to activate register");setError(e?.message||"Could not change the primary register. Your saved register is safe.");}finally{setBusy(false);}};
  const persist=async(makePrimary=false)=>{
    if(name.trim().length<2){toast.error("Enter a name of at least 2 characters.");return;}
