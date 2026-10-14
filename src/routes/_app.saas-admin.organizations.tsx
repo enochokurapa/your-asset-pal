@@ -135,7 +135,7 @@ function SaasAdminOrganizationsPage() {
         data: {
           tenant_id: selectedTenantId,
           status,
-          plan_code: status === "active" ? "paid" : "trial",
+          plan_code: status === "active" ? (["starter","business","enterprise"].includes(tenant?.plan_code)?tenant.plan_code:"paid") : "trial",
         },
       });
       await qc.invalidateQueries({ queryKey: ["saas-admin-dashboard"] });
@@ -146,6 +146,11 @@ function SaasAdminOrganizationsPage() {
     }
   };
 
+  const setNamedPlan=async(plan:string)=>{
+    if(!selectedTenantId||!tenant||tenant.effective_status!=="active")return;
+    try{await authCall(saveTenant,{data:{tenant_id:selectedTenantId,status:"active",plan_code:plan}});await refreshAll();toast.success("Assigned "+plan+" package");}
+    catch(error:any){toast.error(error.message||"Cannot assign package")}
+  };
   const saveName = async () => {
     if (!selectedTenantId || !nameDraft.trim()) return;
     setSavingName(true);
@@ -282,7 +287,7 @@ function SaasAdminOrganizationsPage() {
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">{tenant.slug} · Created {new Date(tenant.created_at).toLocaleDateString()}</p>
                 </div>
-                <div className="w-full sm:w-52">
+                <div className="w-full sm:w-52 space-y-2"><label className="block text-xs font-medium">Assigned paid package</label><Select value={["starter","business","enterprise"].includes(tenant.plan_code)?tenant.plan_code:"legacy"} disabled={tenant.effective_status!=="active"} onValueChange={v=>setNamedPlan(v==="legacy"?"paid":v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="legacy">Legacy paid plan</SelectItem><SelectItem value="starter">Starter</SelectItem><SelectItem value="business">Business</SelectItem><SelectItem value="enterprise">Enterprise</SelectItem></SelectContent></Select><p className="text-xs text-muted-foreground">Changing a package as SaaS Admin also renews its active period. Use only for approved subscriptions.</p></div><div className="w-full sm:w-52">
                   <Select value={tenant.effective_status} onValueChange={(value) => changeTenantStatus(value as any)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
