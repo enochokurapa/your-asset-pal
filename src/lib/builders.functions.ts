@@ -121,13 +121,15 @@ export const getRegisterCatalog = createServerFn({method:"POST"})
  .handler(async ({context})=>{
    const {data:p,error:pe}=await db.from("profiles").select("tenant_id,is_active").eq("id",context.userId).single();
    if(pe||!p?.tenant_id||!p.is_active)throw new Error("Business membership is required.");
-   const [defs,primary]=await Promise.all([
+   const [defs,primary,locationSetting]=await Promise.all([
      db.from("builder_definitions").select("id,name,configuration,is_active").eq("tenant_id",p.tenant_id).eq("builder_key","register_builder").eq("is_active",true).order("name"),
-     db.from("tenant_primary_registers").select("definition_id").eq("tenant_id",p.tenant_id).maybeSingle()
+     db.from("tenant_primary_registers").select("definition_id").eq("tenant_id",p.tenant_id).maybeSingle(),
+     db.from("tenant_location_settings").select("show_in_custom_register").eq("tenant_id",p.tenant_id).maybeSingle()
    ]);
    if(defs.error)throw new Error(defs.error.message);
    if(primary.error)throw new Error(primary.error.message);
-   return {definitions:defs.data??[],primaryId:primary.data?.definition_id??null};
+   if(locationSetting.error)throw new Error(locationSetting.error.message);
+   return {definitions:defs.data??[],primaryId:primary.data?.definition_id??null,includeLocation:locationSetting.data?.show_in_custom_register??true};
  });
 
 export const getAssetTagSettings=createServerFn({method:"POST"})
