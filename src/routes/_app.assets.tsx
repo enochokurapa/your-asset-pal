@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute, useSearch, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useSearch, useNavigate, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -589,6 +589,7 @@ function AssetsPage() {
 
   return (
     <div className="space-y-6">
+      {canView("register_builder") && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3"><div><p className="text-sm font-medium">Missing columns in your asset register?</p><p className="text-xs text-muted-foreground">Build a named custom register, preview its Excel columns and download its template. Your default register is retained.</p></div><Button asChild size="sm" variant="outline"><Link to="/builders" search={{type:"register_builder"}}>Customize register</Link></Button></div>}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Assets</h1>
