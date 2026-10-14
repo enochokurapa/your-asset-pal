@@ -102,7 +102,7 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
     supabase.from("branches").select("id,name,code"),
   ]);
   const catMap = new Map<string, any>((cats ?? []).map((c: any) => [c.name.toLowerCase(), c]));
-  const locMap = new Map<string, any>((locs ?? []).map((l: any) => [l.name.toLowerCase(), l]));
+  const locMap = new Map<string, any>((locs ?? []).map((l: any) => [`${(l.parent_id??"root")}:${l.name.toLowerCase()}`, l]));
   const brMap = new Map<string, any>();
   (brs ?? []).forEach((b: any) => {
     brMap.set(b.name.toLowerCase(), b);
@@ -127,12 +127,12 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
     return data;
   };
   const ensureLocation = async (name: string, parentId: string | null = null) => {
-    const k = name.trim().toLowerCase();
+    const k = `${parentId??"root"}:${name.trim().toLowerCase()}`;
     const existing = locMap.get(k);
     if (existing && (existing.parent_id ?? null) === parentId) return existing;
     const { data, error } = await supabase.from("locations").insert({ name: name.trim(), parent_id: parentId }).select().single();
     if (error) throw error;
-    locMap.set(data.name.toLowerCase(), data);
+    locMap.set(`${parentId??"root"}:${data.name.toLowerCase()}`, data);
     return data;
   };
 
