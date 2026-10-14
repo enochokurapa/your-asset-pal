@@ -1,0 +1,1 @@
+ALTER TABLE public.tenant_location_settings ADD COLUMN IF NOT EXISTS show_in_custom_register boolean NOT NULL DEFAULT true;
