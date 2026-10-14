@@ -415,6 +415,16 @@ export const updateTenantModule = createServerFn({ method: "POST" })
     return { ok: true, inherited: false };
   });
 
+export const assignTenantPricingPlan=createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
+ .inputValidator(input=>z.object({tenant_id:z.string().uuid(),plan_code:z.enum(["starter","business","enterprise","paid"])}).parse(input))
+ .handler(async({context,data})=>{
+  await assertSaasAdmin(context.userId);
+  const {data:tenant,error:tenantError}=await admin.from("tenants").select("id,subscription_status").eq("id",data.tenant_id).single();
+  if(tenantError||!tenant||tenant.subscription_status!=="active")throw Error("Only an active paid workspace can be reassigned");
+  const {error}=await admin.from("tenants").update({plan_code:data.plan_code,updated_at:new Date().toISOString()}).eq("id",data.tenant_id);
+  if(error)throw Error(error.message);
+  return {ok:true};
+ });
 export const updateTenantSubscription = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({
