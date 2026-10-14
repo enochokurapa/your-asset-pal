@@ -1067,24 +1067,17 @@ function AssetsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-                  <th className="px-3 py-3 font-medium">Tag</th>
-                  <th className="px-3 py-3 font-medium">Name</th>
+                  {registerChoice==="default"&&<><th className="px-3 py-3 font-medium">Tag</th><th className="px-3 py-3 font-medium">Name</th></>}
                   {registerFields.map(field=><th key={field.key} className="px-3 py-3 font-medium">{field.label}</th>)}
-                  <th className="hidden px-3 py-3 font-medium md:table-cell">Branch</th>
-                  <th className="hidden px-3 py-3 font-medium lg:table-cell">Category</th>
-                  <th className="hidden px-3 py-3 font-medium lg:table-cell">Location</th>
-                  <th className="hidden px-3 py-3 font-medium md:table-cell">Custodian</th>
-                  <th className="px-3 py-3 font-medium">Status</th>
-                  <th className="hidden px-3 py-3 text-right font-medium sm:table-cell">Value</th>
+                  {registerChoice==="default"&&<><th className="hidden px-3 py-3 font-medium md:table-cell">Branch</th><th className="hidden px-3 py-3 font-medium lg:table-cell">Category</th><th className="hidden px-3 py-3 font-medium lg:table-cell">Location</th><th className="hidden px-3 py-3 font-medium md:table-cell">Custodian</th><th className="px-3 py-3 font-medium">Status</th><th className="hidden px-3 py-3 text-right font-medium sm:table-cell">Value</th></>}
                   <th className="px-3 py-3" />
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((a: any) => (
                   <tr key={a.id} className="border-b last:border-0 hover:bg-muted/40 cursor-pointer" onClick={() => openView(a, "activity")}>
-                    <td className="px-3 py-3 font-mono text-xs">{a.asset_tag}</td>
+                    {registerChoice==="default"&&<>                    <td className="px-3 py-3 font-mono text-xs">{a.asset_tag}</td>
                     <td className="px-3 py-3 font-medium">{a.name}{a.serial_number && <span className="ml-2 font-mono text-[10px] text-muted-foreground">SN: {a.serial_number}</span>}</td>
-                    {registerFields.map(field=><td key={field.key} className="px-3 py-3 text-sm">{String(a.custom_fields?.[field.key]??"—")}</td>)}
                     <td className="hidden px-3 py-3 text-muted-foreground md:table-cell">{a.branches?.name ?? "-"}</td>
                     <td className="hidden px-3 py-3 text-muted-foreground lg:table-cell">{a.categories?.name ?? "-"}</td>
                     <td className="hidden px-3 py-3 text-muted-foreground lg:table-cell">
@@ -1104,6 +1097,8 @@ function AssetsPage() {
                       </span>
                     </td>
                     <td className="hidden px-3 py-3 text-right tabular-nums sm:table-cell">{formatUGX(a.purchase_value)}</td>
+                    </>}
+                    {registerChoice!=="default"&&registerFields.map(field=><td key={field.key} className="px-3 py-3 text-sm">{String(a.custom_fields?.[field.key]??"—")}</td>)}
                     <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-end gap-1">
                         <Button size="icon" variant="ghost" title="View details & history" onClick={() => openView(a, "activity")}>
