@@ -120,12 +120,12 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
     const rowNum = i + 2; // header is row 1
     try {
       const extra=register?.configuration?.fields??[];
-      const custom:Record<string,string|number|boolean|null>={};
-      for(const field of extra){const raw=r[field.label]??r[field.key];const value=raw==null?"":String(raw).trim();if(field.required&&!value)throw Error(`${field.label} is required`);if(!value){custom[field.key]=null;continue;}if(field.type==="number"||field.type==="currency"){const n=Number(value);if(!Number.isFinite(n))throw Error(`${field.label} must be a number`);custom[field.key]=n;}else if(field.type==="boolean"){if(!["true","false","yes","no","1","0"].includes(value.toLowerCase()))throw Error(`${field.label} must be true or false`);custom[field.key]=["true","yes","1"].includes(value.toLowerCase());}else if(field.type==="date"){if(!/^\d{4}-\d{2}-\d{2}$/.test(value))throw Error(`${field.label} must use YYYY-MM-DD`);custom[field.key]=value;}else if(field.type==="select"&&field.options?.length&&!field.options.includes(value))throw Error(`${field.label}: invalid option ${value}`);else custom[field.key]=value;}
       const normalized=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]/g,"");
       const findField=(...aliases:string[])=>extra.find(f=>aliases.includes(normalized(f.label))||aliases.includes(normalized(f.key)));
-      const customTagField=findField("assettag","tagnumber","tag","tagno","serialnumber","engravenumber");
+      const customTagField=findField("assettag","tagnumber","tag","tagno");
       const customNameField=findField("assetname","itemname","name","itemdescription","itemcode");
+      const custom:Record<string,string|number|boolean|null>={};
+      for(const field of extra){const raw=r[field.label]??r[field.key];const value=raw==null?"":String(raw).trim();if(field.required&&!value&&field.key!==customTagField?.key)throw Error(`${field.label} is required`);if(!value){custom[field.key]=null;continue;}if(field.type==="number"||field.type==="currency"){const n=Number(value);if(!Number.isFinite(n))throw Error(`${field.label} must be a number`);custom[field.key]=n;}else if(field.type==="boolean"){if(!["true","false","yes","no","1","0"].includes(value.toLowerCase()))throw Error(`${field.label} must be true or false`);custom[field.key]=["true","yes","1"].includes(value.toLowerCase());}else if(field.type==="date"){if(!/^\d{4}-\d{2}-\d{2}$/.test(value))throw Error(`${field.label} must use YYYY-MM-DD`);custom[field.key]=value;}else if(field.type==="select"&&field.options?.length&&!field.options.includes(value))throw Error(`${field.label}: invalid option ${value}`);else custom[field.key]=value;}
       const explicitTag=customTagField?String(custom[customTagField.key]??"").trim():"";
       const tag=register?(explicitTag||`AUTO-${crypto.randomUUID()}`):String(r.asset_tag??"").trim();
       const name=register?String(customNameField?custom[customNameField.key]??"":Object.values(custom).find(v=>typeof v==="string"&&v.trim())??"").trim():String(r.name??"").trim();
@@ -134,6 +134,7 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
       if(!name)throw new Error("A text/name field must contain an asset name");
       if(!register&&!branchName)throw new Error("branch is required");
       const branch=branchName?await ensureBranch(branchName):brs?.length===1?(brs as any[])[0]:null;
+      if(register&&!branch&&(brs?.length??0)>1)throw new Error("This company has multiple branches. Choose a branch for this import first.");
 
       let categoryId: string | null = null;
       if (r.category) {
