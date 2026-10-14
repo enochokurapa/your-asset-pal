@@ -1205,6 +1205,12 @@ export const getPricingPlans=createServerFn({method:"GET"}).handler(async()=>{
  const {data:settings}=await admin.from("saas_settings").select("currency,extra_user_price,trial_days").eq("id",true).single();
  return {currency:settings?.currency??"USD",extraUserPrice:Number(settings?.extra_user_price??0),trialDays:Number(settings?.trial_days??14),plans:(data??[]).map((p:any)=>({...p,monthly_price:Number(p.monthly_price),annual_price:Number(p.annual_price)}))};
 });
+export const getAdminAvailableModules=createServerFn({method:"POST"}).middleware([requireSupabaseAuth]).handler(async({context})=>{
+ await assertSaasAdmin(context.userId);
+ const {data,error}=await admin.from("saas_modules").select("module_key,label,billing_model").eq("globally_enabled",true).order("sort_order");
+ if(error)throw Error(error.message);
+ return (data??[]).filter((m:any)=>m.billing_model!=="add_on");
+});
 export const getAdminPricingPlans=createServerFn({method:"POST"}).middleware([requireSupabaseAuth]).handler(async({context})=>{
  await assertSaasAdmin(context.userId);
  const {data,error}=await admin.from("saas_pricing_plans").select("*").order("monthly_price");
@@ -1212,10 +1218,10 @@ export const getAdminPricingPlans=createServerFn({method:"POST"}).middleware([re
  return data??[];
 });
 export const saveAdminPricingPlan=createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
- .inputValidator(input=>z.object({id:z.enum(["starter","business","enterprise"]),name:z.string().min(2).max(60),description:z.string().max(300),monthly_price:z.number().finite().min(0),annual_price:z.number().finite().min(0),included_users:z.number().int().min(1),included_assets:z.number().int().min(1),features:z.array(z.string().min(1).max(100)).max(30),is_published:z.boolean()}).parse(input))
+ .inputValidator(input=>z.object({id:z.enum(["starter","business","enterprise"]),name:z.string().min(2).max(60),description:z.string().max(300),monthly_price:z.number().finite().min(0),annual_price:z.number().finite().min(0),included_users:z.number().int().min(1),included_assets:z.number().int().min(1),features:z.array(z.string().min(1).max(100)).max(30),enabled_modules:z.array(z.string().min(1).max(70)).max(40),is_published:z.boolean()}).parse(input))
  .handler(async({context,data})=>{
   await assertSaasAdmin(context.userId);
-  const {error}=await admin.from("saas_pricing_plans").update({...data,updated_at:new Date().toISOString()}).eq("id",data.id);
-  if(error)throw Error(error.message);
-  return {saved:true};
+  const {data:saved,error}=await admin.from("saas_pricing_plans").upsert({...data,updated_at:new Date().toISOString()},{onConflict:"id"}).select("id").single();
+  if(error||!saved)throw Error(error?.message||"The plan could not be saved");
+  return {saved:true,id:saved.id};
  });
