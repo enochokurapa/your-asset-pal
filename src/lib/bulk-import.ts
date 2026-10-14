@@ -32,8 +32,9 @@ export type RegisterTemplate={id:string,name:string,configuration:{fields?:Array
 export function downloadTemplate(register?:RegisterTemplate) {
   const wb = XLSX.utils.book_new();
   const extra=register?.configuration?.fields??[];
-  const columns=[...TEMPLATE_COLUMNS,...extra.map(field=>field.key)];
-  const ws = XLSX.utils.json_to_sheet([{...SAMPLE_ROW,...Object.fromEntries(extra.map(field=>[field.key,""]))}], { header: columns });
+  const columns=register?extra.map(field=>field.label):TEMPLATE_COLUMNS;
+  if(!columns.length)throw new Error("Add at least one field before downloading this custom template.");
+  const ws=register?XLSX.utils.aoa_to_sheet([columns]):XLSX.utils.json_to_sheet([SAMPLE_ROW],{header:columns});
   // Append an "instructions" sheet
   const notes = [
     ["Column", "Required?", "Notes"],
@@ -52,10 +53,10 @@ export function downloadTemplate(register?:RegisterTemplate) {
     ["custodian", "No", "Person responsible (creates an assignment record)"],
     ["department", "No", "Department of the custodian"],
   ];
-  extra.forEach(f=>notes.push([f.key,f.required?"Yes":"No",`${f.label} (${f.type}${f.options?.length?": "+f.options.join(" / "):""})`]));
+  if(register){notes.splice(1);extra.forEach(f=>notes.push([f.label,f.required?"Yes":"No",`${f.type}${f.options?.length?": "+f.options.join(" / "):""}`]));}
   const wsNotes = XLSX.utils.aoa_to_sheet(notes);
   XLSX.utils.book_append_sheet(wb, ws, "Assets");
-  XLSX.utils.book_append_sheet(wb, wsNotes, "Instructions");
+  if(!register)XLSX.utils.book_append_sheet(wb, wsNotes, "Instructions");
   XLSX.writeFile(wb, `${register?.name.replace(/[^a-z0-9]+/gi,"_")??"assetflow"}-import-template.xlsx`);
 }
 
@@ -120,15 +121,19 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
     try {
       const extra=register?.configuration?.fields??[];
       const custom:Record<string,string|number|boolean|null>={};
-      for(const field of extra){const raw=r[field.key];const value=raw==null?"":String(raw).trim();if(field.required&&!value)throw Error(`${field.label} is required`);if(!value){custom[field.key]=null;continue;}if(field.type==="number"||field.type==="currency"){const n=Number(value);if(!Number.isFinite(n))throw Error(`${field.label} must be a number`);custom[field.key]=n;}else if(field.type==="boolean"){if(!["true","false","yes","no","1","0"].includes(value.toLowerCase()))throw Error(`${field.label} must be true or false`);custom[field.key]=["true","yes","1"].includes(value.toLowerCase());}else if(field.type==="date"){if(!/^\d{4}-\d{2}-\d{2}$/.test(value))throw Error(`${field.label} must use YYYY-MM-DD`);custom[field.key]=value;}else if(field.type==="select"&&field.options?.length&&!field.options.includes(value))throw Error(`${field.label}: invalid option ${value}`);else custom[field.key]=value;}
-      const tag = String(r.asset_tag ?? "").trim();
-      const name = String(r.name ?? "").trim();
-      const branchName = String(r.branch ?? "").trim();
-      if (!tag) throw new Error("asset_tag is required");
-      if (!name) throw new Error("name is required");
-      if (!branchName) throw new Error("branch is required");
-
-      const branch = await ensureBranch(branchName);
+      for(const field of extra){const raw=r[field.label]??r[field.key];const value=raw==null?"":String(raw).trim();if(field.required&&!value)throw Error(`${field.label} is required`);if(!value){custom[field.key]=null;continue;}if(field.type==="number"||field.type==="currency"){const n=Number(value);if(!Number.isFinite(n))throw Error(`${field.label} must be a number`);custom[field.key]=n;}else if(field.type==="boolean"){if(!["true","false","yes","no","1","0"].includes(value.toLowerCase()))throw Error(`${field.label} must be true or false`);custom[field.key]=["true","yes","1"].includes(value.toLowerCase());}else if(field.type==="date"){if(!/^\d{4}-\d{2}-\d{2}$/.test(value))throw Error(`${field.label} must use YYYY-MM-DD`);custom[field.key]=value;}else if(field.type==="select"&&field.options?.length&&!field.options.includes(value))throw Error(`${field.label}: invalid option ${value}`);else custom[field.key]=value;}
+      const normalized=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]/g,"");
+      const findField=(...aliases:string[])=>extra.find(f=>aliases.includes(normalized(f.label))||aliases.includes(normalized(f.key)));
+      const customTagField=findField("assettag","tagnumber","tag","tagno","serialnumber","engravenumber");
+      const customNameField=findField("assetname","itemname","name","itemdescription","itemcode");
+      const explicitTag=customTagField?String(custom[customTagField.key]??"").trim():"";
+      const tag=register?(explicitTag||`AUTO-${crypto.randomUUID()}`):String(r.asset_tag??"").trim();
+      const name=register?String(customNameField?custom[customNameField.key]??"":Object.values(custom).find(v=>typeof v==="string"&&v.trim())??"").trim():String(r.name??"").trim();
+      const branchName=String(r.branch??"").trim();
+      if(!tag)throw new Error("Asset tag is required");
+      if(!name)throw new Error("A text/name field must contain an asset name");
+      if(!register&&!branchName)throw new Error("branch is required");
+      const branch=branchName?await ensureBranch(branchName):brs?.length===1?(brs as any[])[0]:null;
 
       let categoryId: string | null = null;
       if (r.category) {
@@ -173,7 +178,7 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
         description: r.description ? String(r.description) : null,
         category_id: categoryId,
         location_id: locationId,
-        branch_id: branch.id,
+        branch_id: branch?.id??null,
         status: status as any,
         purchase_value: Number.isFinite(purchaseValue as number) ? purchaseValue : null,
         purchase_date: purchaseDate,
@@ -186,7 +191,7 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
           asset_id: created.id,
           assigned_to_name: r.custodian ? String(r.custodian).trim() : null,
           department: r.department ? String(r.department).trim() : null,
-          branch_id: branch.id,
+          branch_id: branch?.id??null,
           assignment_date: new Date().toISOString().slice(0, 10),
           created_by: userId,
         });
