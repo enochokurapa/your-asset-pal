@@ -5,6 +5,24 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const admin = supabaseAdmin as any;
 
+async function sendNewUserWelcomeEmail(email:string,fullName:string):Promise<boolean>{
+  const key=process.env.RESEND_API_KEY;
+  if(!key){console.warn("[Account Welcome] Transactional email is not configured");return false;}
+  const safeName=fullName.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]??c));
+  const markup=`<!doctype html><html><body style="margin:0;padding:32px 12px;background:#f8fafc;font-family:Arial,sans-serif;color:#182333"><table role="presentation" style="width:100%;max-width:560px;margin:auto;border-collapse:collapse;border:1px solid #e2e8f0;background:#fff"><tr><td style="padding:30px"><p style="font-size:20px;color:#2563eb;font-weight:700">AssetFlow360</p><h1 style="font-size:24px">Your workspace account is ready</h1><p>Hello ${safeName},</p><p>An administrator has created your AssetFlow360 account. Use your registered email and the temporary sign-in credentials supplied securely by your administrator. You will be asked to choose a new password.</p><p style="margin:26px 0"><a href="https://assetflow360.com/login" style="background:#2563eb;color:#fff;text-decoration:none;padding:14px 20px;border-radius:8px">Open AssetFlow360</a></p><p style="font-size:13px;color:#64748b">For your security, passwords are never sent in this email. If you weren't expecting an account, contact your organization's administrator.</p></td></tr></table></body></html>`;
+  try{
+    const result=await fetch("https://api.resend.com/emails",{
+      method:"POST",
+      headers:{"Authorization":`Bearer ${key}`,"Content-Type":"application/json"},
+      body:JSON.stringify({from:"AssetFlow360 <noreply@assetflow360.com>",to:[email],subject:"Welcome to AssetFlow360",html:markup}),
+      signal:AbortSignal.timeout(8000),
+    });
+    if(!result.ok){console.error("[Account Welcome] Email provider rejected message with status",result.status);return false;}
+    return true;
+  }catch(error){console.error("[Account Welcome] Delivery request failed",error instanceof Error?error.name:"Unknown error");return false;}
+}
+
+
 const roleSchema = z.enum(["admin", "manager", "staff", "security"]);
 const moduleSchema = z.enum([
   "dashboard", "assets", "categories", "locations", "branches", "users",
@@ -147,7 +165,8 @@ export const createUserAccount = createServerFn({ method: "POST" })
       await supabaseAdmin.auth.admin.deleteUser(uid);
       throw new Error(roleError.message);
     }
-    return { id: uid };
+    const welcomeEmailAccepted=await sendNewUserWelcomeEmail(data.email.trim().toLowerCase(),data.full_name);
+    return { id: uid, welcomeEmailAccepted };
   });
 
 export const adminResetPassword = createServerFn({ method: "POST" })
