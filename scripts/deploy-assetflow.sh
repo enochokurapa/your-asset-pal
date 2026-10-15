@@ -21,9 +21,10 @@ chmod 600 "backups/deploy-$stamp.dump"
 git merge --ff-only "$SHA"
 # Only apply migrations in this automated release range. Keep a journal to avoid repeating them.
 docker exec pesapal-db psql -U postgres -d ams -v ON_ERROR_STOP=1 -q -c "CREATE TABLE IF NOT EXISTS public.assetflow_deployment_migrations(filename text primary key, applied_at timestamptz not null default now())"
-for migration in supabase/migrations/20261015*.sql supabase/migrations/20261016*.sql supabase/migrations/20261017*.sql; do
+for migration in supabase/migrations/20*.sql; do
   [[ -f "$migration" ]] || continue
   name=$(basename "$migration")
+  [[ "$name" > "20261015000000" ]] || continue
   already=$(docker exec pesapal-db psql -U postgres -d ams -Atqc "SELECT 1 FROM public.assetflow_deployment_migrations WHERE filename='$name'")
   if [[ "$already" != 1 ]]; then
     echo "Applying $name"
