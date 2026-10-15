@@ -977,24 +977,24 @@ function ReportsPage() {
         <p className="text-sm text-muted-foreground">Filter, visualise and export operational reports.</p>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="register">Register</TabsTrigger>
-          <TabsTrigger value="locations">Locations</TabsTrigger>
-          <TabsTrigger value="movements">Movements</TabsTrigger>
-          <TabsTrigger value="assigned">Assigned</TabsTrigger>
-          <TabsTrigger value="disposals">Retire/Dispose</TabsTrigger>
-          <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
-          <TabsTrigger value="approvals">Approvals</TabsTrigger>
-          <TabsTrigger value="verification">Verification</TabsTrigger>
-          <TabsTrigger value="depreciation">Depreciation</TabsTrigger>
-          <TabsTrigger value="gate-pass">Gate Passes</TabsTrigger>
+      <Tabs value={tab} onValueChange={setTab} className="grid items-start gap-5 lg:grid-cols-[230px_minmax(0,1fr)]">
+        <TabsList className="flex h-auto w-full flex-col items-stretch justify-start gap-1 rounded-xl border bg-card p-2 lg:sticky lg:top-5">
+          <TabsTrigger className="w-full justify-start text-left" value="register">Register</TabsTrigger>
+          <TabsTrigger className="w-full justify-start text-left" value="locations">Locations</TabsTrigger>
+          <TabsTrigger className="w-full justify-start text-left" value="movements">Movements</TabsTrigger>
+          <TabsTrigger className="w-full justify-start text-left" value="assigned">Assigned</TabsTrigger>
+          <TabsTrigger className="w-full justify-start text-left" value="disposals">Retire/Dispose</TabsTrigger>
+          <TabsTrigger className="w-full justify-start text-left" value="maintenance">Maintenance</TabsTrigger>
+          <TabsTrigger className="w-full justify-start text-left" value="approvals">Approvals</TabsTrigger>
+          <TabsTrigger className="w-full justify-start text-left" value="verification">Verification</TabsTrigger>
+          <TabsTrigger className="w-full justify-start text-left" value="depreciation">Depreciation</TabsTrigger>
+          <TabsTrigger className="w-full justify-start text-left" value="gate-pass">Gate Passes</TabsTrigger>
           
-          <TabsTrigger value="branch">Branch</TabsTrigger>
-          <TabsTrigger value="department">Department</TabsTrigger>
-          <TabsTrigger value="condition">Condition</TabsTrigger>
+          <TabsTrigger className="w-full justify-start text-left" value="branch">Branch</TabsTrigger>
+          <TabsTrigger className="w-full justify-start text-left" value="department">Department</TabsTrigger>
+          <TabsTrigger className="w-full justify-start text-left" value="condition">Condition</TabsTrigger>
         </TabsList>
-
+        <div className="min-w-0 space-y-4">
         <TabsContent value="register" className="mt-4 space-y-3">
           <Card className="p-3">
             <p className="mb-3 text-sm font-semibold">Geographic filter</p>
@@ -1105,6 +1105,7 @@ function ReportsPage() {
             </div>
           </Card>
         </TabsContent>
+        </div>
       </Tabs>
     </div>
   );
