@@ -41,10 +41,10 @@ async function recipientsForTenant(tenantId: string) {
     .in("user_id", ids);
   if (rolesError) throw rolesError;
 
-  const privileged = new Set(
+  const privileged = new Set<string>(
     (roles ?? [])
       .filter((r: any) => r.role === "admin" || r.role === "manager")
-      .map((r: any) => r.user_id),
+      .map((r: any) => String(r.user_id)),
   );
   for (const p of profiles ?? []) {
     if ((p as any).tenant_role === "tenant_admin") privileged.add((p as any).id);
