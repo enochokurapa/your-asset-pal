@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { UserCircle, Bell, KeyRound } from "lucide-react";
+import { MfaSettingsCard } from "@/components/mfa-settings-card";
 import { ALL_APPROVAL_KINDS, type ApprovalKind } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_app/profile")({ component: ProfilePage });
@@ -108,6 +109,7 @@ function ProfilePage() {
       </Card>
 
       <ChangePasswordCard />
+      <MfaSettingsCard />
       {!isSaasAdmin && <NotificationPrefsCard />}
     </div>
   );
