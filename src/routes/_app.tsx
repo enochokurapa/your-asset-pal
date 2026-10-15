@@ -64,6 +64,21 @@ function AppLayout() {
   } = useAuth();
   const [open, setOpen] = useState(false);
   const [branding, setBranding] = useState<DocumentTemplate | null>(null);
+  const [mfaChecked,setMfaChecked]=useState(false);
+  const [mfaRequired,setMfaRequired]=useState(false);
+  useEffect(()=>{
+    if(!user){setMfaChecked(false);setMfaRequired(false);return;}
+    let active=true;
+    import("@/integrations/supabase/client").then(async({supabase})=>{
+      const {data,error}=await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if(!active)return;
+      if(error){console.error("[Auth] MFA status unavailable",error);setMfaRequired(false);}
+      else setMfaRequired(data.currentLevel!=="aal2"&&data.nextLevel==="aal2");
+      setMfaChecked(true);
+    }).catch(()=>{if(active)setMfaChecked(true)});
+    return ()=>{active=false;};
+  },[user?.id]);
+
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => {
@@ -91,6 +106,8 @@ function AppLayout() {
     );
   }
   if (!user) return <Navigate to="/login" />;
+  if (!mfaChecked) return <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"/></div>;
+  if (mfaRequired) return <Navigate to="/mfa" />;
   if (mustChangePassword) return <Navigate to="/welcome" />;
 
   const isSaasControlRoute =
