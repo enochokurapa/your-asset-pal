@@ -24,7 +24,7 @@ docker exec pesapal-db psql -U postgres -d ams -v ON_ERROR_STOP=1 -q -c "CREATE 
 for migration in supabase/migrations/20*.sql; do
   [[ -f "$migration" ]] || continue
   name=$(basename "$migration")
-  [[ "$name" > "20261015000000" ]] || continue
+  [[ "$name" > "20261015233459" ]] || continue
   already=$(docker exec pesapal-db psql -U postgres -d ams -Atqc "SELECT 1 FROM public.assetflow_deployment_migrations WHERE filename='$name'")
   if [[ "$already" != 1 ]]; then
     echo "Applying $name"
@@ -47,5 +47,5 @@ if [[ $healthy -ne 1 ]]; then
   echo "Database migration rollback, if required, must be handled from the backup."
   exit 1
 fi
-echo "Deployed verified commit: $SHA"
+printf "%s\\n" "$SHA" > .last-deployed-sha\necho "Deployed verified commit: $SHA"
 DEPLOY
