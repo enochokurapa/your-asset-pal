@@ -84,10 +84,21 @@ export type ImportResult = {
 };
 
 export async function importAssetsFromFile(file: File, userId: string | null,register?:RegisterTemplate, importBranchId?:string,config?:RegisterLocationConfig): Promise<ImportResult> {
+  const MAX_IMPORT_BYTES = 20 * 1024 * 1024;
+  const MAX_IMPORT_ROWS = 10_000;
+  if (file.size <= 0 || file.size > MAX_IMPORT_BYTES) {
+    throw new Error("Excel imports must be between 1 byte and 20 MB. Split large files into smaller batches.");
+  }
+  if (!/\.xlsx?$/i.test(file.name)) {
+    throw new Error("Only .xlsx and .xls spreadsheets can be imported.");
+  }
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: "array" });
+  const wb = XLSX.read(buf, { type: "array", sheetRows: MAX_IMPORT_ROWS + 2, cellFormula: false, cellHTML: false, cellStyles: false });
+  if (!wb.SheetNames.length) throw new Error("The workbook has no worksheets.");
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: "" });
+  if (rows.length > MAX_IMPORT_ROWS) throw new Error("Maximum 10,000 assets per import. Split the workbook into batches.");
+  if (Object.keys(rows[0] ?? {}).length > 250) throw new Error("Too many spreadsheet columns. The maximum is 250.");
   const getValue=(r:Record<string,any>,...names:string[])=>{
     const keys=new Map(Object.keys(r).map(k=>[normalizeHeader(k),k]));
     for(const name of names){const key=keys.get(normalizeHeader(name));if(key!==undefined&&r[key]!==""&&r[key]!=null)return r[key];}
