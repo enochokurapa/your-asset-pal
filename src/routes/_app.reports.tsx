@@ -52,10 +52,12 @@ type ReportExportMeta = {
   generatedBy: string;
 };
 
-async function exportPDF(r: Report, meta: ReportExportMeta) {
+async function exportPDF(r: Report, meta: ReportExportMeta, options?: {orientation:"portrait"|"landscape";paper:"a4"|"letter"|"legal";signature?:string}) {
   const loadedTemplate = await loadTemplate();
   const template = {
     ...loadedTemplate,
+    paper_size: options?.paper ?? loadedTemplate.paper_size,
+    orientation: options?.orientation ?? loadedTemplate.orientation,
     organization_name:
       !loadedTemplate.organization_name || loadedTemplate.organization_name === "Your Organization"
         ? meta.organization
@@ -64,7 +66,7 @@ async function exportPDF(r: Report, meta: ReportExportMeta) {
   const reportRef = `AF-${new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14)}`;
   const { doc, startY, pageWidth, pageHeight } = createBrandedPdf({
     template,
-    orientation: "landscape",
+    orientation: options?.orientation ?? template.orientation,
     title: r.title,
     subtitle: `${meta.organization} · ${r.rows.length} record(s)`,
     generatedBy: meta.generatedBy,
@@ -103,6 +105,7 @@ async function exportPDF(r: Report, meta: ReportExportMeta) {
   doc.text("Report certification", template.margin_left, y);
   y += 8;
 
+  if(options?.signature){try{doc.addImage(options.signature, options.signature.startsWith("data:image/jpeg")?"JPEG":"PNG",template.margin_left,y+1,32,10)}catch{ /* Invalid uploaded signature: do not break report */ }}
   const usable = pageWidth - template.margin_left - template.margin_right;
   const col = usable / 3;
   const labels = [
@@ -1108,19 +1111,29 @@ function ReportsPage() {
 }
 
 function ReportTable({ r, exportMeta }: { r: Report; exportMeta: ReportExportMeta }) {
+  const [columns,setColumns]=useState<string[]|null>(null);
+  const [orientation,setOrientation]=useState<"portrait"|"landscape">("landscape");
+  const [paper,setPaper]=useState<"a4"|"letter"|"legal">("a4");
+  const [signature,setSignature]=useState<string>();
+  const [showOptions,setShowOptions]=useState(false);
+  const selectedColumns=r.columns.filter(c=>columns===null||columns.includes(c.key));
+  const report={...r,columns:selectedColumns};
+  const readSignature=(file?:File)=>{if(!file){setSignature(undefined);return;}if(!["image/png","image/jpeg"].includes(file.type)||file.size>1_000_000){window.alert("Upload a PNG or JPEG signature under 1 MB.");return;}const reader=new FileReader();reader.onload=()=>setSignature(String(reader.result));reader.readAsDataURL(file)};
   return (
     <Card className="p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">{r.title} <span className="ml-2 text-xs font-normal text-muted-foreground">({r.rows.length})</span></h2>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => exportPDF(r, exportMeta)}>
+          <Button size="sm" variant="outline" disabled={!selectedColumns.length} onClick={() => exportPDF(report, exportMeta,{orientation,paper,signature})}>
             <FileDown className="mr-1 h-4 w-4" /> PDF
           </Button>
-          <Button size="sm" variant="outline" onClick={() => exportXLSX(r, exportMeta)}>
+          <Button size="sm" variant="outline" disabled={!selectedColumns.length} onClick={() => exportXLSX(report, exportMeta)}>
             <FileSpreadsheet className="mr-1 h-4 w-4" /> Excel
           </Button>
         </div>
       </div>
+      <div className="mb-3"><Button size="sm" variant="ghost" onClick={()=>setShowOptions(v=>!v)}>{showOptions?"Hide report customization":"Customize report columns & PDF"}</Button></div>
+      {showOptions&&<div className="mb-4 space-y-3 rounded-lg border p-4"><p className="text-sm font-medium">Select columns to include in PDF and Excel exports</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{r.columns.map(c=><label key={c.key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={columns===null||columns.includes(c.key)} onChange={e=>setColumns(previous=>{const all=previous??r.columns.map(v=>v.key);return e.target.checked?[...all,c.key]:all.filter(v=>v!==c.key)})}/>{c.header}</label>)}</div><Button size="sm" variant="outline" onClick={()=>setColumns(null)}>Select all</Button><div className="grid gap-3 sm:grid-cols-2"><div><Label>Paper size</Label><select className="h-10 w-full rounded-md border bg-background px-2" value={paper} onChange={e=>setPaper(e.target.value as typeof paper)}><option value="a4">A4</option><option value="letter">Letter</option><option value="legal">Legal</option></select></div><div><Label>Orientation</Label><select className="h-10 w-full rounded-md border bg-background px-2" value={orientation} onChange={e=>setOrientation(e.target.value as typeof orientation)}><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></div></div><div><Label>Optional signature for this PDF export (PNG/JPEG, max 1 MB)</Label><Input type="file" accept="image/png,image/jpeg" onChange={e=>readSignature(e.target.files?.[0])}/></div></div>}
       <div className="overflow-x-auto">
         {r.rows.length === 0 ? (
           <div className="py-12 text-center">
