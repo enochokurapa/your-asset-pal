@@ -19,10 +19,10 @@ function ResetPassword(){
    if(tokenHash&&url.searchParams.get("type")==="recovery"){
     const {error}=await supabase.auth.verifyOtp({token_hash:tokenHash,type:"recovery"});
     if(mounted){setReady(!error);if(error)setError("This reset link is invalid or expired. Request a new link.");}
-   }else{
+   }else if(url.hash.includes("type=recovery")){
     const {data}=await supabase.auth.getSession();
     if(mounted)setReady(Boolean(data.session));
-   }
+   }else if(mounted){setError("Open the reset link from your email to continue.");}
   };
   initialize();
   const {data:listener}=supabase.auth.onAuthStateChange(event=>{if(mounted&&event==="PASSWORD_RECOVERY")setReady(true);});
