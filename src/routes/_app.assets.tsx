@@ -445,7 +445,7 @@ function AssetsPage() {
     if (locationSettings?.require_internal_location && !form.location_id) { toast.error("Office, store or site is required"); return; }
     if (locationSettings?.require_gps && (!form.location_latitude || !form.location_longitude)) { toast.error("GPS capture is required"); return; }
 
-    for(const field of registerFields){const value=String(resolvedCustomValues[field.key]??"").trim();if(field.required&&!value&&field.id!==tagField?.id){toast.error(`${field.label} is required`);return;}if(value&&(field.type==="number"||field.type==="currency")&&!Number.isFinite(Number(value))){toast.error(`${field.label} must be a valid number`);return;}if(value&&["select","radio"].includes(field.type)&&field.options?.length&&!field.options.includes(value)){toast.error(`${field.label} has an invalid option`);return;}}
+    for(const field of registerFields){const value=String(resolvedCustomValues[field.key]??"").trim();if(field.required&&!value&&field.key!==tagField?.key){toast.error(`${field.label} is required`);return;}if(value&&(field.type==="number"||field.type==="currency")&&!Number.isFinite(Number(value))){toast.error(`${field.label} must be a valid number`);return;}if(value&&["select","radio"].includes(field.type)&&field.options?.length&&!field.options.includes(value)){toast.error(`${field.label} has an invalid option`);return;}}
     const tagLower = (effectiveTag??"").toLowerCase();
     const serialLower = form.serial_number.trim().toLowerCase();
     const dup = (assets as any[]).find((a) =>
