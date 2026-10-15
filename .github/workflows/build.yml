@@ -57,5 +57,5 @@ jobs:
           chmod 600 ~/.ssh/assetflow_key
           printf '%s\n' "$DEPLOY_HOST_KEY" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
-          ssh -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=15 -i ~/.ssh/assetflow_key "$DEPLOY_USER@$DEPLOY_HOST" "sudo -n bash /opt/apps/assetflow/scripts/deploy-assetflow.sh ${{ github.sha }}"
+          ssh -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=15 -i ~/.ssh/assetflow_key "$DEPLOY_USER@$DEPLOY_HOST" "cd /opt/apps/assetflow && git fetch origin main && git show ${{ github.sha }}:scripts/deploy-assetflow.sh | sudo -n bash -s -- ${{ github.sha }}"
           rm -f ~/.ssh/assetflow_key
