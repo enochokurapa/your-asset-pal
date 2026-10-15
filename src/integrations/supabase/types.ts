@@ -400,7 +400,8 @@ export type Database = {
       assets: {
         Row: {
           accumulated_depreciation: number
-          asset_tag: string
+          asset_number: number
+          asset_tag: string | null
           assigned_to: string | null
           branch_id: string | null
           category_id: string | null
@@ -434,7 +435,8 @@ export type Database = {
         }
         Insert: {
           accumulated_depreciation?: number
-          asset_tag: string
+          asset_number?: number
+          asset_tag?: string | null
           assigned_to?: string | null
           branch_id?: string | null
           category_id?: string | null
@@ -468,7 +470,7 @@ export type Database = {
         }
         Update: {
           accumulated_depreciation?: number
-          asset_tag?: string
+          asset_tag?: string | null
           assigned_to?: string | null
           branch_id?: string | null
           category_id?: string | null
