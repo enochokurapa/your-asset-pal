@@ -617,6 +617,24 @@ function AssetsPage() {
 
   const [reqKind, setReqKind] = useState<"retirement" | "disposal" | "deletion" | null>(null);
   const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [selectedAssetIds,setSelectedAssetIds]=useState<string[]>([]);
+  const [bulkDeleteOpen,setBulkDeleteOpen]=useState(false);
+  const [bulkDeleteReason,setBulkDeleteReason]=useState("");
+  const [bulkBusy,setBulkBusy]=useState(false);
+  const requestBulkDeletion=async()=>{
+    if(bulkDeleteReason.trim().length<10){toast.error("Enter a reason of at least 10 characters.");return;}
+    if(!selectedAssetIds.length)return;
+    setBulkBusy(true);let success=0;const failed:string[]=[];
+    for(const id of selectedAssetIds){
+      try{await submitApproval({kind:"deletion",assetId:id,reason:bulkDeleteReason.trim()});success++;}
+      catch(e:any){failed.push(id);}
+    }
+    setSelectedAssetIds(failed);
+    setBulkBusy(false);setBulkDeleteOpen(false);setBulkDeleteReason("");
+    qc.invalidateQueries({queryKey:["pending-approvals"]});qc.invalidateQueries({queryKey:["notifications"]});
+    if(success)toast.success(success+" deletion requests submitted for approval.");
+    if(failed.length)toast.error(failed.length+" requests failed; unsuccessful items remain selected.");
+  };
   const requestRetire = (a: any, kind: "retirement" | "disposal" | "deletion" = "retirement") => { setRetireAsset(a); setRetireReason(""); setReqKind(kind); setRetireOpen(true); };
   const submitRetire = async () => {
     if (requestSubmitting) return;
@@ -993,6 +1011,7 @@ function AssetsPage() {
       )}
 
       <Card className="p-4">
+        {canRequestDelete&&<div className="mb-3 flex flex-wrap items-center gap-2"><span className="text-sm text-muted-foreground">{selectedAssetIds.length} selected</span><Button size="sm" variant="outline" disabled={!selectedAssetIds.length} onClick={()=>setSelectedAssetIds([])}>Clear selection</Button><Button size="sm" variant="destructive" disabled={!selectedAssetIds.length} onClick={()=>setBulkDeleteOpen(true)}><Trash2 className="mr-2 h-4 w-4"/>Request bulk deletion</Button></div>}
         <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
           <div className="relative md:col-span-3 lg:col-span-2">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -1109,6 +1128,7 @@ function AssetsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                   {canRequestDelete&&<th className="px-3 py-3"><input aria-label="Select all filtered assets" type="checkbox" checked={filtered.length>0&&filtered.every(a=>selectedAssetIds.includes(a.id))} onChange={e=>setSelectedAssetIds(old=>e.target.checked?Array.from(new Set([...old,...filtered.map(a=>a.id)])):old.filter(id=>!filtered.some(a=>a.id===id)))}/></th>}
                   {registerChoice==="default"&&<><th className="px-3 py-3 font-medium">Tag</th><th className="px-3 py-3 font-medium">Name</th></>}
                   {registerFields.map(field=><th key={field.key} className="px-3 py-3 font-medium">{field.label}</th>)}{registerChoice!=="default"&&catalog?.includeLocation&&!registerFields.some(f=>f.key.toLowerCase()==="location")&&<th className="px-3 py-3 font-medium">Location</th>}
                   {registerChoice==="default"&&<><th className="hidden px-3 py-3 font-medium md:table-cell">Branch</th><th className="hidden px-3 py-3 font-medium lg:table-cell">Category</th><th className="hidden px-3 py-3 font-medium lg:table-cell">Location</th><th className="hidden px-3 py-3 font-medium md:table-cell">Custodian</th><th className="px-3 py-3 font-medium">Status</th><th className="hidden px-3 py-3 text-right font-medium sm:table-cell">Value</th></>}
@@ -1118,6 +1138,7 @@ function AssetsPage() {
               <tbody>
                 {filtered.map((a: any) => (
                   <tr key={a.id} className="border-b last:border-0 hover:bg-muted/40 cursor-pointer" onClick={() => openView(a, "activity")}>
+                     {canRequestDelete&&<td className="px-3 py-3" onClick={e=>e.stopPropagation()}><input aria-label={`Select ${a.name}`} type="checkbox" checked={selectedAssetIds.includes(a.id)} onChange={e=>setSelectedAssetIds(old=>e.target.checked?[...old,a.id]:old.filter(id=>id!==a.id))}/></td>}
                     {registerChoice==="default"&&<>                    <td className="px-3 py-3 font-mono text-xs">{a.asset_tag}</td>
                     <td className="px-3 py-3 font-medium">{a.name}{a.serial_number && <span className="ml-2 font-mono text-[10px] text-muted-foreground">SN: {a.serial_number}</span>}</td>
                     <td className="hidden px-3 py-3 text-muted-foreground md:table-cell">{a.branches?.name ?? "-"}</td>
@@ -1227,6 +1248,7 @@ function AssetsPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}><DialogContent><DialogHeader><DialogTitle>Request deletion of {selectedAssetIds.length} assets</DialogTitle><DialogDescription>Each selected asset creates an individual deletion approval request with the same reason. Assets are not removed until an administrator approves them.</DialogDescription></DialogHeader><Label>Reason for bulk deletion *</Label><Textarea rows={4} maxLength={1000} value={bulkDeleteReason} onChange={e=>setBulkDeleteReason(e.target.value)} placeholder="Example: Incorrect spreadsheet import batch"/><DialogFooter><Button variant="outline" disabled={bulkBusy} onClick={()=>setBulkDeleteOpen(false)}>Cancel</Button><Button variant="destructive" disabled={bulkBusy||bulkDeleteReason.trim().length<10} onClick={requestBulkDeletion}>{bulkBusy?"Submitting requests…":"Submit for approval"}</Button></DialogFooter></DialogContent></Dialog>
       <Dialog open={retireOpen} onOpenChange={setRetireOpen}>
         <DialogContent>
           <DialogHeader>
