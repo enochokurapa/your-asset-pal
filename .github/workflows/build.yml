@@ -1,9 +1,17 @@
-name: Build
+name: Build and deploy AssetFlow360
 
 on:
-  pull_request:
   push:
     branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assetflow-production
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -18,3 +26,36 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Build application
         run: bun run build
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: production
+    env:
+      DEPLOY_HOST: ${{ secrets.ASSETFLOW_DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.ASSETFLOW_DEPLOY_USER }}
+      DEPLOY_KEY: ${{ secrets.ASSETFLOW_DEPLOY_SSH_KEY }}
+      DEPLOY_HOST_KEY: ${{ secrets.ASSETFLOW_DEPLOY_HOST_KEY }}
+    steps:
+      - name: Check secure deployment configuration
+        run: |
+          for var in DEPLOY_HOST DEPLOY_USER DEPLOY_KEY DEPLOY_HOST_KEY; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Missing deployment secret: $var"
+              exit 1
+            fi
+          done
+      - name: Deploy verified commit to production host
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/assetflow_key
+          chmod 600 ~/.ssh/assetflow_key
+          printf '%s\n' "$DEPLOY_HOST_KEY" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          ssh -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=15 -i ~/.ssh/assetflow_key "$DEPLOY_USER@$DEPLOY_HOST" "sudo -n bash /opt/apps/assetflow/scripts/deploy-assetflow.sh ${{ github.sha }}"
+          rm -f ~/.ssh/assetflow_key
