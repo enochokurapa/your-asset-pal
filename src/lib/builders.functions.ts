@@ -81,9 +81,17 @@ export const saveBuilderDefinition = createServerFn({method:"POST"})
 
 export const archiveBuilderDefinition = createServerFn({method:"POST"})
   .middleware([requireSupabaseAuth])
-  .inputValidator(input=>z.object({kind:kindSchema,id:idSchema}).parse(input))
+  .inputValidator(input=>z.object({kind:kindSchema,id:idSchema,reason:z.string().trim().min(10).max(1000)}).parse(input))
   .handler(async ({data,context})=>{
     const tenantId=await authorize(context.userId,data.kind);
+    if(data.kind==="register_builder"){
+      const {data:current,error:currentError}=await db.from("tenant_primary_registers").select("definition_id").eq("tenant_id",tenantId).maybeSingle();
+      if(currentError)throw new Error(currentError.message);
+      if(current?.definition_id===data.id)throw new Error("Switch to another primary register before archiving this register.");
+      const {count,error:countError}=await db.from("assets").select("id",{count:"exact",head:true}).eq("tenant_id",tenantId).eq("register_definition_id",data.id);
+      if(countError)throw new Error(countError.message);
+      if((count??0)>0)throw new Error("This register contains assets. Migrate them to another register before archiving.");
+    }
     const {data:updated,error}=await db.from("builder_definitions")
       .update({is_active:false,updated_at:new Date().toISOString()})
       .eq("id",data.id).eq("tenant_id",tenantId).eq("builder_key",data.kind).select("id").maybeSingle();
@@ -93,6 +101,8 @@ export const archiveBuilderDefinition = createServerFn({method:"POST"})
       const {error:primaryError}=await db.from("tenant_primary_registers").update({definition_id:null,updated_at:new Date().toISOString()}).eq("tenant_id",tenantId).eq("definition_id",data.id);
       if(primaryError)throw new Error(primaryError.message);
     }
+    const {error:auditError}=await db.from("builder_archive_audit").insert({tenant_id:tenantId,definition_id:data.id,builder_key:data.kind,reason:data.reason,actor_id:context.userId});
+    if(auditError)throw new Error("Configuration archived, but the audit record could not be saved. Contact your administrator: "+auditError.message);
     return {ok:true};
   });
 
