@@ -49,4 +49,5 @@ if [[ $healthy -ne 1 ]]; then
   echo "Database migration rollback, if required, must be handled from the backup."
   exit 1
 fi
-printf "%s\n" "$SHA" > .last-deployed-sha\necho "Deployed verified commit: $SHA"
+printf "%s\n" "$SHA" > .last-deployed-sha
+echo "Deployed verified commit: $SHA"
