@@ -46,9 +46,9 @@ export function MfaSettingsCard() {
     toast.success("Authentication factor removed.");
   };
   return <Card className="space-y-4 p-6">
-    <div className="flex items-center gap-3"><ShieldCheck className="h-6 w-6 text-primary"/><div><h2 className="font-semibold">Two-factor authentication</h2><p className="text-xs text-muted-foreground">Protect your account with a time-based authenticator code.</p></div></div>
+    <div className="flex items-center gap-3"><ShieldCheck className="h-6 w-6 text-primary"/><div><h2 className="font-semibold">Two-factor authentication</h2><p className="text-xs text-muted-foreground">Optional additional protection. Enable an authenticator app only if you choose to.</p></div></div>
     {enabled.map(f=><div key={f.id} className="flex items-center justify-between gap-3 rounded-lg border p-3"><span className="text-sm">Authenticator enabled · {f.friendly_name??"TOTP"}</span><Button size="sm" variant="outline" disabled={busy} onClick={()=>remove(f.id)}>Remove factor</Button></div>)}
     {enrollment?<div className="space-y-3 rounded-lg border p-4"><p className="text-sm">Scan this code in your authenticator app. Keep the secret private.</p><img src={enrollment.qr} className="h-44 w-44 bg-white p-2" alt="Authenticator app QR code"/><p className="break-all text-xs">Manual key: <strong>{enrollment.secret}</strong></p><Label htmlFor="mfa-code">Six-digit code</Label><Input id="mfa-code" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))} inputMode="numeric" maxLength={6} autoComplete="one-time-code"/><div className="flex gap-2"><Button onClick={verify} disabled={busy||code.length!==6}>Confirm and enable</Button><Button variant="outline" onClick={()=>setEnrollment(null)}>Cancel</Button></div></div>:<Button variant="outline" disabled={busy} onClick={enroll}>Add authenticator app</Button>}
-    <p className="text-xs text-muted-foreground">Email recovery and organization-wide enforcement are configured separately. Never share authentication codes.</p>
+    <p className="text-xs text-muted-foreground">An authenticator app is not required for accounts without an enrolled factor. Email-code verification is not yet available until secure email delivery is configured. Never share verification codes.</p>
   </Card>;
 }
