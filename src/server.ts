@@ -400,9 +400,8 @@ function withSecurityHeaders(response: Response, request: Request): Response {
   headers.set("referrer-policy", "strict-origin-when-cross-origin");
   headers.set("x-frame-options", "SAMEORIGIN");
   headers.set("permissions-policy", "camera=(self), geolocation=(self), microphone=()");
-  if (new URL(request.url).protocol === "https:") {
-    headers.set("strict-transport-security", "max-age=31536000");
-  }
+  // TLS terminates at the trusted reverse proxy; browsers only honor this over HTTPS.
+  headers.set("strict-transport-security", "max-age=31536000");
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
