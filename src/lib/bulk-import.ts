@@ -28,7 +28,7 @@ const SAMPLE_ROW: Record<string, any> = {
   department: "Finance",
 };
 
-export type RegisterTemplate={id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean,options?:string[]}>}};
+export type RegisterTemplate={id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean,options?:string[]}>,tag_policy?:"required"|"optional"|"automatic"}};
 export type RegisterLocationConfig={location_mode?:"internal"|"branch"|"geographic"|"hybrid",show_in_custom_register?:boolean,show_coordinates?:boolean,require_gps?:boolean,allow_custom_area?:boolean};
 export const CUSTOM_SYSTEM_COLUMNS=[
  "System Asset Tag","System Asset Name","System Serial Number","System Description",
