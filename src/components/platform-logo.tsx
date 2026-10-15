@@ -9,7 +9,8 @@ export function usePlatformBranding() {
   const query = useQuery({
     queryKey: ["public-saas-branding"],
     queryFn: () => getBranding(),
-    staleTime: 60_000,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   useEffect(() => {
@@ -45,18 +46,18 @@ export function PlatformLogo({
   alt?: string;
   variant?: "mark" | "lockup";
 }) {
-  const { data } = usePlatformBranding();
+  const { data, isPending } = usePlatformBranding();
   const src = variant === "lockup"
     ? (data?.logoDataUrl || "/assetflow360-logo.svg")
     : (data?.iconDataUrl || "/assetflow360-mark.svg");
 
   return (
     <span className={cn("inline-flex items-center justify-center overflow-hidden", className)}>
-      <img
+      {isPending ? <span aria-label="Loading current platform branding" className="inline-block h-full w-full animate-pulse rounded-md bg-muted/40" /> : <img
         src={src}
         alt={alt || data?.name || "AssetFlow 360"}
         className={cn("h-full w-full object-contain", imageClassName)}
-      />
+      />}
     </span>
   );
 }
