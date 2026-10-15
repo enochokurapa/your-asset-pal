@@ -123,7 +123,7 @@ function AssetsPage() {
   const [uploadingField,setUploadingField]=useState<string|null>(null);
   const [importBranchId,setImportBranchId]=useState("");
   const [customValues,setCustomValues]=useState<Record<string,string>>({});
-  const registers=(catalog?.definitions??[]) as Array<{id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean,options?:string[],section?:string}>}} >;
+  const registers=(catalog?.definitions??[]) as Array<{id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean,options?:string[],section?:string}>,tag_policy?:string}} >;
   const registerFields=registers.find(r=>r.id===registerChoice)?.configuration?.fields??[];
   const sectionForField=(field:{section?:string,label:string,key:string})=>{
     if(field.section==="assignment"||field.section==="assign")return "assignment";
@@ -363,7 +363,7 @@ function AssetsPage() {
     if (!code) return;
     if (scanMode === "tag" || scanMode === "serial") {
       const existing = (assets as any[]).find((a) =>
-        (a.asset_tag.toLowerCase() === code.toLowerCase() ||
+        ((a.asset_tag??"").toLowerCase() === code.toLowerCase() ||
          (a.serial_number ?? "").toLowerCase() === code.toLowerCase()) &&
         a.id !== form.id
       );
@@ -374,7 +374,7 @@ function AssetsPage() {
       return;
     }
     const found = (assets as any[]).find((a) =>
-      a.asset_tag.toLowerCase() === code.toLowerCase() ||
+      (a.asset_tag??"").toLowerCase() === code.toLowerCase() ||
       (a.serial_number ?? "").toLowerCase() === code.toLowerCase()
     );
     if (found) {
@@ -435,9 +435,9 @@ function AssetsPage() {
     }
     const enteredTag=tagField?String(resolvedCustomValues[tagField.key]??"").trim():"";
     const enteredName=nameField?String(resolvedCustomValues[nameField.key]??"").trim():String(Object.values(resolvedCustomValues).find(v=>String(v).trim())??"").trim();
-    const effectiveTag=form.asset_tag.trim()||enteredTag||(form.id?"":`AUTO-${crypto.randomUUID()}`);
+    const effectiveTag=form.asset_tag.trim()||enteredTag||null;
     const effectiveName=customRegister?(enteredName||form.name.trim()||enteredTag||"Registered asset"):form.name.trim();
-    if(!effectiveTag||!effectiveName){toast.error("Enter an asset name or item description.");return;}
+    if(!effectiveName){toast.error("Enter an asset name or item description.");return;}
 
     if (locationSettings?.require_branch && !form.branch_id) { toast.error("Branch is required"); return; }
     if (locationSettings?.require_geography && !form.geo_place_id) { toast.error("Geographic area is required"); return; }
@@ -445,11 +445,11 @@ function AssetsPage() {
     if (locationSettings?.require_gps && (!form.location_latitude || !form.location_longitude)) { toast.error("GPS capture is required"); return; }
 
     for(const field of registerFields){const value=String(resolvedCustomValues[field.key]??"").trim();if(field.required&&!value&&field.id!==tagField?.id){toast.error(`${field.label} is required`);return;}if(value&&(field.type==="number"||field.type==="currency")&&!Number.isFinite(Number(value))){toast.error(`${field.label} must be a valid number`);return;}if(value&&["select","radio"].includes(field.type)&&field.options?.length&&!field.options.includes(value)){toast.error(`${field.label} has an invalid option`);return;}}
-    const tagLower = effectiveTag.toLowerCase();
+    const tagLower = (effectiveTag??"").toLowerCase();
     const serialLower = form.serial_number.trim().toLowerCase();
     const dup = (assets as any[]).find((a) =>
       a.id !== form.id && (
-        a.asset_tag.toLowerCase() === tagLower ||
+        (!!tagLower && (a.asset_tag??"").toLowerCase() === tagLower) ||
         (serialLower && (a.serial_number ?? "").toLowerCase() === serialLower)
       )
     );
@@ -584,13 +584,13 @@ function AssetsPage() {
 
   const validateWizardStep = (step: number) => {
     if (step === 0) {
-      if (!form.asset_tag.trim()&&registerChoice==="default") { toast.error("Asset tag is required"); return false; }
+      if (!form.asset_tag.trim()&&registers.find(r=>r.id===registerChoice)?.configuration?.tag_policy==="required") { toast.error("An asset tag is required for this register"); return false; }
       if (!form.name.trim()) { toast.error("Asset name is required"); return false; }
       const tagLower = form.asset_tag.trim().toLowerCase();
       const serialLower = form.serial_number.trim().toLowerCase();
       const duplicate = (assets as any[]).find((a) =>
         a.id !== form.id && (
-          a.asset_tag.toLowerCase() === tagLower ||
+          (!!tagLower && (a.asset_tag??"").toLowerCase() === tagLower) ||
           (serialLower && (a.serial_number ?? "").toLowerCase() === serialLower)
         )
       );
@@ -747,7 +747,7 @@ function AssetsPage() {
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <Label htmlFor="tag">Asset tag *</Label>
+                        <Label htmlFor="tag">Asset tag (optional unless required by register)</Label>
                         <div className="flex gap-2">
                           <Input id="tag" autoFocus value={form.asset_tag} onChange={(e) => setForm({ ...form, asset_tag: e.target.value })} placeholder="LAP-001" />
                           <Button type="button" size="icon" variant="outline" title="Scan tag" onClick={() => { setScanMode("tag"); setScanOpen(true); }}>
