@@ -126,6 +126,7 @@ function LoginPage() {
               </div>
             </div>
 
+            <div className="flex justify-end"><Link to="/forgot-password" className="text-sm font-medium text-primary hover:underline">Forgot password?</Link></div>
             <Button type="submit" className="h-12 w-full rounded-xl text-sm font-semibold" disabled={submitting}>
               {submitting ? (
                 <span className="inline-flex items-center gap-2">
