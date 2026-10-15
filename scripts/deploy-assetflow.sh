@@ -33,11 +33,12 @@ for migration in supabase/migrations/20*.sql; do
     docker exec pesapal-db psql -U postgres -d ams -v ON_ERROR_STOP=1 -q -c "INSERT INTO public.assetflow_deployment_migrations(filename) VALUES ('$name') ON CONFLICT DO NOTHING"
   fi
 done
+printf "%s\n" "$SHA" > public/deploy-version.txt
 docker compose -f standalone.compose.yml build pesapal-app
 docker compose -f standalone.compose.yml up -d --no-deps pesapal-app
 healthy=0
 for i in $(seq 1 40); do
-  if curl -fsS --max-time 4 http://127.0.0.1:4300/ >/dev/null; then healthy=1; break; fi
+  if curl -fsS --max-time 4 http://127.0.0.1:4300/deploy-version.txt 2>/dev/null | grep -Fxq "$SHA"; then healthy=1; break; fi
   sleep 3
 done
 if [[ $healthy -ne 1 ]]; then
@@ -48,4 +49,4 @@ if [[ $healthy -ne 1 ]]; then
   echo "Database migration rollback, if required, must be handled from the backup."
   exit 1
 fi
-printf "%s\\n" "$SHA" > .last-deployed-sha\necho "Deployed verified commit: $SHA"
+printf "%s\n" "$SHA" > .last-deployed-sha\necho "Deployed verified commit: $SHA"
