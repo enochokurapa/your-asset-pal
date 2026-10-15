@@ -5,7 +5,8 @@ ROOT=/opt/apps/assetflow
 SHA="${1:?Expected verified GitHub commit SHA}"
 [[ "$SHA" =~ ^[a-f0-9]{40}$ ]] || { echo "Invalid commit SHA"; exit 2; }
 cd "$ROOT"
-flock -n /var/lock/assetflow-deploy.lock bash -s -- "$SHA" <<'DEPLOY'
+exec 9>/var/lock/assetflow-deploy.lock
+flock -n 9
 set -euo pipefail
 SHA="$1"
 cd /opt/apps/assetflow
@@ -48,4 +49,3 @@ if [[ $healthy -ne 1 ]]; then
   exit 1
 fi
 printf "%s\\n" "$SHA" > .last-deployed-sha\necho "Deployed verified commit: $SHA"
-DEPLOY
