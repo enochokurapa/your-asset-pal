@@ -394,24 +394,36 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   return brandedErrorResponse();
 }
 
+function withSecurityHeaders(response: Response, request: Request): Response {
+  const headers = new Headers(response.headers);
+  headers.set("x-content-type-options", "nosniff");
+  headers.set("referrer-policy", "strict-origin-when-cross-origin");
+  headers.set("x-frame-options", "SAMEORIGIN");
+  headers.set("permissions-policy", "camera=(self), geolocation=(self), microphone=()");
+  if (new URL(request.url).protocol === "https:") {
+    headers.set("strict-transport-security", "max-age=31536000");
+  }
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const microsoftResponse = await maybeHandleMicrosoftOAuth(request);
-      if (microsoftResponse) return microsoftResponse;
+      if (microsoftResponse) return withSecurityHeaders(microsoftResponse, request);
 
       const apiResponse = await maybeHandlePublicApi(request);
-      if (apiResponse) return apiResponse;
+      if (apiResponse) return withSecurityHeaders(apiResponse, request);
 
       const proxied = await maybeProxySupabase(request);
-      if (proxied) return proxied;
+      if (proxied) return withSecurityHeaders(proxied, request);
 
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      return withSecurityHeaders(await normalizeCatastrophicSsrResponse(response), request);
     } catch (error) {
       console.error(error);
-      return brandedErrorResponse();
+      return withSecurityHeaders(brandedErrorResponse(), request);
     }
   },
 };
