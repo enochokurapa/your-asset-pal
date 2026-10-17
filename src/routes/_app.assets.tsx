@@ -583,6 +583,7 @@ function AssetsPage() {
     { title: "Review", short: "Review" },
   ];
 
+  const displayedSteps=registerChoice==="default"?wizardSteps:[wizardSteps[0],wizardSteps[4]];
   const validateWizardStep = (step: number) => {
     if (step === 0) {
       if (!form.asset_tag.trim()&&registers.find(r=>r.id===registerChoice)?.configuration?.tag_policy==="required") { toast.error("An asset tag is required for this register"); return false; }
@@ -607,9 +608,9 @@ function AssetsPage() {
   };
 
   const nextWizardStep = () => {
-    if(registerChoice!=="default"){for(const field of fieldsInStep(wizardStep)){const value=String(customValues[field.key]??"").trim();const label=(field.label||field.key).toLowerCase().replace(/[^a-z0-9]/g,"");if(field.required&&!value&&!["tagnumber","assettag","tag"].includes(label)){toast.error(`${field.label} is required`);return;}}}
+    if(registerChoice!=="default"){for(const field of registerFields){const value=String(customValues[field.key]??"").trim();const label=(field.label||field.key).toLowerCase().replace(/[^a-z0-9]/g,"");if(field.required&&!value&&!["tagnumber","assettag","tag"].includes(label)){toast.error(`${field.label} is required`);return;}}}
     if(registerChoice==="default"&&!validateWizardStep(wizardStep)) return;
-    setWizardStep((step) => Math.min(step + 1, wizardSteps.length - 1));
+    setWizardStep((step) => registerChoice==="default"?Math.min(step+1,wizardSteps.length-1):4);
   };
 
   const reviewCategory = (categories as any[]).find((c) => c.id === form.category_id)?.name ?? "Not specified";
@@ -706,19 +707,20 @@ function AssetsPage() {
               <DialogHeader className="border-b px-5 pb-4 pt-5 sm:px-6">
                 <DialogTitle>{form.id ? "Edit asset" : registerChoice!=="default" ? `New ${registers.find(r=>r.id===registerChoice)?.name??"asset"}` : "Register asset"}</DialogTitle>
                 <div className="flex flex-wrap items-center gap-2"><Label className="whitespace-nowrap text-xs">Asset register</Label><Select value={registerChoice} onValueChange={setRegisterChoice}><SelectTrigger className="h-9 flex-1"><SelectValue/></SelectTrigger><SelectContent>{(!catalog?.primaryId||!!form.id)&&<SelectItem value="default">Default register</SelectItem>}{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select></div>
-                <DialogDescription className="sm:hidden">Step {wizardStep + 1} of {wizardSteps.length} · {wizardSteps[wizardStep].title}</DialogDescription>
+                <DialogDescription className="sm:hidden">Step {registerChoice==="default"?wizardStep+1:wizardStep===4?2:1} of {displayedSteps.length} · {wizardSteps[wizardStep].title}</DialogDescription>
 
                 <div className="hidden pt-4 sm:block">
                   <div className="grid grid-cols-5 gap-2">
-                    {wizardSteps.map((step, index) => {
-                      const done = index < wizardStep;
-                      const active = index === wizardStep;
+                    {displayedSteps.map((step, index) => {
+                      const displayStepIndex=registerChoice==="default"?wizardStep:(wizardStep===4?1:0);
+                      const done = index < displayStepIndex;
+                      const active = index === displayStepIndex;
                       return (
                         <button
                           key={step.title}
                           type="button"
-                          onClick={() => index <= wizardStep && setWizardStep(index)}
-                          className={`min-w-0 text-left ${index <= wizardStep ? "cursor-pointer" : "cursor-default"}`}
+                          onClick={() => index <= (registerChoice==="default"?wizardStep:(wizardStep===4?1:0)) && setWizardStep(registerChoice==="default"?index:index===0?0:4)}
+                          className={`min-w-0 text-left ${index <= (registerChoice==="default"?wizardStep:(wizardStep===4?1:0)) ? "cursor-pointer" : "cursor-default"}`}
                         >
                           <div className="flex items-center">
                             <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${
@@ -728,7 +730,7 @@ function AssetsPage() {
                             }`}>
                               {done ? <Check className="h-3.5 w-3.5" /> : index + 1}
                             </span>
-                            {index < wizardSteps.length - 1 && (
+                            {index < displayedSteps.length - 1 && (
                               <span className={`ml-2 h-px flex-1 ${done ? "bg-primary" : "bg-border"}`} />
                             )}
                           </div>
@@ -741,7 +743,7 @@ function AssetsPage() {
               </DialogHeader>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
-                {wizardStep === 0 && (
+                {registerChoice==="default" && wizardStep === 0 && (
                   <div className="space-y-5">
                     <div>
                       <h3 className="text-base font-semibold">Identify the asset</h3>
@@ -778,7 +780,7 @@ function AssetsPage() {
                   </div>
                 )}
 
-                {wizardStep === 1 && (
+                {registerChoice==="default" && wizardStep === 1 && (
                   <div className="space-y-5">
                     <div>
                       <h3 className="text-base font-semibold">Classify the asset</h3>
@@ -810,7 +812,7 @@ function AssetsPage() {
                   </div>
                 )}
 
-                {wizardStep === 2 && (
+                {registerChoice==="default" && wizardStep === 2 && (
                   <div className="space-y-5">
                     <div>
                       <h3 className="text-base font-semibold">Set the location</h3>
@@ -835,7 +837,7 @@ function AssetsPage() {
                   </div>
                 )}
 
-                {wizardStep === 3 && (
+                {registerChoice==="default" && wizardStep === 3 && (
                   <div className="space-y-5">
                     <div>
                       <h3 className="text-base font-semibold">Assignment & value</h3>
@@ -929,7 +931,7 @@ function AssetsPage() {
                   </div>
                 )}
 
-                {registerChoice!=="default" && wizardStep>0 && wizardStep<4 && fieldsInStep(wizardStep).length>0&&<div className="space-y-3"><div className="grid gap-4 sm:grid-cols-2">{fieldsInStep(wizardStep).map(field=><div key={field.key} className="space-y-2"><Label>{field.label}{field.required?" *":""}</Label>{field.type==="select"&&field.options?.length?<Select value={customValues[field.key]??""} onValueChange={value=>setCustomValues(v=>({...v,[field.key]:value}))}><SelectTrigger><SelectValue placeholder="Choose"/></SelectTrigger><SelectContent>{field.options.map(option=><SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>:field.type==="radio"&&field.options?.length?<div role="radiogroup" aria-label={field.label} className="flex flex-wrap gap-3">{field.options.map(option=><label key={option} className="flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm"><input type="radio" name={`custom-${field.key}`} checked={customValues[field.key]===option} onChange={()=>setCustomValues(v=>({...v,[field.key]:option}))}/>{option}</label>)}</div>:field.type==="attachment"?<label className="block space-y-2">{customValues[field.key]&&<Button type="button" size="sm" variant="outline" onClick={async e=>{e.preventDefault();const {data,error}=await supabase.storage.from("asset-files").createSignedUrl(customValues[field.key],60);if(error||!data?.signedUrl){toast.error(error?.message||"Cannot open attachment");return;}window.open(data.signedUrl,"_blank","noopener,noreferrer")}}>View attachment</Button>}<span className="text-xs text-muted-foreground">{customValues[field.key]?"Attached: "+customValues[field.key].split("/").pop():"PDF or image (max 10 MB)"}</span><Input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx" disabled={uploadingField===field.key} onChange={async e=>{const file=e.target.files?.[0];if(!file||!tenantId)return;if(file.size>10*1024*1024){toast.error("File must be under 10 MB");return;}setUploadingField(field.key);try{const clean=file.name.replace(/[^a-zA-Z0-9._-]/g,"_");const path=`${tenantId}/custom-register/${crypto.randomUUID()}-${clean}`;const result=await supabase.storage.from("asset-files").upload(path,file,{contentType:file.type||"application/octet-stream",upsert:false});if(result.error)throw result.error;setCustomValues(v=>({...v,[field.key]:path}));toast.success("Attachment uploaded")}catch(error:any){toast.error(error.message||"Attachment upload failed")}finally{setUploadingField(null)}}}/></label>:field.type==="boolean"?<label className="flex min-h-11 items-center gap-3 rounded-lg border p-3"><input type="checkbox" checked={customValues[field.key]==="true"} onChange={e=>setCustomValues(v=>({...v,[field.key]:String(e.target.checked)}))}/><span className="text-sm">Yes</span></label>:<Input className="h-11" type={field.type==="date"?"date":field.type==="number"||field.type==="currency"?"number":field.type==="email"?"email":field.type==="url"?"url":field.type==="phone"?"tel":"text"} value={customValues[field.key]??""} onChange={event=>setCustomValues(v=>({...v,[field.key]:event.target.value}))}/>}</div>)}</div></div>}
+                {registerChoice!=="default" && wizardStep===0&&<div className="space-y-3"><div className="grid gap-4 sm:grid-cols-2">{registerFields.map(field=><div key={field.key} className="space-y-2"><Label>{field.label}{field.required?" *":""}</Label>{field.type==="select"&&field.options?.length?<Select value={customValues[field.key]??""} onValueChange={value=>setCustomValues(v=>({...v,[field.key]:value}))}><SelectTrigger><SelectValue placeholder="Choose"/></SelectTrigger><SelectContent>{field.options.map(option=><SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>:field.type==="radio"&&field.options?.length?<div role="radiogroup" aria-label={field.label} className="flex flex-wrap gap-3">{field.options.map(option=><label key={option} className="flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm"><input type="radio" name={`custom-${field.key}`} checked={customValues[field.key]===option} onChange={()=>setCustomValues(v=>({...v,[field.key]:option}))}/>{option}</label>)}</div>:field.type==="attachment"?<label className="block space-y-2">{customValues[field.key]&&<Button type="button" size="sm" variant="outline" onClick={async e=>{e.preventDefault();const {data,error}=await supabase.storage.from("asset-files").createSignedUrl(customValues[field.key],60);if(error||!data?.signedUrl){toast.error(error?.message||"Cannot open attachment");return;}window.open(data.signedUrl,"_blank","noopener,noreferrer")}}>View attachment</Button>}<span className="text-xs text-muted-foreground">{customValues[field.key]?"Attached: "+customValues[field.key].split("/").pop():"PDF or image (max 10 MB)"}</span><Input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx" disabled={uploadingField===field.key} onChange={async e=>{const file=e.target.files?.[0];if(!file||!tenantId)return;if(file.size>10*1024*1024){toast.error("File must be under 10 MB");return;}setUploadingField(field.key);try{const clean=file.name.replace(/[^a-zA-Z0-9._-]/g,"_");const path=`${tenantId}/custom-register/${crypto.randomUUID()}-${clean}`;const result=await supabase.storage.from("asset-files").upload(path,file,{contentType:file.type||"application/octet-stream",upsert:false});if(result.error)throw result.error;setCustomValues(v=>({...v,[field.key]:path}));toast.success("Attachment uploaded")}catch(error:any){toast.error(error.message||"Attachment upload failed")}finally{setUploadingField(null)}}}/></label>:field.type==="boolean"?<label className="flex min-h-11 items-center gap-3 rounded-lg border p-3"><input type="checkbox" checked={customValues[field.key]==="true"} onChange={e=>setCustomValues(v=>({...v,[field.key]:String(e.target.checked)}))}/><span className="text-sm">Yes</span></label>:<Input className="h-11" type={field.type==="date"?"date":field.type==="number"||field.type==="currency"?"number":field.type==="email"?"email":field.type==="url"?"url":field.type==="phone"?"tel":"text"} value={customValues[field.key]??""} onChange={event=>setCustomValues(v=>({...v,[field.key]:event.target.value}))}/>}</div>)}</div></div>}
                 {wizardStep === 4 && (
                   <div className="space-y-5">
                     <div>
@@ -937,7 +939,7 @@ function AssetsPage() {
                       <p className="text-sm text-muted-foreground">Confirm the important details before saving.</p>
                     </div>
                     {registerChoice!=="default"&&<div className="grid gap-2 rounded-xl border p-3">{registerFields.map(field=><div key={field.key} className="flex justify-between gap-3 text-sm"><span>{field.label}</span><span className="font-semibold">{customValues[field.key]||"—"}</span></div>)}</div>}
-                    <div className="overflow-hidden rounded-xl border">
+                    {registerChoice==="default" && <div className="overflow-hidden rounded-xl border">
                       {[
                         ["Asset", form.name || "-"],
                         ["Asset tag", form.asset_tag || "-"],
@@ -955,7 +957,7 @@ function AssetsPage() {
                           <span className="font-medium">{value}</span>
                         </div>
                       ))}
-                    </div>
+                    </div>}
                   </div>
                 )}
               </div>
@@ -964,7 +966,7 @@ function AssetsPage() {
                 <div className="flex gap-2">
                   <Button type="button" variant="ghost" onClick={() => { setOpen(false); setWizardStep(0); }}>Cancel</Button>
                   {wizardStep > 0 && (
-                    <Button type="button" variant="outline" onClick={() => setWizardStep((step) => Math.max(0, step - 1))}>
+                    <Button type="button" variant="outline" onClick={() => setWizardStep((step) => registerChoice==="default"?Math.max(0,step-1):0)}>
                       <ChevronLeft className="mr-2 h-4 w-4" /> Back
                     </Button>
                   )}
