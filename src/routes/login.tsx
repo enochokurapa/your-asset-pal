@@ -83,22 +83,17 @@ function LoginPage() {
   };
   return (
     <div className="platform-brand relative min-h-screen overflow-hidden bg-background px-4 py-8">
-      <div className="af-login-orb absolute -right-24 top-[8%] h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
-      <div className="af-login-orb af-delay-2 absolute -left-24 bottom-[8%] h-72 w-72 rounded-full bg-secondary/25 blur-3xl" />
-      <div className="absolute inset-0 opacity-[0.32] [background-image:radial-gradient(circle_at_1px_1px,color-mix(in_oklab,var(--border)_75%,transparent)_1px,transparent_0)] [background-size:26px_26px]" />
+      <div className="af-login-orb absolute -right-24 top-[8%] h-64 w-64 rounded-full bg-primary/[0.025]" />
+      <div className="af-login-orb af-delay-2 absolute -left-24 bottom-[8%] h-72 w-72 rounded-full bg-primary/[0.025]" />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.1] [background-image:radial-gradient(circle_at_1px_1px,color-mix(in_oklab,var(--border)_75%,transparent)_1px,transparent_0)] [background-size:26px_26px]" />
 
       {takeoverOpen&&<div role="dialog" aria-modal="true" aria-label="Existing sign-in" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"><div className="w-full max-w-md rounded-2xl bg-card p-7 shadow-xl"><h2 className="text-xl font-bold">Account already signed in</h2><p className="mt-3 text-sm text-muted-foreground">Your account is active on another device. Continue here and sign out the other device?</p><div className="my-4 rounded-xl border p-3 text-sm">{existingDevices.slice(0,3).map(item=><p key={item.session_id} className="truncate">{item.device || "Another browser"}</p>)}</div><p className="text-xs text-muted-foreground">The existing device will be notified when it next checks its session.</p><div className="mt-5 flex justify-end gap-2"><Button variant="outline" onClick={cancelTakeover} disabled={submitting}>Keep other device</Button><Button onClick={replaceSession} disabled={submitting}>Sign out other device</Button></div></div></div>}
-      <Link to="/" className="af-auth-back absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-lg border bg-background/90 px-3 py-2 text-sm font-medium text-muted-foreground shadow-sm backdrop-blur transition hover:text-foreground sm:left-6 sm:top-6">
-        <ArrowLeft className="h-4 w-4" />
-        Back to website
-      </Link>
-
       <main className="relative z-10 mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-[470px] flex-col justify-center">
-        <Link to="/" className="af-auth-logo mx-auto mb-7 inline-flex">
-          <PlatformLogo variant="lockup" className="h-14 w-[250px] max-w-[78vw]" />
-        </Link>
-
-        <div className="af-auth-card rounded-[1.6rem] border bg-card/95 p-6 shadow-[0_28px_80px_-38px_rgba(0,0,0,.34)] backdrop-blur sm:p-8">
+        <div className="af-auth-card rounded-[1.6rem] border bg-card p-6 shadow-lg sm:p-8">
+          <div className="mb-6 flex flex-col items-center gap-3">
+            <Link to="/" aria-label="AssetFlow360 homepage"><PlatformLogo variant="lockup" className="h-20 w-[270px] max-w-full" /></Link>
+            <Link to="/" className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted/50"><ArrowLeft className="h-4 w-4"/>Back to homepage</Link>
+          </div>
           <div className="mb-7 text-center">
             <p className="text-sm font-semibold text-primary">Welcome back</p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Sign in to your workspace</h1>
