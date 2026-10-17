@@ -137,6 +137,7 @@ function BuildersPage(){
  const downloadRegister=()=>downloadImportTemplate({id:selected??"",name:name.trim()||"Custom Register",configuration:{fields}},{show_in_custom_register:includeLocation});
  const confirmActive=async(id:string|null)=>{setBusy(true);try{const headers=await getServerAuthHeaders();await activate({headers,data:{definitionId:id}});setActiveRegister(id);setActivationPrompt(null);toast.success(id?"Custom register set as primary.":"Default register restored.");}catch(e:any){toast.error(e?.message||"Unable to activate register");setError(e?.message||"Could not change the primary register. Your saved register is safe.");}finally{setBusy(false);}};
  const persist=async(makePrimary=false)=>{
+   if(kind==="register_builder"&&fields.length===0){toast.error("Add at least one field before saving this register.");return;}
    if(name.trim().length<2){toast.error("Enter a name of at least 2 characters.");return;}
    setBusy(true);
    try{
