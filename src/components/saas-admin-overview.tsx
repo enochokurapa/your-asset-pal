@@ -38,16 +38,16 @@ function MetricCard({ label, value, detail, icon: Icon }: { label: string; value
   );
 }
 
-function HealthRow({ label, ok, detail }: { label: string; ok: boolean; detail: string }) {
+function HealthRow({ label, ok, detail }: { label: string; ok: boolean | null | undefined; detail: string }) {
   return (
     <div className="flex items-center justify-between gap-4 border-b py-3 last:border-0">
       <div>
         <p className="text-sm font-medium">{label}</p>
         <p className="text-xs text-muted-foreground">{detail}</p>
       </div>
-      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${ok ? "bg-emerald-500/10 text-emerald-700" : "bg-amber-500/10 text-amber-700"}`}>
-        {ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Wrench className="h-3.5 w-3.5" />}
-        {ok ? "Ready" : "Needs setup"}
+      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${ok === true ? "bg-emerald-500/10 text-emerald-700" : "bg-muted text-muted-foreground"}`}>
+        {ok === true ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Wrench className="h-3.5 w-3.5" />}
+        {ok === true ? "Ready" : ok === false ? "Needs setup" : "Not checked"}
       </span>
     </div>
   );
@@ -175,10 +175,10 @@ export function SaasAdminOverview() {
 
           <div className="mt-4">
             <HealthRow label="Database & tenant RLS" ok={technical?.database === "operational"} detail="Tenant-scoped application database" />
-            <HealthRow label="Authentication proxy" ok={!!technical?.authProxyConfigured} detail="GoTrue sign-in and signup proxy" />
-            <HealthRow label="REST API proxy" ok={!!technical?.restProxyConfigured} detail="PostgREST data access path" />
-            <HealthRow label="Payment gateway" ok={!!technical?.paymentConfigured} detail="Paid-plan collection configuration" />
-            <HealthRow label="Cloud backup storage" ok={!!technical?.r2Configured} detail="Cloudflare R2 backup destination" />
+            <HealthRow label="Authentication proxy" ok={technical?.authProxyConfigured} detail="GoTrue sign-in and signup proxy" />
+            <HealthRow label="REST API proxy" ok={technical?.restProxyConfigured} detail="PostgREST data access path" />
+            <HealthRow label="Payment gateway" ok={technical?.paymentConfigured} detail="Paid-plan collection configuration" />
+            <HealthRow label="Cloud backup storage" ok={technical?.r2Configured} detail="Cloudflare R2 backup destination" />
           </div>
 
           <div className="mt-4 rounded-xl border bg-muted/25 p-4">
