@@ -204,9 +204,9 @@ function AppLayout() {
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-5">
+        <div className="flex min-h-20 items-center justify-between border-b border-sidebar-border px-4 py-2 sm:px-5">
           <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white text-sidebar-primary sm:h-14 sm:w-14">
               {isSaasAdmin ? (
                 <PlatformLogo className="h-full w-full bg-transparent" imageClassName="bg-white p-0.5" fallbackClassName="bg-sidebar-primary text-sidebar-primary-foreground" />
               ) : branding?.logo_data_url ? (
@@ -216,7 +216,7 @@ function AppLayout() {
               )}
             </div>
             <div>
-              <p className="max-w-40 truncate text-sm font-semibold leading-none">
+              <p className="max-w-36 truncate text-sm font-semibold leading-tight sm:max-w-44 sm:text-base">
                 {isSaasAdmin ? <PlatformName /> : (branding?.organization_name && branding.organization_name !== "Your Organization" ? branding.organization_name : tenantName || "AssetFlow 360")}
               </p>
               <p className="mt-0.5 text-[10px] uppercase tracking-wider text-sidebar-foreground/60">
