@@ -102,6 +102,10 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
       throw new Response("Authentication service unavailable", { status: 503 });
     }
 
+    const {data:activeSession,error:sessionError}=await supabase.rpc("current_login_session_valid" as any);
+    if(sessionError){console.error("[Auth] Session validation unavailable",sessionError);throw new Response("Session validation unavailable",{status:503});}
+    if(activeSession!==true)throw new Response("This session was signed out from another device",{status:401});
+
     return next({
       context: {
         supabase,
