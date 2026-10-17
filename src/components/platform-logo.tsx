@@ -48,7 +48,9 @@ export function PlatformLogo({
 }) {
   const { data } = usePlatformBranding();
   const fallback = variant === "lockup" ? "/assetflow360-logo.svg" : "/assetflow360-mark.svg";
-  const uploaded = variant === "lockup" ? data?.logoDataUrl : data?.iconDataUrl;
+  // The official product logo is permanent on public pages and as the
+  // workspace fallback. Company logos are rendered separately in tenant UI.
+  const uploaded: string | null = null;
   const [failedSrc,setFailedSrc] = useState<string|null>(null);
   // Always show the bundled logo immediately, including during branding fetches.
   // A missing/corrupt uploaded logo must never leave public navigation empty.
