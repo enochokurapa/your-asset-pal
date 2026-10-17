@@ -70,35 +70,30 @@ export const DEFAULT_TEMPLATE: DocumentTemplate = {
   primary_color: "#1e293b",
 };
 
-let cache: { t: DocumentTemplate; at: number } | null = null;
+let cache: { t: DocumentTemplate; at: number; userId: string; tenantId: string } | null = null;
 const CACHE_TTL_MS = 60_000;
 
 export async function loadTemplate(force = false): Promise<DocumentTemplate> {
-  if (!force && cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.t;
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError || !auth.user) throw new Error("Sign in to generate company-branded reports.");
+  const { data: membership, error: membershipError } = await supabase
+    .from("profiles").select("tenant_id,full_name,email").eq("id", auth.user.id).maybeSingle();
+  if (membershipError) throw membershipError;
+  const tenantId = (membership as any)?.tenant_id;
+  if (!tenantId) throw new Error("Select a company workspace before exporting its reports.");
+  if (!force && cache && cache.userId === auth.user.id && cache.tenantId === tenantId && Date.now() - cache.at < CACHE_TTL_MS) return cache.t;
   const { data, error } = await supabase
     .from("document_templates" as any)
     .select("*")
+    .eq("tenant_id", tenantId)
     .eq("is_active", true)
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) throw error;
-  let generatedBy = "";
-  try {
-    const { data: auth } = await supabase.auth.getUser();
-    if (auth.user) {
-      const { data: profile } = await supabase.from("profiles")
-        .select("full_name,email")
-        .eq("id", auth.user.id)
-        .maybeSingle();
-      generatedBy = (profile as any)?.full_name || (profile as any)?.email || auth.user.email || "";
-    }
-  } catch {
-    // Report generation should not fail if the display name cannot be resolved.
-  }
-  const t = ((data as any) ? { ...DEFAULT_TEMPLATE, ...(data as any) } : { ...DEFAULT_TEMPLATE }) as DocumentTemplate;
-  t.generated_by_name = generatedBy;
-  cache = { t, at: Date.now() };
+  const t = (data ? { ...DEFAULT_TEMPLATE, ...(data as any) } : { ...DEFAULT_TEMPLATE }) as DocumentTemplate;
+  t.generated_by_name = (membership as any)?.full_name || (membership as any)?.email || auth.user.email || "";
+  cache = { t, at: Date.now(), userId: auth.user.id, tenantId };
   return t;
 }
 
