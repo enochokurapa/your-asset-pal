@@ -1,3 +1,4 @@
+import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -41,7 +42,7 @@ function SaasAdminPolicyPage() {
   const [form, setForm] = useState<SettingsForm | null>(null);
   const listPlans=useServerFn(getAdminPricingPlans),updatePlan=useServerFn(saveAdminPricingPlan),listModules=useServerFn(getAdminAvailableModules);
   const [plans,setPlans]=useState<any[]>([]),[savingPlan,setSavingPlan]=useState<string|null>(null),[availableModules,setAvailableModules]=useState<any[]>([]);
-  useEffect(()=>{if(!isSaasAdmin)return;getServerAuthHeaders().then(headers=>Promise.all([listPlans({headers}),listModules({headers})])).then(([rows,modules])=>{if(!Array.isArray(rows)||!Array.isArray(modules))throw new Error("Pricing or module service returned an invalid response");setPlans(rows);setAvailableModules(modules)}).catch(e=>toast.error(e.message||"Cannot load plans"))},[isSaasAdmin]);
+  useEffect(()=>{if(!isSaasAdmin)return;let active=true;supabase.rpc("admin_pricing_catalog" as any).then(({data,error})=>{if(!active)return;if(error)throw error;if(!data||!Array.isArray((data as any).plans)||!Array.isArray((data as any).modules))throw new Error("Pricing catalog returned an invalid response");setPlans((data as any).plans);setAvailableModules((data as any).modules);const settings=(data as any).policy;if(settings)setForm({trial_days:Number(settings.trial_days),trial_user_limit:Number(settings.trial_user_limit),paid_price:Number(settings.paid_price),currency:String(settings.currency||"UGX"),included_paid_users:Number(settings.included_paid_users),extra_user_price:Number(settings.extra_user_price),included_assets:Number(settings.included_assets),extra_asset_block_size:Number(settings.extra_asset_block_size),extra_asset_block_price:Number(settings.extra_asset_block_price)});}).catch(e=>{if(active)toast.error(e.message||"Cannot load pricing catalog")});return()=>{active=false}},[isSaasAdmin]);
   const changePlan=(id:string,patch:any)=>setPlans(old=>(Array.isArray(old)?old:[]).map(p=>p.id===id?{...p,...patch}:p));
   const persistPlan=async(p:any)=>{setSavingPlan(p.id);try{await updatePlan({headers:await getServerAuthHeaders(),data:{id:p.id,name:p.name,description:p.description,monthly_price:Number(p.monthly_price),annual_price:Number(p.annual_price),included_users:Number(p.included_users),included_assets:Number(p.included_assets),features:p.features,enabled_modules:p.enabled_modules??[],is_published:p.is_published}});toast.success("Plan saved");qc.invalidateQueries({queryKey:["pricing-plans"]})}catch(e:any){toast.error(e.message||"Save failed")}finally{setSavingPlan(null)}};
 
@@ -58,7 +59,7 @@ function SaasAdminPolicyPage() {
   });
 
   useEffect(() => {
-    if (!policy) return;
+    if (!policy || typeof policy !== "object" || !("trialDays" in policy)) return;
     setForm({
       trial_days: policy.trialDays,
       trial_user_limit: policy.trialUserLimit,
