@@ -1,3 +1,4 @@
+import { PlatformLogo } from "@/components/platform-logo";
 import { useState, useEffect } from "react";
 import { Download, Smartphone, Share, PlusSquare, X, Check, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -125,7 +126,7 @@ export function InstallPwaPrompt() {
 
             <div className="flex items-start gap-3.5 pt-1">
               <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 via-primary/10 to-blue-500/20 p-2.5 shadow-inner">
-                <img src="/assetflow360-mark.svg" alt="AssetFlow 360" className="h-full w-full object-contain rounded-lg" />
+                <PlatformLogo variant="mark" className="h-full w-full rounded-lg" />
                 <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
                   <Sparkles className="h-2.5 w-2.5" />
                 </span>
