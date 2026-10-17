@@ -319,7 +319,7 @@ function AssetsPage() {
     nav({ to: "/assets", search: {} as any, replace: true });
   };
 
-  const openNew = async () => { const result=await refreshRegisterCatalog();if(result.error||!result.data){toast.error("Cannot load your company register. Try again.");return;}const preferred=result.data.primaryId??"default";if(preferred!=="default"&&!result.data.definitions.some((d:any)=>d.id===preferred)){toast.error("Your active register is unavailable. Please contact your administrator.");return;}setRegisterChoice(preferred);setCustomValues({});setForm(empty);setWizardStep(0);setFinancialOpen(false);setOpen(true); };
+  const openNew = async () => { const result=await refreshRegisterCatalog();if(result.error||!result.data){toast.error("Cannot load your company register. Try again.");return;}const preferred=result.data.primaryId??"default";if(preferred!=="default"&&!result.data.definitions.some((d:any)=>d.id===preferred)){toast.error("Your active register is unavailable. Please contact your administrator.");return;}setRegisterChoice(preferred);setCustomValues({});setForm({...empty,branch_id:visibleBranches.length===1?visibleBranches[0].id:null});setWizardStep(0);setFinancialOpen(false);setOpen(true); };
   const openEdit = (a: any) => {
     setRegisterChoice(a.register_definition_id??"default");
     setCustomValues(Object.fromEntries(Object.entries(a.custom_fields??{}).map(([k,v])=>[k,String(v??"")])));
@@ -706,7 +706,7 @@ function AssetsPage() {
             <DialogContent className="flex max-h-[92vh] max-w-3xl flex-col overflow-hidden p-0">
               <DialogHeader className="border-b px-5 pb-4 pt-5 sm:px-6">
                 <DialogTitle>{form.id ? "Edit asset" : registerChoice!=="default" ? `New ${registers.find(r=>r.id===registerChoice)?.name??"asset"}` : "Register asset"}</DialogTitle>
-                <div className="flex flex-wrap items-center gap-2"><Label className="whitespace-nowrap text-xs">Asset register</Label><Select value={registerChoice} onValueChange={setRegisterChoice}><SelectTrigger className="h-9 flex-1"><SelectValue/></SelectTrigger><SelectContent>{(!catalog?.primaryId||!!form.id)&&<SelectItem value="default">Default register</SelectItem>}{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select></div>
+                <div className="flex flex-wrap items-center gap-2"><Label className="whitespace-nowrap text-xs">Asset register</Label><Select value={registerChoice} onValueChange={v=>{setRegisterChoice(v);setCustomValues({});setWizardStep(0);if(!form.id)setForm({...empty,branch_id:visibleBranches.length===1?visibleBranches[0].id:null})}}><SelectTrigger className="h-9 flex-1"><SelectValue/></SelectTrigger><SelectContent>{(!catalog?.primaryId||!!form.id)&&<SelectItem value="default">Default register</SelectItem>}{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select></div>
                 <DialogDescription className="sm:hidden">Step {registerChoice==="default"?wizardStep+1:wizardStep===4?2:1} of {displayedSteps.length} · {wizardSteps[wizardStep].title}</DialogDescription>
 
                 <div className="hidden pt-4 sm:block">
