@@ -105,6 +105,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [addOnModules, setAddOnModules] = useState<Set<ModuleKey>>(new Set());
   const [loading, setLoading] = useState(true);
 
+  // A replaced device sees a notification instead of silently retaining the UI.
+  useEffect(()=>{
+    if(!session?.user?.id)return;
+    let stopped=false;
+    const check=async()=>{
+      const {data,error}=await supabase.rpc("current_login_session_valid" as any);
+      if(stopped||error||data!==false)return;
+      sessionStorage.setItem("assetflow-session-replaced","1");
+      await supabase.auth.signOut({scope:"local"});
+      window.location.replace("/login?session_replaced=1");
+    };
+    void check();
+    const timer=window.setInterval(check,15000);
+    return ()=>{stopped=true;window.clearInterval(timer)};
+  },[session?.user?.id,session?.access_token]);
+
   const resetMetadata = () => {
     setRoles([]); setPermissions(new Set()); setApprovalRights(new Set());
     setActionRights(new Set()); setBranchScope(null); setMustChangePassword(false);
