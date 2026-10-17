@@ -316,6 +316,11 @@ function drawFooter(doc: jsPDF, t: DocumentTemplate, pageWidth: number, pageHeig
   if (t.show_page_numbers) {
     doc.text(`Page ${page} of ${total}`, pageWidth - t.margin_right, y, { align: "right" });
   }
+  // Neutral vendor credit on every generated PDF, independent of company branding.
+  doc.setFont(t.font_family, "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(125, 133, 143);
+  doc.text("Powered by AssetFlow360.com", pageWidth / 2, y - 4, { align: "center" });
   doc.setTextColor(0, 0, 0);
 }
 
