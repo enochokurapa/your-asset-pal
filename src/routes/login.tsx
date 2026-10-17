@@ -1,5 +1,5 @@
 import { createFileRoute, Navigate, Link } from "@tanstack/react-router";
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { ArrowLeft, Check, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -41,6 +41,10 @@ function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [existingDevices,setExistingDevices]=useState<Array<{session_id:string,device:string,last_seen:string}>>([]);
   const [takeoverOpen,setTakeoverOpen]=useState(false);
+  useEffect(()=>{
+    const displaced=sessionStorage.getItem("assetflow-session-replaced")==="1" || new URLSearchParams(window.location.search).has("session_replaced");
+    if(displaced){sessionStorage.removeItem("assetflow-session-replaced");toast.warning("Your account was signed in on another device. This device has been signed out.");}
+  },[]);
 
   if (!loading && user) return <Navigate to={tenantId ? "/dashboard" : "/register"} />;
 
