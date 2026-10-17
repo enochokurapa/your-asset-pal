@@ -1,3 +1,4 @@
+import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -81,7 +82,7 @@ function SaasAdminOrganizationsPage() {
 
   const dashboardQuery = useQuery({
     queryKey: ["saas-admin-dashboard"],
-    queryFn: () => authCall(getDashboard),
+    queryFn: async () => { const {data,error}=await supabase.rpc("admin_control_center" as any);if(error)throw new Error(error.message);if(!data||!Array.isArray((data as any).tenants))throw new Error("Businesses service returned invalid data");return data as any; },
     enabled: isSaasAdmin,
   });
 
