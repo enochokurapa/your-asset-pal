@@ -39,6 +39,8 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [existingDevices,setExistingDevices]=useState<Array<{session_id:string,device:string,last_seen:string}>>([]);
+  const [takeoverOpen,setTakeoverOpen]=useState(false);
 
   if (!loading && user) return <Navigate to={tenantId ? "/dashboard" : "/register"} />;
 
@@ -52,6 +54,10 @@ function LoginPage() {
         toast.error(authErrorMessage(error));
         return;
       }
+      const {data:other,error:deviceError}=await supabase.rpc("other_login_sessions" as any);
+      if(deviceError){await supabase.auth.signOut({scope:"local"});toast.error("Unable to verify active sessions. Please try again.");return;}
+      const devices=Array.isArray(other)?other as Array<{session_id:string,device:string,last_seen:string}>:[];
+      if(devices.length){setExistingDevices(devices);setTakeoverOpen(true);return;}
       window.location.assign("/dashboard");
     } catch (error) {
       console.error("[Login] Sign-in request failed", error);
@@ -61,12 +67,23 @@ function LoginPage() {
     }
   };
 
+  const replaceSession=async()=>{
+    setSubmitting(true);
+    const {error}=await supabase.rpc("replace_other_login_sessions" as any);
+    if(error){toast.error("Could not sign out the other device.");setSubmitting(false);return;}
+    window.location.assign("/dashboard");
+  };
+  const cancelTakeover=async()=>{
+    await supabase.auth.signOut({scope:"local"});
+    setTakeoverOpen(false);setExistingDevices([]);
+  };
   return (
     <div className="platform-brand relative min-h-screen overflow-hidden bg-background px-4 py-8">
       <div className="af-login-orb absolute -right-24 top-[8%] h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
       <div className="af-login-orb af-delay-2 absolute -left-24 bottom-[8%] h-72 w-72 rounded-full bg-secondary/25 blur-3xl" />
       <div className="absolute inset-0 opacity-[0.32] [background-image:radial-gradient(circle_at_1px_1px,color-mix(in_oklab,var(--border)_75%,transparent)_1px,transparent_0)] [background-size:26px_26px]" />
 
+      {takeoverOpen&&<div role="dialog" aria-modal="true" aria-label="Existing sign-in" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"><div className="w-full max-w-md rounded-2xl bg-card p-7 shadow-xl"><h2 className="text-xl font-bold">Account already signed in</h2><p className="mt-3 text-sm text-muted-foreground">Your account is active on another device. Continue here and sign out the other device?</p><div className="my-4 rounded-xl border p-3 text-sm">{existingDevices.slice(0,3).map(item=><p key={item.session_id} className="truncate">{item.device || "Another browser"}</p>)}</div><p className="text-xs text-muted-foreground">The existing device will be notified when it next checks its session.</p><div className="mt-5 flex justify-end gap-2"><Button variant="outline" onClick={cancelTakeover} disabled={submitting}>Keep other device</Button><Button onClick={replaceSession} disabled={submitting}>Sign out other device</Button></div></div></div>}
       <Link to="/" className="af-auth-back absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-lg border bg-background/90 px-3 py-2 text-sm font-medium text-muted-foreground shadow-sm backdrop-blur transition hover:text-foreground sm:left-6 sm:top-6">
         <ArrowLeft className="h-4 w-4" />
         Back to website
