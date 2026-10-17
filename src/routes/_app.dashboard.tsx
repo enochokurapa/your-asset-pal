@@ -199,7 +199,7 @@ function TenantDashboard() {
           <p className="text-sm text-muted-foreground">
             {selectedBranch === "all"
               ? "Overview of your fixed assets across all branches."
-              : `Viewing branch: ${(data?.branchesForFilter ?? []).find((b: any) => b.id === selectedBranch)?.name ?? ""}`}
+              : `Viewing branch: ${(Array.isArray(data?.branchesForFilter) ? data.branchesForFilter : []).find((b: any) => b.id === selectedBranch)?.name ?? ""}`}
           </p>
         </div>
         {(data?.branchesForFilter?.length ?? 0) > 1 && (
