@@ -46,7 +46,7 @@ function LoginPage() {
     if(displaced){sessionStorage.removeItem("assetflow-session-replaced");toast.warning("Your account was signed in on another device. This device has been signed out.");}
   },[]);
 
-  if (!loading && user) return <Navigate to={tenantId ? "/dashboard" : "/register"} />;
+  if (!loading && user && !submitting && !takeoverOpen) return <Navigate to={tenantId ? "/dashboard" : "/register"} />;
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
