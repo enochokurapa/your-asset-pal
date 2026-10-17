@@ -1,3 +1,4 @@
+import { supabase } from "@/integrations/supabase/client";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -30,7 +31,7 @@ function SaasAdminModulesPage() {
 
   const { data: moduleResponse, refetch, isLoading, error } = useQuery({
     queryKey: ["saas-admin-modules"],
-    queryFn: () => authCall(listModules),
+    queryFn: async () => { const {data,error}=await supabase.rpc("admin_all_modules" as any);if(error)throw new Error(error.message);if(!Array.isArray(data))throw new Error("Modules service returned invalid data");return data; },
     enabled: isSaasAdmin,
   });
 
