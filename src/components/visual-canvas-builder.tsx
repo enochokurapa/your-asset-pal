@@ -88,7 +88,7 @@ export function VisualCanvasBuilder({kind}:{kind:CanvasKind}){
  const [saving,setSaving]=useState(false);
  const list=useServerFn(listBuilderDefinitions),save=useServerFn(saveBuilderDefinition),archive=useServerFn(archiveBuilderDefinition);
  const data=useCanvasAssets();
- const refresh=async()=>{const headers=await getServerAuthHeaders();const result=await list({headers,data:{kind}});if(!Array.isArray(result))throw new Error("Unable to load layout definitions");setItems(result.filter((item):item is Saved=>Boolean(item&&typeof item.id==="string")))};
+ const refresh=async()=>{const {data:result,error}=await supabase.rpc("my_builder_definitions" as any,{p_kind:kind});if(error)throw new Error(error.message);if(!Array.isArray(result))throw new Error("Unable to load layout definitions");setItems(result.filter((item):item is Saved=>Boolean(item&&typeof item.id==="string")))};
  useEffect(()=>{refresh().catch(e=>toast.error(e.message))},[kind]);
  const choose=(id:string)=>{setSelected(id);const item=items.find(x=>x.id===id);setTitle(item?.name??"");setDescription(item?.description??"");setWidgets(Array.isArray(item?.configuration?.widgets)?item.configuration.widgets:[]);const loaded=Array.isArray(item?.configuration?.sections)&&item.configuration.sections.length?item.configuration.sections:[{id:"default",title:"Main section",columns:2 as const}];setSections(loaded);setActiveSection(loaded[0].id);setFocused(null)};
  const add=(type:CanvasWidget["type"])=>{const w={...initial(type),sectionId:activeSection};setWidgets(x=>[...x,w]);setFocused(w.id)};
@@ -113,7 +113,7 @@ export function VisualCanvasBuilder({kind}:{kind:CanvasKind}){
  </div>;
 }
 export function PublishedCanvases({kind}:{kind:CanvasKind}){
- const {tenantId}=useAuth();const getPublished=useServerFn(getPublishedCanvasLayouts);const {data:rawLayouts,isLoading,error:layoutsError}=useQuery({queryKey:["published-canvas",tenantId,kind],enabled:!!tenantId,retry:1,queryFn:async()=>{const response=await getPublished({headers:await getServerAuthHeaders(),data:{kind}});if(!Array.isArray(response))throw new Error("Published layouts service returned an invalid response");return response.filter((row):row is Saved=>Boolean(row&&typeof row==="object"&&typeof row.id==="string"&&typeof row.name==="string"));}});const layouts=Array.isArray(rawLayouts)?rawLayouts:[];
+ const {tenantId}=useAuth();const {data:rawLayouts,isLoading,error:layoutsError}=useQuery({queryKey:["published-canvas",tenantId,kind],enabled:!!tenantId,retry:1,queryFn:async()=>{const {data:response,error}=await supabase.from("builder_definitions").select("id,name,description,configuration,is_active").eq("tenant_id",tenantId!).eq("builder_key",kind).eq("is_active",true).order("updated_at",{ascending:false});if(error)throw new Error(error.message);if(!Array.isArray(response))throw new Error("Published layouts service returned an invalid response");return response.filter((row):row is Saved=>Boolean(row&&typeof row==="object"&&typeof row.id==="string"&&typeof row.name==="string"));}});const layouts=Array.isArray(rawLayouts)?rawLayouts:[];
  const assets=useCanvasAssets(layouts.length>0);
  const [selected,setSelected]=useState("");
  useEffect(()=>{if(layouts.length&&!layouts.some(x=>x.id===selected))setSelected(layouts[0].id)},[layouts,selected]);
