@@ -42,6 +42,11 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold">Something went wrong</h1>
         <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+        <details className="mt-5 rounded-md border p-3 text-left text-xs">
+          <summary className="cursor-pointer font-medium">Technical error details</summary>
+          <p className="mt-2 text-muted-foreground">Copy the stack shown here for support. Do not include passwords or access tokens.</p>
+          <pre className="mt-2 max-h-52 overflow-auto whitespace-pre-wrap break-all">{String(error.stack||error.message).slice(0,3500)}</pre>
+        </details>
         <button
           onClick={() => { router.invalidate(); reset(); }}
           className="mt-6 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
