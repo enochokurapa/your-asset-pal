@@ -37,12 +37,12 @@ function fileToDataUrl(file: File, done: (value: string) => void) {
   reader.readAsDataURL(file);
 }
 
-function PreviewBox({ value, fallback, label }: { value: string | null; fallback: string; label: string }) {
+function PreviewBox({ value, label }: { value: string | null; label: string }) {
   return (
     <div>
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
       <div className="flex h-40 items-center justify-center overflow-hidden rounded-2xl border bg-white p-5">
-        <img src={value || fallback} alt={label} className="max-h-full max-w-full object-contain" />
+        {value ? <img src={value} alt={label} className="max-h-full max-w-full object-contain" /> : <span className="text-sm text-muted-foreground">No image uploaded</span>}
       </div>
     </div>
   );
@@ -167,15 +167,15 @@ function SaasAdminBrandingPage() {
 
             <div className="grid gap-5 sm:grid-cols-2">
               <div>
-                <PreviewBox value={logo} fallback="/assetflow360-logo.svg" label="Main logo / lockup" />
+                <PreviewBox value={logo} label="Main logo / lockup" />
                 <div className="mt-3 flex gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={() => logoInput.current?.click()}><Upload className="mr-2 h-4 w-4" /> Upload</Button>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setLogo(null)} disabled={!logo}><RotateCcw className="mr-2 h-4 w-4" /> Default</Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setLogo(null)} disabled={!logo}><RotateCcw className="mr-2 h-4 w-4" /> Clear</Button>
                 </div>
               </div>
 
               <div>
-                <PreviewBox value={icon} fallback="/assetflow360-mark.svg" label="App icon / favicon" />
+                <PreviewBox value={icon} label="App icon / favicon" />
                 <div className="mt-3 flex gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={() => iconInput.current?.click()}><Upload className="mr-2 h-4 w-4" /> Upload</Button>
                   <Button type="button" variant="ghost" size="sm" onClick={() => setIcon(null)} disabled={!icon}><RotateCcw className="mr-2 h-4 w-4" /> Default</Button>
