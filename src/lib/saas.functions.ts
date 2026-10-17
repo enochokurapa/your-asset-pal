@@ -1206,11 +1206,11 @@ export const checkYoSeatPurchase=createServerFn({method:"POST"})
  });
 
 export const getPricingPlans=createServerFn({method:"GET"}).handler(async()=>{
- const {data,error}=await admin.from("saas_pricing_plans").select("id,name,description,monthly_price,annual_price,included_users,included_assets,features,is_published").eq("is_published",true).order("monthly_price");
+ const {data,error}=await admin.from("saas_pricing_plans").select("id,name,description,monthly_price,annual_price,included_users,included_assets,features,enabled_modules,is_published").eq("is_published",true).order("monthly_price");
  if(error)throw Error(error.message);
  const {data:settings}=await admin.from("saas_settings").select("currency,extra_user_price,extra_asset_block_size,extra_asset_block_price,trial_days").eq("id",true).single();
- const {data:modules}=await admin.from("saas_modules").select("module_key,label").eq("globally_enabled",true);const moduleNames=new Map((modules??[]).map((m:any)=>[m.module_key,m.label]));
- return {currency:settings?.currency??"USD",extraUserPrice:Number(settings?.extra_user_price??0),extraAssetBlockSize:Number(settings?.extra_asset_block_size??2000),extraAssetBlockPrice:Number(settings?.extra_asset_block_price??20),trialDays:Number(settings?.trial_days??14),plans:(data??[]).map((p:any)=>({...p,monthly_price:Number(p.monthly_price),annual_price:Number(p.annual_price),module_labels:(p.enabled_modules??[]).map((k:string)=>moduleNames.get(k)||k)}))};
+ const {data:modules}=await admin.from("saas_modules").select("module_key,label").eq("globally_enabled",true);const moduleNames=new Map((Array.isArray(modules)?modules:[]).map((m:any)=>[m.module_key,m.label]));
+ return {currency:settings?.currency??"USD",extraUserPrice:Number(settings?.extra_user_price??0),extraAssetBlockSize:Number(settings?.extra_asset_block_size??2000),extraAssetBlockPrice:Number(settings?.extra_asset_block_price??20),trialDays:Number(settings?.trial_days??14),plans:(data??[]).map((p:any)=>({...p,monthly_price:Number(p.monthly_price),annual_price:Number(p.annual_price),module_labels:(Array.isArray(p.enabled_modules)?p.enabled_modules:[]).map((k:string)=>moduleNames.get(k)||k)}))};
 });
 export const getAdminAvailableModules=createServerFn({method:"POST"}).middleware([requireSupabaseAuth]).handler(async({context})=>{
  await assertSaasAdmin(context.userId);
