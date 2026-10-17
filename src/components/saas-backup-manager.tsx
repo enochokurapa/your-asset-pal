@@ -1,3 +1,4 @@
+import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -74,7 +75,20 @@ export function SaasBackupManager() {
 
   const { data, refetch, isFetching, error } = useQuery({
     queryKey: ["saas-backups"],
-    queryFn: () => authCall(getDashboard),
+    queryFn: async () => {
+      const {data:policy,error:policyError}=await supabase.rpc("admin_backup_policy" as any);
+      if(policyError)throw new Error(policyError.message);
+      if(!policy||typeof policy!=="object")throw new Error("Backup policy could not be loaded");
+      try {
+        const response=await authCall(getDashboard);
+        if(response && typeof response==="object" && Array.isArray((response as any).backups) && (response as any).environment){
+          return {...response,policy};
+        }
+      } catch(e){console.error("[Backup] Full dashboard unavailable",e);}
+      return {policy,environment:{databaseConfigured:false,r2Configured:false},backups:[],retentionCount:3,
+        configurationError:"Backup storage and restore services could not be verified. Backup actions remain unavailable until server validation succeeds.",
+        emailConfigured:false};
+    },
   });
 
   useEffect(() => {
