@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { cn } from "@/lib/utils";
@@ -46,18 +46,19 @@ export function PlatformLogo({
   alt?: string;
   variant?: "mark" | "lockup";
 }) {
-  const { data, isPending } = usePlatformBranding();
-  const src = variant === "lockup"
-    ? (data?.logoDataUrl || "/assetflow360-logo.svg")
-    : (data?.iconDataUrl || "/assetflow360-mark.svg");
-
+  const { data } = usePlatformBranding();
+  const fallback = variant === "lockup" ? "/assetflow360-logo.svg" : "/assetflow360-mark.svg";
+  const uploaded = variant === "lockup" ? data?.logoDataUrl : data?.iconDataUrl;
+  const [failedSrc,setFailedSrc] = useState<string|null>(null);
+  // Always show the bundled logo immediately, including during branding fetches.
+  // A missing/corrupt uploaded logo must never leave public navigation empty.
+  const src = uploaded && failedSrc !== uploaded ? uploaded : fallback;
   return (
-    <span className={cn("inline-flex items-center justify-center overflow-hidden", className)}>
-      {isPending ? <span aria-label="Loading current platform branding" className="inline-block h-full w-full animate-pulse rounded-md bg-muted/40" /> : <img
-        src={src}
-        alt={alt || data?.name || "AssetFlow 360"}
-        className={cn("h-full w-full object-contain", imageClassName)}
-      />}
+    <span className={cn("inline-flex items-center justify-center", className)}>
+      <img src={src} alt={alt || data?.name || "AssetFlow 360"}
+        onError={() => setFailedSrc(src)}
+        className={cn("block h-full w-full object-contain", imageClassName)}
+      />
     </span>
   );
 }
