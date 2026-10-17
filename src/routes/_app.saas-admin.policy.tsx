@@ -41,8 +41,8 @@ function SaasAdminPolicyPage() {
   const [form, setForm] = useState<SettingsForm | null>(null);
   const listPlans=useServerFn(getAdminPricingPlans),updatePlan=useServerFn(saveAdminPricingPlan),listModules=useServerFn(getAdminAvailableModules);
   const [plans,setPlans]=useState<any[]>([]),[savingPlan,setSavingPlan]=useState<string|null>(null),[availableModules,setAvailableModules]=useState<any[]>([]);
-  useEffect(()=>{if(!isSaasAdmin)return;getServerAuthHeaders().then(headers=>Promise.all([listPlans({headers}),listModules({headers})])).then(([rows,modules])=>{setPlans(rows as any[]);setAvailableModules(modules as any[])}).catch(e=>toast.error(e.message||"Cannot load plans"))},[isSaasAdmin]);
-  const changePlan=(id:string,patch:any)=>setPlans(old=>old.map(p=>p.id===id?{...p,...patch}:p));
+  useEffect(()=>{if(!isSaasAdmin)return;getServerAuthHeaders().then(headers=>Promise.all([listPlans({headers}),listModules({headers})])).then(([rows,modules])=>{if(!Array.isArray(rows)||!Array.isArray(modules))throw new Error("Pricing or module service returned an invalid response");setPlans(rows);setAvailableModules(modules)}).catch(e=>toast.error(e.message||"Cannot load plans"))},[isSaasAdmin]);
+  const changePlan=(id:string,patch:any)=>setPlans(old=>(Array.isArray(old)?old:[]).map(p=>p.id===id?{...p,...patch}:p));
   const persistPlan=async(p:any)=>{setSavingPlan(p.id);try{await updatePlan({headers:await getServerAuthHeaders(),data:{id:p.id,name:p.name,description:p.description,monthly_price:Number(p.monthly_price),annual_price:Number(p.annual_price),included_users:Number(p.included_users),included_assets:Number(p.included_assets),features:p.features,enabled_modules:p.enabled_modules??[],is_published:p.is_published}});toast.success("Plan saved");qc.invalidateQueries({queryKey:["pricing-plans"]})}catch(e:any){toast.error(e.message||"Save failed")}finally{setSavingPlan(null)}};
 
 
