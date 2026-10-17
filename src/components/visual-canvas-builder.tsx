@@ -113,7 +113,7 @@ export function VisualCanvasBuilder({kind}:{kind:CanvasKind}){
  </div>;
 }
 export function PublishedCanvases({kind}:{kind:CanvasKind}){
- const {tenantId}=useAuth();const {data:rawLayouts,isLoading,error:layoutsError}=useQuery({queryKey:["published-canvas",tenantId,kind],enabled:!!tenantId,retry:1,queryFn:async()=>{const {data:response,error}=await supabase.from("builder_definitions").select("id,name,description,configuration,is_active").eq("tenant_id",tenantId!).eq("builder_key",kind).eq("is_active",true).order("updated_at",{ascending:false});if(error)throw new Error(error.message);if(!Array.isArray(response))throw new Error("Published layouts service returned an invalid response");return response.filter((row):row is Saved=>Boolean(row&&typeof row==="object"&&typeof row.id==="string"&&typeof row.name==="string"));}});const layouts=Array.isArray(rawLayouts)?rawLayouts:[];
+ const {tenantId}=useAuth();const {data:rawLayouts,isLoading,error:layoutsError}=useQuery({queryKey:["published-canvas",tenantId,kind],enabled:!!tenantId,retry:1,queryFn:async()=>{const {data:response,error}=await supabase.rpc("my_published_canvas_layouts" as any,{p_kind:kind});if(error)throw new Error(error.message);if(!Array.isArray(response))throw new Error("Published layouts service returned an invalid response");return response.filter((row):row is Saved=>Boolean(row&&typeof row==="object"&&typeof row.id==="string"&&typeof row.name==="string"));}});const layouts=Array.isArray(rawLayouts)?rawLayouts:[];
  const assets=useCanvasAssets(layouts.length>0);
  const [selected,setSelected]=useState("");
  useEffect(()=>{if(layouts.length&&!layouts.some(x=>x.id===selected))setSelected(layouts[0].id)},[layouts,selected]);
