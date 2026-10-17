@@ -24,6 +24,7 @@ import {exportAssetsXLSX} from "@/lib/asset-export";
 import {getServerAuthHeaders} from "@/lib/auth-headers";
 import {useServerFn} from "@tanstack/react-start";
 import { AssetLocationFields } from "@/components/asset-location-fields";
+import { loadTenantBranding, BRANDING_CHANGED_EVENT } from "@/lib/branding";
 import { GeoHierarchyFilter, type GeoHierarchyPlace } from "@/components/geo-hierarchy-filter";
 
 export const Route = createFileRoute("/_app/assets")({
@@ -94,6 +95,17 @@ const empty: AssetForm = {
 
 function AssetsPage() {
   const { canWrite, isAdmin, user, canDo, canSeeBranch, canView, tenantId } = useAuth();
+  const [companyLogo,setCompanyLogo]=useState<string|null>(null);
+  useEffect(()=>{
+    if(!tenantId){setCompanyLogo(null);return;}
+    let active=true;
+    const refresh=()=>loadTenantBranding(tenantId).then(t=>{if(active)setCompanyLogo(t.logo_data_url||null)}).catch(()=>{});
+    void refresh();
+    const onChange=(event:Event)=>{const template=(event as CustomEvent).detail;if(template?.logo_data_url!==undefined)setCompanyLogo(template.logo_data_url);else void refresh();};
+    window.addEventListener(BRANDING_CHANGED_EVENT,onChange);
+    return ()=>{active=false;window.removeEventListener(BRANDING_CHANGED_EVENT,onChange)};
+  },[tenantId]);
+
   const canAdd = canWrite || canDo("add_asset");
   const canEdit = canWrite || canDo("edit_asset");
   const canRequestRetire = canWrite || canDo("initiate_retirement");
@@ -706,6 +718,7 @@ function AssetsPage() {
             <Button onClick={openNew} disabled={registerCatalogPending}><Plus className="mr-2 h-4 w-4" /> {registerCatalogPending?"Loading register…":"New asset"}</Button>
             <DialogContent className="flex max-h-[92vh] max-w-3xl flex-col overflow-hidden p-0">
               <DialogHeader className="border-b px-5 pb-4 pt-5 sm:px-6">
+                {companyLogo && <div className="mb-2 flex justify-start"><img src={companyLogo} alt="Company logo" className="h-14 w-auto max-w-[210px] object-contain sm:h-16" /></div>}
                 <DialogTitle>{form.id ? "Edit asset" : registerChoice!=="default" ? `New ${registers.find(r=>r.id===registerChoice)?.name??"asset"}` : "Register asset"}</DialogTitle>
                 <div className="flex flex-wrap items-center gap-2"><Label className="whitespace-nowrap text-xs">Asset register</Label><Select value={registerChoice} onValueChange={v=>{setRegisterChoice(v);setCustomValues({});setWizardStep(0);if(!form.id)setForm({...empty,branch_id:visibleBranches.length===1?visibleBranches[0].id:null})}}><SelectTrigger className="h-9 flex-1"><SelectValue/></SelectTrigger><SelectContent>{(!catalog?.primaryId||!!form.id)&&<SelectItem value="default">Default register</SelectItem>}{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select></div>
                 <DialogDescription className="sm:hidden">Step {registerChoice==="default"?wizardStep+1:wizardStep===4?2:1} of {displayedSteps.length} · {wizardSteps[wizardStep].title}</DialogDescription>
