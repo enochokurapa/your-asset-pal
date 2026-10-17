@@ -291,7 +291,7 @@ function AppLayout() {
                       This is an optional paid add-on. It is activated and billed separately from your AssetFlow plan.
                     </p>
                     <p className="mx-auto mt-3 max-w-lg text-sm font-medium text-muted-foreground">
-                      Activate this paid add-on from Plan & Billing. The price is set by the SaaS administrator.
+                      Activate this feature from Plan & Billing.
                     </p>
                     {isTenantAdmin&&<Button asChild className="mt-5"><Link to="/billing">View add-on pricing & pay</Link></Button>}
                   </>
