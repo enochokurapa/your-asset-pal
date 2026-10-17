@@ -94,7 +94,7 @@ function SaasAdminOrganizationsPage() {
 
   const detailQuery = useQuery({
     queryKey: ["saas-admin-tenant-detail", selectedTenantId],
-    queryFn: () => authCall(getDetail, { data: { tenant_id: selectedTenantId } }),
+    queryFn: async () => { const {data,error}=await supabase.rpc("admin_business_detail" as any,{p_tenant:selectedTenantId});if(error)throw new Error(error.message);if(!data||typeof data!=="object"||!(data as any).tenant||!Array.isArray((data as any).modules)||!Array.isArray((data as any).users))throw new Error("Business controls response is incomplete");return data as any; },
     enabled: !!selectedTenantId && isSaasAdmin,
   });
 
