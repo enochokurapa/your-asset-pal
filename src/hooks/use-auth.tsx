@@ -147,13 +147,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const act = actRes.status === "fulfilled" ? actRes.value.data : null;
       const br = brRes.status === "fulfilled" ? brRes.value.data : null;
       const prof: any = profRes.status === "fulfilled" ? profRes.value.data : null;
-      const rs = (r ?? []).map((x: any) => x.role as AppRole);
+      const rs = (Array.isArray(r)?r:[]).map((x: any) => x.role as AppRole);
 
       setRoles(rs);
-      setPermissions(new Set((p ?? []).filter((x: any) => x.can_view).map((x: any) => x.module as ModuleKey)));
-      setApprovalRights(new Set((a ?? []).map((x: any) => x.approval_kind as ApprovalKind)));
-      setActionRights(new Set((act ?? []).map((x: any) => x.action_kind as ActionKind)));
-      const brList = (br ?? []).map((x: any) => x.branch_id as string);
+      setPermissions(new Set((Array.isArray(p)?p:[]).filter((x: any) => x.can_view).map((x: any) => x.module as ModuleKey)));
+      setApprovalRights(new Set((Array.isArray(a)?a:[]).map((x: any) => x.approval_kind as ApprovalKind)));
+      setActionRights(new Set((Array.isArray(act)?act:[]).map((x: any) => x.action_kind as ActionKind)));
+      const brList = (Array.isArray(br)?br:[]).map((x: any) => x.branch_id as string);
       setBranchScope(rs.includes("admin") || brList.length === 0 ? null : new Set(brList));
       setMustChangePassword(Boolean(prof?.must_change_password));
       setIsActive(prof?.is_active !== false);
@@ -180,12 +180,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setSubscriptionStatus(effective);
 
           const paid = effective === "active";
-          const overrideMap = new Map((overrides ?? []).map((x: any) => [x.module_key, x.enabled]));
-          if (modules?.length) {
+          const overrideMap = new Map((Array.isArray(overrides)?overrides:[]).map((x: any) => [x.module_key, x.enabled]));
+          if (Array.isArray(modules) && modules.length) {
             const eligible = modules.filter((m: any) => !!m.globally_enabled);
             const included = eligible.filter((m: any) => m.billing_model !== "add_on");
             const addOns = eligible.filter((m: any) => m.billing_model === "add_on");
-            const chosenPlan=(pricingPlans??[]).find((p:any)=>p.id===tenant.plan_code);
+            const chosenPlan=(Array.isArray(pricingPlans)?pricingPlans:[]).find((p:any)=>p.id===tenant.plan_code);
             const planModules=["starter","business","enterprise"].includes(tenant.plan_code)?new Set(chosenPlan?.enabled_modules??[]):null;
             const allowedIncluded = included
               .filter((m: any) => paid ? !!m.paid_enabled && (!planModules||planModules.has(m.module_key)) : !!m.trial_enabled)
