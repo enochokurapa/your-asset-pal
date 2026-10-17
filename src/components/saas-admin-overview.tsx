@@ -60,7 +60,11 @@ export function SaasAdminOverview() {
     queryKey: ["saas-admin-dashboard"],
     queryFn: async () => {
       const headers = await getServerAuthHeaders();
-      return getDashboard({ headers });
+      const response = await getDashboard({ headers });
+      if (!response || typeof response !== "object" || !Array.isArray((response as any).tenants) || !(response as any).summary) {
+        throw new Error("SaaS dashboard API returned an invalid response. Check authentication and server function logs.");
+      }
+      return response;
     },
     enabled: isSaasAdmin,
     retry: 1,
