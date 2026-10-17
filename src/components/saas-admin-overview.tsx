@@ -1,3 +1,4 @@
+import { supabase } from "@/integrations/supabase/client";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -59,8 +60,8 @@ export function SaasAdminOverview() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["saas-admin-dashboard"],
     queryFn: async () => {
-      const headers = await getServerAuthHeaders();
-      const response = await getDashboard({ headers });
+      const {data:response,error:rpcError}=await supabase.rpc("admin_control_center" as any);
+      if(rpcError) throw new Error(rpcError.message);
       if (!response || typeof response !== "object" || !Array.isArray((response as any).tenants) || !(response as any).summary) {
         throw new Error("SaaS dashboard API returned an invalid response. Check authentication and server function logs.");
       }
