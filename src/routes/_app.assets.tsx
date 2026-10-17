@@ -439,6 +439,7 @@ function AssetsPage() {
     const effectiveTag=form.asset_tag.trim()||enteredTag||null;
     const effectiveName=customRegister?(enteredName||form.name.trim()||enteredTag||"Registered asset"):form.name.trim();
     if(!effectiveName){toast.error("Enter an asset name or item description.");return;}
+    if(customRegister&&registers.find(r=>r.id===registerChoice)?.configuration?.tag_policy==="required"&&!effectiveTag){toast.error("This register requires a physical asset tag.");return;}
 
     if (locationSettings?.require_branch && !form.branch_id) { toast.error("Branch is required"); return; }
     if (locationSettings?.require_geography && !form.geo_place_id) { toast.error("Geographic area is required"); return; }
