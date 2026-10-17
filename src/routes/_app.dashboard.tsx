@@ -172,7 +172,7 @@ function TenantDashboard() {
     { label: "Branches", value: data?.branchCount ?? 0, icon: Building2, color: "#7C3AED", filter: { kind: "all" } },
     { label: "Located Assets", value: data?.locatedAssets ?? 0, icon: MapPin, color: "#0F766E", filter: { kind: "all" }, navigateTo: "/assets", navigateSearch: { located: "1" } },
     { label: "No Location", value: data?.unlocatedAssets ?? 0, icon: AlertTriangle, color: "#B45309", filter: { kind: "all" }, navigateTo: "/assets", navigateSearch: { unlocated: "1" } },
-    { label: "In Storage", value: data?.statusCounts.find((s) => s.key === "in_storage")?.value ?? 0, icon: Boxes, color: "#475569", filter: { kind: "status", status: "in_storage" }, subtotal: data?.inStorageValue },
+    { label: "In Storage", value: (Array.isArray(data?.statusCounts) ? data.statusCounts : []).find((s) => s.key === "in_storage")?.value ?? 0, icon: Boxes, color: "#475569", filter: { kind: "status", status: "in_storage" }, subtotal: data?.inStorageValue },
     { label: "In Use", value: data?.inUse ?? 0, icon: CheckCircle2, color: "#0E7490", filter: { kind: "status", status: "in_use" }, subtotal: data?.inUseValue },
     { label: "Under Repair", value: data?.repair ?? 0, icon: Wrench, color: "#B45309", filter: { kind: "status", status: "under_repair" } },
     { label: "Retired", value: data?.retired ?? 0, icon: Archive, color: "#52525B", filter: { kind: "status", status: "retired" } },
@@ -188,7 +188,7 @@ function TenantDashboard() {
   ];
 
   const [tile, setTile] = useState<{ title: string; filter: TileFilter } | null>(null);
-  const pieData = (data?.statusCounts ?? []).filter((s) => s.value > 0);
+  const pieData = (Array.isArray(data?.statusCounts) ? data.statusCounts : []).filter((s) => s.value > 0);
 
   return (
     <div className="space-y-6">
