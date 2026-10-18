@@ -99,7 +99,7 @@ function BuildersPage(){
    setItems([]);setSelected(null);setName("");setDescription("");setFields([]);setError("");setEditing(false);setStep(2);
    if(!allowed||!isTenantAdmin||isSaasAdmin)return;
    setBusy(true);
-   supabase.rpc("my_builder_definitions" as any,{p_kind:kind}).then(async ({data:rows,error:catalogError})=>{ if(catalogError)throw new Error(catalogError.message);
+   getServerAuthHeaders().then(headers=>list({headers,data:{kind}})).then(async (rows)=>{
      if(valid){if(!Array.isArray(rows))throw Error("Unexpected response from server");setItems(rows.filter((row):row is Definition=>Boolean(row&&typeof row==="object"&&typeof row.id==="string"&&typeof row.name==="string")).map(row=>({...row,configuration:{...((row.configuration&&typeof row.configuration==="object"&&!Array.isArray(row.configuration))?row.configuration:{}),fields:Array.isArray(row.configuration?.fields)?row.configuration.fields:[]}})));if(kind==="register_builder")catalog({headers:await getServerAuthHeaders()}).then(c=>{if(valid){setActiveRegister(c.primaryId??null);setIncludeLocation(c.includeLocation??true)}}).catch(e=>{if(valid)toast.error(e?.message||"Unable to load primary register")});}
    }).catch(e=>{if(valid)setError(e?.message||"Unable to load definitions")})
      .finally(()=>{if(valid)setBusy(false)});
