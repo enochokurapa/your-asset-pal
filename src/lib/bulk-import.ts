@@ -43,7 +43,9 @@ export function locationColumns(config?:RegisterLocationConfig){if(config?.show_
 const normalizeHeader=(name:string)=>name.trim().toLowerCase().replace(/[^a-z0-9]/g,"");
 export function getCustomRegisterHeaders(register:RegisterTemplate,_config?:RegisterLocationConfig){
   // System fields belong to the application, not the user's custom import template.
-  return (register.configuration.fields??[]).map(f=>f.label.trim()).filter(Boolean);
+  const custom = (register.configuration.fields??[]).map(f=>f.label.trim()).filter(Boolean);
+  const hasName = (register.configuration.fields??[]).some(f=>["assetname","itemname","name","itemdescription","itemcode"].includes(normalizeHeader(f.label)) || ["assetname","itemname","name","itemdescription","itemcode"].includes(normalizeHeader(f.key)));
+  return hasName ? custom : ["System Asset Name",...custom];
 }
 export function downloadTemplate(register?:RegisterTemplate, config?:RegisterLocationConfig) {
   const wb = XLSX.utils.book_new();
@@ -69,7 +71,7 @@ export function downloadTemplate(register?:RegisterTemplate, config?:RegisterLoc
     ["custodian", "No", "Person responsible (creates an assignment record)"],
     ["department", "No", "Department of the custodian"],
   ];
-  if(register){notes.splice(1);extra.forEach(f=>notes.push([f.label,f.required?"Yes":"No",`${f.type}${f.options?.length?": "+f.options.join(" / "):""}`]));}
+  if(register){notes.splice(1);if(columns.includes("System Asset Name"))notes.push(["System Asset Name","Yes","Required asset name (unless your custom register includes an asset-name field)."]);extra.forEach(f=>notes.push([f.label,f.required?"Yes":"No",`${f.type}${f.options?.length?": "+f.options.join(" / "):""}`]));}
   const wsNotes = XLSX.utils.aoa_to_sheet(notes);
   XLSX.utils.book_append_sheet(wb, ws, "Assets");
   if(register){const info=[["1. FIELDS","The Assets sheet includes only fields that you defined in the custom register."],["2. SYSTEM VALUES","Built-in fields are managed separately and do not need import columns."],["3. IMPORT","Choose the same register in Assets > Import. Older spreadsheets with system columns remain supported."]];const guide=XLSX.utils.aoa_to_sheet([...info,[],...notes,]);guide["!cols"]=[{wch:26},{wch:100},{wch:60}];XLSX.utils.book_append_sheet(wb,guide,"Read Me");}else XLSX.utils.book_append_sheet(wb, wsNotes, "Instructions");
@@ -166,7 +168,7 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
       for(const field of extra){const raw=getValue(r,field.label,field.key);const value=raw==null?"":String(raw).trim();if(field.required&&!value&&field.key!==customTagField?.key)throw Error(`${field.label} is required`);if(!value){custom[field.key]=null;continue;}if(field.type==="number"||field.type==="currency"){const n=Number(value);if(!Number.isFinite(n))throw Error(`${field.label} must be a number`);custom[field.key]=n;}else if(field.type==="boolean"){if(!["true","false","yes","no","1","0"].includes(value.toLowerCase()))throw Error(`${field.label} must be true or false`);custom[field.key]=["true","yes","1"].includes(value.toLowerCase());}else if(field.type==="date"){if(!/^\d{4}-\d{2}-\d{2}$/.test(value))throw Error(`${field.label} must use YYYY-MM-DD`);custom[field.key]=value;}else if(["select","radio"].includes(field.type)&&field.options?.length&&!field.options.includes(value))throw Error(`${field.label}: invalid option ${value}`);else custom[field.key]=value;}
       const explicitTag=textValue(r,"System Asset Tag","asset_tag")||(customTagField?String(custom[customTagField.key]??"").trim():"");
       const tag=explicitTag||null;
-      const name=register?(String(customNameField?custom[customNameField.key]??"":textValue(r,"System Asset Name","name")||explicitTag||"Registered asset").trim()):String(r.name??"").trim();
+      const name=register?(String(customNameField?custom[customNameField.key]??"":textValue(r,"System Asset Name","name")).trim()):String(r.name??"").trim();
       const branchName=textValue(r,"Branch","branch");
       if(!tag&&register?.configuration?.tag_policy==="required")throw new Error("Asset tag is required by this register");
       if(!name)throw new Error("A text/name field must contain an asset name");
