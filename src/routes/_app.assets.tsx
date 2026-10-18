@@ -1,3 +1,4 @@
+import { runPermittedExport, useExportAccess } from "@/lib/export-permissions";
 import {builderPayload} from "@/lib/builder-response";
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useSearch, useNavigate, Link } from "@tanstack/react-router";
@@ -672,6 +673,7 @@ function AssetsPage() {
     requestRetire(a, "deletion");
   };
 
+  const exportAccess=useExportAccess();
   const [importing, setImporting] = useState(false);
   const [importProgress,setImportProgress]=useState<string>("");
   const onImport = async (f: File) => {
@@ -703,8 +705,8 @@ function AssetsPage() {
           <Button variant="outline" onClick={() => { setScanMode("lookup"); setScanOpen(true); }}>
             <ScanLine className="mr-2 h-4 w-4" /> Scan
           </Button>
-          <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError} onClick={()=>exportAssetsXLSX(registers.find(r=>r.id===registerChoice)?.name??"Default Asset Register", (assets as any[]).filter(a=>registerChoice==="default"?a.register_definition_id==null:a.register_definition_id===registerChoice),registerFields,locationSettings as any)} title="Export assets for selected register"><Download className="mr-2 h-4 w-4"/> Export register</Button>
-          <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError} onClick={()=>downloadTemplate(registers.find(r=>r.id===registerChoice),locationSettings as any)} title="Download Excel import template">
+          <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError||!exportAccess.allowed("register")} onClick={()=>runPermittedExport("register",()=>exportAssetsXLSX(registers.find(r=>r.id===registerChoice)?.name??"Default Asset Register", (assets as any[]).filter(a=>registerChoice==="default"?a.register_definition_id==null:a.register_definition_id===registerChoice),registerFields,locationSettings as any))} title="Export assets for selected register"><Download className="mr-2 h-4 w-4"/> Export register</Button>
+          <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError||!exportAccess.allowed("template")} onClick={()=>runPermittedExport("template",()=>downloadTemplate(registers.find(r=>r.id===registerChoice),locationSettings as any))} title="Download Excel import template">
             <Download className="mr-2 h-4 w-4" /> Template
           </Button>
           {canAdd&&registerChoice!=="default"&&visibleBranches.length>1&&<Select value={importBranchId||"choose"} onValueChange={v=>setImportBranchId(v==="choose"?"":v)}><SelectTrigger className="w-52"><SelectValue placeholder="Import into branch"/></SelectTrigger><SelectContent><SelectItem value="choose">Choose import branch</SelectItem>{visibleBranches.map(branch=><SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}</SelectContent></Select>}

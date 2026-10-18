@@ -1,3 +1,4 @@
+import { runPermittedExport } from "@/lib/export-permissions";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -105,10 +106,10 @@ export function TileAssetsDialog({
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input className="pl-8" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
               </div>
-              <Button size="sm" variant="outline" disabled={!filtered.length} onClick={() => exportAssetsXLSX(title, filtered)}>
+              <Button size="sm" variant="outline" disabled={!filtered.length} onClick={() => runPermittedExport("register",()=>exportAssetsXLSX(title, filtered))}>
                 <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
               </Button>
-              <Button size="sm" variant="outline" disabled={!filtered.length} onClick={() => exportAssetsPDF(title, filtered)}>
+              <Button size="sm" variant="outline" disabled={!filtered.length} onClick={() => runPermittedExport("register",()=>exportAssetsPDF(title, filtered))}>
                 <FileText className="mr-2 h-4 w-4" /> PDF
               </Button>
             </div>
@@ -157,10 +158,10 @@ export function TileAssetsDialog({
                   <DialogTitle className="!mt-0">{selected.name}</DialogTitle>
                 </div>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => exportAssetDetailXLSX(selected)}>
+                  <Button size="sm" variant="outline" onClick={() => runPermittedExport("register",()=>exportAssetDetailXLSX(selected))}>
                     <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => exportAssetDetailPDF(selected)}>
+                  <Button size="sm" variant="outline" onClick={() => runPermittedExport("register",()=>exportAssetDetailPDF(selected))}>
                     <Download className="mr-2 h-4 w-4" /> PDF
                   </Button>
                 </div>

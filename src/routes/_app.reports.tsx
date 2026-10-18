@@ -1,3 +1,4 @@
+import { runPermittedExport, useExportAccess } from "@/lib/export-permissions";
 import {PublishedCanvases} from "@/components/visual-canvas-builder";
 import { useMemo, useState } from "react";
 import { createFileRoute, Navigate } from "@tanstack/react-router";
@@ -1112,6 +1113,7 @@ function ReportsPage() {
 }
 
 function ReportTable({ r, exportMeta }: { r: Report; exportMeta: ReportExportMeta }) {
+  const exportAccess=useExportAccess();
   const [columns,setColumns]=useState<string[]|null>(null);
   const [orientation,setOrientation]=useState<"portrait"|"landscape">("landscape");
   const [paper,setPaper]=useState<"a4"|"letter"|"legal">("a4");
@@ -1125,10 +1127,10 @@ function ReportTable({ r, exportMeta }: { r: Report; exportMeta: ReportExportMet
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold">{r.title} <span className="ml-2 text-xs font-normal text-muted-foreground">({r.rows.length})</span></h2>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" disabled={!selectedColumns.length} onClick={() => exportPDF(report, exportMeta,{orientation,paper,signature})}>
+          <Button size="sm" variant="outline" disabled={!selectedColumns.length||!exportAccess.allowed("reports")} onClick={() => runPermittedExport("reports",()=>exportPDF(report, exportMeta,{orientation,paper,signature}))}>
             <FileDown className="mr-1 h-4 w-4" /> PDF
           </Button>
-          <Button size="sm" variant="outline" disabled={!selectedColumns.length} onClick={() => exportXLSX(report, exportMeta)}>
+          <Button size="sm" variant="outline" disabled={!selectedColumns.length||!exportAccess.allowed("reports")} onClick={() => runPermittedExport("reports",()=>exportXLSX(report, exportMeta))}>
             <FileSpreadsheet className="mr-1 h-4 w-4" /> Excel
           </Button>
         </div>

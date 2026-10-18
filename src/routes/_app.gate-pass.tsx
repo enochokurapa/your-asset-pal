@@ -1,3 +1,4 @@
+import { runPermittedExport, useExportAccess } from "@/lib/export-permissions";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -41,7 +42,8 @@ function GatePassPage() {
   const canVerify = isAdmin || isManager || isSecurity || canDo("verify_gate_pass");
   const canRequest = !!user;
   const canViewReports = isAdmin || isManager || canDo("view_gate_pass_reports");
-  const canExportReports = isAdmin || isManager || canDo("export_gate_pass_reports");
+  const exportAccess=useExportAccess();
+  const canExportReports = exportAccess.allowed("reports") && (isAdmin || isManager || canDo("export_gate_pass_reports"));
 
   const [createOpen, setCreateOpen] = useState(false);
   const [detailGP, setDetailGP] = useState<GP | null>(null);
@@ -172,13 +174,13 @@ function GatePassPage() {
     return parts.join(" · ") || "All gate passes";
   }, [statusFilter, assetFilter, requesterFilter, branchFilter, destinationFilter, dateField, dateFrom, dateTo, assetsQ.data, branchesQ.data, profilesQ.data]);
 
-  const exportXLSX = () => {
+  const exportXLSX = () => runPermittedExport("reports",()=>{
     const ws = XLSX.utils.json_to_sheet(reportRows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Gate Passes");
     XLSX.writeFile(wb, `gate-pass-report-${new Date().toISOString().slice(0, 10)}.xlsx`);
-  };
-  const exportPDF = async () => {
+  });
+  const exportPDF = async () => runPermittedExport("reports",async()=>{
     const { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } = await import("@/lib/pdf-template");
     const template = await loadTemplate();
     const { doc, startY } = createBrandedPdf({
@@ -197,7 +199,7 @@ function GatePassPage() {
       margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
     });
     saveBranded(doc, template, `gate-pass-report-${new Date().toISOString().slice(0, 10)}.pdf`);
-  };
+  });
 
 
   return (
@@ -663,7 +665,7 @@ function DetailDialog(props: {
     );
   };
 
-  const downloadPdf = async () => {
+  const downloadPdf = async () => runPermittedExport("documents",async()=>{
     const { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } = await import("@/lib/pdf-template");
     const template = await loadTemplate();
     const { doc, startY, pageWidth } = createBrandedPdf({
@@ -714,7 +716,7 @@ function DetailDialog(props: {
     doc.text("Security signature", x3, finalY + 6);
 
     saveBranded(doc, template, `gate-pass-${gp.pass_number ?? gp.id.slice(0, 8)}.pdf`);
-  };
+  });
 
 
   return (

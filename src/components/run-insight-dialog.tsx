@@ -1,3 +1,4 @@
+import { runPermittedExport } from "@/lib/export-permissions";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -39,7 +40,7 @@ export function RunInsightDialog({
         .order("created_at", { ascending: true })).data ?? [],
   });
 
-  const downloadPdf = async () => {
+  const downloadPdf = async () => runPermittedExport("documents",async()=>{
     if (!run) return;
     const template = await loadTemplate();
     const { doc, startY } = createBrandedPdf({
@@ -103,7 +104,7 @@ export function RunInsightDialog({
       margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
     });
     saveBranded(doc, template, `run-${run.period_end}.pdf`);
-  };
+  });
 
   const statusIcon = (s: string) => {
     if (s === "success") return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />;

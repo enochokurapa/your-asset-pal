@@ -1,3 +1,4 @@
+import { runPermittedExport, useExportAccess } from "@/lib/export-permissions";
 import {builderPayload,builderList} from "@/lib/builder-response";
 import {supabase} from "@/integrations/supabase/client";
 import {useEffect,useState} from "react";
@@ -136,7 +137,7 @@ function BuildersPage(){
  };
  const dropField=(source:string,target:string)=>setFields(previous=>{const next=[...previous];const from=next.findIndex(f=>f.id===source),to=next.findIndex(f=>f.id===target);if(from<0||to<0||from===to)return previous;next.splice(to,0,...next.splice(from,1));return next;});
  const moveField=(id:string,step:number)=>setFields(previous=>{const next=[...previous];const index=next.findIndex(field=>field.id===id);const target=index+step;if(index<0||target<0||target>=next.length)return previous;[next[index],next[target]]=[next[target],next[index]];return next;});
- const downloadRegister=()=>{if(!fields.length){toast.error("Add at least one field before downloading an import template.");return;}try{downloadImportTemplate({id:selected??"",name:name.trim()||"Custom Register",configuration:{fields}},{show_in_custom_register:includeLocation});toast.success("Excel import template prepared.");}catch(err){toast.error(err instanceof Error?err.message:"Could not generate the Excel template.");}};
+ const downloadRegister=()=>runPermittedExport("template",()=>{if(!fields.length){toast.error("Add at least one field before downloading an import template.");return;}try{downloadImportTemplate({id:selected??"",name:name.trim()||"Custom Register",configuration:{fields}},{show_in_custom_register:includeLocation});toast.success("Excel import template prepared.");}catch(err){toast.error(err instanceof Error?err.message:"Could not generate the Excel template.");}});
  const confirmActive=async(id:string|null)=>{setBusy(true);try{const headers=await getServerAuthHeaders();await activate({headers,data:{definitionId:id}});setActiveRegister(id);setActivationPrompt(null);toast.success(id?"Custom register set as primary.":"Default register restored.");}catch(e:any){toast.error(e?.message||"Unable to activate register");setError(e?.message||"Could not change the primary register. Your saved register is safe.");}finally{setBusy(false);}};
  const persist=async(makePrimary=false)=>{
    if(kind==="register_builder"&&fields.length===0){toast.error("Add at least one field before saving this register.");return;}

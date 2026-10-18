@@ -1,3 +1,4 @@
+import { runPermittedExport } from "@/lib/export-permissions";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "@tanstack/react-router";
@@ -167,7 +168,7 @@ export function PendingApprovalsCard() {
   const HEAD = ["Type", "Asset", "Branch", "Location", "Requester", "Requested at (EAT)", "Reason", "Status", "Final decision"];
   const KEYS = ["type", "asset", "branch", "location", "requester", "requested_at", "reason", "status", "decision"] as const;
 
-  const exportCSV = () => {
+  const exportCSV = () => runPermittedExport("reports",()=>{
     const data = buildExportRows();
     const csv = [HEAD.join(","), ...data.map((row) =>
       KEYS.map((k) => `"${String((row as any)[k] ?? "").replace(/"/g, '""')}"`).join(",")
@@ -177,8 +178,8 @@ export function PendingApprovalsCard() {
     const a = document.createElement("a");
     a.href = url; a.download = `pending-approvals-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
     URL.revokeObjectURL(url);
-  };
-  const exportPDF = async () => {
+  });
+  const exportPDF = async () => runPermittedExport("reports",async()=>{
     const tpl = await loadTemplate();
     const { doc, startY } = createBrandedPdf({
       template: tpl, orientation: "landscape",
@@ -195,7 +196,7 @@ export function PendingApprovalsCard() {
       margin: { left: tpl.margin_left, right: tpl.margin_right, bottom: tpl.margin_bottom },
     });
     saveBranded(doc, tpl, `pending-approvals-${new Date().toISOString().slice(0, 10)}.pdf`);
-  };
+  });
 
   return (
     <Card className="p-5" ref={cardRef as any}>

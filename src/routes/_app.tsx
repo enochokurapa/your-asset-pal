@@ -1,3 +1,4 @@
+import {useExportAccess} from "@/lib/export-permissions";
 import { createFileRoute, Outlet, Link, Navigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth, ModuleKey } from "@/hooks/use-auth";
@@ -80,6 +81,7 @@ function AppLayout() {
   },[user?.id]);
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const exportAccess=useExportAccess();
 
   useEffect(() => {
     if (isSaasAdmin || !tenantId) return;
@@ -149,15 +151,15 @@ function AppLayout() {
     : null;
 
   const blockRestrictedExport = (e: React.MouseEvent<HTMLElement>) => {
-    if (isSaasAdmin || canExportReports) return;
+    if (isSaasAdmin || (["register","template","reports","documents","other"] as const).some(cap=>exportAccess.allowed(cap))) return;
     const target = e.target as HTMLElement;
     const button = target.closest("button");
     if (!button) return;
     const text = (button.textContent || "").trim().toLowerCase();
-    if (/\b(pdf|excel|xlsx|csv)\b/.test(text)) {
+    if (/\b(pdf|excel|xlsx|csv|export|template|download)\b/.test(text)) {
       e.preventDefault();
       e.stopPropagation();
-      toast.error("Exports are available on the paid plan. You can still view the information during the free trial.");
+      toast.error("Downloads are locked for this business. Contact your SaaS administrator.");
     }
   };
 
@@ -264,7 +266,7 @@ function AppLayout() {
         </header>
 
         <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
-          {!isSaasAdmin && pathname.startsWith("/reports") && !canExportReports && subscriptionStatus === "trial" && !lockedPaidFeature && (
+          {!isSaasAdmin && pathname.startsWith("/reports") && !exportAccess.allowed("reports") && subscriptionStatus === "trial" && !lockedPaidFeature && (
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
               <div className="flex items-center gap-2"><LockKeyhole className="h-4 w-4" /><span><strong>Free trial:</strong> reports are view-only. PDF and Excel downloads are locked until upgrade.</span></div>
               {isTenantAdmin && <Button asChild size="sm"><Link to="/billing">Upgrade</Link></Button>}

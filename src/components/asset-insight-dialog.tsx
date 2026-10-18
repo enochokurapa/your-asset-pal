@@ -1,3 +1,4 @@
+import { runPermittedExport } from "@/lib/export-permissions";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -68,7 +69,7 @@ export function AssetInsightDialog({
 
   const nbv = asset ? netBookValue(asset as any) : 0;
 
-  const downloadPdf = async () => {
+  const downloadPdf = async () => runPermittedExport("documents",async()=>{
     if (!asset) return;
     const template = await loadTemplate();
     const focusLabel = {
@@ -144,7 +145,7 @@ export function AssetInsightDialog({
     }
 
     saveBranded(doc, template, `${asset.asset_tag}-${focus}-insight.pdf`);
-  };
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -1,3 +1,4 @@
+import type { ExportCapability } from "@/lib/export-permissions";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
@@ -61,6 +62,37 @@ function SaasAdminOrganizationsPage() {
   const saveControls = useServerFn(updateTenantControls);
   const getTags=useServerFn(getSaasTenantTagSettings);
   const setTags=useServerFn(updateSaasTenantTagSettings);
+  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
+  const exportCapabilities: Array<{key:ExportCapability,label:string}> = [
+    {key:"register",label:"Register Excel exports"},
+    {key:"template",label:"Import and update templates"},
+    {key:"reports",label:"Reports (Excel / PDF)"},
+    {key:"documents",label:"Document and depreciation downloads"},
+    {key:"other",label:"Other downloads"},
+  ];
+  const exportQuery=useQuery({
+    queryKey:["saas-tenant-export-controls",selectedTenantId],
+    enabled:!!selectedTenantId&&isSaasAdmin,
+    queryFn:async()=>{
+      const {data,error}=await supabase.rpc("saas_list_tenant_export_controls" as any,{p_tenant:selectedTenantId});
+      if(error)throw new Error(error.message);
+      return (data??{}) as Record<string,boolean>;
+    }
+  });
+  const [exportSaving,setExportSaving]=useState<string|null>(null);
+  const changeExport=async(key:ExportCapability, setting:string)=>{
+    if(!selectedTenantId)return;
+    setExportSaving(key);
+    try{
+      const {error}=await supabase.rpc("saas_set_tenant_export_control" as any,{
+        p_tenant:selectedTenantId,p_capability:key,p_setting:setting,
+      });
+      if(error)throw new Error(error.message);
+      await exportQuery.refetch();
+      toast.success("Download access updated");
+    }catch(e:any){toast.error(e?.message||"Could not update download permissions");}
+    finally{setExportSaving(null);}
+  };
   const [tagPrefix,setTagPrefix]=useState("AST");
   const [tagSeparator,setTagSeparator]=useState("-");
   const [tagDigits,setTagDigits]=useState(5);
@@ -71,7 +103,6 @@ function SaasAdminOrganizationsPage() {
   const [savingControls,setSavingControls] = useState(false);
 
   const [search, setSearch] = useState("");
-  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState("");
   const [savingName, setSavingName] = useState(false);
 
@@ -308,6 +339,22 @@ function SaasAdminOrganizationsPage() {
               </div>
             </Card>
 
+            <Card className="p-5 space-y-4">
+              <div><h3 className="font-semibold">Export and download locks</h3>
+              <p className="text-sm text-muted-foreground">Trial businesses are locked by default. Paid businesses are allowed by default. Override each category for this business, including paid businesses. Inherit restores the default.</p></div>
+              {exportQuery.isLoading ? <p className="text-sm">Loading download controls…</p> :
+              exportQuery.error ? <p className="text-sm text-destructive">Could not load download controls. Changes are disabled.</p> :
+              <div className="space-y-3">
+                {exportCapabilities.map(({key,label})=><div key={key} className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="text-sm font-medium">{label}</span>
+                  <Select value={exportQuery.data?.[key]===true?"allow":exportQuery.data?.[key]===false?"deny":"inherit"}
+                    disabled={exportSaving!==null} onValueChange={v=>changeExport(key,v)}>
+                    <SelectTrigger className="w-48"><SelectValue/></SelectTrigger>
+                    <SelectContent><SelectItem value="inherit">Plan default</SelectItem><SelectItem value="allow">Allow</SelectItem><SelectItem value="deny">Lock</SelectItem></SelectContent>
+                  </Select>
+                </div>)}
+              </div>}
+            </Card>
             <Card className="p-5 space-y-4">
               <div>
                 <h3 className="font-semibold">Business-specific controls</h3>

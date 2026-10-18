@@ -1,3 +1,4 @@
+import { runPermittedExport } from "@/lib/export-permissions";
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -156,14 +157,14 @@ function VerificationPage() {
     "Changes": v.changes && Object.keys(v.changes).length ? JSON.stringify(v.changes) : "",
   }));
 
-  const exportXLSX = () => {
+  const exportXLSX = () => runPermittedExport("reports",()=>{
     const ws = XLSX.utils.json_to_sheet(toRows(filtered));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Verifications");
     XLSX.writeFile(wb, "verification-report.xlsx");
-  };
+  });
 
-  const exportPDF = async () => {
+  const exportPDF = async () => runPermittedExport("reports",async()=>{
     const tpl = await loadTemplate();
     const { doc, startY } = createBrandedPdf({
       template: tpl,
@@ -182,7 +183,7 @@ function VerificationPage() {
       margin: { left: tpl.margin_left, right: tpl.margin_right, bottom: tpl.margin_bottom },
     });
     saveBranded(doc, tpl, "verification-report.pdf");
-  };
+  });
 
   return (
     <div className="space-y-6">

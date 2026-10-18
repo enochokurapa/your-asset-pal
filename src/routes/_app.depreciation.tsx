@@ -1,3 +1,4 @@
+import { runPermittedExport, useExportAccess } from "@/lib/export-permissions";
 import { useMemo, useState } from "react";
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -392,8 +393,8 @@ function DepreciationPage() {
       ] as (string | number)[];
     });
     const title = "Depreciation audit log";
-    if (kind === "xlsx") exportReportXLSX(title, headers, rows);
-    else exportReportPDF(title, headers, rows);
+    if (kind === "xlsx") void runPermittedExport("documents",()=>exportReportXLSX(title, headers, rows));
+    else void runPermittedExport("documents",()=>exportReportPDF(title, headers, rows));
   };
 
   return (
@@ -832,10 +833,10 @@ function ReportTable({
       <div className="mb-3 flex items-center justify-between">
         <h3 className="font-semibold">{title}</h3>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => exportReportXLSX(title, headers, rows)}>
+          <Button size="sm" variant="outline" onClick={() => runPermittedExport("documents",()=>exportReportXLSX(title, headers, rows))}>
             <Download className="mr-1 h-3 w-3" /> Excel
           </Button>
-          <Button size="sm" variant="outline" onClick={() => exportReportPDF(title, headers, rows)}>
+          <Button size="sm" variant="outline" onClick={() => runPermittedExport("documents",()=>exportReportPDF(title, headers, rows))}>
             <FileText className="mr-1 h-3 w-3" /> PDF
           </Button>
         </div>
