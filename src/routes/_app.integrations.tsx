@@ -53,12 +53,13 @@ function IntegrationsPage() {
     return fn({ ...arg, headers });
   };
 
-  const { data: keys = [], refetch, isLoading } = useQuery({
+  const { data: keyRows, refetch, isLoading, error: keysError } = useQuery({
     queryKey: ["tenant-api-keys"],
-    queryFn: () => authCall(listKeys),
+    queryFn: async () => {const response=await authCall(listKeys);if(!Array.isArray(response))throw new Error("API key list response was not an array.");return response;},
     enabled: isTenantAdmin && canView("api_access"),
   });
 
+  const keys = Array.isArray(keyRows) ? keyRows : [];
   const { data: microsoftStatus, refetch: refetchMicrosoft, isLoading: microsoftLoading } = useQuery({
     queryKey: ["microsoft-365-status"],
     queryFn: () => authCall(getMicrosoftStatus),
@@ -259,11 +260,11 @@ function IntegrationsPage() {
                     <Users className="h-4 w-4 text-primary"/>
                     <p className="text-sm font-semibold">Microsoft 365 directory</p>
                   </div>
-                  {!microsoftStatus.directory_preview?.length ? (
+                  {!Array.isArray(microsoftStatus.directory_preview) || !microsoftStatus.directory_preview.length ? (
                     <p className="text-sm text-muted-foreground">Sync the directory to load Microsoft 365 users.</p>
                   ) : (
                     <div className="space-y-2">
-                      {microsoftStatus.directory_preview.map((u:any)=>(
+                      {(Array.isArray(microsoftStatus.directory_preview) ? microsoftStatus.directory_preview : []).map((u:any)=>(
                         <div key={u.microsoft_user_id} className="flex items-center justify-between gap-3 rounded-lg bg-muted/30 px-3 py-2">
                           <div className="min-w-0">
                             <p className="truncate text-sm font-medium">{u.display_name}</p>
@@ -358,6 +359,7 @@ function IntegrationsPage() {
           <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /> API keys</CardTitle>
         </CardHeader>
         <CardContent>
+          {keysError && <p className="text-sm text-destructive">Unable to load API keys: {keysError.message}</p>}
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Loading keys…</p>
           ) : keys.length === 0 ? (
