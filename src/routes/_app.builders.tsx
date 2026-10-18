@@ -99,8 +99,8 @@ function BuildersPage(){
    setItems([]);setSelected(null);setName("");setDescription("");setFields([]);setError("");setEditing(false);setStep(2);
    if(!allowed||!isTenantAdmin||isSaasAdmin)return;
    setBusy(true);
-   (kind==="register_builder" ? getServerAuthHeaders().then(headers=>catalog({headers})).then(c=>({data:c.definitions,error:null,catalog:c})) : supabase.rpc("my_builder_definitions" as any,{p_kind:kind})).then(async ({data:rows,error:catalogError,...rest})=>{ if(catalogError)throw new Error(catalogError.message);
-     if(valid){if(!Array.isArray(rows))throw Error("Unexpected response from server");setItems(rows.filter((row):row is Definition=>Boolean(row&&typeof row==="object"&&typeof row.id==="string"&&typeof row.name==="string")).map(row=>({...row,configuration:{...((row.configuration&&typeof row.configuration==="object"&&!Array.isArray(row.configuration))?row.configuration:{}),fields:Array.isArray(row.configuration?.fields)?row.configuration.fields:[]}})));if(kind==="register_builder"){const c=(rest as any).catalog;if(c){setActiveRegister(c.primaryId??null);setIncludeLocation(c.includeLocation??true)}}}
+   supabase.rpc("my_builder_definitions" as any,{p_kind:kind}).then(async ({data:rows,error:catalogError})=>{ if(catalogError)throw new Error(catalogError.message);
+     if(valid){if(!Array.isArray(rows))throw Error("Unexpected response from server");setItems(rows.filter((row):row is Definition=>Boolean(row&&typeof row==="object"&&typeof row.id==="string"&&typeof row.name==="string")).map(row=>({...row,configuration:{...((row.configuration&&typeof row.configuration==="object"&&!Array.isArray(row.configuration))?row.configuration:{}),fields:Array.isArray(row.configuration?.fields)?row.configuration.fields:[]}})));if(kind==="register_builder")catalog({headers:await getServerAuthHeaders()}).then(c=>{if(valid){setActiveRegister(c.primaryId??null);setIncludeLocation(c.includeLocation??true)}}).catch(e=>{if(valid)toast.error(e?.message||"Unable to load primary register")});}
    }).catch(e=>{if(valid)setError(e?.message||"Unable to load definitions")})
      .finally(()=>{if(valid)setBusy(false)});
    return()=>{valid=false};
@@ -145,7 +145,7 @@ function BuildersPage(){
      const headers=await getServerAuthHeaders();
      const saved=await save({headers,data:{kind,id:selected||undefined,name:name.trim(),description,
        configuration:{source,fields,tag_policy:tagPolicy},is_active:true}});
-     const {data:rows,error:reloadError}=kind==="register_builder" ? {data:(await catalog({headers})).definitions,error:null} : await supabase.rpc("my_builder_definitions" as any,{p_kind:kind});
+     const {data:rows,error:reloadError}=await supabase.rpc("my_builder_definitions" as any,{p_kind:kind});
      if(reloadError)throw new Error(reloadError.message);
      if(!Array.isArray(rows))throw new Error("Saved, but unable to reload your register list.");
      setItems(rows.filter((row):row is Definition=>Boolean(row&&typeof row==="object"&&typeof row.id==="string"&&typeof row.name==="string")).map(row=>({...row,configuration:{...((row.configuration&&typeof row.configuration==="object"&&!Array.isArray(row.configuration))?row.configuration:{}),fields:Array.isArray(row.configuration?.fields)?row.configuration.fields:[]}})));setSelected(saved.id);setStep(3);setEditing(false);setError("");if(makePrimary&&kind==="register_builder"){await activate({headers,data:{definitionId:saved.id}});setActiveRegister(saved.id);toast.success("Register saved and made primary.");}else toast.success("Register saved. You can keep using your current primary.");
