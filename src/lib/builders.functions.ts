@@ -70,7 +70,10 @@ export const saveBuilderDefinition = createServerFn({method:"POST"})
         .eq("id",data.id).eq("tenant_id",tenantId).eq("builder_key",data.kind).select("id").maybeSingle();
       if(error) throw new Error(error.message);
       if(!updated) throw new Error("Builder definition not found in your business.");
-      return updated;
+      const {data:definitions,error:listError}=await db.from("builder_definitions").select("id,name,description,configuration,is_active,updated_at").eq("tenant_id",tenantId).eq("builder_key",data.kind).order("updated_at",{ascending:false});
+      if(listError)throw new Error("Unable to verify updated builder catalog: "+listError.message);
+      if(!definitions?.some((x:any)=>x.id===updated.id))throw new Error("Updated builder missing from tenant catalog.");
+      return {id:updated.id,definitions};
     }
     const {data:created,error}=await db.from("builder_definitions").insert({
       ...payload,tenant_id:tenantId,builder_key:data.kind,created_by:context.userId,
@@ -79,7 +82,10 @@ export const saveBuilderDefinition = createServerFn({method:"POST"})
     if(!created?.id) throw new Error("Register creation returned no database ID.");
     const {data:confirmed,error:readError}=await db.from("builder_definitions").select("id,name,configuration,is_active").eq("id",created.id).eq("tenant_id",tenantId).eq("builder_key",data.kind).single();
     if(readError || !confirmed || confirmed.name!==data.name) throw new Error("Register creation was not verified in the business database.");
-    return confirmed;
+    const {data:definitions,error:listError}=await db.from("builder_definitions").select("id,name,description,configuration,is_active,updated_at").eq("tenant_id",tenantId).eq("builder_key",data.kind).order("updated_at",{ascending:false});
+    if(listError)throw new Error("Unable to load saved builder catalog: "+listError.message);
+    if(!definitions?.some((x:any)=>x.id===confirmed.id))throw new Error("Created builder missing from tenant catalog.");
+    return {id:confirmed.id,definitions};
   });
 
 export const archiveBuilderDefinition = createServerFn({method:"POST"})
