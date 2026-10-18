@@ -8,8 +8,19 @@ export const attachSupabaseAuth = createMiddleware({ type: 'function' }).client(
   async ({ next }) => {
     const { data } = await supabase.auth.getSession()
     const token = data.session?.access_token
+    // Set the token on the final network request, not only middleware metadata.
+    // Protect against header merging or transport adapters silently losing Authorization.
+    const authenticatedFetch = async (url: string, init?: RequestInit) => {
+      const target = new URL(url, window.location.origin)
+      const headers = new Headers(init?.headers)
+      if (token && target.origin === window.location.origin && target.pathname.startsWith('/_serverFn/')) {
+        headers.set('Authorization', `Bearer ${token}`)
+      }
+      return fetch(url, { ...init, headers })
+    }
     return next({
       headers: token ? { Authorization: `Bearer ${token}` } : {},
+      fetch: authenticatedFetch,
     })
   },
 )
