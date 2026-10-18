@@ -145,7 +145,9 @@ function BuildersPage(){
      const headers=await getServerAuthHeaders();
      const saved=await save({headers,data:{kind,id:selected||undefined,name:name.trim(),description,
        configuration:{source,fields,tag_policy:tagPolicy},is_active:true}});
-     const {data:rows,error:reloadError}=await supabase.rpc("my_builder_definitions" as any,{p_kind:kind});
+     const rows=await list({headers,data:{kind}});
+     const reloadError=null;
+     if(!Array.isArray(rows)||!rows.some((item:any)=>item.id===saved.id&&item.name===name.trim()))throw new Error("Database read-back failed: register was not confirmed saved. Please retry.");
      if(reloadError)throw new Error(reloadError.message);
      if(!Array.isArray(rows))throw new Error("Saved, but unable to reload your register list.");
      setItems(rows.filter((row):row is Definition=>Boolean(row&&typeof row==="object"&&typeof row.id==="string"&&typeof row.name==="string")).map(row=>({...row,configuration:{...((row.configuration&&typeof row.configuration==="object"&&!Array.isArray(row.configuration))?row.configuration:{}),fields:Array.isArray(row.configuration?.fields)?row.configuration.fields:[]}})));setSelected(saved.id);setStep(3);setEditing(false);setError("");if(makePrimary&&kind==="register_builder"){await activate({headers,data:{definitionId:saved.id}});setActiveRegister(saved.id);toast.success("Register saved and made primary.");}else toast.success("Register saved. You can keep using your current primary.");
