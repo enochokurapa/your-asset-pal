@@ -105,7 +105,7 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
   };
   const textValue=(r:Record<string,any>,...names:string[])=>String(getValue(r,...names)).trim();
   if(register){
-    const known=new Set([...getCustomRegisterHeaders(register,config),...CUSTOM_SYSTEM_COLUMNS,...TEMPLATE_COLUMNS,"Asset Name","Asset Tag","Serial Number","Country Code"].map(normalizeHeader));
+    const known=new Set([...getCustomRegisterHeaders(register,config),...CUSTOM_SYSTEM_COLUMNS,"System Status",...TEMPLATE_COLUMNS,"Asset Name","Asset Tag","Serial Number","Country Code"].map(normalizeHeader));
     const unknown=Object.keys(rows[0]??{}).filter(k=>!known.has(normalizeHeader(k)));
     if(unknown.length)throw Error("Unmapped spreadsheet columns: "+unknown.join(", ")+". Add matching fields in Register Builder or rename these columns.");
   }
@@ -216,9 +216,15 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
       const latitude=latRaw?Number(latRaw):null,longitude=lngRaw?Number(lngRaw):null;
       if(latitude!==null&&(!Number.isFinite(latitude)||latitude < -90||latitude>90))throw Error("Latitude must be between -90 and 90.");
       if(longitude!==null&&(!Number.isFinite(longitude)||longitude < -180||longitude>180))throw Error("Longitude must be between -180 and 180.");
-      const statusRaw = (textValue(r,"Status","status")||"in_storage").toLowerCase().replace(/\s+/g, "_");
-      if(statusRaw&&!STATUS_VALUES.includes(statusRaw))throw Error("Invalid Status: "+statusRaw);
-      const status = statusRaw;
+      // Custom STATUS is a free-text condition, not the system lifecycle enum.
+      const hasCustomStatus=Boolean(register?.configuration?.fields?.some(f=>
+        normalizeHeader(f.label)==="status"||normalizeHeader(f.key)==="status"));
+      const systemStatusText=hasCustomStatus
+        ? textValue(r,"System Status")
+        : textValue(r,"System Status","Status","status");
+      const statusRaw=(systemStatusText||"in_storage").toLowerCase().replace(/\s+/g,"_");
+      if(!STATUS_VALUES.includes(statusRaw))throw Error("Invalid system lifecycle status: "+systemStatusText+". Use a custom text field for condition values.");
+      const status=statusRaw;
 
       let purchaseDate: string | null = null;
       if (getValue(r,"Purchase Date","purchase_date")) {
