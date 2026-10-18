@@ -1,3 +1,4 @@
+import { runPermittedExport } from "@/lib/export-permissions";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -278,7 +279,7 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
     }
   };
 
-  const openDetailPdf = async (r: any) => {
+  const openDetailPdf = async (r: any) => runPermittedExport("reports",async()=>{
     const template = await (await import("@/lib/pdf-template")).loadTemplate();
     const { createBrandedPdf, applyTemplateChrome } = await import("@/lib/pdf-template");
     const { doc, startY } = createBrandedPdf({ template, orientation: "landscape", title: "Audit Log Entry" });
@@ -287,9 +288,9 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
     const blob = doc.output("blob");
     const url = URL.createObjectURL(blob);
     window.open(url, "_blank");
-  };
+  });
 
-  const openCombinedPdf = async () => {
+  const openCombinedPdf = async () => runPermittedExport("reports",async()=>{
     const picks = filtered.filter((r: any) => selectedRows.has(r.id));
     if (picks.length === 0) { toast.error("Select at least one entry"); return; }
     const { loadTemplate, createBrandedPdf, applyTemplateChrome } = await import("@/lib/pdf-template");
@@ -311,7 +312,7 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
     const blob = doc.output("blob");
     const url = URL.createObjectURL(blob);
     window.open(url, "_blank");
-  };
+  });
 
   const toggleRow = (id: string) => {
     const next = new Set(selectedRows);
