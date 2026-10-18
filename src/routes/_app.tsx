@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth, ModuleKey } from "@/hooks/use-auth";
 import {
   LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X, FileBarChart,
-  Building2, History, UserCircle, TrendingDown, DoorOpen, Settings, ClipboardCheck,
+  Building2, History, UserCircle, TrendingDown, DoorOpen, Settings, ChevronDown, ClipboardCheck,
   CreditCard, Globe2, ShieldCheck, LockKeyhole, DatabaseBackup, ImageIcon, PlugZap, Radar, SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,12 +39,9 @@ const tenantNav: NavItem[] = [
   { to: "/verification", label: "Verification", icon: ClipboardCheck, module: "verification" },
   { to: "/reports", label: "Reports", icon: FileBarChart, module: "reports" },
   { to: "/audit", label: "Audit Trail", icon: History, module: "audit" },
-  { to: "/users", label: "Users", icon: Users, module: "users", tenantAdminOnly: true },
   { to: "/builders", label: "Builders", icon: SlidersHorizontal, tenantAdminOnly: true },
   { to: "/settings", label: "Settings", icon: Settings, module: "settings", tenantAdminOnly: true },
-  { to: "/integrations", label: "API & Integrations", icon: PlugZap, module: "api_access", tenantAdminOnly: true },
   { to: "/billing", label: "Plan & Billing", icon: CreditCard, tenantAdminOnly: true },
-  { to: "/domains", label: "Custom Domain", icon: Globe2, tenantAdminOnly: true },
   { to: "/profile", label: "My profile", icon: UserCircle },
 ];
 
@@ -64,6 +61,7 @@ function AppLayout() {
     mustChangePassword, canExportReports, subscriptionStatus, trialEndsAt, tenantId, tenantName,
   } = useAuth();
   const [open, setOpen] = useState(false);
+  const [settingsOpen,setSettingsOpen]=useState(false);
   const [branding, setBranding] = useState<DocumentTemplate | null>(null);
   const [mfaChecked,setMfaChecked]=useState(false);
   const [mfaRequired,setMfaRequired]=useState(false);
@@ -81,6 +79,9 @@ function AppLayout() {
   },[user?.id]);
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  useEffect(()=>{
+    if(["/settings","/users","/integrations","/domains"].some(path=>pathname.startsWith(path)))setSettingsOpen(true);
+  },[pathname]);
   const exportAccess=useExportAccess();
 
   useEffect(() => {
@@ -236,7 +237,23 @@ function AppLayout() {
         )}
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {visibleNav.map(renderNavItem)}
+          {visibleNav.map(item => item.to === "/settings" && !isSaasAdmin ? (
+            <div key="settings-group">
+              <button type="button" onClick={()=>setSettingsOpen(v=>!v)}
+                aria-expanded={settingsOpen} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent">
+                <Settings className="h-4 w-4"/><span className="flex-1 text-left">Settings</span>
+                <ChevronDown className={cn("h-4 w-4 transition-transform",settingsOpen&&"rotate-180")}/>
+              </button>
+              {settingsOpen&&<div className="ml-4 border-l border-sidebar-border pl-2">
+                {[
+                  {to:"/settings",label:"General",icon:Settings,module:"settings",tenantAdminOnly:true},
+                  {to:"/users",label:"Users",icon:Users,module:"users",tenantAdminOnly:true},
+                  {to:"/integrations",label:"Integrations",icon:PlugZap,module:"api_access",tenantAdminOnly:true},
+                  {to:"/domains",label:"Domain",icon:Globe2,tenantAdminOnly:true},
+                ].filter(item=>!item.module||canView(item.module as ModuleKey)||isPaidFeature(item.module as ModuleKey)||isAddOnFeature(item.module as ModuleKey)).map(renderNavItem)}
+              </div>}
+            </div>
+          ) : renderNavItem(item))}
         </nav>
 
         <div className="border-t border-sidebar-border p-3">

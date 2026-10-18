@@ -1,3 +1,4 @@
+import {bulkUpdateFromFile, downloadBulkUpdateTemplate, type UpdateResult} from "@/lib/bulk-update";
 import { runPermittedExport, useExportAccess } from "@/lib/export-permissions";
 import {builderPayload} from "@/lib/builder-response";
 import { useEffect, useMemo, useState } from "react";
@@ -674,6 +675,34 @@ function AssetsPage() {
   };
 
   const exportAccess=useExportAccess();
+  const [bulkFile,setBulkFile]=useState<File|null>(null);
+  const [bulkPreview,setBulkPreview]=useState<UpdateResult|null>(null);
+  const [bulkRunning,setBulkRunning]=useState(false);
+  const [bulkProgress,setBulkProgress]=useState("");
+  const previewBulk=async(file:File)=>{
+    const register=registers.find(r=>r.id===registerChoice);
+    if(!register){toast.error("Choose a saved custom register.");return;}
+    setBulkRunning(true);setBulkPreview(null);setBulkFile(file);
+    try{
+      const summary=await bulkUpdateFromFile(file,register,undefined,true);
+      setBulkPreview(summary);
+      if(summary.failed.length)toast.error(`${summary.failed.length} rows need correction. First error: ${summary.failed[0].message}`);
+    }catch(e:any){setBulkFile(null);toast.error(e?.message||"Could not preview updates");}
+    finally{setBulkRunning(false);}
+  };
+  const applyBulk=async()=>{
+    const register=registers.find(r=>r.id===registerChoice);
+    if(!bulkFile||!register||!bulkPreview||bulkPreview.failed.length)return;
+    if(!window.confirm(`Apply updates to ${bulkPreview.updated} existing assets? Blank cells will be left unchanged.`))return;
+    setBulkRunning(true);
+    try{
+      const result=await bulkUpdateFromFile(bulkFile,register,(done,total,updated,failed)=>setBulkProgress(`${done}/${total} processed · ${updated} updated · ${failed} failed`));
+      toast.success(`Updated ${result.updated} assets. ${result.unchanged} unchanged. ${result.failed.length} failed.`);
+      setBulkPreview(result);
+      await qc.invalidateQueries({queryKey:["assets"]});
+    }catch(e:any){toast.error(e?.message||"Bulk update stopped");}
+    finally{setBulkRunning(false);setBulkFile(null);}
+  };
   const [importing, setImporting] = useState(false);
   const [importProgress,setImportProgress]=useState<string>("");
   const onImport = async (f: File) => {
@@ -719,6 +748,23 @@ function AssetsPage() {
               </Button>
             </label>
           )}
+          {canEdit&&registerChoice!=="default"&&<Button size="sm" variant="outline" disabled={!exportAccess.allowed("template")}
+            onClick={()=>runPermittedExport("template",()=>downloadBulkUpdateTemplate(registers.find(r=>r.id===registerChoice)!,
+              (assets as any[]).filter(a=>a.register_definition_id===registerChoice)))}>Update Template</Button>}
+          {canEdit&&registerChoice!=="default"&&<label className="inline-flex items-center gap-2">
+            <input type="file" accept=".xlsx,.xls" className="hidden" disabled={bulkRunning}
+              onChange={e=>{const file=e.target.files?.[0];if(file)void previewBulk(file);e.target.value="";}}/>
+            <Button variant="outline" type="button" asChild disabled={bulkRunning}>
+              <span><Upload className="mr-2 h-4 w-4"/>Bulk Update</span>
+            </Button>
+          </label>}
+          {bulkPreview&&<div className="w-full rounded-lg border p-3 text-sm" role="status">
+            <p className="font-semibold">Bulk update preview: {bulkPreview.updated} changes, {bulkPreview.unchanged} unchanged, {bulkPreview.failed.length} errors.</p>
+            {bulkPreview.failed.length>0&&<p className="text-destructive">First error on row {bulkPreview.failed[0].row}: {bulkPreview.failed[0].message}</p>}
+            {bulkFile&&bulkPreview.failed.length===0&&<Button size="sm" disabled={bulkRunning} onClick={applyBulk}>Confirm Updates</Button>}
+            <Button size="sm" variant="ghost" onClick={()=>{setBulkFile(null);setBulkPreview(null);}}>Close</Button>
+            {bulkProgress&&<p>{bulkProgress}</p>}
+          </div>}
           {importProgress && <span role="status" aria-live="polite" className="max-w-96 text-xs text-muted-foreground">{importProgress}</span>}
           {canAdd && (
           <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) setWizardStep(0); }}>

@@ -44,7 +44,8 @@ const safe = (s: string) => s.replace(/[^a-z0-9_-]+/gi, "_");
 
 export function exportAssetsXLSX(title:string,assets:any[],customFields:Array<{key:string,label:string}>=[],locationConfig?:RegisterLocationConfig){
  const custom=customFields.length>0;
- const headers=custom?getCustomRegisterHeaders({id:"export",name:title,configuration:{fields:customFields.map(f=>({...f,type:"text",required:false}))}},locationConfig):ASSET_COLUMNS.map(c=>c.header);
+ const originalHeaders=custom?getCustomRegisterHeaders({id:"export",name:title,configuration:{fields:customFields.map(f=>({...f,type:"text",required:false}))}},locationConfig):ASSET_COLUMNS.map(c=>c.header);
+ const headers=["Asset ID",...originalHeaders.filter(h=>h!=="Asset ID")];
  const row=(asset:any)=>{
   const base=normalize(asset);
   const geoParts=String(asset.geo_places?.display_path??"").split("·").map((v:string)=>v.trim()).filter(Boolean);
@@ -63,7 +64,7 @@ export function exportAssetsXLSX(title:string,assets:any[],customFields:Array<{k
    "Geo Place ID":asset.geo_place_id,"Latitude":asset.location_latitude,"Longitude":asset.location_longitude
   };
   const customValues=Object.fromEntries(customFields.map(f=>[f.label,asset.custom_fields?.[f.key]??""]));
-  return headers.map(name=>custom?customValues[name]??lookup[name]??"":fmt((base as any)[ASSET_COLUMNS.find(c=>c.header===name)?.key??""]));
+  return headers.map(name=>name==="Asset ID"?asset.id:custom?customValues[name]??lookup[name]??"":fmt((base as any)[ASSET_COLUMNS.find(c=>c.header===name)?.key??""]));
  };
  const wb=XLSX.utils.book_new();
  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([headers,...assets.map(row)]),"Assets");
