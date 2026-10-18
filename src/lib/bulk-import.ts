@@ -79,10 +79,11 @@ export function downloadTemplate(register?:RegisterTemplate, config?:RegisterLoc
 export type ImportResult = {
   total: number;
   success: number;
+  skipped: number;
   errors: { row: number; tag?: string; error: string }[];
 };
 
-export async function importAssetsFromFile(file: File, userId: string | null,register?:RegisterTemplate, importBranchId?:string,config?:RegisterLocationConfig): Promise<ImportResult> {
+export async function importAssetsFromFile(file: File, userId: string | null,register?:RegisterTemplate, importBranchId?:string,config?:RegisterLocationConfig,onProgress?:(completed:number,total:number,success:number,skipped:number,failed:number)=>void): Promise<ImportResult> {
   const MAX_IMPORT_BYTES = 20 * 1024 * 1024;
   const MAX_IMPORT_ROWS = 10_000;
   if (file.size <= 0 || file.size > MAX_IMPORT_BYTES) {
@@ -151,7 +152,19 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
     return data;
   };
 
-  const result: ImportResult = { total: rows.length, success: 0, errors: [] };
+  // Resume interrupted custom-register imports without duplicating saved assets.
+  const existingTags=new Set<string>();
+  if(register){
+    for(let offset=0;;offset+=1000){
+      const {data:existing,error:lookupError}=await supabase.from("assets")
+        .select("asset_tag").eq("register_definition_id",register.id)
+        .order("id").range(offset,offset+999);
+      if(lookupError)throw new Error("Unable to check previously imported assets: "+lookupError.message);
+      for(const asset of existing??[])if(asset.asset_tag)existingTags.add(asset.asset_tag.trim().toLowerCase());
+      if((existing?.length??0)<1000)break;
+    }
+  }
+  const result: ImportResult = { total: rows.length, success: 0, skipped: 0, errors: [] };
 
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
@@ -166,6 +179,10 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
       for(const field of extra){const raw=getValue(r,field.label,field.key);const value=raw==null?"":String(raw).trim();if(field.required&&!value&&field.key!==customTagField?.key)throw Error(`${field.label} is required`);if(!value){custom[field.key]=null;continue;}if(field.type==="number"||field.type==="currency"){const n=Number(value);if(!Number.isFinite(n))throw Error(`${field.label} must be a number`);custom[field.key]=n;}else if(field.type==="boolean"){if(!["true","false","yes","no","1","0"].includes(value.toLowerCase()))throw Error(`${field.label} must be true or false`);custom[field.key]=["true","yes","1"].includes(value.toLowerCase());}else if(field.type==="date"){if(!/^\d{4}-\d{2}-\d{2}$/.test(value))throw Error(`${field.label} must use YYYY-MM-DD`);custom[field.key]=value;}else if(["select","radio"].includes(field.type)&&field.options?.length&&!field.options.includes(value))throw Error(`${field.label}: invalid option ${value}`);else custom[field.key]=value;}
       const explicitTag=textValue(r,"System Asset Tag","asset_tag")||(customTagField?String(custom[customTagField.key]??"").trim():"");
       const tag=explicitTag||null;
+      if(register&&tag&&existingTags.has(tag.toLowerCase())){
+        result.skipped++;
+        continue;
+      }
       const name=register?(String(customNameField?custom[customNameField.key]??"":textValue(r,"System Asset Name","name")).trim() || Object.values(custom).find(v=>typeof v==="string"&&v.trim())?.toString().trim() || `Record ${rowNum}`):String(r.name??"").trim();
       const branchName=textValue(r,"Branch","branch");
       if(!tag&&register?.configuration?.tag_policy==="required")throw new Error("Asset tag is required by this register");
@@ -272,8 +289,13 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
       }
 
       result.success++;
+      if(register&&tag)existingTags.add(tag.toLowerCase());
     } catch (e: any) {
-      result.errors.push({ row: rowNum, tag: r.asset_tag, error: e?.message ?? String(e) });
+      result.errors.push({ row: rowNum, tag: textValue(r,"System Asset Tag","asset_tag","TAG NUMBER"), error: e?.message ?? String(e) });
+    } finally {
+      if(onProgress&&((i+1)%20===0||i+1===rows.length)){
+        onProgress(i+1,rows.length,result.success,result.skipped,result.errors.length);
+      }
     }
   }
 
