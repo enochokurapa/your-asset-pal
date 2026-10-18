@@ -1,3 +1,4 @@
+import {builderPayload} from "@/lib/builder-response";
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useSearch, useNavigate, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -130,7 +131,7 @@ function AssetsPage() {
   const [geoSelection, setGeoSelection] = useState<GeoHierarchyPlace|null>(null);
 
   const catalogFn=useServerFn(getRegisterCatalog);
-  const {data:catalog,refetch:refreshRegisterCatalog,isPending:registerCatalogPending,error:registerCatalogError}=useQuery({queryKey:["register-catalog",tenantId],enabled:!!tenantId,staleTime:0,refetchOnMount:"always",queryFn:async()=>{const details=await catalogFn({headers:await getServerAuthHeaders()});if(!Array.isArray(details?.definitions))throw new Error("Business register catalog is unavailable.");return {...details,definitions:details.definitions.filter((d:any)=>d&&typeof d.id==="string"&&d.is_active!==false)};}});
+  const {data:catalog,refetch:refreshRegisterCatalog,isPending:registerCatalogPending,error:registerCatalogError}=useQuery({queryKey:["register-catalog",tenantId],enabled:!!tenantId,staleTime:0,refetchOnMount:"always",queryFn:async()=>{const details=builderPayload<Awaited<ReturnType<typeof catalogFn>>>(await catalogFn({headers:await getServerAuthHeaders()}));if(!Array.isArray(details?.definitions))throw new Error("Business register catalog is unavailable.");return {...details,definitions:details.definitions.filter((d:any)=>d&&typeof d.id==="string"&&d.is_active!==false)};}});
   const [registerChoice,setRegisterChoice]=useState("default");
   const [registerPreview,setRegisterPreview]=useState<string|null>(null);
   const [uploadingField,setUploadingField]=useState<string|null>(null);
