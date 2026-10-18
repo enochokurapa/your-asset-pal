@@ -108,9 +108,35 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' })
       throw new Response("Authentication service unavailable", { status: 503 });
     }
 
-    const {data:activeSession,error:sessionError}=await supabase.rpc("current_login_session_valid" as any);
-    if(sessionError){console.error("[Auth] Session validation unavailable",sessionError);throw new Response("Session validation unavailable",{status:503});}
-    if(activeSession!==true)throw new Response("This session was signed out from another device",{status:401});
+    // Validate the verified JWT directly against PostgREST.
+    const restBase = (process.env.SUPABASE_REST_INTERNAL_URL?.trim() ||
+      `${SUPABASE_URL.replace(/\/$/, "")}/rest/v1`).replace(/\/$/, "");
+    let activeSession: unknown;
+    try {
+      const check = await fetch(`${restBase}/rpc/current_login_session_valid`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          apikey: SUPABASE_PUBLISHABLE_KEY,
+          "Content-Type": "application/json",
+        },
+        body: "{}",
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!check.ok) {
+        console.error("[Auth] Session validation HTTP status", check.status);
+        throw new Response("Session validation unavailable", {status:503});
+      }
+      activeSession = await check.json();
+    } catch (error) {
+      if (error instanceof Response) throw error;
+      console.error("[Auth] Session validation transport error");
+      throw new Response("Session validation unavailable", {status:503});
+    }
+    if (activeSession !== true) {
+      console.warn("[Auth] Verified user has no active session record");
+      throw new Response("This session was signed out from another device", {status:401});
+    }
 
     return next({
       context: {
