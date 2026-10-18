@@ -1,3 +1,4 @@
+import {builderPayload,builderList} from "@/lib/builder-response";
 import {supabase} from "@/integrations/supabase/client";
 import {useEffect,useState} from "react";
 import {createFileRoute} from "@tanstack/react-router";
@@ -99,7 +100,7 @@ function BuildersPage(){
    setItems([]);setSelected(null);setName("");setDescription("");setFields([]);setError("");setEditing(false);setStep(2);
    if(!allowed||!isTenantAdmin||isSaasAdmin)return;
    setBusy(true);
-   getServerAuthHeaders().then(headers=>list({headers,data:{kind}})).then(async (rows)=>{
+   getServerAuthHeaders().then(headers=>list({headers,data:{kind}})).then(async (response)=>{const rows=builderList<Definition>(response);
      if(valid){if(!Array.isArray(rows))throw Error("Unexpected response from server");setItems(rows.filter((row):row is Definition=>Boolean(row&&typeof row==="object"&&typeof row.id==="string"&&typeof row.name==="string")).map(row=>({...row,configuration:{...((row.configuration&&typeof row.configuration==="object"&&!Array.isArray(row.configuration))?row.configuration:{}),fields:Array.isArray(row.configuration?.fields)?row.configuration.fields:[]}})));if(kind==="register_builder")catalog({headers:await getServerAuthHeaders()}).then(c=>{if(valid){setActiveRegister(c.primaryId??null);setIncludeLocation(c.includeLocation??true)}}).catch(e=>{if(valid)toast.error(e?.message||"Unable to load primary register")});}
    }).catch(e=>{if(valid)setError(e?.message||"Unable to load definitions")})
      .finally(()=>{if(valid)setBusy(false)});
@@ -143,9 +144,9 @@ function BuildersPage(){
    setBusy(true);
    try{
      const headers=await getServerAuthHeaders();
-     const saved=await save({headers,data:{kind,id:selected||undefined,name:name.trim(),description,
-       configuration:{source,fields,tag_policy:tagPolicy},is_active:true}});
-     const rows=saved.definitions;
+     const saved=builderPayload<{id:string,definitions:Definition[]}>(await save({headers,data:{kind,id:selected||undefined,name:name.trim(),description,
+       configuration:{source,fields,tag_policy:tagPolicy},is_active:true}}));
+     const rows=builderList<Definition>(saved.definitions);
      if(!Array.isArray(rows)||!rows.some((item:any)=>item.id===saved.id))throw new Error("The server did not confirm the saved register.");
      setItems(rows.filter((row):row is Definition=>Boolean(row&&typeof row==="object"&&typeof row.id==="string"&&typeof row.name==="string")).map(row=>({...row,configuration:{...((row.configuration&&typeof row.configuration==="object"&&!Array.isArray(row.configuration))?row.configuration:{}),fields:Array.isArray(row.configuration?.fields)?row.configuration.fields:[]}})));setSelected(saved.id);setStep(3);setEditing(false);setError("");if(makePrimary&&kind==="register_builder"){await activate({headers,data:{definitionId:saved.id}});setActiveRegister(saved.id);toast.success("Register saved and made primary.");}else toast.success("Register saved. You can keep using your current primary.");
    }catch(e:any){setError(e?.message||"Save failed");toast.error(e?.message||"Save failed");}
