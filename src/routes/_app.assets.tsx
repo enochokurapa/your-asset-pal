@@ -673,14 +673,17 @@ function AssetsPage() {
   };
 
   const [importing, setImporting] = useState(false);
+  const [importProgress,setImportProgress]=useState<string>("");
   const onImport = async (f: File) => {
     setImporting(true);
+    setImportProgress("Preparing import…");
     try {
       if(registerCatalogPending||registerCatalogError||!catalog)throw new Error("The company register has not finished loading.");
       
-      const r = await importAssetsFromFile(f, user?.id ?? null,registers.find(r=>r.id===registerChoice),importBranchId||undefined,locationSettings as any);
-      if(r.success===0){toast.error(`No assets imported. ${r.errors[0]?.error??"Check the selected register and spreadsheet."}`);return;}
-      toast.success(`Imported ${r.success} of ${r.total} rows`, { description: r.errors.length ? `${r.errors.length} rows failed. First error (row ${r.errors[0].row}): ${r.errors[0].error}` : undefined });
+      const r = await importAssetsFromFile(f, user?.id ?? null,registers.find(r=>r.id===registerChoice),importBranchId||undefined,locationSettings as any,
+        (done,total,saved,skipped,failed)=>setImportProgress(`${done}/${total} processed · ${saved} saved · ${skipped} already present · ${failed} failed`));
+      if(r.success===0&&r.skipped===0){toast.error(`No assets imported. ${r.errors[0]?.error??"Check the selected register and spreadsheet."}`);return;}
+      toast.success(`Imported ${r.success} new assets; ${r.skipped} already existed`, {description:r.errors.length ? `${r.errors.length} rows failed. First error (row ${r.errors[0].row}): ${r.errors[0].error}` : `Processed ${r.total} rows successfully.`});
       qc.invalidateQueries({ queryKey: ["assets"] });
     } catch (e: any) { toast.error(e?.message ?? "Import failed"); }
     finally { setImporting(false); }
@@ -714,6 +717,7 @@ function AssetsPage() {
               </Button>
             </label>
           )}
+          {importProgress && <span role="status" aria-live="polite" className="max-w-96 text-xs text-muted-foreground">{importProgress}</span>}
           {canAdd && (
           <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) setWizardStep(0); }}>
             <Button onClick={openNew} disabled={registerCatalogPending}><Plus className="mr-2 h-4 w-4" /> {registerCatalogPending?"Loading register…":"New asset"}</Button>
