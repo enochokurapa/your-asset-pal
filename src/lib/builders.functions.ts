@@ -49,7 +49,11 @@ export const listBuilderDefinitions = createServerFn({method:"POST"})
     const tenantId = await authorize(context.userId,data.kind);
     const {data:rows,error}=await db.from("builder_definitions").select("id,name,description,configuration,is_active,updated_at")
       .eq("tenant_id",tenantId).eq("builder_key",data.kind).order("updated_at",{ascending:false});
-    if(error) throw new Error(error.message);
+    if(error) {
+      console.error("[BuilderDiag] list query failed", {kind:data.kind, message:error.message, code:error.code});
+      throw new Error(error.message);
+    }
+    console.info("[BuilderDiag] list success", {kind:data.kind, count:rows?.length??0, isArray:Array.isArray(rows)});
     return rows ?? [];
   });
 
@@ -63,6 +67,7 @@ export const saveBuilderDefinition = createServerFn({method:"POST"})
   }).parse(input))
   .handler(async ({data,context})=>{
     const tenantId=await authorize(context.userId,data.kind);
+    console.info("[BuilderDiag] save authorized", {kind:data.kind, updating:Boolean(data.id)});
     const payload={name:data.name,description:data.description,configuration:data.configuration,is_active:data.is_active,
       updated_at:new Date().toISOString()};
     if(data.id){
@@ -80,11 +85,13 @@ export const saveBuilderDefinition = createServerFn({method:"POST"})
     }).select("id").single();
     if(error) throw new Error(error.message);
     if(!created?.id) throw new Error("Register creation returned no database ID.");
+    console.info("[BuilderDiag] insert acknowledged", {kind:data.kind, receivedId:Boolean(created.id)});
     const {data:confirmed,error:readError}=await db.from("builder_definitions").select("id,name,configuration,is_active").eq("id",created.id).eq("tenant_id",tenantId).eq("builder_key",data.kind).single();
     if(readError || !confirmed || confirmed.name!==data.name) throw new Error("Register creation was not verified in the business database.");
     const {data:definitions,error:listError}=await db.from("builder_definitions").select("id,name,description,configuration,is_active,updated_at").eq("tenant_id",tenantId).eq("builder_key",data.kind).order("updated_at",{ascending:false});
     if(listError)throw new Error("Unable to load saved builder catalog: "+listError.message);
     if(!definitions?.some((x:any)=>x.id===confirmed.id))throw new Error("Created builder missing from tenant catalog.");
+    console.info("[BuilderDiag] save catalog verified", {kind:data.kind, count:definitions.length});
     return {id:confirmed.id,definitions};
   });
 
