@@ -76,7 +76,10 @@ export const saveBuilderDefinition = createServerFn({method:"POST"})
       ...payload,tenant_id:tenantId,builder_key:data.kind,created_by:context.userId,
     }).select("id").single();
     if(error) throw new Error(error.message);
-    return created;
+    if(!created?.id) throw new Error("Register creation returned no database ID.");
+    const {data:confirmed,error:readError}=await db.from("builder_definitions").select("id,name,configuration,is_active").eq("id",created.id).eq("tenant_id",tenantId).eq("builder_key",data.kind).single();
+    if(readError || !confirmed || confirmed.name!==data.name) throw new Error("Register creation was not verified in the business database.");
+    return confirmed;
   });
 
 export const archiveBuilderDefinition = createServerFn({method:"POST"})
