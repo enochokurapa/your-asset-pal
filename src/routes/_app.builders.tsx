@@ -145,10 +145,10 @@ function BuildersPage(){
      const headers=await getServerAuthHeaders();
      const saved=await save({headers,data:{kind,id:selected||undefined,name:name.trim(),description,
        configuration:{source,fields,tag_policy:tagPolicy},is_active:true}});
-     const rows=await list({headers,data:{kind}});
-     if(!Array.isArray(rows))throw new Error("Register was saved, but the register list could not be reloaded.");
-     const persisted=rows.find((item:any)=>item.id===saved.id);
-     if(!persisted)throw new Error("Saved register is missing from your business catalog. Contact support with the register name.");
+     const {data:rows,error:reloadError}=await supabase.rpc("my_builder_definitions" as any,{p_kind:kind});
+     if(reloadError)throw new Error("Register was submitted, but the catalog could not be loaded: "+reloadError.message);
+     if(!Array.isArray(rows))throw new Error("Builder catalog returned an invalid result.");
+     if(!rows.some((item:any)=>item.id===saved.id))throw new Error("The new register was not found in the business catalog. The save is not confirmed.");
      setItems(rows.filter((row):row is Definition=>Boolean(row&&typeof row==="object"&&typeof row.id==="string"&&typeof row.name==="string")).map(row=>({...row,configuration:{...((row.configuration&&typeof row.configuration==="object"&&!Array.isArray(row.configuration))?row.configuration:{}),fields:Array.isArray(row.configuration?.fields)?row.configuration.fields:[]}})));setSelected(saved.id);setStep(3);setEditing(false);setError("");if(makePrimary&&kind==="register_builder"){await activate({headers,data:{definitionId:saved.id}});setActiveRegister(saved.id);toast.success("Register saved and made primary.");}else toast.success("Register saved. You can keep using your current primary.");
    }catch(e:any){setError(e?.message||"Save failed");toast.error(e?.message||"Save failed");}
    finally{setBusy(false);}
