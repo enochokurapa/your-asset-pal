@@ -676,7 +676,7 @@ function AssetsPage() {
     setImporting(true);
     try {
       if(registerCatalogPending||registerCatalogError||!catalog)throw new Error("The company register has not finished loading.");
-      if(registerChoice!=="default"&&visibleBranches.length>1&&!importBranchId)throw new Error("Choose the destination branch before importing.");
+      
       const r = await importAssetsFromFile(f, user?.id ?? null,registers.find(r=>r.id===registerChoice),importBranchId||undefined,locationSettings as any);
       if(r.success===0){toast.error(`No assets imported. ${r.errors[0]?.error??"Check the selected register and spreadsheet."}`);return;}
       toast.success(`Imported ${r.success} of ${r.total} rows`, { description: r.errors.length ? `${r.errors.length} rows failed. First error (row ${r.errors[0].row}): ${r.errors[0].error}` : undefined });
@@ -695,7 +695,7 @@ function AssetsPage() {
           <p className="text-sm text-muted-foreground">Manage your organization's fixed assets. Assets are retired (with admin approval), never deleted.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Select value={registerChoice} onValueChange={setRegisterChoice}><SelectTrigger className="w-52"><SelectValue placeholder="Select register"/></SelectTrigger><SelectContent>{(!catalog?.primaryId||!!form.id)&&<SelectItem value="default">Default register</SelectItem>}{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select>
+          <Select value={registerChoice} onValueChange={setRegisterChoice}><SelectTrigger className="w-52"><SelectValue placeholder="Select register"/></SelectTrigger><SelectContent><SelectItem value="default">Default register</SelectItem>{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select>
           <Button variant="outline" onClick={() => { setScanMode("lookup"); setScanOpen(true); }}>
             <ScanLine className="mr-2 h-4 w-4" /> Scan
           </Button>

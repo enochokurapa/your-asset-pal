@@ -166,13 +166,13 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
       for(const field of extra){const raw=getValue(r,field.label,field.key);const value=raw==null?"":String(raw).trim();if(field.required&&!value&&field.key!==customTagField?.key)throw Error(`${field.label} is required`);if(!value){custom[field.key]=null;continue;}if(field.type==="number"||field.type==="currency"){const n=Number(value);if(!Number.isFinite(n))throw Error(`${field.label} must be a number`);custom[field.key]=n;}else if(field.type==="boolean"){if(!["true","false","yes","no","1","0"].includes(value.toLowerCase()))throw Error(`${field.label} must be true or false`);custom[field.key]=["true","yes","1"].includes(value.toLowerCase());}else if(field.type==="date"){if(!/^\d{4}-\d{2}-\d{2}$/.test(value))throw Error(`${field.label} must use YYYY-MM-DD`);custom[field.key]=value;}else if(["select","radio"].includes(field.type)&&field.options?.length&&!field.options.includes(value))throw Error(`${field.label}: invalid option ${value}`);else custom[field.key]=value;}
       const explicitTag=textValue(r,"System Asset Tag","asset_tag")||(customTagField?String(custom[customTagField.key]??"").trim():"");
       const tag=explicitTag||null;
-      const name=register?(String(customNameField?custom[customNameField.key]??"":textValue(r,"System Asset Name","name")||explicitTag||"Registered asset").trim()):String(r.name??"").trim();
+      const name=register?(String(customNameField?custom[customNameField.key]??"":textValue(r,"System Asset Name","name")).trim() || Object.values(custom).find(v=>typeof v==="string"&&v.trim())?.toString().trim() || `Record ${rowNum}`):String(r.name??"").trim();
       const branchName=textValue(r,"Branch","branch");
       if(!tag&&register?.configuration?.tag_policy==="required")throw new Error("Asset tag is required by this register");
       if(!name)throw new Error("A text/name field must contain an asset name");
       if(!register&&!branchName)throw new Error("branch is required");
       const branch=branchName?await ensureBranch(branchName):importBranchId?(brs as any[]).find(b=>b.id===importBranchId):brs?.length===1?(brs as any[])[0]:null;
-      if(register&&!branch&&(brs?.length??0)>1)throw new Error("Choose an import branch before uploading to this register.");
+      // A custom register does not require a branch column unless the creator defined one as required.
 
       let categoryId: string | null = null;
       if (textValue(r,"Category","category")) {
