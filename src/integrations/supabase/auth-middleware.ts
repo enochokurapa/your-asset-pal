@@ -3,11 +3,17 @@ import { createMiddleware } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from './types'
+import { supabase } from './client'
 
 
 
-export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
-  async ({ next }) => {
+export const requireSupabaseAuth = createMiddleware({ type: 'function' })
+  .client(async ({ next }) => {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error || !session?.access_token) throw new Error("Your session has expired. Please sign in again.");
+    return next({ headers: { Authorization: `Bearer ${session.access_token}` } });
+  })
+  .server(async ({ next }) => {
     
     const request = getRequest();
     const requestOrigin = request?.url ? new URL(request.url).origin : "";
