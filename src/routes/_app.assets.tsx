@@ -130,7 +130,7 @@ function AssetsPage() {
   const [geoSelection, setGeoSelection] = useState<GeoHierarchyPlace|null>(null);
 
   const catalogFn=useServerFn(getRegisterCatalog);
-  const {data:catalog,refetch:refreshRegisterCatalog,isPending:registerCatalogPending,error:registerCatalogError}=useQuery({queryKey:["register-catalog",tenantId],enabled:!!tenantId,staleTime:0,refetchOnMount:"always",queryFn:async()=>catalogFn({headers:await getServerAuthHeaders()})});
+  const {data:catalog,refetch:refreshRegisterCatalog,isPending:registerCatalogPending,error:registerCatalogError}=useQuery({queryKey:["register-catalog",tenantId],enabled:!!tenantId,staleTime:0,refetchOnMount:"always",queryFn:async()=>{const {data:definitions,error}=await supabase.rpc("my_builder_definitions" as any,{p_kind:"register_builder"});if(error)throw new Error(error.message);if(!Array.isArray(definitions))throw new Error("Saved register list returned an invalid response.");let primaryId:string|null=null;let includeLocation=true;try{const details=await catalogFn({headers:await getServerAuthHeaders()});primaryId=details?.primaryId??null;includeLocation=details?.includeLocation??true;}catch(e){console.warn("Primary register preferences unavailable; saved registers remain accessible.",e);}return {definitions:definitions.filter((d:any)=>d&&typeof d.id==="string"&&d.is_active!==false),primaryId,includeLocation};}});
   const [registerChoice,setRegisterChoice]=useState("default");
   const [registerPreview,setRegisterPreview]=useState<string|null>(null);
   const [uploadingField,setUploadingField]=useState<string|null>(null);
@@ -297,7 +297,7 @@ function AssetsPage() {
     })), [assets, currentBy, canSeeBranch]);
 
   const filtered = enriched.filter((a) => {
-    if(registerChoice!=="default"&&a.register_definition_id!==registerChoice)return false;
+    if(registerChoice==="default" ? a.register_definition_id!=null : a.register_definition_id!==registerChoice)return false;
     if (q) {
       const needle = q.toLowerCase();
       const hit = [a.name, a.asset_tag, a.serial_number, a.custodian, a.department, a.locations?.name, a.geo_places?.name, a.geo_places?.display_path]
@@ -699,7 +699,7 @@ function AssetsPage() {
           <Button variant="outline" onClick={() => { setScanMode("lookup"); setScanOpen(true); }}>
             <ScanLine className="mr-2 h-4 w-4" /> Scan
           </Button>
-          <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError} onClick={()=>exportAssetsXLSX(registers.find(r=>r.id===registerChoice)?.name??"Default Asset Register", (assets as any[]).filter(a=>registerChoice==="default"||a.register_definition_id===registerChoice),registerFields,locationSettings as any)} title="Export assets for selected register"><Download className="mr-2 h-4 w-4"/> Export register</Button>
+          <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError} onClick={()=>exportAssetsXLSX(registers.find(r=>r.id===registerChoice)?.name??"Default Asset Register", (assets as any[]).filter(a=>registerChoice==="default"?a.register_definition_id==null:a.register_definition_id===registerChoice),registerFields,locationSettings as any)} title="Export assets for selected register"><Download className="mr-2 h-4 w-4"/> Export register</Button>
           <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError} onClick={()=>downloadTemplate(registers.find(r=>r.id===registerChoice),locationSettings as any)} title="Download Excel import template">
             <Download className="mr-2 h-4 w-4" /> Template
           </Button>
