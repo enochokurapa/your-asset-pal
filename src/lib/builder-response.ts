@@ -20,6 +20,6 @@ export function builderPayload<T = unknown>(value: unknown): T {
 
 export function builderList<T extends { id: string }>(response: unknown): T[] {
   const payload = builderPayload(response);
-  if (!Array.isArray(payload)) throw new Error("Builder API returned invalid list data");
+  if (!Array.isArray(payload)) { const shape=payload===null?"null":typeof payload; const keys=payload && typeof payload==="object" ? Object.keys(payload).slice(0,8).join(",") : ""; console.error("[BuilderDiag] Invalid list response", {shape,keys}); throw new Error(`Builder API returned ${shape} instead of a list${keys?` (fields: ${keys})`:""}`); }
   return payload.filter((row): row is T => !!row && typeof row === "object" && typeof row.id === "string");
 }
