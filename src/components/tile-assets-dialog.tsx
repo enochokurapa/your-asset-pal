@@ -1,5 +1,5 @@
 import { runPermittedExport } from "@/lib/export-permissions";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -35,16 +35,34 @@ export function TileAssetsDialog({
   const { canSeeBranch } = useAuth();
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<any>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  useEffect(() => { setPage(1); setSelected(null); }, [open, title, branchId, filter.kind, filter.kind === "status" ? filter.status : ""]);
+
 
 
   const { data: assets = [], isLoading } = useQuery({
     enabled: open,
     queryKey: ["tile-assets"],
     queryFn: async () => {
-      const [{ data: a }, { data: assigns }, { data: pendings }] = await Promise.all([
-        supabase.from("assets").select("*, categories(name), locations(name), branches(name,code)").order("created_at", { ascending: false }),
-        supabase.from("asset_assignments").select("asset_id, assigned_to_name, department, assignment_date").order("assignment_date", { ascending: false }),
-        supabase.from("approval_requests").select("asset_id, kind, status").eq("status", "pending"),
+      // PostgREST limits a single response to 1,000 rows on many deployments.
+      // Fetch in pages so large KPI cards show the full set, not just the first 1,000.
+      async function fetchAll(table: "assets" | "asset_assignments" | "approval_requests", columns: string, order: string, pending = false) {
+        const all: any[] = [];
+        for (let offset = 0; offset < 100000; offset += 500) {
+          let query: any = supabase.from(table).select(columns).order(order, {ascending:false}).range(offset,offset+499);
+          if(pending) query=query.eq("status","pending");
+          const {data,error}=await query;
+          if(error) throw error;
+          all.push(...(data??[]));
+          if((data?.length??0)<500) return all;
+        }
+        throw new Error("Too many assets to load into this report. Narrow the view.");
+      }
+      const [a, assigns, pendings] = await Promise.all([
+        fetchAll("assets","*, categories(name), locations(name), branches(name,code)","created_at"),
+        fetchAll("asset_assignments","asset_id, assigned_to_name, department, assignment_date","assignment_date"),
+        fetchAll("approval_requests","asset_id, kind, status","created_at",true),
       ]);
       const cur: Record<string, any> = {};
       (assigns ?? []).forEach((x: any) => { if (!cur[x.asset_id]) cur[x.asset_id] = x; });
@@ -82,6 +100,15 @@ export function TileAssetsDialog({
     return list;
   }, [assets, filter, q, canSeeBranch, branchId]);
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pageAssets = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const pageStart = filtered.length ? (currentPage - 1) * pageSize + 1 : 0;
+  const pageEnd = Math.min(filtered.length, currentPage * pageSize);
+  const pageNumbers = Array.from({length: Math.min(5,totalPages)}, (_,i) => {
+    const first=Math.max(1,Math.min(currentPage-2,totalPages-4));
+    return first+i;
+  });
   const handleClose = (v: boolean) => {
     if (!v) setSelected(null);
     onOpenChange(v);
@@ -104,7 +131,7 @@ export function TileAssetsDialog({
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input className="pl-8" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />
+                <Input className="pl-8" placeholder="Search…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
               </div>
               <Button size="sm" variant="outline" disabled={!filtered.length} onClick={() => runPermittedExport("register",()=>exportAssetsXLSX(title, filtered))}>
                 <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
@@ -114,9 +141,9 @@ export function TileAssetsDialog({
               </Button>
             </div>
 
-            <div className="overflow-x-auto rounded border">
+            <div className="max-h-[52vh] overflow-auto rounded border">
               <table className="w-full text-sm">
-                <thead className="bg-muted/50">
+                <thead className="sticky top-0 z-10 bg-muted">
                   <tr className="text-left">
                     <th className="px-3 py-2">Tag</th>
                     <th className="px-3 py-2">Name</th>
@@ -128,7 +155,7 @@ export function TileAssetsDialog({
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((a) => (
+                  {pageAssets.map((a) => (
                     <tr key={a.id} onClick={() => setSelected(a)}
                       className="cursor-pointer border-t hover:bg-accent">
                       <td className="px-3 py-2 font-mono text-xs">{a.asset_tag}</td>
@@ -145,6 +172,26 @@ export function TileAssetsDialog({
                   )}
                 </tbody>
               </table>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3 text-sm">
+              <span className="text-muted-foreground">{pageStart.toLocaleString()}–{pageEnd.toLocaleString()} of {filtered.length.toLocaleString()} assets</span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <select aria-label="Rows per page" value={pageSize}
+                  onChange={e=>{setPageSize(Number(e.target.value));setPage(1);}}
+                  className="mr-2 h-8 rounded-md border bg-background px-2 text-xs">
+                  <option value={10}>10 per page</option><option value={25}>25 per page</option>
+                  <option value={50}>50 per page</option><option value={100}>100 per page</option>
+                </select>
+                <Button size="sm" variant="outline" disabled={currentPage===1} onClick={()=>setPage(1)}>First</Button>
+                <Button size="sm" variant="outline" disabled={currentPage===1} onClick={()=>setPage(p=>Math.max(1,p-1))}>Previous</Button>
+                {pageNumbers.map(n=><Button key={n} size="sm" variant={n===currentPage?"default":"outline"}
+                  aria-label={`Page ${n}`} aria-current={n===currentPage?"page":undefined}
+                  onClick={()=>setPage(n)}>{n}</Button>)}
+                <Button size="sm" variant="outline" disabled={currentPage===totalPages}
+                  onClick={()=>setPage(p=>Math.min(totalPages,p+1))}>Next</Button>
+                <Button size="sm" variant="outline" disabled={currentPage===totalPages}
+                  onClick={()=>setPage(totalPages)}>Last</Button>
+              </div>
             </div>
           </>
         ) : (
