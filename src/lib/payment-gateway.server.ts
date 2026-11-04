@@ -46,6 +46,7 @@ export async function storeGateway(userId:string,values: any){
 }
 export async function switchGateway(userId:string,values:{provider:Provider;environment:Mode;enabled:boolean}){
   await assertSaasAdmin(userId);
+  if(values.enabled && values.provider==="iotec") throw new Error("ioTec collections cannot be enabled until its transaction and reconciliation integration is complete.");
   if(values.enabled){
     const {error}=await db.from("platform_payment_gateways").update({is_enabled:false})
       .eq("provider",values.provider).neq("environment",values.environment);
@@ -65,25 +66,30 @@ export async function getEnabledGatewayCredentials(kind:Provider,mode:Environmen
 }
 export async function getYoCheckoutConfig() {
   const {data,error}=await db.from("platform_payment_gateways")
-    .select("environment,encrypted_credentials")
-    .eq("provider","yo").eq("is_enabled",true).maybeSingle();
+    .select("environment,encrypted_credentials,is_enabled")
+    .eq("provider","yo");
   if(error)throw new Error("Unable to load Yo Uganda gateway settings");
-  if(data) {
-    const secrets=unseal(data.encrypted_credentials);
+  const records=data??[];
+  const enabled=records.filter((row:any)=>row.is_enabled);
+  if(enabled.length>1)throw new Error("Ambiguous Yo Uganda production/sandbox configuration");
+  if(records.length>0 && enabled.length===0)throw new Error("Yo Uganda gateway is disabled by SaaS administrator");
+  if(enabled.length===1) {
+    const secrets=unseal(enabled[0].encrypted_credentials);
     if(!secrets.username||!secrets.password) throw new Error("Yo Uganda credentials are incomplete");
-    return {username:String(secrets.username),password:String(secrets.password),mode:data.environment as Environment};
+    return {username:String(secrets.username),password:String(secrets.password),mode:enabled[0].environment as Mode};
   }
-  const mode:Environment=process.env.YO_API_MODE==="sandbox"?"sandbox":"production";
-  const username=process.env.YO_API_USERNAME||"";
-  const password=process.env.YO_API_PASSWORD||"";
+  // Legacy deployment variables are accepted only until an administrator configures the gateway.
+  const mode:Mode=process.env.YO_API_MODE==="sandbox"?"sandbox":"production";
+  const username=process.env.YO_API_USERNAME||"",password=process.env.YO_API_PASSWORD||"";
   if(!username||!password)throw new Error("Yo Uganda is not configured for checkout");
   return {username,password,mode};
 }
 export async function isYoCheckoutConfigured() {
-  const {data,error}=await db.from("platform_payment_gateways").select("provider")
-    .eq("provider","yo").eq("is_enabled",true).limit(1);
-  if(error) return Boolean(process.env.YO_API_USERNAME&&process.env.YO_API_PASSWORD);
-  return Boolean(data?.length)||Boolean(process.env.YO_API_USERNAME&&process.env.YO_API_PASSWORD);
+  const {data,error}=await db.from("platform_payment_gateways")
+    .select("is_enabled").eq("provider","yo");
+  if(error) return false;
+  if(data?.length) return data.some((x:any)=>x.is_enabled===true);
+  return Boolean(process.env.YO_API_USERNAME&&process.env.YO_API_PASSWORD);
 }
 
 export async function checkGateway(userId:string,values:{provider:Provider;environment:Mode}){
