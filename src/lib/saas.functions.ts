@@ -1,4 +1,4 @@
-import { getYoCheckoutConfig, isYoCheckoutConfigured } from "@/lib/payment-gateway.functions";
+import { getYoCheckoutConfig, isYoCheckoutConfigured } from "@/lib/payment-gateway.server";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { resolveTxt } from "node:dns/promises";
