@@ -54,6 +54,7 @@ const saasAdminNav: NavItem[] = [
   { to: "/saas-admin/modules", label: "Global Modules", icon: Boxes },
   { to: "/saas-admin/backups", label: "Backup & Restore", icon: DatabaseBackup },
   { to: "/saas-admin/security", label: "Security & Sessions", icon: ShieldCheck },
+  { to: "/saas-admin/payment-gateways", label: "Payment Gateways", icon: CreditCard },
   { to: "/profile", label: "My profile", icon: UserCircle },
 ];
 
