@@ -13,10 +13,10 @@ BEGIN
     CREATE ROLE service_role NOLOGIN NOSUPERUSER NOINHERIT NOCREATEDB NOCREATEROLE NOREPLICATION;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_auth_admin') THEN
-    CREATE ROLE supabase_auth_admin LOGIN CREATEDB CREATEROLE REPLICATION PASSWORD 'super-secret-postgres-password';
+    CREATE ROLE supabase_auth_admin LOGIN CREATEDB CREATEROLE REPLICATION;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticator') THEN
-    CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD 'super-secret-postgres-password';
+    CREATE ROLE authenticator NOINHERIT LOGIN;
   END IF;
 END $$;
 
