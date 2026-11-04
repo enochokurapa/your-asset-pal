@@ -19,6 +19,7 @@ const SECTIONS = [
   { to: "/saas-admin/policy", title: "Plan & Pricing", description: "Trial duration, trial user limits, paid price and currency.", icon: CreditCard },
   { to: "/saas-admin/modules", title: "Global Modules", description: "Control included modules and optional paid add-ons.", icon: Boxes },
   { to: "/saas-admin/backups", title: "Backup & Restore", description: "R2 backup automation, restore points and manual backups.", icon: DatabaseBackup },
+  { to: "/saas-admin/security", title: "Security & Sessions", description: "Control inactivity timeouts and security policy.", icon: ShieldCheck },
 ] as const;
 
 function MetricCard({ label, value, detail, icon: Icon }: { label: string; value: string | number; detail: string; icon: any }) {
