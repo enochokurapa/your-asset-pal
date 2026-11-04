@@ -284,7 +284,10 @@ async function maybeHandlePublicApi(request: Request): Promise<Response | null> 
       metadata: body?.metadata && typeof body.metadata === "object" ? body.metadata : {},
     };
     const { data: event, error: eventError } = await apiAdmin.from("tracking_events").insert(telemetry).select("id,recorded_at").single();
-    if (eventError) return jsonResponse(500, { error: "telemetry_failed", message: eventError.message });
+    if (eventError) {
+      console.error("[API] Tracking event write failed", eventError);
+      return jsonResponse(500, { error: "telemetry_failed", message: "Unable to save telemetry at this time." });
+    }
 
     await apiAdmin.from("tracking_devices").update({ last_seen_at: recordedAt.toISOString(), updated_at: new Date().toISOString() }).eq("id", device.id);
     if (device.asset_id) {
@@ -337,7 +340,10 @@ async function maybeHandlePublicApi(request: Request): Promise<Response | null> 
   if (id) query = query.eq("id", id);
 
   const { data, error } = await query;
-  if (error) return jsonResponse(500, { error: "query_failed", message: error.message });
+  if (error) {
+    console.error("[API] Resource query failed", error);
+    return jsonResponse(500, { error: "query_failed", message: "Unable to retrieve this resource at this time." });
+  }
 
   await apiAdmin.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", key.id);
   return jsonResponse(200, {
