@@ -5,14 +5,16 @@ services:
       dockerfile_inline: |
         FROM postgres:15-alpine
         COPY complete_init.sql /docker-entrypoint-initdb.d/01-init.sql
-        COPY server_seed.sql /docker-entrypoint-initdb.d/02-seed.sql
         COPY saas_policy.sql /docker-entrypoint-initdb.d/03-saas-policy.sql
+        COPY scripts/init-role-passwords.sh /docker-entrypoint-initdb.d/04-role-passwords.sh
     container_name: pesapal-db
     restart: unless-stopped
     environment:
       POSTGRES_DB: ams
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}"
+      SUPABASE_AUTH_DB_PASSWORD: "${SUPABASE_AUTH_DB_PASSWORD:?SUPABASE_AUTH_DB_PASSWORD must be set}"
+      POSTGREST_DB_PASSWORD: "${POSTGREST_DB_PASSWORD:?POSTGREST_DB_PASSWORD must be set}"
     volumes:
       - pesapal-db-data:/var/lib/postgresql/data
     networks:
