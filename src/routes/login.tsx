@@ -42,6 +42,7 @@ function LoginPage() {
   const [existingDevices,setExistingDevices]=useState<Array<{session_id:string,device:string,last_seen:string}>>([]);
   const [takeoverOpen,setTakeoverOpen]=useState(false);
   useEffect(()=>{
+    if(new URLSearchParams(window.location.search).get("inactive")==="1") toast.info("Signed out after inactivity. Please sign in again.");
     const displaced=sessionStorage.getItem("assetflow-session-replaced")==="1" || new URLSearchParams(window.location.search).has("session_replaced");
     if(displaced){sessionStorage.removeItem("assetflow-session-replaced");toast.warning("Your account was signed in on another device. This device has been signed out.");}
   },[]);
