@@ -272,6 +272,11 @@ function AppLayout() {
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setOpen(true)} aria-label="Open menu"><Menu className="h-5 w-5" /></Button>
           {isSaasAdmin && <div className="hidden text-sm font-medium text-foreground sm:block">AssetFlow 360 · SaaS Control Center</div>}
           <div className="flex-1" />
+          {!isSaasAdmin && subscriptionStatus === "active" && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300" title="Your organization has an active paid subscription">
+              <ShieldCheck className="h-3.5 w-3.5" /> Premium · Active
+            </span>
+          )}
           {!isSaasAdmin && subscriptionStatus === "trial" && isTenantAdmin && (
             <Button asChild variant="outline" size="sm" className="hidden gap-1.5 border-primary/20 bg-primary/5 text-xs font-semibold text-primary hover:bg-primary/10 sm:inline-flex">
               <Link to="/billing">Trial · {trialDaysLeft ?? "-"} days left</Link>
