@@ -66,6 +66,11 @@ export const setPlatformGatewayEnabled=createServerFn({method:"POST"})
  .inputValidator(input=>selector.extend({enabled:z.boolean()}).parse(input))
  .handler(async({data,context})=>{
    await assertSaasAdmin(context.userId);
+   if(data.enabled) {
+     const {error:otherError}=await db.from("platform_payment_gateways").update({is_enabled:false})
+       .eq("provider",data.provider).neq("environment",data.environment);
+     if(otherError) throw new Error("Unable to select gateway environment");
+   }
    const {data:record,error}=await db.from("platform_payment_gateways").update({
      is_enabled:data.enabled,updated_at:new Date().toISOString(),updated_by:context.userId
    }).eq("provider",data.provider).eq("environment",data.environment).select("provider").maybeSingle();
@@ -80,20 +85,26 @@ export async function getEnabledGatewayCredentials(kind:Provider,mode:Environmen
   return data ? unseal(data.encrypted_credentials) : null;
 }
 export async function getYoCheckoutConfig() {
-  const mode=process.env.YO_API_MODE==="sandbox"?"sandbox":"production";
-  const stored=await getEnabledGatewayCredentials("yo",mode);
-  if(stored?.username&&stored?.password) return {username:String(stored.username),password:String(stored.password),mode};
+  const {data,error}=await db.from("platform_payment_gateways")
+    .select("environment,encrypted_credentials")
+    .eq("provider","yo").eq("is_enabled",true).maybeSingle();
+  if(error)throw new Error("Unable to load Yo Uganda gateway settings");
+  if(data) {
+    const secrets=unseal(data.encrypted_credentials);
+    if(!secrets.username||!secrets.password) throw new Error("Yo Uganda credentials are incomplete");
+    return {username:String(secrets.username),password:String(secrets.password),mode:data.environment as Environment};
+  }
+  const mode:Environment=process.env.YO_API_MODE==="sandbox"?"sandbox":"production";
   const username=process.env.YO_API_USERNAME||"";
   const password=process.env.YO_API_PASSWORD||"";
   if(!username||!password)throw new Error("Yo Uganda is not configured for checkout");
   return {username,password,mode};
 }
 export async function isYoCheckoutConfigured() {
-  const mode=process.env.YO_API_MODE==="sandbox"?"sandbox":"production";
   const {data,error}=await db.from("platform_payment_gateways").select("provider")
-    .eq("provider","yo").eq("environment",mode).eq("is_enabled",true).maybeSingle();
-  if(error)throw new Error("Payment configuration unavailable");
-  return Boolean(data)||Boolean(process.env.YO_API_USERNAME&&process.env.YO_API_PASSWORD);
+    .eq("provider","yo").eq("is_enabled",true).limit(1);
+  if(error) return Boolean(process.env.YO_API_USERNAME&&process.env.YO_API_PASSWORD);
+  return Boolean(data?.length)||Boolean(process.env.YO_API_USERNAME&&process.env.YO_API_PASSWORD);
 }
 export const testPlatformGateway=createServerFn({method:"POST"})
  .middleware([requireSupabaseAuth])
