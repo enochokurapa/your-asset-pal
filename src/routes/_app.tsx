@@ -1,4 +1,5 @@
 import {useExportAccess} from "@/lib/export-permissions";
+import { SessionIdleGuard } from "@/components/session-idle-guard";
 import { createFileRoute, Outlet, Link, Navigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth, ModuleKey } from "@/hooks/use-auth";
@@ -52,6 +53,7 @@ const saasAdminNav: NavItem[] = [
   { to: "/saas-admin/policy", label: "Plan & Pricing", icon: CreditCard },
   { to: "/saas-admin/modules", label: "Global Modules", icon: Boxes },
   { to: "/saas-admin/backups", label: "Backup & Restore", icon: DatabaseBackup },
+  { to: "/saas-admin/security", label: "Security & Sessions", icon: ShieldCheck },
   { to: "/profile", label: "My profile", icon: UserCircle },
 ];
 
@@ -199,6 +201,7 @@ function AppLayout() {
 
   return (
     <div className={cn("flex min-h-screen w-full bg-background", isSaasAdmin && "platform-brand")} onClickCapture={blockRestrictedExport}>
+      <SessionIdleGuard userId={user.id} />
       {open && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setOpen(false)} />}
 
       <aside
