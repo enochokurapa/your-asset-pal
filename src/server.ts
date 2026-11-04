@@ -244,6 +244,15 @@ async function maybeHandlePublicApi(request: Request): Promise<Response | null> 
     } catch {
       return jsonResponse(400, { error: "invalid_json", message: "A JSON body is required." });
     }
+    // Reject oversized or structurally invalid telemetry before writing with service-role privileges.
+    if (JSON.stringify(body).length > 16_384 || !body || typeof body !== "object" || Array.isArray(body)) {
+      return jsonResponse(413, { error: "invalid_payload", message: "Tracking payload must be a JSON object under 16 KB." });
+    }
+    if (body.metadata !== undefined &&
+        (!body.metadata || typeof body.metadata !== "object" || Array.isArray(body.metadata) ||
+         JSON.stringify(body.metadata).length > 2_048)) {
+      return jsonResponse(400, { error: "invalid_metadata", message: "Tracking metadata must be a small JSON object." });
+    }
     const provider = String(body?.provider || "").trim().toLowerCase();
     const externalDeviceId = String(body?.external_device_id || "").trim();
     const latitude = Number(body?.latitude);
@@ -256,6 +265,13 @@ async function maybeHandlePublicApi(request: Request): Promise<Response | null> 
     if (!provider || !externalDeviceId || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
         !Number.isFinite(longitude) || longitude < -180 || longitude > 180 || Number.isNaN(recordedAt.getTime())) {
       return jsonResponse(400, { error: "invalid_telemetry", message: "provider, external_device_id, latitude and longitude are required." });
+    }
+
+    if ((accuracy !== null && (!Number.isFinite(accuracy) || accuracy < 0 || accuracy > 50_000)) ||
+        (speed !== null && (!Number.isFinite(speed) || speed < 0 || speed > 500)) ||
+        (heading !== null && (!Number.isFinite(heading) || heading < 0 || heading >= 360)) ||
+        recordedAt.getTime() > Date.now() + 5 * 60_000) {
+      return jsonResponse(400, { error: "invalid_telemetry", message: "Tracking measurement or timestamp is outside allowed bounds." });
     }
 
     const { data: device, error: deviceError } = await apiAdmin.from("tracking_devices")
