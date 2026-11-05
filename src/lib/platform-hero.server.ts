@@ -106,28 +106,28 @@ async function requirePlatformAdmin(userId:string) {
 export async function listHeroSettings(userId:string) {
   await requirePlatformAdmin(userId);
   const {data,error}=await db.from("platform_hero_images")
-    .select("page,mime_type,width,height,alt_text,updated_at").order("page");
+    .select("page,mime_type,width,height,alt_text,layout,updated_at").order("page");
   if(error) throw new Error("Unable to load hero settings. Apply the database migration.");
   return data??[];
 }
 export async function getPublicHeroImage(page:HeroPage) {
   const {data,error}=await db.from("platform_hero_images")
-    .select("mime_type,image_base64,width,height,alt_text,updated_at")
+    .select("mime_type,image_base64,width,height,alt_text,layout,updated_at")
     .eq("page",page).maybeSingle();
   if(error) {console.error("[Hero] Public lookup failed:",error.code);return null;}
   if(!data)return null;
   return {url:"data:"+data.mime_type+";base64,"+data.image_base64,
     width:data.width as number,height:data.height as number,
-    altText:data.alt_text as string,updatedAt:data.updated_at as string};
+    altText:data.alt_text as string,layout:data.layout as string,updatedAt:data.updated_at as string};
 }
-export async function saveHeroImage(userId:string,page:HeroPage,dataUrl:string,altText:string) {
+export async function saveHeroImage(userId:string,page:HeroPage,dataUrl:string,altText:string,layout:"standard"|"approved_home_lifecycle") {
   await requirePlatformAdmin(userId);
   const image=decodeAndValidate(dataUrl);
   const alt=altText.trim();
   if(alt.length<15||alt.length>220)throw new Error("Enter a meaningful 15–220 character image description for accessibility");
   const {error}=await db.from("platform_hero_images").upsert({
     page,mime_type:image.mime,image_base64:image.image_base64,
-    width:image.width,height:image.height,alt_text:alt,
+    width:image.width,height:image.height,alt_text:alt,layout:page==="home"?layout:"standard",
     updated_at:new Date().toISOString(),updated_by:userId,
   },{onConflict:"page"});
   if(error)throw new Error("Unable to save the hero image");
