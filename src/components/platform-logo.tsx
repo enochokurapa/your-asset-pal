@@ -28,8 +28,7 @@ export function usePlatformBranding() {
       icon.rel = "icon";
       document.head.appendChild(icon);
     }
-    if (faviconHref) icon.href = faviconHref;
-    else icon.removeAttribute("href");
+    icon.href = faviconHref || "/icon-192.png";
   }, [query.data]);
 
   return query;
