@@ -350,7 +350,7 @@ export const updateSaasSettings = createServerFn({ method: "POST" })
     trial_days: z.number().int().min(1).max(365),
     trial_user_limit: z.number().int().min(1).max(10000),
     paid_price: z.number().min(0),
-    currency: z.string().min(3).max(8),
+    currency: z.literal("USD"),
   }).parse(input))
   .handler(async ({ data, context }) => {
     await assertSaasAdmin(context.userId);
