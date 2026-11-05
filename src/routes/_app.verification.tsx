@@ -4,6 +4,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { AssetVerificationSchedule } from "@/components/asset-verification-schedule";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -194,6 +195,8 @@ function VerificationPage() {
         </div>
       </div>
 
+      <AssetVerificationSchedule />
+
       {/* Scanner row */}
       <Card className="p-5">
         <div className="grid gap-3 sm:grid-cols-[260px_1fr_auto_auto]">
@@ -326,6 +329,7 @@ function VerificationPage() {
           userId={user?.id ?? null}
           onSaved={() => {
             qc.invalidateQueries({ queryKey: ["verifications"] });
+      qc.invalidateQueries({ queryKey: ["verification-overview"] });
             qc.invalidateQueries({ queryKey: ["assets"] });
             qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
           }}
