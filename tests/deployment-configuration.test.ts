@@ -23,6 +23,6 @@ test("no default database or JWT signing password is bundled with deployment", (
 });
 
 test("privileged service tokens come from runtime configuration, not literal JWTs", () => {
-  expect(compose).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY:\\s*"eyJ/);
+  expect(compose).not.toContain('SUPABASE_SERVICE_ROLE_KEY: "eyJ');
   expect(compose).toContain("ASSETFLOW_SERVICE_ROLE_JWT");
 });
