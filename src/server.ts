@@ -6,6 +6,7 @@ import { startBackupScheduler } from "./lib/backup-core.server";
 import { startTenantAutomationScheduler } from "./lib/automation-core.server";
 import { startPlatformEmailReportScheduler } from "./lib/platform-email-reports.server";
 import { createHash } from "node:crypto";
+import { maybeHandlePlatformBrandingAsset } from "./lib/platform-branding-assets.server";
 import { supabaseAdmin } from "./integrations/supabase/client.server";
 import { completeMicrosoftOAuth } from "./lib/microsoft365.server";
 
@@ -432,6 +433,9 @@ function withSecurityHeaders(response: Response, request: Request): Response {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const brandedAsset = await maybeHandlePlatformBrandingAsset(request);
+      if (brandedAsset) return withSecurityHeaders(brandedAsset, request);
+
       const microsoftResponse = await maybeHandleMicrosoftOAuth(request);
       if (microsoftResponse) return withSecurityHeaders(microsoftResponse, request);
 
