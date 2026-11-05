@@ -20,7 +20,6 @@ export function usePlatformBranding() {
 export function PlatformBrandingEffect() {
   const { data } = usePlatformBranding();
   useEffect(() => {
-    const data = data;
     if (!data || typeof document === "undefined") return;
 
     const root = document.documentElement;
