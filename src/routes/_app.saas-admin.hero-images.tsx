@@ -19,13 +19,15 @@ export const Route=createFileRoute("/_app/saas-admin/hero-images")({
 });
 type Page="home"|"home_2"|"home_3"|"features"|"solutions"|"pricing"|"about";
 const pages:{key:Page;label:string;url:string}[]=[
- {key:"home",label:"Homepage",url:"/"},
+ {key:"home",label:"Homepage · Slide 1 (Lifecycle)",url:"/"},
+ {key:"home_2",label:"Homepage · Slide 2 (Locations)",url:"/"},
+ {key:"home_3",label:"Homepage · Slide 3 (Reporting)",url:"/"},
  {key:"features",label:"Features",url:"/features"},
  {key:"solutions",label:"Solutions",url:"/solutions"},
  {key:"pricing",label:"Plans & Pricing",url:"/pricing"},
  {key:"about",label:"About AssetFlow",url:"/about"},
 ];
-const MAX_BYTES=3_000_000;
+const MAX_BYTES=300_000;
 const defaultAlt="AssetFlow 360 visual overview of the complete fixed asset management lifecycle";
 function HeroSettings(){
  const {isSaasAdmin,loading}=useAuth();
@@ -54,7 +56,7 @@ function HeroSettings(){
   setCandidate("");setFileName("");setDimension("");
   if(inputRef.current)inputRef.current.value="";
   setAltText(existing?.altText??defaultAlt);
-  setLayout(page==="home"?(existing?.layout==="standard"?"standard":"approved_home_lifecycle"):"standard");
+  setLayout("standard");
  },[page,existing?.altText]);
  if(loading)return null;
  if(!isSaasAdmin)return <Navigate to="/dashboard"/>;
@@ -62,7 +64,7 @@ function HeroSettings(){
   if(!["image/png","image/webp","image/svg+xml"].includes(file.type))
    return toast.error("Use PNG, WebP or SVG (vector).");
   if(!file.size||file.size>MAX_BYTES)
-   return toast.error("Hero images must be 3 MB or smaller.");
+   return toast.error("Hero images must be 300 KB or smaller.");
   try{
    const dataUrl=await new Promise<string>((resolve,reject)=>{
     const r=new FileReader();r.onload=()=>resolve(String(r.result));r.onerror=reject;
@@ -117,7 +119,7 @@ function HeroSettings(){
   <header className="space-y-1"><div className="flex items-center gap-2">
    <ImageIcon className="h-7 w-7 text-primary"/><h1 className="text-2xl font-bold">Hero Images</h1>
   </div><p className="text-sm text-muted-foreground">
-   Upload or replace the visual hero on any public marketing page. Changes are saved securely and appear without another deployment.
+   Upload or replace lightweight backgrounds for the homepage carousel or other public pages. Titles, services and buttons stay as live webpage text.
   </p></header>
   <Card className="space-y-5 p-5 sm:p-7">
    <div className="space-y-2"><Label htmlFor="hero-page">Page</Label>
@@ -150,16 +152,13 @@ function HeroSettings(){
    <div className="space-y-2"><Label htmlFor="hero-upload">Upload image</Label>
     <Input id="hero-upload" ref={inputRef} type="file" accept=".png,.webp,.svg,image/png,image/webp,image/svg+xml"
       disabled={busy} onChange={e=>{const f=e.target.files?.[0];if(f)void readFile(f);}}/>
-    <p className="text-xs leading-6 text-muted-foreground">PNG, WebP or safe SVG vector. Maximum 3 MB. Minimum 1280 × 600 px; maximum 3840 × 2400 px. Landscape aspect ratio 1.5:1 to 3.2:1. Recommended 1774 × 887 (2:1).</p>
+    <p className="text-xs leading-6 text-muted-foreground">PNG, WebP or safe SVG vector. Maximum 300 KB. Minimum 1280 × 600 px; maximum 3840 × 2400 px. Landscape aspect ratio 1.5:1 to 3.2:1. Recommended 1672 × 941 (16:9), optimized WebP.</p>
     <p className="text-xs text-muted-foreground">SVG files are checked for scripts, unsafe elements and external references. Complex SVG files may need to be exported as PNG or WebP.</p>
    </div>
-   {page==="home"&&<label className="flex items-start gap-3 rounded-lg border p-3 text-sm">
-    <input type="checkbox" checked={layout==="approved_home_lifecycle"} disabled={busy}
-     onChange={e=>setLayout(e.target.checked?"approved_home_lifecycle":"standard")}
-     className="mt-1 h-4 w-4"/>
-    <span><strong>Approved seven-step lifecycle artwork</strong><span className="mt-1 block text-xs text-muted-foreground">Use this for the original staircase hero. It hides the sample top navigation and makes its two visual buttons clickable. Turn off when uploading a different homepage design.</span></span>
-   </label>}
-   <div className="space-y-2"><Label htmlFor="hero-alt">Image description (accessibility)</Label>
+   {page.startsWith("home")&&<p className="rounded-lg border border-[#dce5eb] bg-[#f5f9fb] p-3 text-sm text-[#345467]">
+      <strong>Background image only.</strong> Headings, descriptions, buttons and the seven lifecycle labels are real webpage elements. They remain visible when you replace this slide's image. The three homepage slides rotate automatically every seven seconds.
+    </p>}
+    <div className="space-y-2"><Label htmlFor="hero-alt">Image description (accessibility)</Label>
     <Input id="hero-alt" maxLength={220} value={altText} disabled={busy}
      onChange={e=>setAltText(e.target.value)}
      placeholder="Describe what the image shows for screen-reader visitors"/>
