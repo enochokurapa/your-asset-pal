@@ -35,7 +35,7 @@ function uploadedImage(data: Branding | null): Uint8Array | null {
   return binary;
 }
 
-function resizedIcon(input: Uint8Array, size: 192 | 512): Promise<Uint8Array> {
+export function resizedIcon(input: Uint8Array, size: 192 | 512): Promise<Uint8Array> {
   const fingerprint = createHash("sha256").update(input).digest("hex") + ":" + size;
   const existing = cache.get(fingerprint);
   if (existing) return existing;
