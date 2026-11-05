@@ -12,6 +12,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { useEffect } from "react";
 import { applyStoredTheme } from "@/lib/theme";
 import { InstallPwaPrompt } from "@/components/install-pwa-prompt";
+import { PlatformBrandingEffect } from "@/components/platform-logo";
 
 import appCss from "../styles.css?url";
 
@@ -111,6 +112,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <PlatformBrandingEffect />
         <Outlet />
         <Toaster richColors position="top-right" />
         <InstallPwaPrompt />
