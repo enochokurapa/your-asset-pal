@@ -62,7 +62,7 @@ export function SaasBackupManager() {
   const fileInput = useRef<HTMLInputElement | null>(null);
 
   const [enabled, setEnabled] = useState(true);
-  const [intervalHours, setIntervalHours] = useState<6 | 24>(24);
+  const [intervalHours, setIntervalHours] = useState<6 | 12 | 24 | 168>(24);
   const [savingPolicy, setSavingPolicy] = useState(false);
   const [runningBackup, setRunningBackup] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -85,7 +85,7 @@ export function SaasBackupManager() {
           return {...response,policy};
         }
       } catch(e){console.error("[Backup] Full dashboard unavailable",e);}
-      return {policy,environment:{databaseConfigured:false,r2Configured:false},backups:[],retentionCount:3,
+      return {policy,environment:{databaseConfigured:false,r2Configured:false},backups:[],retentionCount:14,
         configurationError:"Backup storage and restore services could not be verified. Backup actions remain unavailable until server validation succeeds.",
         emailConfigured:false};
     },
@@ -94,7 +94,7 @@ export function SaasBackupManager() {
   useEffect(() => {
     if (!data?.policy) return;
     setEnabled(Boolean(data.policy.enabled));
-    setIntervalHours(data.policy.intervalHours === 6 ? 6 : 24);
+    setIntervalHours(([6,12,24,168] as const).includes(data.policy.intervalHours) ? data.policy.intervalHours : 24);
   }, [data?.policy]);
 
   const persistPolicy = async () => {
@@ -204,7 +204,7 @@ export function SaasBackupManager() {
           <div>
             <h2 className="font-semibold">Database backup & restore</h2>
             <p className="text-sm text-muted-foreground">
-              Private Cloudflare R2 backups. The system always keeps only the newest {data?.retentionCount ?? 3} database backups.
+              Private Cloudflare R2 backups. The system always keeps only the newest {data?.retentionCount ?? 14} database backups.
             </p>
           </div>
         </div>
@@ -237,13 +237,15 @@ export function SaasBackupManager() {
           <Label>Frequency</Label>
           <Select
             value={String(intervalHours)}
-            onValueChange={(value) => setIntervalHours(value === "6" ? 6 : 24)}
+            onValueChange={(value) => setIntervalHours(([6,12,24,168] as const).includes(Number(value) as 6 | 12 | 24 | 168) ? Number(value) as 6 | 12 | 24 | 168 : 24)}
             disabled={!data?.policy || !enabled}
           >
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="6">Every 6 hours</SelectItem>
+              <SelectItem value="12">Every 12 hours</SelectItem>
               <SelectItem value="24">Once a day</SelectItem>
+              <SelectItem value="168">Once a week</SelectItem>
             </SelectContent>
           </Select>
         </div>

@@ -11,7 +11,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 const admin = supabaseAdmin as any;
 const BACKUP_PREFIX = "backups/";
 const RESTORE_UPLOAD_PREFIX = "restore-uploads/";
-const RETENTION_COUNT = 3;
+const RETENTION_COUNT = 14;
 const MAX_LOCAL_RESTORE_BYTES = 5 * 1024 * 1024 * 1024;
 
 type BackupKind = "manual" | "automatic" | "pre-restore";
@@ -25,7 +25,7 @@ export type BackupObject = {
 
 export type BackupPolicy = {
   enabled: boolean;
-  intervalHours: 6 | 24;
+  intervalHours: 6 | 12 | 24 | 168;
 };
 
 type R2Config = {
@@ -456,13 +456,13 @@ export async function readBackupPolicy(): Promise<BackupPolicy> {
     );
   }
   const hours = Number(data.backup_interval_hours);
-  if (hours !== 6 && hours !== 24) {
-    throw new Error("Backup interval must be 6 or 24 hours");
+  if (![6,12,24,168].includes(hours)) {
+    throw new Error("Backup interval must be 6, 12, 24 or 168 hours");
   }
   return { enabled: data.backup_enabled !== false, intervalHours: hours };
 }
 
-export async function updateBackupPolicy(enabled: boolean, intervalHours: 6 | 24, userId: string) {
+export async function updateBackupPolicy(enabled: boolean, intervalHours: 6 | 12 | 24 | 168, userId: string) {
   const { error } = await admin
     .from("saas_settings")
     .update({
