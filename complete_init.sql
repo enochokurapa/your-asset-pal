@@ -1,6 +1,10 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+-- The database credential is provided by Docker, never stored in Git.
+\\getenv assetflow_db_password ASSETFLOW_DB_PASSWORD
+SELECT set_config('assetflow.init_password', :'assetflow_db_password', false);
+
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
@@ -13,10 +17,10 @@ BEGIN
     CREATE ROLE service_role NOLOGIN NOSUPERUSER NOINHERIT NOCREATEDB NOCREATEROLE NOREPLICATION;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_auth_admin') THEN
-    CREATE ROLE supabase_auth_admin LOGIN CREATEDB CREATEROLE REPLICATION PASSWORD 'super-secret-postgres-password';
+    EXECUTE format('CREATE ROLE supabase_auth_admin LOGIN CREATEDB CREATEROLE REPLICATION PASSWORD %L', current_setting('assetflow.init_password'));
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticator') THEN
-    CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD 'super-secret-postgres-password';
+    EXECUTE format('CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD %L', current_setting('assetflow.init_password'));
   END IF;
 END $$;
 
