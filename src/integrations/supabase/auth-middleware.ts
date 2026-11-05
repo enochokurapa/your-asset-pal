@@ -99,9 +99,24 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' })
       if (!verified.ok) {
         throw new Response("Unauthorized: Invalid or expired session", { status: 401 });
       }
-      const verifiedUser = await verified.json() as { id?: string };
+      const verifiedUser = await verified.json() as { id?: string; factors?: Array<{ factor_type?: string; status?: string }> };
       if (!verifiedUser.id) throw new Response("Unauthorized: No user ID found", { status: 401 });
       verifiedUserId = verifiedUser.id;
+      // GoTrue verified the token first. A user with a verified authenticator
+      // must complete the AAL2 challenge before privileged server functions run.
+      // Do not trust a browser-only MFA redirect as the authorization boundary.
+      if (verifiedUser.factors?.some(f => f.factor_type === "totp" && f.status === "verified")) {
+        let aal = "";
+        try {
+          const jwtPayload = JSON.parse(Buffer.from(token.split(".")[1] || "", "base64url").toString("utf8")) as {aal?: string};
+          aal = jwtPayload.aal || "";
+        } catch {
+          throw new Response("Invalid authentication assurance claim", { status: 401 });
+        }
+        if (aal !== "aal2") {
+          throw new Response("Authenticator verification required", { status: 403 });
+        }
+      }
     } catch (error) {
       if (error instanceof Response) throw error;
       console.error("[Supabase] Authentication service unavailable", error);
