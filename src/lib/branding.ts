@@ -39,42 +39,9 @@ export function applyBrowserBranding(template: DocumentTemplate) {
     document.documentElement.style.setProperty("--sidebar-primary-foreground", foreground);
   }
 
-  if (template.logo_data_url) {
-    setLink("icon", template.logo_data_url);
-    setLink("shortcut icon", template.logo_data_url);
-    setLink("apple-touch-icon", template.logo_data_url);
-  }
+  // Tenant logo and document colors are workspace-specific. Browser/PWA icons
+  // are platform-level branding and must not be overwritten by tenant templates.
 
-  // Browsers use this manifest for future installs. Existing installed icons are
-  // controlled by the OS and may require reinstalling the app to refresh its icon.
-  const manifest = {
-    name: `${company} - Asset Management`, short_name: company.slice(0, 30), id: "/",
-    description: `Manage ${company}'s fixed assets.`, start_url: "/", scope: "/",
-    display: "standalone", orientation: "any",
-    background_color: "#ffffff", theme_color: template.primary_color,
-    categories: ["business", "productivity", "utilities"],
-    icons: template.logo_data_url ? [
-      { src: template.logo_data_url, sizes: "any", purpose: "any" },
-    ] : [
-      { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
-      { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
-    ],
-  };
-  const oldUrl = document.documentElement.dataset.brandManifestUrl;
-  if (oldUrl) URL.revokeObjectURL(oldUrl);
-  const url = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: "application/manifest+json" }));
-  document.documentElement.dataset.brandManifestUrl = url;
-  setLink("manifest", url);
-}
-
-function setLink(rel: string, href: string) {
-  let link = document.head.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
-  if (!link) {
-    link = document.createElement("link");
-    link.rel = rel;
-    document.head.appendChild(link);
-  }
-  link.href = href;
 }
 
 function setMetaColor(color: string) {

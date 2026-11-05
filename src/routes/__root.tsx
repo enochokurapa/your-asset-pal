@@ -12,6 +12,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { useEffect } from "react";
 import { applyStoredTheme } from "@/lib/theme";
 import { InstallPwaPrompt } from "@/components/install-pwa-prompt";
+import { PlatformBrandingEffect } from "@/components/platform-logo";
 
 import appCss from "../styles.css?url";
 
@@ -70,9 +71,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "manifest", href: "/api/branding/manifest.webmanifest" },
+      { rel: "icon", type: "image/png", href: "/api/branding/icon-192.png" },
 
-      { rel: "apple-touch-icon", href: "/icon-192.png" },
+      { rel: "apple-touch-icon", href: "/api/branding/icon-192.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -110,6 +112,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <PlatformBrandingEffect />
         <Outlet />
         <Toaster richColors position="top-right" />
         <InstallPwaPrompt />
