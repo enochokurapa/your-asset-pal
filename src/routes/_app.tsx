@@ -66,20 +66,24 @@ function AppLayout() {
   const [open, setOpen] = useState(false);
   const [settingsOpen,setSettingsOpen]=useState(false);
   const [branding, setBranding] = useState<DocumentTemplate | null>(null);
-  const [mfaChecked,setMfaChecked]=useState(false);
-  const [mfaRequired,setMfaRequired]=useState(false);
+  const [mfaStatus,setMfaStatus]=useState<"checking"|"ready"|"setup"|"challenge"|"error">("checking");
   useEffect(()=>{
-    if(!user){setMfaChecked(false);setMfaRequired(false);return;}
+    if(!user || loading){setMfaStatus("checking");return;}
     let active=true;
+    const strictAdminMfa = isSaasAdmin || isTenantAdmin || isAdmin;
     import("@/integrations/supabase/client").then(async({supabase})=>{
-      const {data,error}=await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      const {data:levels,error}=await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
       if(!active)return;
-      if(error){console.error("[Auth] MFA status unavailable",error);setMfaRequired(false);}
-      else setMfaRequired(data.currentLevel!=="aal2"&&data.nextLevel==="aal2");
-      setMfaChecked(true);
-    }).catch(()=>{if(active)setMfaChecked(true)});
+      if(error || !levels){console.error("[Auth] MFA status unavailable");setMfaStatus(strictAdminMfa?"error":"ready");return;}
+      if(levels.currentLevel==="aal2"){setMfaStatus("ready");return;}
+      const {data:factors,error:factorError}=await supabase.auth.mfa.listFactors();
+      if(!active)return;
+      if(factorError){console.error("[Auth] Cannot list enrolled factors");setMfaStatus(strictAdminMfa?"error":"ready");return;}
+      if(factors?.totp?.some(f=>f.status==="verified"))setMfaStatus("challenge");
+      else setMfaStatus(strictAdminMfa?"setup":"ready");
+    }).catch(()=>{if(active)setMfaStatus(strictAdminMfa?"error":"ready");});
     return ()=>{active=false;};
-  },[user?.id]);
+  },[user?.id,loading,isSaasAdmin,isTenantAdmin,isAdmin]);
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   useEffect(()=>{
@@ -112,8 +116,10 @@ function AppLayout() {
     );
   }
   if (!user) return <Navigate to="/login" />;
-  if (!mfaChecked) return <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"/></div>;
-  if (mfaRequired) return <Navigate to="/mfa" />;
+  if (mfaStatus==="checking") return <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"/></div>;
+  if (mfaStatus==="error") return <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 p-6 text-center"><h1 className="text-xl font-semibold">Administrator verification unavailable</h1><p>Access to sensitive settings is paused because we could not validate your MFA status. Please try again.</p><button className="rounded-md border px-4 py-2" onClick={()=>window.location.reload()}>Try again</button></div>;
+  if (mfaStatus==="setup") return <Navigate to="/mfa-setup" />;
+  if (mfaStatus==="challenge") return <Navigate to="/mfa" />;
   if (mustChangePassword) return <Navigate to="/welcome" />;
 
   const isSaasControlRoute =
