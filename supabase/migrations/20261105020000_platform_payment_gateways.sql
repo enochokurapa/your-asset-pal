@@ -10,3 +10,5 @@ CREATE TABLE IF NOT EXISTS public.platform_payment_gateways (
 );
 ALTER TABLE public.platform_payment_gateways ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.platform_payment_gateways FROM PUBLIC, anon, authenticated;
+
+GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE public.platform_payment_gateways TO service_role;
