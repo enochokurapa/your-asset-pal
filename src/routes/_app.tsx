@@ -6,7 +6,7 @@ import { useAuth, ModuleKey } from "@/hooks/use-auth";
 import {
   LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X, FileBarChart,
   Building2, History, UserCircle, TrendingDown, DoorOpen, Settings, ChevronDown, ClipboardCheck,
-  CreditCard, Globe2, ShieldCheck, LockKeyhole, DatabaseBackup, ImageIcon, PlugZap, Radar, SlidersHorizontal,
+  CreditCard, Globe2, ShieldCheck, Mail, LockKeyhole, DatabaseBackup, ImageIcon, PlugZap, Radar, SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -55,6 +55,7 @@ const saasAdminNav: NavItem[] = [
   { to: "/saas-admin/backups", label: "Backup & Restore", icon: DatabaseBackup },
   { to: "/saas-admin/security", label: "Security & Sessions", icon: ShieldCheck },
   { to: "/saas-admin/payment-gateways", label: "Payment Gateways", icon: CreditCard },
+  { to: "/saas-admin/email", label: "Email & SMTP", icon: Mail },
   { to: "/profile", label: "My profile", icon: UserCircle },
 ];
 
