@@ -149,12 +149,12 @@ function SaasAdminPolicyPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Currency</Label>
-              <Input
-                value={form.currency}
-                onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
-                maxLength={8}
-              />
+              <Label htmlFor="base-currency">Price currency (preset)</Label>
+              <select id="base-currency" value="USD" disabled
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm font-semibold">
+                <option value="USD">USD — base subscription pricing</option>
+              </select>
+              <p className="text-xs text-muted-foreground">Prices are stored in USD. Customers can switch to UGX on the public Pricing page. Yo Uganda mobile-money checkout converts to UGX using a validated exchange rate.</p>
             </div>
           </div>
 
