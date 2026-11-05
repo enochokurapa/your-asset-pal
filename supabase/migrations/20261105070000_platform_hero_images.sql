@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS public.platform_hero_images (
   width integer NOT NULL CHECK (width BETWEEN 1280 AND 3840),
   height integer NOT NULL CHECK (height BETWEEN 600 AND 2400),
   alt_text text NOT NULL DEFAULT '',
+  layout text NOT NULL DEFAULT 'standard' CHECK (layout IN ('standard','approved_home_lifecycle')),
   updated_at timestamptz NOT NULL DEFAULT now(),
   updated_by uuid REFERENCES auth.users(id)
 );
