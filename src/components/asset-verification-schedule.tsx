@@ -6,10 +6,11 @@ import { getServerAuthHeaders } from "@/lib/auth-headers";
 import { getAssetVerificationPolicy, updateAssetVerificationPolicy } from "@/lib/asset-verification-policy.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { CalendarClock, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 
 type State = "pending"|"attention"|"overdue"|"due_soon"|"current";
 type ScheduledAsset = {
@@ -94,14 +95,11 @@ export function AssetVerificationSchedule() {
     {isTenantAdmin && <div className="flex flex-wrap items-end gap-3 rounded-lg border p-3">
       <div className="min-w-[170px] space-y-2">
         <Label htmlFor="verification-frequency">Business verification interval</Label>
-        <select id="verification-frequency" value={currentMonths}
-          disabled={policyLoading||saving}
-          className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-          onChange={e=>setMonths(Number(e.target.value))}>
-          {[1,3,6,12,18,24,36,48,60].map(n=><option value={n} key={n}>{n===12?"12 months (default)":n+" months"}</option>)}
-        </select>
+        <Input id="verification-frequency" type="number" min={1} max={60} step={1}
+          value={currentMonths} disabled={policyLoading||saving}
+          onChange={e=>setMonths(Number(e.target.value))}/>
       </div>
-      <Button onClick={save} disabled={saving||policyLoading||currentMonths===policy?.intervalMonths}>
+      <Button onClick={save} disabled={saving||policyLoading||!Number.isInteger(currentMonths)||currentMonths<1||currentMonths>60||currentMonths===policy?.intervalMonths}>
        {saving?"Saving…":"Save validity"}
       </Button>
       <p className="w-full text-xs text-muted-foreground">Only business administrators can change this setting. Existing verification dates stay unchanged; overdue status recalculates from the new interval.</p>
