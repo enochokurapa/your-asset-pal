@@ -1,11 +1,12 @@
 import {useExportAccess} from "@/lib/export-permissions";
+import { SessionIdleGuard } from "@/components/session-idle-guard";
 import { createFileRoute, Outlet, Link, Navigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth, ModuleKey } from "@/hooks/use-auth";
 import {
   LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X, FileBarChart,
   Building2, History, UserCircle, TrendingDown, DoorOpen, Settings, ChevronDown, ClipboardCheck,
-  CreditCard, Globe2, ShieldCheck, LockKeyhole, DatabaseBackup, ImageIcon, PlugZap, Radar, SlidersHorizontal,
+  CreditCard, Globe2, ShieldCheck, Mail, LockKeyhole, DatabaseBackup, ImageIcon, PlugZap, Radar, SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,9 @@ const saasAdminNav: NavItem[] = [
   { to: "/saas-admin/policy", label: "Plan & Pricing", icon: CreditCard },
   { to: "/saas-admin/modules", label: "Global Modules", icon: Boxes },
   { to: "/saas-admin/backups", label: "Backup & Restore", icon: DatabaseBackup },
+  { to: "/saas-admin/security", label: "Security & Sessions", icon: ShieldCheck },
+  { to: "/saas-admin/payment-gateways", label: "Payment Gateways", icon: CreditCard },
+  { to: "/saas-admin/email", label: "Email & SMTP", icon: Mail },
   { to: "/profile", label: "My profile", icon: UserCircle },
 ];
 
@@ -63,20 +67,24 @@ function AppLayout() {
   const [open, setOpen] = useState(false);
   const [settingsOpen,setSettingsOpen]=useState(false);
   const [branding, setBranding] = useState<DocumentTemplate | null>(null);
-  const [mfaChecked,setMfaChecked]=useState(false);
-  const [mfaRequired,setMfaRequired]=useState(false);
+  const [mfaStatus,setMfaStatus]=useState<"checking"|"ready"|"setup"|"challenge"|"error">("checking");
   useEffect(()=>{
-    if(!user){setMfaChecked(false);setMfaRequired(false);return;}
+    if(!user || loading){setMfaStatus("checking");return;}
     let active=true;
+    const strictAdminMfa = isSaasAdmin || isTenantAdmin || isAdmin;
     import("@/integrations/supabase/client").then(async({supabase})=>{
-      const {data,error}=await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      const {data:levels,error}=await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
       if(!active)return;
-      if(error){console.error("[Auth] MFA status unavailable",error);setMfaRequired(false);}
-      else setMfaRequired(data.currentLevel!=="aal2"&&data.nextLevel==="aal2");
-      setMfaChecked(true);
-    }).catch(()=>{if(active)setMfaChecked(true)});
+      if(error || !levels){console.error("[Auth] MFA status unavailable");setMfaStatus(strictAdminMfa?"error":"ready");return;}
+      if(levels.currentLevel==="aal2"){setMfaStatus("ready");return;}
+      const {data:factors,error:factorError}=await supabase.auth.mfa.listFactors();
+      if(!active)return;
+      if(factorError){console.error("[Auth] Cannot list enrolled factors");setMfaStatus(strictAdminMfa?"error":"ready");return;}
+      if(factors?.totp?.some(f=>f.status==="verified"))setMfaStatus("challenge");
+      else setMfaStatus(strictAdminMfa?"setup":"ready");
+    }).catch(()=>{if(active)setMfaStatus(strictAdminMfa?"error":"ready");});
     return ()=>{active=false;};
-  },[user?.id]);
+  },[user?.id,loading,isSaasAdmin,isTenantAdmin,isAdmin]);
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   useEffect(()=>{
@@ -109,8 +117,10 @@ function AppLayout() {
     );
   }
   if (!user) return <Navigate to="/login" />;
-  if (!mfaChecked) return <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"/></div>;
-  if (mfaRequired) return <Navigate to="/mfa" />;
+  if (mfaStatus==="checking") return <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"/></div>;
+  if (mfaStatus==="error") return <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 p-6 text-center"><h1 className="text-xl font-semibold">Administrator verification unavailable</h1><p>Access to sensitive settings is paused because we could not validate your MFA status. Please try again.</p><button className="rounded-md border px-4 py-2" onClick={()=>window.location.reload()}>Try again</button></div>;
+  if (mfaStatus==="setup") return <Navigate to="/mfa-setup" />;
+  if (mfaStatus==="challenge") return <Navigate to="/mfa" />;
   if (mustChangePassword) return <Navigate to="/welcome" />;
 
   const isSaasControlRoute =
@@ -199,6 +209,7 @@ function AppLayout() {
 
   return (
     <div className={cn("flex min-h-screen w-full bg-background", isSaasAdmin && "platform-brand")} onClickCapture={blockRestrictedExport}>
+      <SessionIdleGuard userId={user.id} />
       {open && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setOpen(false)} />}
 
       <aside
@@ -272,6 +283,11 @@ function AppLayout() {
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setOpen(true)} aria-label="Open menu"><Menu className="h-5 w-5" /></Button>
           {isSaasAdmin && <div className="hidden text-sm font-medium text-foreground sm:block">AssetFlow 360 · SaaS Control Center</div>}
           <div className="flex-1" />
+          {!isSaasAdmin && subscriptionStatus === "active" && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300" title="Your organization has an active paid subscription">
+              <ShieldCheck className="h-3.5 w-3.5" /> Premium · Active
+            </span>
+          )}
           {!isSaasAdmin && subscriptionStatus === "trial" && isTenantAdmin && (
             <Button asChild variant="outline" size="sm" className="hidden gap-1.5 border-primary/20 bg-primary/5 text-xs font-semibold text-primary hover:bg-primary/10 sm:inline-flex">
               <Link to="/billing">Trial · {trialDaysLeft ?? "-"} days left</Link>

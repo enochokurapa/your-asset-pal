@@ -1,3 +1,4 @@
+import { getYoCheckoutConfig, isYoCheckoutConfigured } from "@/lib/payment-gateway.server";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { resolveTxt } from "node:dns/promises";
@@ -338,7 +339,7 @@ export const getSaasContext = createServerFn({ method: "GET" })
       })),
       canExportReports: paid,
       canUseCustomDomain: paid,
-      paymentConfigured: Boolean(process.env.YO_API_USERNAME && process.env.YO_API_PASSWORD),
+      paymentConfigured: await isYoCheckoutConfigured(),
     };
   });
 
@@ -646,7 +647,7 @@ export const getSaasAdminDashboard = createServerFn({ method: "GET" })
         database: "operational",
         authProxyConfigured: Boolean(process.env.SUPABASE_AUTH_INTERNAL_URL),
         restProxyConfigured: Boolean(process.env.SUPABASE_REST_INTERNAL_URL),
-        paymentConfigured: Boolean(process.env.YO_API_USERNAME && process.env.YO_API_PASSWORD),
+        paymentConfigured: await isYoCheckoutConfigured(),
         databaseBackupConfigured: Boolean(process.env.DATABASE_URL),
         r2Configured: Boolean(
           process.env.R2_ACCOUNT_ID &&
@@ -870,15 +871,16 @@ function xmlTag(xml: string, tag: string) {
   const m = xml.match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, "i"));
   return m?.[1]?.trim() ?? "";
 }
-async function yoRequest(body: string) {
-  const mode = (process.env.YO_API_MODE || "production").toLowerCase();
-  const endpoint = process.env.YO_API_URL || (mode === "sandbox"
+async function yoRequest(body: string, mode: "sandbox" | "production") {
+  // Fixed provider endpoints prevent user-controlled payment destinations.
+  const endpoint = mode === "sandbox"
     ? "https://sandbox.yo.co.ug/services/yopaymentsdev/task.php"
-    : "https://paymentsapi1.yo.co.ug/ybs/task.php");
+    : "https://paymentsapi1.yo.co.ug/ybs/task.php";
   const r = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/xml; charset=UTF-8" },
     body,
+    signal: AbortSignal.timeout(20000),
   });
   const text = await r.text();
   if (!r.ok) throw new Error(`Payment gateway returned HTTP ${r.status}`);
@@ -890,8 +892,7 @@ export const startYoUpgrade = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({phone:z.string().min(9).max(20),plan_id:z.enum(["starter","business","enterprise"]),period:z.enum(["monthly","annual"])}).parse(input))
   .handler(async ({ data, context }) => {
     const p = await assertTenantAdmin(context.userId);
-    const username = process.env.YO_API_USERNAME;
-    const password = process.env.YO_API_PASSWORD;
+    const {username,password,mode}=await getYoCheckoutConfig();
     if (!username || !password) throw new Error("Payment gateway is not configured on this deployment yet");
 
     const { data: settings, error: settingsError } = await admin.from("saas_settings")
@@ -927,7 +928,7 @@ export const startYoUpgrade = createServerFn({ method: "POST" })
       `</Request></AutoCreate>`;
 
     try {
-      const raw = await yoRequest(xml);
+      const raw = await yoRequest(xml,mode);
       const response = {
         Status: xmlTag(raw, "Status"),
         StatusCode: xmlTag(raw, "StatusCode"),
@@ -960,8 +961,7 @@ export const startYoAddonPurchase = createServerFn({ method: "POST" })
   }).parse(input))
   .handler(async ({ data, context }) => {
     const p = await assertTenantAdmin(context.userId);
-    const username = process.env.YO_API_USERNAME;
-    const password = process.env.YO_API_PASSWORD;
+    const {username,password,mode}=await getYoCheckoutConfig();
     if (!username || !password) throw new Error("Payment gateway is not configured");
 
     const { data: module, error: moduleError } = await admin.from("saas_modules")
@@ -1002,7 +1002,7 @@ export const startYoAddonPurchase = createServerFn({ method: "POST" })
       '<ExternalReference>' + xmlEscape(tx.id) + '</ExternalReference></Request></AutoCreate>';
 
     try {
-      const raw = await yoRequest(xml);
+      const raw = await yoRequest(xml,mode);
       const response = {
         Status: xmlTag(raw, "Status"),
         StatusCode: xmlTag(raw, "StatusCode"),
@@ -1032,8 +1032,7 @@ export const checkYoAddonPurchase = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ transaction_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const p = await assertTenantAdmin(context.userId);
-    const username = process.env.YO_API_USERNAME;
-    const password = process.env.YO_API_PASSWORD;
+    const {username,password,mode}=await getYoCheckoutConfig();
     if (!username || !password) throw new Error("Payment gateway is not configured");
 
     const { data: tx, error } = await admin.from("billing_transactions").select("*")
@@ -1046,7 +1045,7 @@ export const checkYoAddonPurchase = createServerFn({ method: "POST" })
       '<Method>actransactioncheckstatus</Method><TransactionReference>' + xmlEscape(tx.provider_reference) + '</TransactionReference>' +
       '<PrivateTransactionReference>' + xmlEscape(tx.id) + '</PrivateTransactionReference>' +
       '<DepositTransactionType>PULL</DepositTransactionType></Request></AutoCreate>';
-    const raw = await yoRequest(xml);
+    const raw = await yoRequest(xml,mode);
     const transactionStatus = xmlTag(raw, "TransactionStatus").toUpperCase();
     const successful = transactionStatus === "SUCCEEDED";
     const failed = transactionStatus === "FAILED";
@@ -1085,8 +1084,7 @@ export const checkYoUpgrade = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ transaction_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const p = await assertTenantAdmin(context.userId);
-    const username = process.env.YO_API_USERNAME;
-    const password = process.env.YO_API_PASSWORD;
+    const {username,password,mode}=await getYoCheckoutConfig();
     if (!username || !password) throw new Error("Payment gateway is not configured on this deployment yet");
     const { data: tx, error } = await admin.from("billing_transactions").select("*")
       .eq("id", data.transaction_id).eq("tenant_id", p.tenant_id).single();
@@ -1099,7 +1097,7 @@ export const checkYoUpgrade = createServerFn({ method: "POST" })
       `<TransactionReference>${xmlEscape(tx.provider_reference)}</TransactionReference>` +
       `<PrivateTransactionReference>${xmlEscape(tx.id)}</PrivateTransactionReference>` +
       `<DepositTransactionType>PULL</DepositTransactionType></Request></AutoCreate>`;
-    const raw = await yoRequest(xml);
+    const raw = await yoRequest(xml,mode);
     const transactionStatus = xmlTag(raw, "TransactionStatus").toUpperCase();
     const response = {
       Status: xmlTag(raw, "Status"),
@@ -1161,7 +1159,7 @@ export const startYoSeatPurchase=createServerFn({method:"POST"})
  .inputValidator(input=>z.object({phone:z.string().min(9).max(20),quantity:z.number().int().min(1).max(100)}).parse(input))
  .handler(async ({data,context})=>{
   const p=await assertTenantAdmin(context.userId);
-  const username=process.env.YO_API_USERNAME,password=process.env.YO_API_PASSWORD;
+  const {username,password,mode}=await getYoCheckoutConfig();
   if(!username||!password)throw Error("Payment gateway is not configured");
   const {data:tenant,error:te}=await admin.from("tenants").select("subscription_status,subscription_ends_at").eq("id",p.tenant_id).single();
   if(te||tenant?.subscription_status!=="active"||(tenant.subscription_ends_at&&new Date(tenant.subscription_ends_at)<=new Date()))throw Error("Activate or renew your paid subscription before adding seats.");
@@ -1179,7 +1177,7 @@ export const startYoSeatPurchase=createServerFn({method:"POST"})
    '<Method>acdepositfunds</Method><NonBlocking>TRUE</NonBlocking><Account>'+xmlEscape(phone)+'</Account><Amount>'+xmlEscape(amount)+'</Amount>'+
    '<Narrative>'+xmlEscape("AssetFlow "+data.quantity+" extra user seats")+'</Narrative><ExternalReference>'+xmlEscape(tx.id)+'</ExternalReference></Request></AutoCreate>';
   try{
-    const raw=await yoRequest(xml),reference=xmlTag(raw,"TransactionReference"),status=xmlTag(raw,"Status");
+    const raw=await yoRequest(xml,mode),reference=xmlTag(raw,"TransactionReference"),status=xmlTag(raw,"Status");
     await admin.from("seat_purchase_transactions").update({provider_reference:reference||null,status:status==="OK"?"pending":"failed"}).eq("id",tx.id);
     if(status!=="OK")throw Error(xmlTag(raw,"ErrorMessage")||xmlTag(raw,"StatusMessage")||"Payment was rejected");
     return {transactionId:tx.id,status:xmlTag(raw,"TransactionStatus")||"PENDING"};
@@ -1190,14 +1188,15 @@ export const checkYoSeatPurchase=createServerFn({method:"POST"})
  .middleware([requireSupabaseAuth])
  .inputValidator(input=>z.object({transactionId:z.string().uuid()}).parse(input))
  .handler(async ({data,context})=>{
-  const p=await assertTenantAdmin(context.userId),username=process.env.YO_API_USERNAME,password=process.env.YO_API_PASSWORD;
+  const p=await assertTenantAdmin(context.userId);
+    const {username,password,mode}=await getYoCheckoutConfig();
   if(!username||!password)throw Error("Payment gateway unavailable");
   const {data:tx,error}=await admin.from("seat_purchase_transactions").select("*").eq("id",data.transactionId).eq("tenant_id",p.tenant_id).single();
   if(error||!tx)throw Error("Seat purchase not found");
   if(tx.status==="successful")return {successful:true,status:"SUCCEEDED"};
   if(tx.status!=="pending"||!tx.provider_reference)throw Error("Payment is not pending");
   const xml='<?xml version="1.0" encoding="UTF-8"?><AutoCreate><Request><APIUsername>'+xmlEscape(username)+'</APIUsername><APIPassword>'+xmlEscape(password)+'</APIPassword><Method>actransactioncheckstatus</Method><TransactionReference>'+xmlEscape(tx.provider_reference)+'</TransactionReference><PrivateTransactionReference>'+xmlEscape(tx.id)+'</PrivateTransactionReference><DepositTransactionType>PULL</DepositTransactionType></Request></AutoCreate>';
-  const raw=await yoRequest(xml),status=xmlTag(raw,"TransactionStatus").toUpperCase();
+  const raw=await yoRequest(xml,mode),status=xmlTag(raw,"TransactionStatus").toUpperCase();
   if(status==="SUCCEEDED"){
    const {error:activationError}=await admin.rpc("activate_seat_purchase",{p_id:tx.id,p_tenant:p.tenant_id});
    if(activationError)throw Error(activationError.message);
@@ -1237,7 +1236,7 @@ export const startYoAssetCapacityPurchase=createServerFn({method:"POST"})
  .inputValidator(input=>z.object({phone:z.string().min(9).max(20),quantity:z.number().int().min(1).max(100)}).parse(input))
  .handler(async ({data,context})=>{
   const p=await assertTenantAdmin(context.userId);
-  const username=process.env.YO_API_USERNAME,password=process.env.YO_API_PASSWORD;
+  const {username,password,mode}=await getYoCheckoutConfig();
   if(!username||!password)throw Error("Payment gateway is not configured");
   const {data:tenant,error:te}=await admin.from("tenants").select("subscription_status,subscription_ends_at").eq("id",p.tenant_id).single();
   if(te||tenant?.subscription_status!=="active"||(tenant.subscription_ends_at&&new Date(tenant.subscription_ends_at)<=new Date()))throw Error("Activate or renew your paid subscription before adding asset blocks.");
@@ -1255,7 +1254,7 @@ export const startYoAssetCapacityPurchase=createServerFn({method:"POST"})
    '<Method>acdepositfunds</Method><NonBlocking>TRUE</NonBlocking><Account>'+xmlEscape(phone)+'</Account><Amount>'+xmlEscape(amount)+'</Amount>'+
    '<Narrative>'+xmlEscape("AssetFlow "+data.quantity+" extra user asset blocks")+'</Narrative><ExternalReference>'+xmlEscape(tx.id)+'</ExternalReference></Request></AutoCreate>';
   try{
-    const raw=await yoRequest(xml),reference=xmlTag(raw,"TransactionReference"),status=xmlTag(raw,"Status");
+    const raw=await yoRequest(xml,mode),reference=xmlTag(raw,"TransactionReference"),status=xmlTag(raw,"Status");
     await admin.from("asset_capacity_purchases").update({provider_reference:reference||null,status:status==="OK"?"pending":"failed"}).eq("id",tx.id);
     if(status!=="OK")throw Error(xmlTag(raw,"ErrorMessage")||xmlTag(raw,"StatusMessage")||"Payment was rejected");
     return {transactionId:tx.id,status:xmlTag(raw,"TransactionStatus")||"PENDING"};
@@ -1266,14 +1265,15 @@ export const checkYoAssetCapacityPurchase=createServerFn({method:"POST"})
  .middleware([requireSupabaseAuth])
  .inputValidator(input=>z.object({transactionId:z.string().uuid()}).parse(input))
  .handler(async ({data,context})=>{
-  const p=await assertTenantAdmin(context.userId),username=process.env.YO_API_USERNAME,password=process.env.YO_API_PASSWORD;
+  const p=await assertTenantAdmin(context.userId);
+    const {username,password,mode}=await getYoCheckoutConfig();
   if(!username||!password)throw Error("Payment gateway unavailable");
   const {data:tx,error}=await admin.from("asset_capacity_purchases").select("*").eq("id",data.transactionId).eq("tenant_id",p.tenant_id).single();
   if(error||!tx)throw Error("Asset capacity purchase not found");
   if(tx.status==="successful")return {successful:true,status:"SUCCEEDED"};
   if(tx.status!=="pending"||!tx.provider_reference)throw Error("Payment is not pending");
   const xml='<?xml version="1.0" encoding="UTF-8"?><AutoCreate><Request><APIUsername>'+xmlEscape(username)+'</APIUsername><APIPassword>'+xmlEscape(password)+'</APIPassword><Method>actransactioncheckstatus</Method><TransactionReference>'+xmlEscape(tx.provider_reference)+'</TransactionReference><PrivateTransactionReference>'+xmlEscape(tx.id)+'</PrivateTransactionReference><DepositTransactionType>PULL</DepositTransactionType></Request></AutoCreate>';
-  const raw=await yoRequest(xml),status=xmlTag(raw,"TransactionStatus").toUpperCase();
+  const raw=await yoRequest(xml,mode),status=xmlTag(raw,"TransactionStatus").toUpperCase();
   if(status==="SUCCEEDED"){
    const {error:activationError}=await admin.rpc("activate_asset_capacity_purchase",{p_id:tx.id,p_tenant:p.tenant_id});
    if(activationError)throw Error(activationError.message);

@@ -29,19 +29,29 @@ function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [awaitingCode,setAwaitingCode]=useState(false);
+  const [verificationCode,setVerificationCode]=useState("");
 
   if (!loading && user && tenantId) return <Navigate to="/dashboard" />;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (submitting) return;
-    if (!user && form.password.length < 8) return toast.error("Use at least 8 characters for your password.");
-    if (!user && form.password !== confirmPassword) return toast.error("Passwords do not match.");
+    if (!user && !awaitingCode && form.password.length < 8) return toast.error("Use at least 8 characters for your password.");
+    if (!user && !awaitingCode && form.password !== confirmPassword) return toast.error("Passwords do not match.");
 
     setSubmitting(true);
     let createdNewAuthUser = false;
     try {
-      if (!user) {
+      if (awaitingCode) {
+        if (!/^\d{6,8}$/.test(verificationCode)) throw new Error("Enter the verification code sent to your email.");
+        const {data,error}=await supabase.auth.verifyOtp({
+          email:form.email.trim().toLowerCase(),token:verificationCode,type:"signup"
+        });
+        if(error)throw error;
+        if(!data.session)throw new Error("Email verified, but sign-in session was not created. Sign in to continue.");
+        setAwaitingCode(false);
+      } else if (!user) {
         const { data, error } = await supabase.auth.signUp({
           email: form.email.trim(),
           password: form.password,
@@ -49,7 +59,11 @@ function RegisterPage() {
         });
         if (error) throw error;
         if (!data.user) throw new Error("Account creation did not complete.");
-        if (!data.session) throw new Error("Your account was created. Please sign in to continue.");
+        if (!data.session) {
+          setAwaitingCode(true);
+          toast.success("Check your email for your one-time verification code.");
+          return;
+        }
         createdNewAuthUser = true;
       }
 
@@ -75,6 +89,20 @@ function RegisterPage() {
       setSubmitting(false);
     }
   };
+
+  if (awaitingCode) return (
+    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-5 p-6">
+      <h1 className="text-2xl font-bold">Verify your email address</h1>
+      <p className="text-sm text-muted-foreground">We sent a one-time verification code to your email. Enter it to activate your new workspace.</p>
+      <form onSubmit={submit} className="space-y-4">
+        <Label htmlFor="registration-code">Email verification code</Label>
+        <Input id="registration-code" autoComplete="one-time-code" inputMode="numeric" value={verificationCode}
+          onChange={e=>setVerificationCode(e.target.value.replace(/\\D/g,"").slice(0,8))} maxLength={8} required/>
+        <Button disabled={submitting} type="submit">{submitting?"Verifying…":"Verify and create workspace"}</Button>
+      </form>
+      <Button variant="outline" onClick={()=>{setAwaitingCode(false);setVerificationCode("")}}>Back to registration</Button>
+    </main>
+  );
 
   return (
     <div className="platform-brand relative min-h-screen overflow-hidden bg-background px-4 py-8">
