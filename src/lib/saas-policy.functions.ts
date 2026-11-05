@@ -71,7 +71,7 @@ export const updateGlobalSaasPolicy = createServerFn({ method: "POST" })
         trial_user_limit: z.number().int().min(1).max(10000),
         paid_price: z.number().min(0),
         included_paid_users:z.number().int().min(1).max(100000),extra_user_price:z.number().min(0),included_assets:z.number().int().min(1).max(1000000000),extra_asset_block_size:z.number().int().min(1).max(10000000),extra_asset_block_price:z.number().min(0),
-        currency: z.string().trim().min(3).max(8),
+        currency: z.literal("USD"),
       })
       .parse(input),
   )
