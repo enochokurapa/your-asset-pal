@@ -18,11 +18,10 @@ const PHRASES = [
   "Control transfers and maintenance",
   "Turn asset records into clear reports",
 ] as const;
-const STAGES = ["Register","Tag","Assign","Verify","Locate","Maintain","Report"] as const;
 
 /**
  * Backgrounds crossfade every 7s. Content, controls and seven stage labels
- * never change. SaaS administrators may replace backgrounds independently.
+ * never change. Diagram labels belong inside the images, not beneath the hero.
  */
 export function HomeHeroCarousel() {
   const [active,setActive] = useState(0);
@@ -107,14 +106,6 @@ export function HomeHeroCarousel() {
             </Link>
           </div>
         </div>
-      </div>
-    </div>
-    <div className="relative z-10 border-t border-[#d8e3ea] bg-white/95 px-5 py-4">
-      <div className="mx-auto flex max-w-7xl items-center gap-3 overflow-x-auto sm:justify-between">
-        <span className="shrink-0 pr-2 text-xs font-bold uppercase tracking-[.12em] text-[#435c6f]">The 7 steps</span>
-        {STAGES.map((stage,i)=><div key={stage} className="flex shrink-0 items-center gap-2 text-sm font-semibold text-[#18374a]">
-          <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[#e6c0a4] bg-[#fff1e8] text-xs font-bold text-[#b36534]">{i+1}</span>{stage}
-        </div>)}
       </div>
     </div>
   </section>;
