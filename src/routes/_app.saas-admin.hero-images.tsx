@@ -36,6 +36,7 @@ function HeroSettings(){
  const [candidate,setCandidate]=useState("");
  const [altText,setAltText]=useState(defaultAlt);
  const [dimension,setDimension]=useState("");
+ const [layout,setLayout]=useState<"standard"|"approved_home_lifecycle">("approved_home_lifecycle");
  const [busy,setBusy]=useState(false);
  const list=useServerFn(listPlatformHeroImages);
  const get=useServerFn(getHeroImage);
@@ -53,6 +54,7 @@ function HeroSettings(){
   setCandidate("");setFileName("");setDimension("");
   if(inputRef.current)inputRef.current.value="";
   setAltText(existing?.altText??defaultAlt);
+  setLayout(page==="home"?(existing?.layout==="standard"?"standard":"approved_home_lifecycle"):"standard");
  },[page,existing?.altText]);
  if(loading)return null;
  if(!isSaasAdmin)return <Navigate to="/dashboard"/>;
@@ -84,7 +86,7 @@ function HeroSettings(){
   setBusy(true);
   try{
    const headers=await getHeroHeaders();
-   const result=await save({headers,data:{page,dataUrl:candidate,altText:altText.trim()}});
+   const result=await save({headers,data:{page,dataUrl:candidate,altText:altText.trim(),layout}});
    setCandidate("");setFileName("");setDimension("");
    if(inputRef.current)inputRef.current.value="";
    await Promise.all([
@@ -151,6 +153,12 @@ function HeroSettings(){
     <p className="text-xs leading-6 text-muted-foreground">PNG, WebP or safe SVG vector. Maximum 3 MB. Minimum 1280 × 600 px; maximum 3840 × 2400 px. Landscape aspect ratio 1.5:1 to 3.2:1. Recommended 1774 × 887 (2:1).</p>
     <p className="text-xs text-muted-foreground">SVG files are checked for scripts, unsafe elements and external references. Complex SVG files may need to be exported as PNG or WebP.</p>
    </div>
+   {page==="home"&&<label className="flex items-start gap-3 rounded-lg border p-3 text-sm">
+    <input type="checkbox" checked={layout==="approved_home_lifecycle"} disabled={busy}
+     onChange={e=>setLayout(e.target.checked?"approved_home_lifecycle":"standard")}
+     className="mt-1 h-4 w-4"/>
+    <span><strong>Approved seven-step lifecycle artwork</strong><span className="mt-1 block text-xs text-muted-foreground">Use this for the original staircase hero. It hides the sample top navigation and makes its two visual buttons clickable. Turn off when uploading a different homepage design.</span></span>
+   </label>}
    <div className="space-y-2"><Label htmlFor="hero-alt">Image description (accessibility)</Label>
     <Input id="hero-alt" maxLength={220} value={altText} disabled={busy}
      onChange={e=>setAltText(e.target.value)}
