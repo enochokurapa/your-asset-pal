@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { ShieldCheck } from "lucide-react";
 
 type TotpEnrollment = { factorId: string; qr: string; secret: string };
-export function MfaSettingsCard() {
+export function MfaSettingsCard({ required = false, onVerified }: { required?: boolean; onVerified?: () => void } = {}) {
   const [enrollment,setEnrollment]=useState<TotpEnrollment|null>(null);
   const [code,setCode]=useState("");
   const [enabled,setEnabled]=useState<{id:string;friendly_name?:string}[]>([]);
@@ -36,6 +36,7 @@ export function MfaSettingsCard() {
     if(error){toast.error(error.message);return;}
     setEnrollment(null);setCode("");await refresh();
     toast.success("Authenticator verification enabled.");
+    onVerified?.();
   };
   const remove=async(id:string)=>{
     if(!window.confirm("Remove this authentication factor? Verify your identity before changing security settings."))return;
@@ -46,9 +47,9 @@ export function MfaSettingsCard() {
     toast.success("Authentication factor removed.");
   };
   return <Card className="space-y-4 p-6">
-    <div className="flex items-center gap-3"><ShieldCheck className="h-6 w-6 text-primary"/><div><h2 className="font-semibold">Two-factor authentication</h2><p className="text-xs text-muted-foreground">Optional additional protection. Enable an authenticator app only if you choose to.</p></div></div>
-    {enabled.map(f=><div key={f.id} className="flex items-center justify-between gap-3 rounded-lg border p-3"><span className="text-sm">Authenticator enabled · {f.friendly_name??"TOTP"}</span><Button size="sm" variant="outline" disabled={busy} onClick={()=>remove(f.id)}>Remove factor</Button></div>)}
+    <div className="flex items-center gap-3"><ShieldCheck className="h-6 w-6 text-primary"/><div><h2 className="font-semibold">Two-factor authentication</h2><p className="text-xs text-muted-foreground">{required ? "An authenticator app is mandatory for administrator access." : "Enable an authenticator app to improve account protection."}</p></div></div>
+    {enabled.map(f=><div key={f.id} className="flex items-center justify-between gap-3 rounded-lg border p-3"><span className="text-sm">Authenticator enabled · {f.friendly_name??"TOTP"}</span><Button size="sm" variant="outline" disabled={busy || (required && enabled.length <= 1)} onClick={()=>remove(f.id)}>Remove factor</Button></div>)}
     {enrollment?<div className="space-y-3 rounded-lg border p-4"><p className="text-sm">Scan this code in your authenticator app. Keep the secret private.</p><img src={enrollment.qr} className="h-44 w-44 bg-white p-2" alt="Authenticator app QR code"/><p className="break-all text-xs">Manual key: <strong>{enrollment.secret}</strong></p><Label htmlFor="mfa-code">Six-digit code</Label><Input id="mfa-code" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))} inputMode="numeric" maxLength={6} autoComplete="one-time-code"/><div className="flex gap-2"><Button onClick={verify} disabled={busy||code.length!==6}>Confirm and enable</Button><Button variant="outline" onClick={()=>setEnrollment(null)}>Cancel</Button></div></div>:<Button variant="outline" disabled={busy} onClick={enroll}>Add authenticator app</Button>}
-    <p className="text-xs text-muted-foreground">An authenticator app is not required for accounts without an enrolled factor. Email-code verification is not yet available until secure email delivery is configured. Never share verification codes.</p>
+    <p className="text-xs text-muted-foreground">Never share your authenticator secret or one-time codes. If your device is lost, contact an authorized platform security administrator for account recovery.</p>
   </Card>;
 }
