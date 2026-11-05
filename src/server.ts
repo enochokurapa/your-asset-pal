@@ -4,6 +4,7 @@ import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { startBackupScheduler } from "./lib/backup-core.server";
 import { startTenantAutomationScheduler } from "./lib/automation-core.server";
+import { startPlatformEmailReportScheduler } from "./lib/platform-email-reports.server";
 import { createHash } from "node:crypto";
 import { supabaseAdmin } from "./integrations/supabase/client.server";
 import { completeMicrosoftOAuth } from "./lib/microsoft365.server";
@@ -38,6 +39,7 @@ let serverEntryPromise: Promise<ServerEntry> | undefined;
 // and creates a backup only when the configured 6/24-hour interval has elapsed.
 startBackupScheduler();
 startTenantAutomationScheduler();
+startPlatformEmailReportScheduler();
 
 async function getServerEntry(): Promise<ServerEntry> {
   if (!serverEntryPromise) {

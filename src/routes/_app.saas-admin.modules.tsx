@@ -71,7 +71,7 @@ function SaasAdminModulesPage() {
         <Boxes className="mt-0.5 h-5 w-5 text-primary" />
         <div>
           <h2 className="font-semibold">Module control</h2>
-          <p className="text-sm text-muted-foreground">Set add-on prices.</p>
+          <p className="text-sm text-muted-foreground">Set global module availability and add-on prices. Activating a standard subscription never grants API Access or Live Tracking: unlock each add-on separately per customer under Businesses.</p>
         </div>
       </div>
 

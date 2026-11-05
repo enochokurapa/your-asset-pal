@@ -170,3 +170,34 @@ export async function getConfiguredSmtpForApplication(category:MailCategory){
  const displayName={security:"AssetFlow Security",operations:"AssetFlow Operations",finance:"AssetFlow Finance"}[category];
  return {...config,displayName};
 }
+
+/** Server-side platform email delivery using the saved, encrypted SMTP configuration. */
+export async function sendPlatformReportEmail(to:string,subject:string,body:string){
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)||to.length>250)throw new Error("Invalid report recipient");
+ const config=await getConfiguredSmtpForApplication("operations");
+ const c=await connect(config);
+ try{
+  await c.send("MAIL FROM:<"+config.fromEmail+">");
+  await c.send("RCPT TO:<"+to+">");
+  await c.send("DATA",354);
+  const lines=[
+   "From: AssetFlow Operations <"+config.fromEmail+">",
+   "To: "+safe(to),
+   "Subject: "+safe(subject).slice(0,180),
+   "MIME-Version: 1.0",
+   "Content-Type: text/plain; charset=UTF-8",
+   "X-Auto-Response-Suppress: All",
+   "",
+   "AssetFlow 360 | Operations",
+   "--------------------------------",
+   body.slice(0,7000),
+   "",
+   "This is an automated report for your organization's authorized administrators.",
+   "Please do not reply to this message."
+  ];
+  const payload=lines.join("\r\n").replace(/\r\n\./g,"\r\n..");
+  await c.send(payload+"\r\n.");
+  await c.send("QUIT",221);
+  return {accepted:true};
+ }finally{c.close()}
+}

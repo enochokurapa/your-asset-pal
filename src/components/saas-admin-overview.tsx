@@ -15,6 +15,9 @@ import {
 
 const SECTIONS = [
   { to: "/saas-admin/organizations", title: "Businesses", description: "Open one organization and control plan, modules, users, domains and activity.", icon: Building2 },
+  { to: "/saas-admin/settings", title: "SaaS Settings", description: "Central controls for payment gateways, email, modules, billing and backups.", icon: Settings2 },
+  { to: "/saas-admin/email-reports", title: "Automated Reports", description: "Control monthly or daily asset summary emails.", icon: Mail },
+  { to: "/saas-admin/payment-gateways", title: "Payment Gateways", description: "Securely configure Yo Uganda and ioTec credentials.", icon: CreditCard },
   { to: "/saas-admin/branding", title: "Branding", description: "Platform logo, app icon and AssetFlow 360 color palette.", icon: ImageIcon },
   { to: "/saas-admin/policy", title: "Plan & Pricing", description: "Trial duration, trial user limits, paid price and currency.", icon: CreditCard },
   { to: "/saas-admin/modules", title: "Global Modules", description: "Control included modules and optional paid add-ons.", icon: Boxes },

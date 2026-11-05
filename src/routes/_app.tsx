@@ -48,6 +48,9 @@ const tenantNav: NavItem[] = [
 const saasAdminNav: NavItem[] = [
   { to: "/dashboard", label: "Control Center", icon: LayoutDashboard, exact: true },
   { to: "/saas-admin/organizations", label: "Businesses", icon: Building2 },
+  { to: "/saas-admin/settings", label: "Settings", icon: Settings },
+  { to: "/saas-admin/email-reports", label: "Automated Reports", icon: Mail },
+  { to: "/saas-admin/payment-gateways", label: "Payment Gateways", icon: CreditCard },
   { to: "/saas-admin/branding", label: "Branding", icon: ImageIcon },
   { to: "/saas-admin/policy", label: "Plan & Pricing", icon: CreditCard },
   { to: "/saas-admin/modules", label: "Global Modules", icon: Boxes },
