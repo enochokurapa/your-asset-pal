@@ -4,6 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { resolveTxt } from "node:dns/promises";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { queryPostgres } from "@/lib/postgres.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const admin = supabaseAdmin as any;
@@ -111,11 +112,13 @@ function normalizePlatformLogo(dataUrl: string | null): string | null {
 
 export const getPublicSaasBranding = createServerFn({ method: "GET" })
   .handler(async () => {
-    const { data, error } = await admin.from("saas_settings")
-      .select("platform_name,platform_logo_data_url,platform_icon_data_url,platform_primary_color,platform_secondary_color")
-      .eq("id", true)
-      .single();
-    if (error) throw new Error(error.message);
+    const [data] = await queryPostgres<{
+      platform_name: string | null;
+      platform_logo_data_url: string | null;
+      platform_icon_data_url: string | null;
+      platform_primary_color: string | null;
+      platform_secondary_color: string | null;
+    }>("SELECT platform_name, platform_logo_data_url, platform_icon_data_url, platform_primary_color, platform_secondary_color FROM public.saas_settings WHERE id = TRUE LIMIT 1");
     return {
       name: data?.platform_name || "AssetFlow 360",
       logoDataUrl: data?.platform_logo_data_url || null,
@@ -137,11 +140,14 @@ export const updateSaasBranding = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertSaasAdmin(context.userId);
 
-    const { data: current, error: readError } = await admin.from("saas_settings")
-      .select("platform_name,platform_logo_data_url,platform_icon_data_url,platform_primary_color,platform_secondary_color")
-      .eq("id", true)
-      .single();
-    if (readError || !current) throw new Error(readError?.message || "Platform branding is not configured");
+    const [current] = await queryPostgres<{
+      platform_name: string | null;
+      platform_logo_data_url: string | null;
+      platform_icon_data_url: string | null;
+      platform_primary_color: string | null;
+      platform_secondary_color: string | null;
+    }>("SELECT platform_name, platform_logo_data_url, platform_icon_data_url, platform_primary_color, platform_secondary_color FROM public.saas_settings WHERE id = TRUE LIMIT 1");
+    if (!current) throw new Error("Platform branding is not configured");
 
     const logo = data.logo_data_url === undefined
       ? current.platform_logo_data_url
@@ -153,16 +159,18 @@ export const updateSaasBranding = createServerFn({ method: "POST" })
     const primaryColor = (data.primary_color ?? current.platform_primary_color ?? "#C77435").toUpperCase();
     const secondaryColor = (data.secondary_color ?? current.platform_secondary_color ?? "#4B47DC").toUpperCase();
 
-    const { error } = await admin.from("saas_settings").update({
-      platform_name: platformName,
-      platform_logo_data_url: logo,
-      platform_icon_data_url: icon,
-      platform_primary_color: primaryColor,
-      platform_secondary_color: secondaryColor,
-      updated_at: new Date().toISOString(),
-      updated_by: context.userId,
-    }).eq("id", true);
-    if (error) throw new Error(error.message);
+    await queryPostgres(
+      `UPDATE public.saas_settings
+       SET platform_name = $1,
+           platform_logo_data_url = $2,
+           platform_icon_data_url = $3,
+           platform_primary_color = $4,
+           platform_secondary_color = $5,
+           updated_at = NOW(),
+           updated_by = $6
+       WHERE id = TRUE`,
+      [platformName, logo, icon, primaryColor, secondaryColor, context.userId],
+    );
     return {
       ok: true,
       name: platformName,

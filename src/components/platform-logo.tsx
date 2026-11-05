@@ -9,30 +9,42 @@ export function usePlatformBranding() {
   const query = useQuery({
     queryKey: ["public-saas-branding"],
     queryFn: () => getBranding(),
-    staleTime: 0,
-    refetchOnMount: "always",
+    staleTime: 30_000,
+    refetchOnMount: false,
   });
 
+  return query;
+}
+
+/** Run once per application, not for every logo in the header/footer. */
+export function PlatformBrandingEffect() {
+  const { data } = usePlatformBranding();
   useEffect(() => {
-    const data = query.data;
     if (!data || typeof document === "undefined") return;
 
     const root = document.documentElement;
     root.style.setProperty("--platform-primary", data.primaryColor || "#C77435");
     root.style.setProperty("--platform-secondary", data.secondaryColor || "#4B47DC");
 
-    const faviconHref = data.iconDataUrl;
-    let icon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-    if (!icon) {
-      icon = document.createElement("link");
-      icon.rel = "icon";
-      document.head.appendChild(icon);
+    // The favicon, installed app and Apple icon all use the admin-uploaded
+    // platform mark. Cache-bust after a branding update so browsers reload it.
+    const version = Date.now();
+    for (const [rel, path] of [
+      ["icon", "/api/branding/icon-192.png"],
+      ["apple-touch-icon", "/api/branding/icon-192.png"],
+      ["manifest", "/api/branding/manifest.webmanifest"],
+    ] as const) {
+      let link = document.head.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = rel;
+        document.head.appendChild(link);
+      }
+      link.href = `${path}?v=${version}`;
     }
-    if (faviconHref) icon.href = faviconHref;
-    else icon.removeAttribute("href");
-  }, [query.data]);
+  }, [data]);
 
-  return query;
+  return null;
 }
 
 export function PlatformLogo({
@@ -48,9 +60,13 @@ export function PlatformLogo({
   variant?: "mark" | "lockup";
 }) {
   const { data } = usePlatformBranding();
-  const uploaded = variant === "lockup" ? data?.logoDataUrl : data?.iconDataUrl;
+  const uploaded = variant === "lockup"
+    ? (data?.logoDataUrl || data?.iconDataUrl)
+    : (data?.iconDataUrl || data?.logoDataUrl);
   const [failedSrc,setFailedSrc] = useState<string|null>(null);
-  const src = uploaded && failedSrc !== uploaded ? uploaded : null;
+  const src = uploaded && failedSrc !== uploaded
+    ? uploaded
+    : variant === "lockup" ? "/assetflow360-logo.svg" : "/assetflow360-mark.svg";
   return (
     <span className={cn("inline-flex items-center justify-center", className)}>
       {src ? <img
