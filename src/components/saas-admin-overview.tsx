@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import {
   Activity, ArrowRight, Boxes, Building2, CheckCircle2, CircleDollarSign,
   CreditCard, Database, DatabaseBackup, Globe2, ImageIcon, Settings2,
-  ShieldCheck, Users, Wrench, XCircle,
+  ShieldCheck, Users, Wrench, XCircle, Mail,
 } from "lucide-react";
 
 const SECTIONS = [
@@ -19,6 +19,7 @@ const SECTIONS = [
   { to: "/saas-admin/policy", title: "Plan & Pricing", description: "Trial duration, trial user limits, paid price and currency.", icon: CreditCard },
   { to: "/saas-admin/modules", title: "Global Modules", description: "Control included modules and optional paid add-ons.", icon: Boxes },
   { to: "/saas-admin/backups", title: "Backup & Restore", description: "R2 backup automation, restore points and manual backups.", icon: DatabaseBackup },
+  { to: "/saas-admin/email", title: "Email & SMTP", description: "Configure SMTP credentials and test the email connection.", icon: Mail },
 ] as const;
 
 function MetricCard({ label, value, detail, icon: Icon }: { label: string; value: string | number; detail: string; icon: any }) {
