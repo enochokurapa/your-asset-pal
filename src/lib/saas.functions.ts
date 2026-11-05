@@ -1,4 +1,5 @@
 import { getYoCheckoutConfig, isYoCheckoutConfigured } from "@/lib/payment-gateway.server";
+import { currentUsdUgxQuote, usdToUgx } from "@/lib/pricing-fx.server";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { resolveTxt } from "node:dns/promises";
@@ -900,10 +901,13 @@ export const startYoUpgrade = createServerFn({ method: "POST" })
     if (settingsError || !settings) throw new Error(settingsError?.message || "Global SaaS pricing is not configured");
     const {data:plan,error:planError}=await admin.from("saas_pricing_plans").select("id,monthly_price,annual_price,is_published").eq("id",data.plan_id).single();
     if(planError||!plan||!plan.is_published)throw Error("Selected subscription package is unavailable");
-    const amount=Number(data.period==="annual"?plan.annual_price:plan.monthly_price);
-    const currency=String(settings.currency||"").toUpperCase();
-    if(currency!=="UGX")throw Error("Mobile-money checkout requires UGX pricing. SaaS Admin must set billing currency and package prices in UGX before collecting payment.");
-    if(!Number.isFinite(amount)||amount<=0)throw Error("Selected package requires a positive price");
+    const baseAmountUsd=Number(data.period==="annual"?plan.annual_price:plan.monthly_price);
+    if(String(settings.currency).toUpperCase()!=="USD")throw Error("SaaS prices must be configured in USD");
+    if(!Number.isFinite(baseAmountUsd)||baseAmountUsd<=0)throw Error("Selected package requires a positive price");
+    const quote=await currentUsdUgxQuote(true);
+    if(!quote)throw Error("Verified exchange rate unavailable");
+    const amount=usdToUgx(baseAmountUsd,quote.rate);
+    const currency="UGX";
 
     const phone = data.phone.replace(/\s+/g, "").replace(/^\+/, "");
     if (!/^256\d{9}$/.test(phone)) throw new Error("Use a mobile-money number in format 2567XXXXXXXX");
@@ -913,6 +917,10 @@ export const startYoUpgrade = createServerFn({ method: "POST" })
       phone,
       amount,
       currency,
+      base_amount_usd:baseAmountUsd,
+      conversion_rate:quote.rate,
+      conversion_source:quote.source,
+      conversion_timestamp:quote.updatedAt,
       status: "pending",
       plan_code:data.plan_id,billing_period:data.period,
     }).select().single();
@@ -970,12 +978,16 @@ export const startYoAddonPurchase = createServerFn({ method: "POST" })
     if (moduleError || !module || module.billing_model !== "add_on" || !module.globally_enabled) {
       throw new Error("Add-on is not available");
     }
-    const amount = Number(module.add_on_price);
-    if (!Number.isFinite(amount) || amount <= 0) throw new Error("Add-on price is not set");
+    const baseAmountUsd = Number(module.add_on_price);
+    if (!Number.isFinite(baseAmountUsd) || baseAmountUsd <= 0) throw new Error("Add-on price is not set");
     const { data: settings, error: settingsError } = await admin.from("saas_settings")
       .select("currency").eq("id", true).single();
     if (settingsError || !settings?.currency) throw new Error("Billing currency is not configured");
-    const currency = String(settings.currency).toUpperCase();
+    if(String(settings.currency).toUpperCase()!=="USD")throw Error("SaaS prices must be configured in USD");
+    const quote=await currentUsdUgxQuote(true);
+    if(!quote)throw Error("Verified exchange rate unavailable");
+    const amount=usdToUgx(baseAmountUsd,quote.rate);
+    const currency="UGX";
 
     const existing = await admin.from("tenant_module_overrides")
       .select("enabled").eq("tenant_id", p.tenant_id).eq("module_key", data.module_key).maybeSingle();
@@ -990,6 +1002,10 @@ export const startYoAddonPurchase = createServerFn({ method: "POST" })
       phone,
       amount,
       currency,
+      base_amount_usd:baseAmountUsd,
+      conversion_rate:quote.rate,
+      conversion_source:quote.source,
+      conversion_timestamp:quote.updatedAt,
       status: "pending",
     }).select().single();
     if (txError) throw new Error(txError.message);
@@ -1209,7 +1225,8 @@ export const getPricingPlans=createServerFn({method:"GET"}).handler(async()=>{
  if(error)throw Error(error.message);
  const {data:settings}=await admin.from("saas_settings").select("currency,extra_user_price,extra_asset_block_size,extra_asset_block_price,trial_days").eq("id",true).single();
  const {data:modules}=await admin.from("saas_modules").select("module_key,label").eq("globally_enabled",true);const moduleNames=new Map((Array.isArray(modules)?modules:[]).map((m:any)=>[m.module_key,m.label]));
- return {currency:settings?.currency??"USD",extraUserPrice:Number(settings?.extra_user_price??0),extraAssetBlockSize:Number(settings?.extra_asset_block_size??2000),extraAssetBlockPrice:Number(settings?.extra_asset_block_price??20),trialDays:Number(settings?.trial_days??14),plans:(data??[]).map((p:any)=>({...p,monthly_price:Number(p.monthly_price),annual_price:Number(p.annual_price),module_labels:(Array.isArray(p.enabled_modules)?p.enabled_modules:[]).map((k:string)=>moduleNames.get(k)||k)}))};
+ const fx=await currentUsdUgxQuote();
+ return {currency:"USD",fxRate:fx?.rate??null,fxUpdatedAt:fx?.updatedAt??null,fxSource:fx?.source??null,extraUserPrice:Number(settings?.extra_user_price??0),extraAssetBlockSize:Number(settings?.extra_asset_block_size??2000),extraAssetBlockPrice:Number(settings?.extra_asset_block_price??20),trialDays:Number(settings?.trial_days??14),plans:(data??[]).map((p:any)=>({...p,monthly_price:Number(p.monthly_price),annual_price:Number(p.annual_price),module_labels:(Array.isArray(p.enabled_modules)?p.enabled_modules:[]).map((k:string)=>moduleNames.get(k)||k)}))};
 });
 export const getAdminAvailableModules=createServerFn({method:"POST"}).middleware([requireSupabaseAuth]).handler(async({context})=>{
  await assertSaasAdmin(context.userId);
