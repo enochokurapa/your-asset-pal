@@ -45,7 +45,7 @@ export const getBackupDashboard = createServerFn({ method: "GET" })
 
     try {
       policy = await readBackupPolicy();
-      if (environment.r2Configured) backups = (await listBackupObjects()).slice(0, 3);
+      if (environment.r2Configured) backups = (await listBackupObjects()).slice(0, 14);
     } catch (error: any) {
       configurationError = error?.message || "Backup configuration could not be loaded";
     }
@@ -54,7 +54,7 @@ export const getBackupDashboard = createServerFn({ method: "GET" })
       environment,
       policy,
       backups,
-      retentionCount: 3,
+      retentionCount: 14,
       emailConfigured: Boolean(
         process.env.RESEND_API_KEY?.trim() && process.env.BACKUP_EMAIL_FROM?.trim(),
       ),
@@ -68,7 +68,7 @@ export const saveBackupPolicy = createServerFn({ method: "POST" })
     z
       .object({
         enabled: z.boolean(),
-        interval_hours: z.union([z.literal(6), z.literal(24)]),
+        interval_hours: z.union([z.literal(6), z.literal(12), z.literal(24), z.literal(168)]),
       })
       .parse(input),
   )
