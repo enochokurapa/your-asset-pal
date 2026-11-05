@@ -4,7 +4,7 @@ const db = supabaseAdmin as any;
 export const HERO_PAGES = ["home","home_2","home_3","features","solutions","pricing","about"] as const;
 export type HeroPage = typeof HERO_PAGES[number];
 type ImageFormat = "image/png" | "image/webp" | "image/svg+xml";
-const MAX_BYTES = 3_000_000;
+const MAX_BYTES = 300_000;
 const MIN_WIDTH = 1280;
 const MIN_HEIGHT = 600;
 const MAX_WIDTH = 3840;
@@ -87,10 +87,10 @@ function decodeAndValidate(dataUrl:string) {
   const match=/^data:(image\/png|image\/webp|image\/svg\+xml);base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl);
   if(!match) throw new Error("Upload a PNG, WebP or vector SVG image");
   const mime=match[1] as ImageFormat;
-  if(match[2].length>Math.ceil(MAX_BYTES/3)*4+4) throw new Error("Image must be 3 MB or smaller");
+  if(match[2].length>Math.ceil(MAX_BYTES/3)*4+4) throw new Error("Image must be 300 KB or smaller");
   const binary=Buffer.from(match[2],"base64");
   if(!binary.length || binary.length>MAX_BYTES || binary.toString("base64")!==match[2])
-    throw new Error("Image encoding is invalid or file exceeds 3 MB");
+    throw new Error("Image encoding is invalid or file exceeds 300 KB");
   const [width,height]=mime==="image/png"?pngDimensions(binary):
     mime==="image/webp"?webpDimensions(binary):validateSvg(binary);
   if(width<MIN_WIDTH||height<MIN_HEIGHT||width>MAX_WIDTH||height>MAX_HEIGHT ||
