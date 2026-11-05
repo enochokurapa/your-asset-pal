@@ -173,7 +173,7 @@ export async function getConfiguredSmtpForApplication(category:MailCategory){
 
 /** Server-side platform email delivery using the saved, encrypted SMTP configuration. */
 export async function sendPlatformReportEmail(to:string,subject:string,body:string){
- if(!/^[^\s@]+@[^\s@]+\\.[^\s@]+$/.test(to)||to.length>250)throw new Error("Invalid report recipient");
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)||to.length>250)throw new Error("Invalid report recipient");
  const config=await getConfiguredSmtpForApplication("operations");
  const c=await connect(config);
  try{
@@ -195,7 +195,7 @@ export async function sendPlatformReportEmail(to:string,subject:string,body:stri
    "This is an automated report for your organization's authorized administrators.",
    "Please do not reply to this message."
   ];
-  const payload=lines.join("\r\n").replace(/\r\n\\./g,"\r\n..");
+  const payload=lines.join("\r\n").replace(/\r\n\./g,"\r\n..");
   await c.send(payload+"\r\n.");
   await c.send("QUIT",221);
   return {accepted:true};
