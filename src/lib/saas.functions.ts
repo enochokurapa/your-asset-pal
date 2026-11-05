@@ -1181,12 +1181,17 @@ export const startYoSeatPurchase=createServerFn({method:"POST"})
   if(te||tenant?.subscription_status!=="active"||(tenant.subscription_ends_at&&new Date(tenant.subscription_ends_at)<=new Date()))throw Error("Activate or renew your paid subscription before adding seats.");
   const {data:settings,error:se}=await admin.from("saas_settings").select("currency,extra_user_price").eq("id",true).single();
   if(se||!settings)throw Error("Seat pricing not configured");
-  if(String(settings.currency).toUpperCase()!=="UGX")throw Error("Mobile-money seat checkout requires UGX pricing. Ask SaaS Admin to configure billing currency and seat price.");
-  const unitPrice=Number(settings.extra_user_price),amount=unitPrice*data.quantity;
-  if(!Number.isFinite(amount)||amount<=0)throw Error("SaaS Admin must configure a positive extra-user price");
+  if(String(settings.currency).toUpperCase()!=="USD")throw Error("SaaS prices must be configured in USD");
+  const baseUnitPriceUsd=Number(settings.extra_user_price);
+  const baseAmountUsd=baseUnitPriceUsd*data.quantity;
+  if(!Number.isFinite(baseAmountUsd)||baseAmountUsd<=0)throw Error("SaaS Admin must configure a positive extra-user price");
+  const quote=await currentUsdUgxQuote(true);
+  if(!quote)throw Error("Verified exchange rate unavailable");
+  const unitPrice=usdToUgx(baseUnitPriceUsd,quote.rate);
+  const amount=usdToUgx(baseAmountUsd,quote.rate);
   const phone=data.phone.replace(/\s+/g,"").replace(/^\+/,"");
   if(!/^256\d{9}$/.test(phone))throw Error("Use mobile money number 2567XXXXXXXX");
-  const {data:tx,error}=await admin.from("seat_purchase_transactions").insert({tenant_id:p.tenant_id,user_id:context.userId,quantity:data.quantity,unit_price:unitPrice,amount,currency:settings.currency,phone}).select("id").single();
+  const {data:tx,error}=await admin.from("seat_purchase_transactions").insert({tenant_id:p.tenant_id,user_id:context.userId,quantity:data.quantity,unit_price:unitPrice,amount,currency:"UGX",base_amount_usd:baseAmountUsd,conversion_rate:quote.rate,conversion_timestamp:quote.updatedAt,phone}).select("id").single();
   if(error||!tx)throw Error(error?.message||"Could not create purchase");
   const xml='<?xml version="1.0" encoding="UTF-8"?><AutoCreate><Request>'+
    '<APIUsername>'+xmlEscape(username)+'</APIUsername><APIPassword>'+xmlEscape(password)+'</APIPassword>'+
@@ -1259,12 +1264,15 @@ export const startYoAssetCapacityPurchase=createServerFn({method:"POST"})
   if(te||tenant?.subscription_status!=="active"||(tenant.subscription_ends_at&&new Date(tenant.subscription_ends_at)<=new Date()))throw Error("Activate or renew your paid subscription before adding asset blocks.");
   const {data:settings,error:se}=await admin.from("saas_settings").select("currency,extra_asset_block_price,extra_asset_block_size").eq("id",true).single();
   if(se||!settings)throw Error("Asset capacity pricing not configured");
-  if(String(settings.currency).toUpperCase()!=="UGX")throw Error("Mobile-money asset capacity checkout requires UGX pricing. Ask SaaS Admin to configure billing currency and seat price.");
-  const unitPrice=Number(settings.extra_asset_block_price),amount=unitPrice*data.quantity;
-  if(!Number.isFinite(amount)||amount<=0)throw Error("SaaS Admin must configure a positive extra-asset block price");
+  if(String(settings.currency).toUpperCase()!=="USD")throw Error("SaaS prices must be configured in USD");
+  const baseUnitPriceUsd=Number(settings.extra_asset_block_price),baseAmountUsd=baseUnitPriceUsd*data.quantity;
+  if(!Number.isFinite(baseAmountUsd)||baseAmountUsd<=0)throw Error("SaaS Admin must configure a positive extra-asset block price");
+  const quote=await currentUsdUgxQuote(true);
+  if(!quote)throw Error("Verified exchange rate unavailable");
+  const unitPrice=usdToUgx(baseUnitPriceUsd,quote.rate),amount=usdToUgx(baseAmountUsd,quote.rate);
   const phone=data.phone.replace(/\s+/g,"").replace(/^\+/,"");
   if(!/^256\d{9}$/.test(phone))throw Error("Use mobile money number 2567XXXXXXXX");
-  const {data:tx,error}=await admin.from("asset_capacity_purchases").insert({tenant_id:p.tenant_id,user_id:context.userId,blocks:data.quantity,block_size:Number(settings.extra_asset_block_size),unit_price:unitPrice,amount,currency:settings.currency,phone}).select("id").single();
+  const {data:tx,error}=await admin.from("asset_capacity_purchases").insert({tenant_id:p.tenant_id,user_id:context.userId,blocks:data.quantity,block_size:Number(settings.extra_asset_block_size),unit_price:unitPrice,amount,currency:"UGX",base_amount_usd:baseAmountUsd,conversion_rate:quote.rate,conversion_timestamp:quote.updatedAt,phone}).select("id").single();
   if(error||!tx)throw Error(error?.message||"Could not create purchase");
   const xml='<?xml version="1.0" encoding="UTF-8"?><AutoCreate><Request>'+
    '<APIUsername>'+xmlEscape(username)+'</APIUsername><APIPassword>'+xmlEscape(password)+'</APIPassword>'+
