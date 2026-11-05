@@ -21,14 +21,22 @@ export function usePlatformBranding() {
     root.style.setProperty("--platform-primary", data.primaryColor || "#C77435");
     root.style.setProperty("--platform-secondary", data.secondaryColor || "#4B47DC");
 
-    const faviconHref = data.iconDataUrl;
-    let icon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-    if (!icon) {
-      icon = document.createElement("link");
-      icon.rel = "icon";
-      document.head.appendChild(icon);
+    // The favicon, installed app and Apple icon all use the admin-uploaded
+    // platform mark. Cache-bust after a branding update so browsers reload it.
+    const version = Date.now();
+    for (const [rel, path] of [
+      ["icon", "/api/branding/icon-192.png"],
+      ["apple-touch-icon", "/api/branding/icon-192.png"],
+      ["manifest", "/api/branding/manifest.webmanifest"],
+    ] as const) {
+      let link = document.head.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = rel;
+        document.head.appendChild(link);
+      }
+      link.href = `${path}?v=${version}`;
     }
-    icon.href = faviconHref || "/icon-192.png";
   }, [query.data]);
 
   return query;
