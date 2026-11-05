@@ -9,12 +9,18 @@ export function usePlatformBranding() {
   const query = useQuery({
     queryKey: ["public-saas-branding"],
     queryFn: () => getBranding(),
-    staleTime: 0,
-    refetchOnMount: "always",
+    staleTime: 30_000,
+    refetchOnMount: false,
   });
 
+  return query;
+}
+
+/** Run once per application, not for every logo in the header/footer. */
+export function PlatformBrandingEffect() {
+  const { data } = usePlatformBranding();
   useEffect(() => {
-    const data = query.data;
+    const data = data;
     if (!data || typeof document === "undefined") return;
 
     const root = document.documentElement;
@@ -37,9 +43,9 @@ export function usePlatformBranding() {
       }
       link.href = `${path}?v=${version}`;
     }
-  }, [query.data]);
+  }, [data]);
 
-  return query;
+  return null;
 }
 
 export function PlatformLogo({
@@ -55,9 +61,13 @@ export function PlatformLogo({
   variant?: "mark" | "lockup";
 }) {
   const { data } = usePlatformBranding();
-  const uploaded = variant === "lockup" ? data?.logoDataUrl : data?.iconDataUrl;
+  const uploaded = variant === "lockup"
+    ? (data?.logoDataUrl || data?.iconDataUrl)
+    : (data?.iconDataUrl || data?.logoDataUrl);
   const [failedSrc,setFailedSrc] = useState<string|null>(null);
-  const src = uploaded && failedSrc !== uploaded ? uploaded : null;
+  const src = uploaded && failedSrc !== uploaded
+    ? uploaded
+    : variant === "lockup" ? "/assetflow360-logo.svg" : "/assetflow360-mark.svg";
   return (
     <span className={cn("inline-flex items-center justify-center", className)}>
       {src ? <img
