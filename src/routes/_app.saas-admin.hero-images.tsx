@@ -17,7 +17,7 @@ import {ImageIcon,Upload,RotateCcw,ExternalLink} from "lucide-react";
 export const Route=createFileRoute("/_app/saas-admin/hero-images")({
   component:HeroSettings,
 });
-type Page="home"|"features"|"solutions"|"pricing"|"about";
+type Page="home"|"home_2"|"home_3"|"features"|"solutions"|"pricing"|"about";
 const pages:{key:Page;label:string;url:string}[]=[
  {key:"home",label:"Homepage",url:"/"},
  {key:"features",label:"Features",url:"/features"},
