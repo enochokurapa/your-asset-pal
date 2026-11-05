@@ -1,4 +1,4 @@
-import {createFileRoute, Navigate} from "@tanstack/react-router";
+import {createFileRoute, Navigate, Link} from "@tanstack/react-router";
 import {useAuth} from "@/hooks/use-auth";
 export const Route=createFileRoute("/_app/saas-admin/settings")({component:SettingsPage});
 function SettingsPage(){
@@ -6,5 +6,18 @@ function SettingsPage(){
  if(loading)return null;
  if(!isSaasAdmin)return <Navigate to="/dashboard"/>;
  return <div className="space-y-4"><h1 className="text-2xl font-bold">SaaS Settings</h1>
- <p>Platform configuration sections.</p></div>;
+ <p>Manage the platform from one location.</p>
+ <div className="grid gap-3 md:grid-cols-2">
+ {[
+ {to:"/saas-admin/payment-gateways",title:"Payment Gateways",description:"Yo Uganda and ioTec credentials"},
+ {to:"/saas-admin/email",title:"Email & SMTP",description:"Sender credentials and email tests"},
+ {to:"/saas-admin/modules",title:"Modules & Add-ons",description:"Explicit activation of integrations and GPS"},
+ {to:"/saas-admin/organizations",title:"Organizations & Billing",description:"Manage subscriptions and tenant permissions"},
+ {to:"/saas-admin/backups",title:"Backups & Restore",description:"Cloudflare R2 and automated backup schedules"},
+ {to:"/saas-admin/policy",title:"Plans & Pricing",description:"Price and plan settings"},
+ {to:"/saas-admin/branding",title:"Branding",description:"Application identity"}
+ ].map(item=><Link key={item.to} to={item.to} className="rounded-xl border p-5 transition hover:border-primary">
+ <span className="font-semibold">{item.title}</span><p className="text-sm text-muted-foreground">{item.description}</p></Link>)}
+ </div>
+ <p className="text-sm text-muted-foreground">A standard paid plan does not automatically enable optional integrations or live GPS tracking. Enable these independently for each business.</p></div>;
 }
