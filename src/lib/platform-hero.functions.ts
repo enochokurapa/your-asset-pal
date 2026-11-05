@@ -18,7 +18,7 @@ export const setPlatformHeroImage=createServerFn({method:"POST"})
   .middleware([requireSupabaseAuth])
   .inputValidator(value=>z.object({
     page,
-    dataUrl:z.string().min(100).max(4_100_000),
+    dataUrl:z.string().min(100).max(410_000),
     altText:z.string().trim().min(15).max(220),
     layout:z.enum(["standard","approved_home_lifecycle"]),
   }).parse(value))
