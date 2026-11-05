@@ -50,3 +50,6 @@ WHERE a.status::text NOT IN ('retired','disposed');
 
 REVOKE ALL ON public.asset_verification_schedule FROM PUBLIC, anon;
 GRANT SELECT ON public.asset_verification_schedule TO authenticated;
+
+-- Make the new schedule view available immediately in PostgREST after migration.
+NOTIFY pgrst, 'reload schema';
