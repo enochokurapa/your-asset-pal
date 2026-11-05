@@ -20,8 +20,9 @@ export const setPlatformHeroImage=createServerFn({method:"POST"})
     page,
     dataUrl:z.string().min(100).max(4_100_000),
     altText:z.string().trim().min(15).max(220),
+    layout:z.enum(["standard","approved_home_lifecycle"]),
   }).parse(value))
-  .handler(({context,data})=>saveHeroImage(context.userId,data.page,data.dataUrl,data.altText));
+  .handler(({context,data})=>saveHeroImage(context.userId,data.page,data.dataUrl,data.altText,data.layout));
 
 export const clearPlatformHeroImage=createServerFn({method:"POST"})
   .middleware([requireSupabaseAuth])
