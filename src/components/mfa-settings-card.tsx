@@ -49,6 +49,14 @@ export function MfaSettingsCard() {
     <div className="flex items-center gap-3"><ShieldCheck className="h-6 w-6 text-primary"/><div><h2 className="font-semibold">Two-factor authentication</h2><p className="text-xs text-muted-foreground">Optional additional protection. Enable an authenticator app only if you choose to.</p></div></div>
     {enabled.map(f=><div key={f.id} className="flex items-center justify-between gap-3 rounded-lg border p-3"><span className="text-sm">Authenticator enabled · {f.friendly_name??"TOTP"}</span><Button size="sm" variant="outline" disabled={busy} onClick={()=>remove(f.id)}>Remove factor</Button></div>)}
     {enrollment?<div className="space-y-3 rounded-lg border p-4"><p className="text-sm">Scan this code in your authenticator app. Keep the secret private.</p><img src={enrollment.qr} className="h-44 w-44 bg-white p-2" alt="Authenticator app QR code"/><p className="break-all text-xs">Manual key: <strong>{enrollment.secret}</strong></p><Label htmlFor="mfa-code">Six-digit code</Label><Input id="mfa-code" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))} inputMode="numeric" maxLength={6} autoComplete="one-time-code"/><div className="flex gap-2"><Button onClick={verify} disabled={busy||code.length!==6}>Confirm and enable</Button><Button variant="outline" onClick={()=>setEnrollment(null)}>Cancel</Button></div></div>:<Button variant="outline" disabled={busy} onClick={enroll}>Add authenticator app</Button>}
+    <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+      <p className="font-medium">Set up Google Authenticator</p>
+      <p className="mt-1 text-xs text-muted-foreground">Install the official app, scan the QR code above, and enter its six-digit code. Never share the QR code or manual key.</p>
+      <div className="mt-2 flex flex-wrap gap-3 text-sm">
+        <a href="https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2" target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline">Google Play (Android)</a>
+        <a href="https://apps.apple.com/us/app/google-authenticator/id388497605" target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline">App Store (iPhone)</a>
+      </div>
+    </div>
     <p className="text-xs text-muted-foreground">An authenticator app is not required for accounts without an enrolled factor. Email-code verification is not yet available until secure email delivery is configured. Never share verification codes.</p>
   </Card>;
 }
