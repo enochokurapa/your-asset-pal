@@ -24,6 +24,7 @@ export function ManagedPublicHero({page,children}:{
  });
  if(error||!data)return <>{children}</>;
  const isHome=page==="home";
+ const hasOriginalLayout=isHome&&data.layout==="approved_home_lifecycle";
  return <section aria-label={"AssetFlow 360 "+page+" hero"} className="relative overflow-hidden bg-[#F5F8FA]">
    <div className="relative overflow-hidden">
      <img
@@ -34,14 +35,14 @@ export function ManagedPublicHero({page,children}:{
        decoding="async"
        fetchPriority="high"
        className="block h-auto w-full"
-       style={isHome?{marginTop:"-5.45%"}:undefined}
+       style={hasOriginalLayout?{marginTop:"-5.45%"}:undefined}
      />
-     {isHome&&<div className="hidden md:block">
+     {hasOriginalLayout&&<div className="hidden md:block">
       <Link to="/register" aria-label="Start your free trial" className="absolute left-[3.6%] top-[52.6%] h-[9.3%] w-[14.1%] rounded-md focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#C77435]"/>
       <Link to="/about" aria-label="Learn about AssetFlow 360" className="absolute left-[19.3%] top-[52.6%] h-[9.3%] w-[13.4%] rounded-md focus-visible:outline focus-visible:outline-4 focus-visible:outline-[#C77435]"/>
      </div>}
    </div>
-   <div className="flex flex-wrap justify-center gap-3 px-5 pb-6 pt-3 md:hidden">
+   <div className={"flex flex-wrap justify-center gap-3 px-5 pb-6 pt-3 "+(hasOriginalLayout?"md:hidden":"")}>
       <Button asChild className="bg-[#C77435] text-white hover:bg-[#A45E2B]">
        <Link to="/register">Start free trial <ArrowRight className="ml-2 h-4 w-4"/></Link>
       </Button>
