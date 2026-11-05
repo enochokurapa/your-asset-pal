@@ -44,7 +44,7 @@ function RegisterPage() {
     let createdNewAuthUser = false;
     try {
       if (awaitingCode) {
-        if (!/^\\d{6,8}$/.test(verificationCode)) throw new Error("Enter the verification code sent to your email.");
+        if (!/^\d{6,8}$/.test(verificationCode)) throw new Error("Enter the verification code sent to your email.");
         const {data,error}=await supabase.auth.verifyOtp({
           email:form.email.trim().toLowerCase(),token:verificationCode,type:"signup"
         });
