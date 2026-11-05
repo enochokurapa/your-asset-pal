@@ -1,5 +1,6 @@
 import sharp from "sharp";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { createHash } from "node:crypto";
+import { queryPostgres } from "@/lib/postgres.server";
 
 /**
  * Serve the administrator's saved platform icon at standard PWA dimensions.
@@ -18,13 +19,10 @@ type Branding = {
 };
 
 async function readBranding(): Promise<Branding | null> {
-  const { data, error } = await (supabaseAdmin as any)
-    .from("saas_settings")
-    .select("platform_name,platform_icon_data_url,platform_logo_data_url,platform_primary_color")
-    .eq("id", true)
-    .maybeSingle();
-  if (error) throw error;
-  return data || null;
+  const rows = await queryPostgres<Branding>(
+    "SELECT platform_name, platform_icon_data_url, platform_logo_data_url, platform_primary_color FROM public.saas_settings WHERE id = TRUE LIMIT 1",
+  );
+  return rows[0] || null;
 }
 
 function uploadedImage(data: Branding | null): Uint8Array | null {
@@ -38,8 +36,7 @@ function uploadedImage(data: Branding | null): Uint8Array | null {
 }
 
 function resizedIcon(input: Uint8Array, size: 192 | 512): Promise<Uint8Array> {
-  const fingerprint = Buffer.from(input).toString("base64url").slice(0, 64)
-    + ":" + input.length + ":" + size;
+  const fingerprint = createHash("sha256").update(input).digest("hex") + ":" + size;
   const existing = cache.get(fingerprint);
   if (existing) return existing;
   const generated = sharp(input, { limitInputPixels: 16_000_000 })
