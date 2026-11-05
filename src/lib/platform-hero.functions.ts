@@ -5,7 +5,7 @@ import {
   getPublicHeroImage, listHeroSettings, saveHeroImage, deleteHeroImage
 } from "@/lib/platform-hero.server";
 
-const page=z.enum(["home","features","solutions","pricing","about"]);
+const page=z.enum(["home","home_2","home_3","features","solutions","pricing","about"]);
 export const getHeroImage=createServerFn({method:"GET"})
   .inputValidator(value=>z.object({page}).parse(value))
   .handler(({data})=>getPublicHeroImage(data.page));

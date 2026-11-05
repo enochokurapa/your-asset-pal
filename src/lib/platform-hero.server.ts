@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const db = supabaseAdmin as any;
-export const HERO_PAGES = ["home","features","solutions","pricing","about"] as const;
+export const HERO_PAGES = ["home","home_2","home_3","features","solutions","pricing","about"] as const;
 export type HeroPage = typeof HERO_PAGES[number];
 type ImageFormat = "image/png" | "image/webp" | "image/svg+xml";
 const MAX_BYTES = 3_000_000;
