@@ -41,6 +41,26 @@ function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [existingDevices,setExistingDevices]=useState<Array<{session_id:string,device:string,last_seen:string}>>([]);
   const [takeoverOpen,setTakeoverOpen]=useState(false);
+  const [googleEnabled,setGoogleEnabled]=useState(false);
+  useEffect(()=>{
+    let active=true;
+    fetch("/auth/v1/settings",{cache:"no-store"})
+      .then(r=>r.ok?r.json():null)
+      .then(settings=>{if(active)setGoogleEnabled(settings?.external?.google===true)})
+      .catch(()=>{if(active)setGoogleEnabled(false)});
+    return()=>{active=false};
+  },[]);
+  const signInWithGoogle=async()=>{
+    if(submitting||!googleEnabled)return;
+    setSubmitting(true);
+    try{
+      const {error}=await supabase.auth.signInWithOAuth({
+        provider:"google",
+        options:{redirectTo:window.location.origin+"/dashboard"},
+      });
+      if(error)throw error;
+    }catch(err){toast.error(authErrorMessage(err));setSubmitting(false);}
+  };
   useEffect(()=>{
     const displaced=sessionStorage.getItem("assetflow-session-replaced")==="1" || new URLSearchParams(window.location.search).has("session_replaced");
     if(displaced){sessionStorage.removeItem("assetflow-session-replaced");toast.warning("Your account was signed in on another device. This device has been signed out.");}
@@ -153,6 +173,12 @@ function LoginPage() {
             </Button>
           </form>
 
+          {googleEnabled&&<>
+            <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border"/><span>or</span><span className="h-px flex-1 bg-border"/></div>
+            <Button type="button" variant="outline" className="h-11 w-full rounded-xl text-sm font-semibold" disabled={submitting} onClick={signInWithGoogle}>
+              Continue with Google
+            </Button>
+          </>}
           <div className="mt-5 flex items-center justify-center gap-2 rounded-xl bg-muted/45 px-3 py-2.5 text-xs text-muted-foreground">
             <ShieldCheck className="h-4 w-4 shrink-0 text-primary" />
             Secure workspace authentication

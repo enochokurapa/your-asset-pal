@@ -2,7 +2,7 @@ import {createServerFn} from "@tanstack/react-start";
 import {z} from "zod";
 import {queryPostgres} from "@/lib/postgres.server";
 import {requireSupabaseAuth} from "@/integrations/supabase/auth-middleware";
-import {sendPlatformReportEmail} from "@/lib/platform-smtp.server";
+import {sendPlatformContactReply} from "@/lib/platform-smtp.server";
 
 const email=z.string().trim().toLowerCase().email().max(254);
 const submitSchema=z.object({
@@ -19,7 +19,7 @@ type RequestRow={
 };
 type MessageRow={
  id:string;request_id:string;subject:string;body:string;delivery_status:string;
- created_at:string;delivered_at:string|null;admin_user_id:string|null;
+ created_at:string;delivered_at:string|null;admin_user_id:string|null;delivery_error:string|null;
 };
 export type ContactTemplate={id:string;title:string;subject:string;body:string;is_active:boolean};
 async function adminOnly(id:string){
@@ -59,7 +59,7 @@ export const getAdminContactMessages=createServerFn({method:"POST"})
  .handler(async({data,context})=>{
    await adminOnly(context.userId);
    return queryPostgres<MessageRow>(`SELECT id,request_id,subject,body,delivery_status,created_at,
-      delivered_at,admin_user_id FROM public.platform_contact_messages
+      delivered_at,admin_user_id,delivery_error FROM public.platform_contact_messages
       WHERE request_id=$1 ORDER BY created_at ASC LIMIT 120`,[data.id]);
  });
 export const setAdminContactStatus=createServerFn({method:"POST"})
@@ -117,15 +117,24 @@ export const sendAdminContactReply=createServerFn({method:"POST"})
    `,[data.id,context.userId,subject,body]);
    try{
      await queryPostgres("UPDATE public.platform_contact_messages SET delivery_status='sending' WHERE id=$1",[saved.id]);
-     await sendPlatformReportEmail(recipient.email,subject,body);
+     await sendPlatformContactReply(recipient.email,subject,body);
      await queryPostgres(`UPDATE public.platform_contact_messages SET delivery_status='sent',
        delivered_at=NOW() WHERE id=$1`,[saved.id]);
      await queryPostgres(`UPDATE public.platform_contact_requests
        SET status='waiting_for_customer',updated_at=NOW() WHERE id=$1`,[data.id]);
      return {delivered:true};
    }catch(err){
+     const errorText=err instanceof Error?err.message:"";
+     const code=/\((\d{3})\)/.exec(errorText)?.[1];
+     const reason=/certificate|hostname.*match|altnames/i.test(errorText)
+       ?"SMTP TLS certificate hostname mismatch"
+       :code?"SMTP server rejected the reply ("+code+")"
+       :/timeout|ETIMEDOUT|ECONNREFUSED|ENOTFOUND|connect/i.test(errorText)
+       ?"SMTP connection failed or timed out"
+       :"SMTP authentication or mail delivery failed";
      await queryPostgres(`UPDATE public.platform_contact_messages SET delivery_status='failed',
-       delivery_error='SMTP delivery failed' WHERE id=$1`,[saved.id]);
-     throw Error("Reply was saved, but SMTP did not confirm delivery. Review the failed message before retrying.");
+       delivery_error=$2 WHERE id=$1`,[saved.id,reason]);
+     console.error("[Contact email] Delivery not accepted:",reason);
+     throw Error("Reply saved but email was not accepted: "+reason+". Check Email & SMTP settings before retrying.");
    }
  });

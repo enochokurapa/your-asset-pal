@@ -122,14 +122,25 @@ class SmtpSession{
  }
  close(){this.socket.end();this.socket.destroy();}
 }
+/**
+ * The shared SMTP service currently serves a valid mail.arofi.net certificate.
+ * The marketing-domain mail alias resolves to that same SMTP server, but its
+ * hostname is not on the SMTP daemon's active certificate. Connect using the
+ * certified SMTP hostname while continuing strict TLS hostname verification.
+ * Remove this mapping once aaPanel SMTP has a proper SAN certificate.
+ */
+export function smtpTransportHostname(host:string):string{
+ return host==="mail.assetflow360.com" ? "mail.arofi.net" : host;
+}
 async function connect(config:SmtpConfig){
- const ip=await lookup(config.host);
+ const verifiedHost=smtpTransportHostname(config.host);
+ const ip=await lookup(verifiedHost);
  // Admin configuration cannot be used as a proxy into private/internal infrastructure.
  if(ip.address.startsWith("127.")||ip.address.startsWith("10.")||ip.address.startsWith("192.168.")||
     ip.address.startsWith("169.254.")||ip.address==="::1"||ip.address.startsWith("172.16."))
     throw new Error("SMTP host must resolve to a public address");
  const sock=config.port===465?
-  tls.connect({host:ip.address,port:465,servername:config.host,rejectUnauthorized:true,minVersion:"TLSv1.2"}):
+  tls.connect({host:ip.address,port:465,servername:verifiedHost,rejectUnauthorized:true,minVersion:"TLSv1.2"}):
   net.connect({host:ip.address,port:587});
  await new Promise<void>((resolve,reject)=>{
   sock.once(config.port===465?"secureConnect":"connect",resolve);
@@ -139,7 +150,7 @@ async function connect(config:SmtpConfig){
  const c=new SmtpSession(sock);
  await c.response(220);
  await c.send("EHLO assetflow360.com");
- if(config.port===587){await c.send("STARTTLS",220);await c.secure(config.host);await c.send("EHLO assetflow360.com");}
+ if(config.port===587){await c.send("STARTTLS",220);await c.secure(verifiedHost);await c.send("EHLO assetflow360.com");}
  await c.send("AUTH PLAIN "+Buffer.from("\u0000"+config.username+"\u0000"+config.password).toString("base64"),235);
  return c;
 }
@@ -160,7 +171,7 @@ export async function smtpTest(userId:string,to:string){
    "Content-Type: text/plain; charset=UTF-8","X-Auto-Response-Suppress: All","",body]
    .join("\r\n").replace(/\r\n\./g,"\r\n..");
   await c.send(payload+"\r\n.");
-  await c.send("QUIT",221);
+  try{await c.send("QUIT",221)}catch{/* DATA 250 already confirms acceptance */}
   return {ok:true,message:"SMTP test email was accepted by the mail server. Check recipient delivery."};
  }finally{c.close();}
 }
@@ -169,6 +180,33 @@ export async function getConfiguredSmtpForApplication(category:MailCategory){
  if(!config)throw new Error("SaaS SMTP configuration missing");
  const displayName={security:"AssetFlow Security",operations:"AssetFlow Operations",finance:"AssetFlow Finance"}[category];
  return {...config,displayName};
+}
+
+/** Human-written support replies should never be presented as automated reports. */
+export async function sendPlatformContactReply(to:string,subject:string,body:string){
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)||to.length>250)throw new Error("Invalid contact recipient");
+ const config=await getConfiguredSmtpForApplication("operations");
+ const c=await connect(config);
+ try{
+  await c.send("MAIL FROM:<"+config.fromEmail+">");
+  await c.send("RCPT TO:<"+to+">");
+  await c.send("DATA",354);
+  const payload=[
+   "From: AssetFlow 360 Support <"+config.fromEmail+">",
+   "To: "+safe(to),
+   "Subject: "+safe(subject).slice(0,180),
+   "MIME-Version: 1.0",
+   "Content-Type: text/plain; charset=UTF-8",
+   "X-Auto-Response-Suppress: All",
+   "",
+   body.slice(0,7000)
+  ].join("\r\n").replace(/\r\n\./g,"\r\n..");
+  await c.send(payload+"\r\n.",250);
+  // Once DATA receives 250, the server accepted the message. A later QUIT
+  // error must not mark the already accepted reply as failed.
+  try{await c.send("QUIT",221)}catch{/* best-effort shutdown */}
+  return {accepted:true};
+ }finally{c.close()}
 }
 
 /** Server-side platform email delivery using the saved, encrypted SMTP configuration. */
@@ -197,7 +235,7 @@ export async function sendPlatformReportEmail(to:string,subject:string,body:stri
   ];
   const payload=lines.join("\r\n").replace(/\r\n\./g,"\r\n..");
   await c.send(payload+"\r\n.");
-  await c.send("QUIT",221);
+  try{await c.send("QUIT",221)}catch{/* DATA 250 already confirms acceptance */}
   return {accepted:true};
  }finally{c.close()}
 }
