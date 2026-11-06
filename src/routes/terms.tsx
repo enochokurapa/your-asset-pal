@@ -1,8 +1,8 @@
+import {publicHead} from "@/lib/public-seo";
 import {createFileRoute,Link} from "@tanstack/react-router";
 import {PublicShell} from "@/components/public-site-shell";
 export const Route=createFileRoute("/terms")({component:TermsPage,
- head:()=>({meta:[{title:"Terms of Use | AssetFlow 360"},
- {name:"description",content:"General terms and acceptable-use information for the AssetFlow 360 platform."}]})});
+ head:()=>publicHead("/terms","Terms of Use | AssetFlow 360","Read general information about AssetFlow 360 platform use, accounts, subscriptions, responsibilities and acceptable use.")});
 function TermsPage(){return <PublicShell><main className="mx-auto w-full max-w-7xl bg-[#f3f7f8] px-5 py-10 sm:px-8 sm:py-14">
  <article className="mx-auto max-w-3xl space-y-6 text-sm leading-7 text-[#445d6a]">
   <header><p className="text-xs font-semibold uppercase tracking-[.15em] text-[#bb6b3f]">Platform information</p>
