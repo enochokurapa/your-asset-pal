@@ -9,14 +9,80 @@ import {Button} from "@/components/ui/button";
 import {Check,ArrowRight,Users,Package} from "lucide-react";
 export const Route=createFileRoute("/pricing")({component:PricingPage,head:()=>({meta:[{title:"Plans & Pricing | AssetFlow 360"},{name:"description",content:"Compare three AssetFlow 360 plans with monthly and annual prices, users, assets and features."}]})});
 const money=(n:number,c:string)=>{try{return new Intl.NumberFormat("en-US",{style:"currency",currency:c,maximumFractionDigits:0}).format(n)}catch{return c+" "+n.toLocaleString()}};
+type PublicPlan = {
+  id: string; name: string; description: string;
+  monthly_price: number; annual_price: number; included_users: number; included_assets: number;
+  enabled_modules?: string[]; module_labels?: string[]; features?: string[];
+};
+function planHighlights(plan: PublicPlan, previous?: PublicPlan) {
+  const modules = Array.isArray(plan.enabled_modules) ? plan.enabled_modules : [];
+  const labels = Array.isArray(plan.module_labels) ? plan.module_labels : [];
+  const earlier = Array.isArray(previous?.enabled_modules) ? previous.enabled_modules : [];
+  // Never imply inheritance if an administrator removed a lower-plan module.
+  const includesEarlier = Boolean(previous) && earlier.every(key => modules.includes(key));
+  const shown = modules.length
+    ? modules.map((key, index) => ({ key, label: labels[index] || key.replace(/_/g, " ") }))
+    : (Array.isArray(plan.features) ? plan.features : [])
+        .map(label => ({ key: label.toLowerCase().trim(), label }));
+  const previousFeatures = new Set((previous?.features || []).map(s => s.toLowerCase().trim()));
+  const extras = includesEarlier
+    ? shown.filter(item => modules.length ? !earlier.includes(item.key) : !previousFeatures.has(item.key))
+    : shown;
+  return { includesEarlier, extras };
+}
 function PricingPage(){
  const get=useServerFn(getPricingPlans);
- const {data,error,isLoading}=useQuery({queryKey:["pricing-plans"],queryFn:()=>get()});
+ const {data,error,isLoading}=useQuery({queryKey:["pricing-plans"],queryFn:()=>get(),staleTime:60_000});
  const [period,setPeriod]=useState<"monthly"|"annual">("monthly");
  const [currency,setCurrency]=useState<"USD"|"UGX">("USD");
  const display=(usd:number)=>currency==="USD"?money(usd,"USD"):data?.fxRate?money(Math.round(usd*data.fxRate),"UGX"):"Rate unavailable";
- return <PublicShell><main><PublicPageHero page="pricing" /><section className="bg-[#f4f7f8] px-5 py-14 sm:py-20"><div className="mx-auto max-w-7xl"><div className="mb-8 flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-2xl font-bold">Choose your package</h2><p className="mt-1 text-sm text-[#5b7180]">Compare package features and choose the option that suits your business.</p></div><div className="flex gap-1 rounded-xl border bg-white p-1"><select value={currency} onChange={e=>setCurrency(e.target.value as "USD"|"UGX")} aria-label="Currency"><option value="USD">USD</option><option value="UGX" disabled={!data?.fxRate}>UGX</option></select><button onClick={()=>setPeriod("monthly")} className={`rounded-lg px-5 py-2 text-sm font-semibold ${period==="monthly"?"bg-[#c66d3d] text-white":"text-[#344c58]"}`}>Monthly</button><button onClick={()=>setPeriod("annual")} className={`rounded-lg px-5 py-2 text-sm font-semibold ${period==="annual"?"bg-[#c66d3d] text-white":"text-[#344c58]"}`}>Annual</button></div></div>
- {error?<div className="rounded-xl border bg-white p-6 text-red-700">Pricing is temporarily unavailable.</div>:isLoading||!data?<div className="rounded-xl border bg-white p-6">Loading current plans…</div>:<><div className="grid gap-5 lg:grid-cols-3">{data.plans.map((p:any)=><article key={p.id} className={`flex flex-col rounded-2xl border bg-white p-7 shadow-sm ${p.id==="business"?"border-[#c66d3d] ring-1 ring-[#c66d3d]":"border-[#dce4e8]"}`}><div className="flex items-center justify-between"><h3 className="text-xl font-bold">{p.name}</h3>{p.id==="business"&&<span className="rounded-full bg-[#f8e9df] px-3 py-1 text-xs font-semibold text-[#9d4c23]">Popular</span>}</div><p className="mt-3 min-h-12 text-sm leading-6 text-[#5c7280]">{p.description}</p><p className="mt-4 text-4xl font-extrabold">{display(period==="monthly"?p.monthly_price:p.annual_price)}<span className="ml-1 text-sm font-normal text-[#617684]">/{period==="monthly"?"month":"year"}</span></p><div className="mt-6 grid grid-cols-2 gap-3 rounded-lg bg-[#f3f6f7] p-4"><div><Users className="mb-2 h-5 w-5 text-[#ba6334]"/><b>{p.included_users.toLocaleString()}</b><p className="text-xs text-[#617684]">Users included</p></div><div><Package className="mb-2 h-5 w-5 text-[#ba6334]"/><b>{p.included_assets.toLocaleString()}</b><p className="text-xs text-[#617684]">Assets included</p></div></div><p className="mt-6 text-sm font-bold">Included capabilities</p><ul className="mt-3 flex-1 space-y-3">{(p.module_labels?.length?p.module_labels:p.features??[]).map((x:string,i:number)=><li key={i} className="flex items-start gap-2 text-sm"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#c66d3d]"/>{x}</li>)}</ul><Button asChild className="mt-8 bg-[#c66d3d] text-white hover:bg-[#ab582e]"><Link to="/register">Get started <ArrowRight className="ml-2 h-4 w-4"/></Link></Button></article>)}</div>
- <div className="mt-9 rounded-xl border bg-white p-6"><h2 className="text-xl font-bold">Need additional users?</h2><p className="mt-2 text-sm text-[#5c7280]">Each plan includes a set number of seats. Additional user capacity is available through Plan & Billing. API Integration and Live Tracking are separate paid add-ons.</p><p className="mt-3 text-sm font-semibold">Configured additional seat price: {display(data.extraUserPrice)}. Additional asset blocks: {data.extraAssetBlockSize.toLocaleString()} assets for {display(data.extraAssetBlockPrice)} per block</p></div></>}
- <div className="mt-10 flex flex-wrap items-center justify-between gap-4 rounded-xl bg-[#e9ecef] p-7"><div><h2 className="text-xl font-bold">Want to explore first?</h2><p className="mt-2 text-sm text-[#5c7280]">Start a free trial, then choose your paid package when ready.</p></div><Button asChild variant="outline"><Link to="/register">Start free trial <ArrowRight className="ml-2 h-4 w-4"/></Link></Button></div></div></section></main></PublicShell>
+ const published:PublicPlan[] = Array.isArray(data?.plans) ? [...data.plans] : [];
+ const ordered = published.sort((a,b) => {
+   const rank=(id:string)=>({starter:0,business:1,enterprise:2} as Record<string,number>)[id] ?? 10;
+   return rank(a.id)-rank(b.id);
+ });
+ return <PublicShell><main><PublicPageHero page="pricing" />
+ <section className="bg-[#f4f6f6] px-4 py-10 sm:px-8 sm:py-14"><div className="mx-auto max-w-7xl">
+   <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+     <div className="min-w-0"><h2 className="text-xl font-semibold tracking-tight text-[#263a44] sm:text-2xl">Choose your plan</h2><p className="mt-1 text-sm text-[#62737d]">Clear pricing, with capabilities that grow with your team.</p></div>
+     <div className="flex w-fit max-w-full flex-wrap items-center gap-2">
+       <select value={currency} onChange={e=>setCurrency(e.target.value as "USD"|"UGX")} aria-label="Currency"
+         className="h-10 rounded-lg border border-[#dbe2e3] bg-white px-3 text-sm"><option value="USD">USD</option><option value="UGX" disabled={!data?.fxRate}>UGX</option></select>
+       <div className="flex rounded-lg border border-[#dbe2e3] bg-white p-1">
+         <button type="button" onClick={()=>setPeriod("monthly")} className={`rounded-md px-3 py-2 text-xs font-semibold sm:text-sm ${period==="monthly"?"bg-[#c77435] text-white":"text-[#485e68]"}`}>Monthly</button>
+         <button type="button" onClick={()=>setPeriod("annual")} className={`rounded-md px-3 py-2 text-xs font-semibold sm:text-sm ${period==="annual"?"bg-[#c77435] text-white":"text-[#485e68]"}`}>Annual</button>
+       </div>
+     </div>
+   </div>
+   {error?<div className="rounded-xl border bg-white p-6 text-sm text-red-700">Pricing is temporarily unavailable.</div>
+   :isLoading||!data?<div className="rounded-xl border bg-white p-6 text-sm">Loading current plans…</div>
+   :<div className="grid items-stretch gap-5 lg:grid-cols-3">
+    {ordered.map((plan,index)=>{
+      const previous=index>0?ordered[index-1]:undefined;
+      const {includesEarlier,extras}=planHighlights(plan,previous);
+      const featured=plan.id==="business";
+      return <article key={plan.id} className={`relative flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-white p-5 shadow-[0_8px_30px_rgba(39,61,70,.04)] sm:p-6 ${featured?"border-[#ca895e] ring-1 ring-[#e8b38b] shadow-[0_12px_40px_rgba(181,101,52,.10)]":"border-[#dae3e5]"}`}>
+        {featured&&<span className="absolute right-0 top-0 rounded-bl-xl bg-[#f7e7da] px-3 py-1.5 text-[11px] font-semibold text-[#a85c32]">Most popular</span>}
+        <div className="min-w-0 pr-12"><h3 className="text-lg font-semibold text-[#263945]">{plan.name}</h3><p className="mt-2 min-h-12 text-sm leading-6 text-[#62737d]">{plan.description}</p></div>
+        <p className="mt-5 break-words text-[clamp(1.6rem,2.5vw,2.15rem)] font-semibold tracking-tight text-[#263945]">{display(period==="monthly"?plan.monthly_price:plan.annual_price)}<span className="ml-1 text-xs font-normal text-[#6c7e87]">/{period==="monthly"?"month":"year"}</span></p>
+        <div className="mt-5 grid grid-cols-2 gap-3 rounded-xl bg-[#f4f7f6] p-3.5 text-sm">
+          <div className="min-w-0"><Users className="mb-1.5 h-4 w-4 text-[#b96d3d]"/><p className="font-semibold tabular-nums">{plan.included_users.toLocaleString()}</p><p className="text-xs text-[#647780]">Users</p></div>
+          <div className="min-w-0"><Package className="mb-1.5 h-4 w-4 text-[#b96d3d]"/><p className="font-semibold tabular-nums">{plan.included_assets.toLocaleString()}</p><p className="text-xs text-[#647780]">Assets</p></div>
+        </div>
+        <div className="mt-6 flex-1"><p className="text-sm font-semibold text-[#324653]">Included capabilities</p>
+          {includesEarlier&&previous&&<p className="mt-3 flex items-center gap-2 text-sm font-medium text-[#384e59]"><Check className="h-4 w-4 shrink-0 text-[#b96d3d]"/>Everything in {previous.name}</p>}
+          <ul className="mt-3 space-y-2.5">{extras.map(item=><li key={item.key} className="flex items-start gap-2 text-[13px] leading-5 text-[#526671]"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#b96d3d]"/><span className="min-w-0 break-words">{item.label}</span></li>)}</ul>
+          {!extras.length&&!includesEarlier&&<p className="mt-3 text-sm text-[#657580]">Contact us for details of this plan.</p>}
+        </div>
+        <Button asChild className={`mt-7 h-10 w-full text-sm font-semibold ${featured?"bg-[#c77435] text-white hover:bg-[#ae6131]":"bg-[#314b59] text-white hover:bg-[#243a45]"}`}><Link to="/register">Get started <ArrowRight className="ml-2 h-4 w-4"/></Link></Button>
+      </article>;
+    })}
+   </div>}
+   {data&&!isLoading&&!error&&<div className="mt-7 rounded-xl border border-[#dde5e5] bg-white/80 p-5">
+     <h2 className="text-base font-semibold">Need additional capacity?</h2>
+     <p className="mt-2 text-sm leading-6 text-[#60737d]">Each plan includes users and assets. Additional seats and optional modules are available as your organisation grows.</p>
+     <p className="mt-2 text-xs leading-5 text-[#667982]">Additional user: {display(data.extraUserPrice)}. Extra asset block: {data.extraAssetBlockSize.toLocaleString()} assets for {display(data.extraAssetBlockPrice)}.</p>
+   </div>}
+ </div></section>
+ </main></PublicShell>;
 }

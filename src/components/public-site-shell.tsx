@@ -1,4 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getPublicImportantLinks } from "@/lib/platform-links.functions";
 import { useEffect, useRef, useState } from "react";
 import { PlatformLogo } from "@/components/platform-logo";
 import { Button } from "@/components/ui/button";
@@ -113,5 +116,34 @@ export function PublicHeader() {
   );
 }
 
-export function PublicFooter(){return <footer className="bg-[#102b3c] text-white"><div className="mx-auto grid max-w-7xl gap-9 px-5 py-12 sm:px-8 md:grid-cols-[1fr_auto]"><div><PlatformLogo variant="lockup" className="h-10 w-40"/><p className="mt-5 max-w-sm text-sm leading-7 text-slate-300">Asset registration, verification, location control and lifecycle management in one adaptable platform.</p></div><nav aria-label="Footer navigation" className="flex flex-wrap items-start gap-6 text-sm text-slate-200">{nav.map(n=><Link key={n.to} to={n.to} className="hover:text-white">{n.label}</Link>)}<Link to="/login">Sign in</Link></nav></div><div className="border-t border-white/10 px-5 py-5 text-center text-xs text-slate-400">© {new Date().getFullYear()} AssetFlow 360</div></footer>}
+export function PublicFooter(){
+  const getLinks=useServerFn(getPublicImportantLinks);
+  const {data:links=[]}=useQuery({
+    queryKey:["public-important-links"],
+    queryFn:()=>getLinks(),
+    staleTime:60_000,
+    retry:1,
+  });
+  return <footer className="bg-[#203946] text-white">
+    <div className="mx-auto grid max-w-7xl gap-9 px-5 py-12 sm:px-8 md:grid-cols-[1.1fr_.9fr]">
+      <div className="min-w-0">
+        <PlatformLogo variant="lockup" className="h-10 w-40"/>
+        <p className="mt-5 max-w-sm text-sm leading-7 text-slate-300">Asset registration, verification, location control and lifecycle management in one adaptable platform.</p>
+      </div>
+      <div className="grid min-w-0 grid-cols-2 gap-7">
+        <nav aria-label="Footer navigation" className="flex min-w-0 flex-col items-start gap-3 text-sm text-slate-200">
+          <p className="font-semibold text-white">Explore</p>
+          {nav.map(n=><Link key={n.to} to={n.to} className="hover:text-white">{n.label}</Link>)}
+          <Link to="/login" className="hover:text-white">Sign in</Link>
+        </nav>
+        {links.length>0&&<nav aria-label="Important links" className="flex min-w-0 flex-col items-start gap-3 text-sm text-slate-200">
+          <p className="font-semibold text-white">Important links</p>
+          {links.map(link=><a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer"
+            title={link.description||undefined} className="max-w-full break-words leading-5 hover:text-white">{link.title}</a>)}
+        </nav>}
+      </div>
+    </div>
+    <div className="border-t border-white/10 px-5 py-5 text-center text-xs text-slate-400">© {new Date().getFullYear()} AssetFlow 360</div>
+  </footer>;
+}
 export function PublicShell({children}:{children:React.ReactNode}){return <div className="min-h-screen bg-[#f7f9fa] text-[#112c3c]"><style>{`@keyframes af-appear{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}@keyframes af-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}@keyframes af-pulse{0%,100%{opacity:.5}50%{opacity:1}}.af-enter{animation:af-appear .7s both}.af-enter-late{animation:af-appear .85s .2s both}.af-float{animation:af-float 7s ease-in-out infinite}.af-softpulse{animation:af-pulse 5s ease-in-out infinite}@media(prefers-reduced-motion:reduce){.af-enter,.af-enter-late,.af-float,.af-softpulse{animation:none!important}}`}</style><PublicHeader/>{children}<PublicFooter/></div>}

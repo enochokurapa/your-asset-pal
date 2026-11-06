@@ -63,8 +63,8 @@ export function HomeHeroCarousel() {
     return ()=>window.clearInterval(timer);
   },[reducedMotion,visible]);
 
-  return <section aria-label="AssetFlow 360 fixed asset management" className="relative isolate overflow-hidden bg-[#f0f5fb] text-[#102b3c]">
-    <div className="relative min-h-[625px] sm:min-h-[680px] lg:min-h-[710px]">
+  return <section aria-label="AssetFlow 360 fixed asset management" className="relative isolate overflow-hidden bg-[#e7eeed] text-[#243c48]">
+    <div className="relative min-h-[475px] sm:min-h-[535px] lg:min-h-[575px]">
       {BACKGROUNDS.map((bg,i)=><div key={bg.key} aria-hidden="true"
         className={`pointer-events-none absolute inset-0 transition-opacity duration-1000 ease-in-out ${i===active?"opacity-100":"opacity-0"}`}>
         <img
@@ -77,31 +77,31 @@ export function HomeHeroCarousel() {
           className="absolute inset-0 h-full w-full object-cover object-[60%_center] lg:object-center"
         />
       </div>)}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#f4f8ff]/[.98] via-[#f4f8ff]/[.91] to-[#f4f8ff]/[.12] lg:via-[#f4f8ff]/[.78]"/>
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#f4f8ff]/60 via-transparent to-transparent"/>
-      <div className="relative z-10 mx-auto flex min-h-[625px] max-w-7xl flex-col justify-center px-6 py-14 sm:min-h-[680px] sm:px-8 lg:min-h-[710px] lg:px-10">
-        <div className="max-w-[655px]">
-          <p className="mb-5 inline-flex items-center gap-2 rounded-md border border-[#d3e0ea] bg-white/90 px-3.5 py-2 text-xs font-bold uppercase tracking-[.13em] text-[#a65a32]">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#e8efed]/[.98] via-[#e8eeef]/[.90] to-[#e7edef]/[.12] lg:via-[#e8eeef]/[.80]"/>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#e5edea]/60 via-transparent to-transparent"/>
+      <div className="relative z-10 mx-auto flex min-h-[625px] max-w-7xl flex-col justify-center px-5 py-8 sm:min-h-[535px] sm:px-8 sm:py-12 lg:min-h-[575px]">
+        <div className="max-w-[580px]">
+          <p className="mb-4 inline-flex items-center gap-2 rounded-md border border-[#d3deda] bg-white/75 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[.12em] text-[#a65a32]">
             <span aria-hidden="true" className="h-2 w-2 rounded-sm bg-[#c77435]"/> Complete fixed asset management
           </p>
-          <h1 className="text-[clamp(2.6rem,4.6vw,4.55rem)] font-extrabold leading-[1.08] tracking-[-.042em] text-[#102b3c]">
+          <h1 className="text-[clamp(2rem,3.4vw,3.45rem)] font-semibold leading-[1.15] tracking-[-.035em] text-[#102b3c]">
             Every asset.<br/><span className="text-[#bf6a39]">Fully accounted for.</span>
           </h1>
-          <div className="mt-7 max-w-[600px]">
+          <div className="mt-5 max-w-[550px]">
             <p className="text-xs font-bold uppercase tracking-[.15em] text-[#b36534]">What we do</p>
             <HeroTypingLine
-              phrases={PHRASES}
-              className="mt-2 min-h-[3.5rem] max-w-[590px] text-[clamp(1.1rem,2vw,1.5rem)] font-bold leading-7 text-[#244e68] sm:min-h-[2.25rem]"
+              phrases={PHRASES} initialFullPhrase
+              className="mt-2 min-h-[2.25rem] max-w-[545px] text-[clamp(.95rem,1.6vw,1.15rem)] font-medium leading-6 text-[#395c65]"
             />
           </div>
-          <p className="mt-3 max-w-[530px] text-base leading-8 text-[#486376] sm:text-lg">
+          <p className="mt-2 max-w-[530px] text-sm leading-7 text-[#486376] sm:text-base">
             Register, verify, locate and manage your organisation's fixed assets through one reliable, accountable platform.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link to="/register" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-[#b56435] bg-[#c77435] px-6 text-sm font-bold text-white shadow-[0_6px_14px_rgba(160,80,36,.16)] transition-colors hover:bg-[#a85d30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#102b3c]">
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link to="/register" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#b56435] bg-[#c77435] px-5 text-sm font-bold text-white shadow-[0_6px_14px_rgba(160,80,36,.16)] transition-colors hover:bg-[#a85d30] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#102b3c]">
               Start free trial <ArrowRight className="h-4 w-4" aria-hidden="true"/>
             </Link>
-            <Link to="/features" className="inline-flex min-h-12 items-center justify-center rounded-lg border border-[#9bb3c1] bg-white/90 px-6 text-sm font-bold text-[#17394d] transition-colors hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#102b3c]">
+            <Link to="/features" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[#9bb3c1] bg-white/75 px-5 text-sm font-bold text-[#17394d] transition-colors hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#102b3c]">
               Explore features
             </Link>
           </div>
