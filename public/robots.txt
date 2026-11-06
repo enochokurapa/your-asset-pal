@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Disallow: /saas-admin/
+Disallow: /dashboard
+Disallow: /billing
+Disallow: /verification
+Disallow: /audit
+Disallow: /analytics
+Disallow: /diagnostics
+Disallow: /settings
+Disallow: /profile
+Disallow: /login
+Disallow: /register
+Sitemap: https://assetflow360.com/sitemap.xml
