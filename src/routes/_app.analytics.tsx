@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Activity, ArrowUpRight, ChartNoAxesColumnIncreasing, ClipboardCheck, FileClock, Package, Route, Users } from "lucide-react";
+import { Activity, ArrowUpRight, ChartNoAxesColumnIncreasing, ClipboardCheck, FileClock, Package, Route as RouteIcon, Users } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { getServerAuthHeaders } from "@/lib/auth-headers";
 import { getTenantOperationsAnalytics } from "@/lib/tenant-operations.functions";
@@ -26,7 +26,7 @@ function AnalyticsPage(){
     {label:"Assets added",value:metrics?.assetsAdded30Days,icon:ArrowUpRight,detail:"Last 30 days"},
     {label:"Recorded activity",value:metrics?.activity30Days,icon:Activity,detail:"Audit events, last 30 days"},
     {label:"Active operators",value:metrics?.activeActors30Days,icon:Users,detail:"Distinct recorded users, 30 days"},
-    {label:"Asset movements",value:metrics?.movements30Days,icon:Route,detail:"Last 30 days"},
+    {label:"Asset movements",value:metrics?.movements30Days,icon:RouteIcon,detail:"Last 30 days"},
     {label:"Pending approvals",value:metrics?.pendingApprovals,icon:ClipboardCheck,detail:"Awaiting a decision"},
   ];
   const maximum=Math.max(1,...(data?.daily||[]).map(row=>row.events));
