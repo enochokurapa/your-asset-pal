@@ -15,7 +15,7 @@ function AnalyticsPage(){
   const {data,isLoading,error,refetch,isFetching}=useQuery({
     queryKey:["tenant-operations-analytics"],
     enabled:isTenantAdmin,
-    queryFn:()=>get({headers:await getServerAuthHeaders()}),
+    queryFn:async()=>get({headers:await getServerAuthHeaders()}),
     staleTime:60_000,
   });
   if(loading)return null;
