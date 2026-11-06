@@ -36,10 +36,11 @@ function ContactInbox(){
   qc.invalidateQueries({queryKey:["platform-contact-inbox"]}),
   qc.invalidateQueries({queryKey:["platform-contact-messages",selected]})
  ])};
+ const formatLegacy=(v:string)=>v.replace(/\\\\n/g,"\n");
  const useTemplate=(id:string)=>{
   setTemplateId(id);
   const t=data?.templates.find(x=>x.id===id);
-  if(t){setSubject(t.subject);setBody(t.body);}
+  if(t){setSubject(t.subject);setBody(formatLegacy(t.body));}
  };
  if(loading)return null;
  if(!isSaasAdmin)return <Navigate to="/dashboard"/>;
@@ -92,7 +93,8 @@ function ContactInbox(){
       {messages.map(m=><div key={m.id} className="rounded-lg border p-3">
        <div className="flex flex-wrap justify-between gap-2"><span className="text-xs font-semibold">{m.subject}</span>
        <span className="text-xs capitalize text-muted-foreground">{m.delivery_status} · {new Date(m.created_at).toLocaleString()}</span></div>
-       <p className="mt-2 whitespace-pre-wrap break-words text-xs leading-5">{m.body}</p>
+       <p className="mt-2 whitespace-pre-wrap break-words text-xs leading-5">{formatLegacy(m.body)}</p>
+       {m.delivery_status==="failed"&&m.delivery_error&&<p className="mt-2 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">{m.delivery_error}</p>}
       </div>)}
      </div>}
      <div className="space-y-3 border-t pt-5">
@@ -139,7 +141,7 @@ function ContactInbox(){
     <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={draftTemplate.is_active} onChange={e=>setDraftTemplate(v=>({...v,is_active:e.target.checked}))}/> Available in reply selection</label>
     <Button disabled={draftTemplate.title.trim().length<3||draftTemplate.subject.trim().length<3||draftTemplate.body.trim().length<10} onClick={async()=>{
      try{await saveTemplate({headers:await getServerAuthHeaders(),data:{
-      ...(draftTemplate.id?{id:draftTemplate.id}:{}),title:draftTemplate.title,subject:draftTemplate.subject,body:draftTemplate.body,is_active:draftTemplate.is_active,
+      ...(draftTemplate.id?{id:draftTemplate.id}:{}),title:draftTemplate.title,subject:draftTemplate.subject,body:formatLegacy(draftTemplate.body),is_active:draftTemplate.is_active,
      }});toast.success("Template saved");setEditing(false);await refresh();}
      catch(err:any){toast.error(err.message||"Unable to save template")}
     }}>Save template</Button>
