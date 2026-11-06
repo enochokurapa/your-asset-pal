@@ -47,7 +47,7 @@ export function PublicPageHero({page}:{page:MarketingPage}){
   const background=data?.url||cfg.background;
 
   return (
-    <section aria-label={cfg.title} className="relative isolate mx-auto w-full max-w-7xl overflow-hidden border-y border-[#dce6e8] bg-[#e8eef1] text-[#263742] sm:border-x lg:rounded-2xl">
+    <section aria-label={cfg.title} className="relative isolate mx-auto w-full max-w-7xl overflow-hidden border-y border-[#dce6e8] bg-[#e8eef1] text-[#263742] sm:border-x rounded-tr-none rounded-tl-none rounded-bl-none lg:rounded-br-[64px]">
       <img src={background} alt="" aria-hidden="true" loading="eager" decoding="async"
         width={1672} height={941}
         className="pointer-events-none absolute inset-0 h-full w-full object-cover object-[66%_center] opacity-80 lg:object-center" />
