@@ -137,7 +137,10 @@ function FloatingWhatsApp(){
  const getter=useServerFn(getPublicSocialLinks);
  const {data:links=[]}=useQuery({queryKey:["public-social-links"],queryFn:()=>getter(),staleTime:60_000,retry:1});
  const chat=links.find(link=>link.platform==="whatsapp");
- if(!chat)return null;
+ if(!chat)return <Link to="/contact" aria-label="Contact AssetFlow support" title="Contact AssetFlow support"
+   className="fixed bottom-5 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full border-2 border-white bg-[#bf7043] text-white shadow-lg transition-transform duration-200 hover:scale-105 motion-reduce:transition-none sm:bottom-7 sm:right-7">
+   <MessageCircle className="h-6 w-6" aria-hidden="true"/>
+ </Link>;
  return <a href={chat.url} target="_blank" rel="noopener noreferrer"
    aria-label="Chat with AssetFlow support on WhatsApp" title="Chat with us on WhatsApp"
    className="fixed bottom-5 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full border-2 border-white bg-[#25D366] text-white shadow-[0_8px_28px_rgba(10,70,45,.28)] transition-transform duration-200 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#25D366] motion-reduce:transition-none sm:bottom-7 sm:right-7">
