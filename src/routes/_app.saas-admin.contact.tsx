@@ -12,6 +12,7 @@ import {Input} from "@/components/ui/input";
 import {Textarea} from "@/components/ui/textarea";
 import {toast} from "sonner";
 import {Mail,Send,Inbox,BookOpen} from "lucide-react";
+import {AlertDialog,AlertDialogContent,AlertDialogHeader,AlertDialogTitle,AlertDialogDescription,AlertDialogFooter,AlertDialogCancel,AlertDialogAction} from "@/components/ui/alert-dialog";
 
 export const Route=createFileRoute("/_app/saas-admin/contact")({component:ContactInbox});
 type Status="new"|"in_progress"|"waiting_for_customer"|"resolved"|"closed";
@@ -23,6 +24,7 @@ function ContactInbox(){
  const [statusFilter,setStatusFilter]=useState("all");
  const [subject,setSubject]=useState("Re: {{subject}}"),[body,setBody]=useState("");
  const [sending,setSending]=useState(false);
+ const [pendingReply,setPendingReply]=useState<{id:string;email:string;subject:string;body:string}|null>(null);
  const [templateId,setTemplateId]=useState("");
  const [editing,setEditing]=useState(false);
  const [draftTemplate,setDraftTemplate]=useState({id:"",title:"",subject:"Re: {{subject}}",body:"",is_active:true});
@@ -114,14 +116,9 @@ function ContactInbox(){
          placeholder="Write a response. Use {{name}} and {{subject}} as placeholders."/>
       </label>
       <Button disabled={sending||body.trim().length<2||subject.trim().length<3}
-       onClick={async()=>{
-        if(!window.confirm(`Send this reply to ${request.email}?`))return;
-        setSending(true);
-        try{await send({headers:await getServerAuthHeaders(),data:{id:request.id,subject,body}});
-         toast.success("Reply accepted by SMTP");setBody("");await refresh();
-        }catch(err:any){toast.error(err.message||"Reply was not delivered");await refresh();}
-        finally{setSending(false)}
-       }}><Send className="mr-2 h-4 w-4"/>{sending?"Sending…":"Send email reply"}</Button>
+       onClick={()=>setPendingReply({id:request.id,email:request.email,subject,body})}>
+        <Send className="mr-2 h-4 w-4"/>{sending?"Sending…":"Review & send reply"}
+      </Button>
       <p className="text-xs leading-5 text-muted-foreground">Replies are saved in the case history. If SMTP fails, the message shows as failed rather than sent. An SMTP acceptance is not proof of delivery to the recipient's inbox.</p>
      </div>
     </>}
@@ -147,5 +144,43 @@ function ContactInbox(){
     }}>Save template</Button>
    </div>}
   </Card>
+  <AlertDialog open={pendingReply!==null} onOpenChange={open=>{if(!open&&!sending)setPendingReply(null)}}>
+    <AlertDialogContent className="w-[calc(100vw-2rem)] max-w-md rounded-2xl border-[#dce5e7] bg-white p-5 shadow-2xl sm:p-6">
+      <AlertDialogHeader>
+        <AlertDialogTitle className="flex items-center gap-2 text-base font-semibold text-[#263a46]">
+          <Mail className="h-5 w-5 text-[#c77435]"/>Send support reply?
+        </AlertDialogTitle>
+        <AlertDialogDescription className="break-words text-sm leading-6">
+          Please confirm the recipient and review your response before sending.
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <div className="min-w-0 space-y-2 rounded-lg border border-[#e3e9e9] bg-[#f5f8f8] p-3 text-sm">
+        <p className="break-all"><span className="font-medium text-[#435864]">To:</span> {pendingReply?.email}</p>
+        <p className="break-words"><span className="font-medium text-[#435864]">Subject:</span> {pendingReply?.subject}</p>
+        <p className="max-h-32 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-5 text-[#526973]">{pendingReply?.body}</p>
+      </div>
+      <AlertDialogFooter className="gap-2">
+        <AlertDialogCancel disabled={sending} className="mt-0">Cancel</AlertDialogCancel>
+        <AlertDialogAction disabled={sending} className="bg-[#c77435] text-white hover:bg-[#a85b2d]"
+          onClick={async(event)=>{
+            event.preventDefault();
+            const reply=pendingReply;
+            if(!reply||sending)return;
+            setSending(true);
+            try{
+              await send({headers:await getServerAuthHeaders(),data:{id:reply.id,subject:reply.subject,body:reply.body}});
+              toast.success("Reply accepted by SMTP");
+              setPendingReply(null);setBody("");await refresh();
+            }catch(err:any){
+              setPendingReply(null);
+              toast.error(err?.message||"Unable to send reply");
+              await refresh();
+            }finally{setSending(false)}
+          }}>
+          <Send className="mr-2 h-4 w-4"/>{sending?"Sending…":"Confirm & send"}
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
  </div>;
 }
