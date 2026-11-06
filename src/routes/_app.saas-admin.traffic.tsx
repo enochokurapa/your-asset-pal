@@ -215,6 +215,17 @@ function AcquisitionPage(){
        <p className="mt-1 text-xs text-muted-foreground">{metric.label}</p>
       </Card>)}
      </section>
+     <Card className="min-w-0 p-4 sm:p-5">
+      <h3 className="text-sm font-semibold text-[#244453]">Where visitors came from</h3>
+      <p className="mt-1 text-xs text-muted-foreground">Provider-reported referrer channels, including identifiable AI assistant links.</p>
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+       {cf.channels.map(channel=><div key={channel.label} className="min-w-0 rounded-lg bg-muted/40 p-3">
+        <p className="text-lg font-semibold tabular-nums">{channel.visits.toLocaleString()}</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">{channel.label}</p>
+       </div>)}
+       {!cf.channels.length&&<p className="text-xs text-muted-foreground">No referrer channels reported.</p>}
+      </div>
+     </Card>
      <section className="grid min-w-0 gap-4 xl:grid-cols-2">
       <SourceTable title="Websites referring visitors" rows={cf.referrers} mode="referrals"/>
       <SourceTable title="Known AI / agent referral domains" rows={cf.aiReferrers} mode="referrals"/>
