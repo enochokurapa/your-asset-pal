@@ -39,7 +39,7 @@ async function requirePlatformAdmin(userId: string) {
   if (!admin) throw new Error("Platform administrator required");
 }
 export const getPublicStats = createServerFn({method:"GET"}).handler(async () =>
-  (await readStats()).filter(row=>row.is_visible).map(({metric_key,label,value})=>({metric_key,label,value})),
+  (await readStats()).filter(row=>row.is_visible && !["site_visits","app_visits"].includes(row.metric_key)).map(({metric_key,label,value})=>({metric_key,label,value})),
 );
 export const getAdminPublicStats = createServerFn({method:"GET"})
   .middleware([requireSupabaseAuth])
