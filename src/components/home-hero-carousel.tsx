@@ -63,7 +63,7 @@ export function HomeHeroCarousel() {
     return ()=>window.clearInterval(timer);
   },[reducedMotion,visible]);
 
-  return <section aria-label="AssetFlow 360 fixed asset management" className="relative isolate overflow-hidden bg-[#e7eeed] text-[#243c48]">
+  return <section aria-label="AssetFlow 360 fixed asset management" className="relative isolate mx-auto w-full max-w-7xl overflow-hidden border-y border-[#dce6e8] bg-[#e7eef1] text-[#243c48] sm:border-x lg:rounded-2xl">
     <div className="relative min-h-[475px] sm:min-h-[535px] lg:min-h-[575px]">
       {BACKGROUNDS.map((bg,i)=><div key={bg.key} aria-hidden="true"
         className={`pointer-events-none absolute inset-0 transition-opacity duration-1000 ease-in-out ${i===active?"opacity-100":"opacity-0"}`}>
@@ -77,9 +77,9 @@ export function HomeHeroCarousel() {
           className="absolute inset-0 h-full w-full object-cover object-[60%_center] lg:object-center"
         />
       </div>)}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#e8efed]/[.98] via-[#e8eeef]/[.90] to-[#e7edef]/[.12] lg:via-[#e8eeef]/[.80]"/>
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#e5edea]/60 via-transparent to-transparent"/>
-      <div className="relative z-10 mx-auto flex min-h-[625px] max-w-7xl flex-col justify-center px-5 py-8 sm:min-h-[535px] sm:px-8 sm:py-12 lg:min-h-[575px]">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-full bg-[linear-gradient(90deg,#e7f0f6_0%,rgba(232,242,241,.98)_32%,rgba(236,242,236,.86)_60%,rgba(238,242,240,0)_100%)] md:w-[76%]"/>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-full bg-[radial-gradient(ellipse_at_8%_90%,rgba(199,116,53,.13),transparent_65%)] md:w-[72%]"/>
+      <div className="relative z-10 mx-auto flex min-h-[475px] w-full max-w-7xl flex-col justify-center px-5 py-8 sm:min-h-[535px] sm:px-8 sm:py-12 lg:min-h-[575px]">
         <div className="max-w-[580px]">
           <p className="mb-4 inline-flex items-center gap-2 rounded-md border border-[#d3deda] bg-white/75 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[.12em] text-[#a65a32]">
             <span aria-hidden="true" className="h-2 w-2 rounded-sm bg-[#c77435]"/> Complete fixed asset management
