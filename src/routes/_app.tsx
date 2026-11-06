@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { DEFAULT_TEMPLATE, type DocumentTemplate } from "@/lib/pdf-template";
 import { applyBrowserBranding, BRANDING_CHANGED_EVENT, loadTenantBranding } from "@/lib/branding";
 import { PlatformLogo, PlatformName } from "@/components/platform-logo";
+import {TrafficCapture} from "@/components/traffic-capture";
 
 export const Route = createFileRoute("/_app")({ component: AppLayout });
 
@@ -296,7 +297,7 @@ function AppLayout() {
           )}
 
           {workspaceLocked ? (
-            <div className="relative min-h-[65vh]"><div className="pointer-events-none select-none opacity-45" aria-hidden="true"><Outlet /></div><div className="absolute inset-0 z-20 flex items-start justify-center bg-background/35 pt-12"><div className="sticky top-24 mx-3 max-w-md rounded-2xl border bg-card p-7 text-center shadow-xl"><LockKeyhole className="mx-auto mb-3 h-8 w-8 text-primary"/><h2 className="text-xl font-bold">Workspace locked</h2><p className="mt-2 text-sm text-muted-foreground">Your features and existing records are preserved. Renew your subscription to use them again.</p>{isTenantAdmin?<Button asChild className="mt-5"><Link to="/billing">Renew or upgrade</Link></Button>:<p className="mt-4 text-sm">Contact your business administrator to renew access.</p>}</div></div></div>
+            <div className="relative min-h-[65vh]"><div className="pointer-events-none select-none opacity-45" aria-hidden="true"><TrafficCapture area="application"/><Outlet /></div><div className="absolute inset-0 z-20 flex items-start justify-center bg-background/35 pt-12"><div className="sticky top-24 mx-3 max-w-md rounded-2xl border bg-card p-7 text-center shadow-xl"><LockKeyhole className="mx-auto mb-3 h-8 w-8 text-primary"/><h2 className="text-xl font-bold">Workspace locked</h2><p className="mt-2 text-sm text-muted-foreground">Your features and existing records are preserved. Renew your subscription to use them again.</p>{isTenantAdmin?<Button asChild className="mt-5"><Link to="/billing">Renew or upgrade</Link></Button>:<p className="mt-4 text-sm">Contact your business administrator to renew access.</p>}</div></div></div>
           ) : lockedPaidFeature ? (
             <div className="mx-auto max-w-2xl py-8">
               <div className="rounded-2xl border bg-card p-8 text-center shadow-sm">
