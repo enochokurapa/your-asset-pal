@@ -47,12 +47,12 @@ export function PublicPageHero({page}:{page:MarketingPage}){
   const background=data?.url||cfg.background;
 
   return (
-    <section aria-label={cfg.title} className="relative isolate w-full overflow-hidden border-b border-[#e4e7e8] bg-[#e9eff0] text-[#263742]">
+    <section aria-label={cfg.title} className="relative isolate mx-auto w-full max-w-7xl overflow-hidden border-y border-[#dce6e8] bg-[#e8eef1] text-[#263742] sm:border-x lg:rounded-2xl">
       <img src={background} alt="" aria-hidden="true" loading="eager" decoding="async"
         width={1672} height={941}
-        className="pointer-events-none absolute inset-0 h-full w-full object-cover object-[66%_center] opacity-[.24] saturate-[.68] lg:object-center" />
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#e7eeed]/[.98] via-[#edf1ee]/[.90] to-[#e6e9e7]/[.34] lg:to-[#e2e8e9]/[.12]" />
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_13%_90%,rgba(199,116,53,.14),transparent_62%)]" />
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover object-[66%_center] opacity-80 lg:object-center" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-full bg-[linear-gradient(90deg,#e6eff4_0%,rgba(232,241,240,.98)_34%,rgba(235,240,235,.88)_62%,rgba(238,243,242,0)_100%)] md:w-[76%]" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-full bg-[radial-gradient(ellipse_at_8%_90%,rgba(199,116,53,.15),transparent_62%)] md:w-[72%]" />
       <div className="relative z-10 mx-auto flex min-h-[185px] w-full max-w-7xl flex-col justify-center px-5 py-7 sm:min-h-[225px] sm:px-8 sm:py-10 lg:min-h-[265px]">
         <div className="max-w-[620px]">
           <p className="text-[11px] font-semibold uppercase tracking-[.17em] text-[#aa673f]">{cfg.eyebrow}</p>
