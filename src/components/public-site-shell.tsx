@@ -2,18 +2,17 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getPublicImportantLinks } from "@/lib/platform-links.functions";
+import {getPublicSocialLinks,type SocialPlatform} from "@/lib/platform-social.functions";
 import { useEffect, useRef, useState } from "react";
 import { PlatformLogo } from "@/components/platform-logo";
 import {TrafficCapture} from "@/components/traffic-capture";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Menu, X } from "lucide-react";
+import { ArrowRight, Menu, X, Facebook, Instagram, Linkedin, Youtube, Twitter, Send, MessageCircle, Music2 } from "lucide-react";
 
 const nav = [
   { to: "/features", label: "Features" },
   { to: "/solutions", label: "Solutions" },
   { to: "/pricing", label: "Pricing" },
-  { to: "/contact", label: "Contact" },
-  { to: "/about", label: "About" },
 ] as const;
 
 export function PublicHeader() {
@@ -118,34 +117,72 @@ export function PublicHeader() {
   );
 }
 
-export function PublicFooter(){
-  const getLinks=useServerFn(getPublicImportantLinks);
-  const {data:links=[]}=useQuery({
-    queryKey:["public-important-links"],
-    queryFn:()=>getLinks(),
-    staleTime:60_000,
-    retry:1,
-  });
-  return <footer className="mx-auto w-full max-w-7xl overflow-hidden bg-[#203946] text-white">
-    <div className="mx-auto grid max-w-7xl gap-9 px-5 py-12 sm:px-8 md:grid-cols-[1.1fr_.9fr]">
-      <div className="min-w-0">
-        <PlatformLogo variant="lockup" className="h-10 w-40"/>
-        <p className="mt-5 max-w-sm text-sm leading-7 text-slate-300">Asset registration, verification, location control and lifecycle management in one adaptable platform.</p>
-      </div>
-      <div className="grid min-w-0 grid-cols-2 gap-7">
-        <nav aria-label="Footer navigation" className="flex min-w-0 flex-col items-start gap-3 text-sm text-slate-200">
-          <p className="font-semibold text-white">Explore</p>
-          {nav.map(n=><Link key={n.to} to={n.to} className="hover:text-white">{n.label}</Link>)}
-          <Link to="/login" className="hover:text-white">Sign in</Link>
-        </nav>
-        {links.length>0&&<nav aria-label="Important links" className="flex min-w-0 flex-col items-start gap-3 text-sm text-slate-200">
-          <p className="font-semibold text-white">Important links</p>
-          {links.map(link=><a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer"
-            title={link.description||undefined} className="max-w-full break-words leading-5 hover:text-white">{link.title}</a>)}
-        </nav>}
-      </div>
-    </div>
-    <div className="border-t border-white/10 px-5 py-5 text-center text-xs text-slate-400">© {new Date().getFullYear()} AssetFlow 360</div>
-  </footer>;
+const socialIcons={
+ whatsapp:MessageCircle,facebook:Facebook,instagram:Instagram,linkedin:Linkedin,
+ x:Twitter,youtube:Youtube,tiktok:Music2,telegram:Send,
+} satisfies Record<SocialPlatform,typeof MessageCircle>;
+const secondary=[
+ {to:"/about",label:"About"},
+ {to:"/contact",label:"Contact Us"},
+ {to:"/privacy",label:"Privacy Policy"},
+ {to:"/terms",label:"Terms of Use"},
+] as const;
+function FloatingWhatsApp(){
+ const getter=useServerFn(getPublicSocialLinks);
+ const {data:links=[]}=useQuery({queryKey:["public-social-links"],queryFn:()=>getter(),staleTime:60_000,retry:1});
+ const chat=links.find(link=>link.platform==="whatsapp");
+ if(!chat)return null;
+ return <a href={chat.url} target="_blank" rel="noopener noreferrer"
+   aria-label="Chat with AssetFlow support on WhatsApp" title="Chat with us on WhatsApp"
+   className="fixed bottom-5 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full border-2 border-white bg-[#25D366] text-white shadow-[0_8px_28px_rgba(10,70,45,.28)] transition-transform duration-200 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#25D366] motion-reduce:transition-none sm:bottom-7 sm:right-7">
+   <svg aria-hidden="true" viewBox="0 0 32 32" fill="currentColor" className="h-8 w-8">
+     <path d="M16 3a13 13 0 0 0-11.2 19.6L3 29l6.6-1.7A13 13 0 1 0 16 3Zm0 23.5a10.5 10.5 0 0 1-5.3-1.4l-.4-.2-3.9 1 1-3.8-.3-.4A10.5 10.5 0 1 1 16 26.5Zm5.7-7.8c-.3-.2-1.8-.9-2.1-1s-.5-.2-.7.2c-.2.3-.8 1-1 1.1-.2.2-.4.2-.8 0-.3-.2-1.3-.5-2.5-1.6-.9-.8-1.6-1.8-1.7-2.1-.2-.3 0-.5.1-.7l.5-.6c.2-.2.2-.4.3-.6.1-.2 0-.5 0-.7s-.7-1.7-1-2.4c-.3-.6-.5-.6-.7-.6h-.6c-.2 0-.6.1-.9.5-.3.3-1.2 1.2-1.2 2.9s1.2 3.3 1.4 3.5c.2.2 2.4 3.7 5.8 5.2.8.4 1.4.6 1.9.8.8.2 1.5.2 2 .1.6-.1 1.8-.7 2.1-1.5.3-.7.3-1.4.2-1.5-.1-.2-.3-.3-.6-.5Z"/>
+   </svg>
+ </a>;
 }
-export function PublicShell({children}:{children:React.ReactNode}){return <div className="min-h-screen bg-[#f7f9fa] text-[#112c3c]"><TrafficCapture area="website"/><style>{`@keyframes af-appear{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}@keyframes af-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}@keyframes af-pulse{0%,100%{opacity:.5}50%{opacity:1}}.af-enter{animation:af-appear .7s both}.af-enter-late{animation:af-appear .85s .2s both}.af-float{animation:af-float 7s ease-in-out infinite}.af-softpulse{animation:af-pulse 5s ease-in-out infinite}@media(prefers-reduced-motion:reduce){.af-enter,.af-enter-late,.af-float,.af-softpulse{animation:none!important}}`}</style><PublicHeader/>{children}<PublicFooter/></div>}
+export function PublicFooter(){
+ const getLinks=useServerFn(getPublicImportantLinks);
+ const getSocial=useServerFn(getPublicSocialLinks);
+ const {data:links=[]}=useQuery({
+  queryKey:["public-important-links"],queryFn:()=>getLinks(),staleTime:60_000,retry:1,
+ });
+ const {data:social=[]}=useQuery({
+  queryKey:["public-social-links"],queryFn:()=>getSocial(),staleTime:60_000,retry:1,
+ });
+ return <footer className="mx-auto w-full max-w-7xl overflow-hidden bg-[#203946] text-white">
+   <div className="mx-auto flex min-w-0 flex-wrap items-start justify-between gap-8 px-5 pb-8 pt-10 sm:px-8 sm:pb-10 sm:pt-12">
+     <div className="max-w-md min-w-0">
+       <PlatformLogo variant="lockup" className="h-10 w-40"/>
+       <p className="mt-4 text-sm leading-7 text-slate-300">
+        Asset registration, verification, location control and lifecycle management in one adaptable platform.
+       </p>
+     </div>
+     <div className="flex min-w-0 flex-col gap-4">
+       <nav aria-label="Footer social media" className="flex flex-wrap items-center gap-2">
+         {social.map(link=>{
+           const Icon=socialIcons[link.platform];
+           return <a href={link.url} key={link.platform} target="_blank"
+             rel="noopener noreferrer" title={link.platform==="x"?"X":link.platform}
+             aria-label={"Visit AssetFlow on "+link.platform}
+             className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 text-slate-200 transition-colors hover:border-[#d58b55] hover:bg-white/10 hover:text-white">
+             <Icon className="h-4 w-4" aria-hidden="true"/>
+           </a>;
+         })}
+       </nav>
+       {links.length>0&&<nav aria-label="Other websites" className="flex max-w-md flex-wrap gap-x-4 gap-y-2 text-xs text-slate-300">
+         {links.map(link=><a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer"
+           title={link.description||undefined} className="max-w-full break-words hover:text-white">{link.title}</a>)}
+       </nav>}
+     </div>
+   </div>
+   <div className="border-t border-white/15">
+     <div className="mx-auto flex min-w-0 max-w-7xl flex-col gap-3 px-5 py-5 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+       <span className="shrink-0">© {new Date().getFullYear()} AssetFlow 360. All rights reserved.</span>
+       <nav aria-label="Legal and company information" className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2">
+         {secondary.map(n=><Link key={n.to} to={n.to} className="transition-colors hover:text-white">{n.label}</Link>)}
+       </nav>
+     </div>
+   </div>
+ </footer>;
+}
+export function PublicShell({children}:{children:React.ReactNode}){return <div className="min-h-screen bg-[#f7f9fa] text-[#112c3c]"><TrafficCapture area="website"/><style>{`@keyframes af-appear{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}@keyframes af-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}@keyframes af-pulse{0%,100%{opacity:.5}50%{opacity:1}}.af-enter{animation:af-appear .7s both}.af-enter-late{animation:af-appear .85s .2s both}.af-float{animation:af-float 7s ease-in-out infinite}.af-softpulse{animation:af-pulse 5s ease-in-out infinite}@media(prefers-reduced-motion:reduce){.af-enter,.af-enter-late,.af-float,.af-softpulse{animation:none!important}}`}</style><PublicHeader/>{children}<PublicFooter/><FloatingWhatsApp/></div>}
