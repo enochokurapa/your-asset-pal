@@ -30,7 +30,7 @@ function uploadedLogo(data:Branding|null):Uint8Array|null{
 }
 function decodeUploadedImage(raw:string|null|undefined):Uint8Array|null{
   if(typeof raw!=="string"||raw.length>2_800_000)return null;
-  const match=/^data:image\\/(?:png|webp|svg\\+xml);base64,([A-Za-z0-9+/=]+)$/.exec(raw);
+  const match=/^data:image\/(?:png|webp|svg\+xml);base64,([A-Za-z0-9+/=]+)$/.exec(raw);
   if(!match)return null;
   const bin=Buffer.from(match[1],"base64");
   return bin.length>0&&bin.length<=2_000_000?bin:null;
