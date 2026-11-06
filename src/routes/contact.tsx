@@ -1,3 +1,4 @@
+import {publicHead} from "@/lib/public-seo";
 import {createFileRoute,Link} from "@tanstack/react-router";
 import {useState,type FormEvent} from "react";
 import {useServerFn} from "@tanstack/react-start";
@@ -10,8 +11,7 @@ import {Textarea} from "@/components/ui/textarea";
 import {Mail,MessageSquareText,ShieldCheck} from "lucide-react";
 
 export const Route=createFileRoute("/contact")({component:ContactPage,
-  head:()=>({meta:[{title:"Contact AssetFlow 360 | Support and Enquiries"},
-    {name:"description",content:"Contact the AssetFlow 360 team about pricing, product information or support."}]})});
+  head:()=>publicHead("/contact","Contact AssetFlow 360 | Support & Enquiries","Contact AssetFlow 360 for support, product questions, demonstrations, pricing or integrations. Our team can reply directly to your enquiry.")});
 function ContactPage(){
  const submit=useServerFn(submitContactRequest);
  const [form,setForm]=useState({name:"",email:"",subject:"",message:"",website:""});
