@@ -1,3 +1,4 @@
+import {publicHead} from "@/lib/public-seo";
 import {PublicShell} from "@/components/public-site-shell";
 import {PublicPageHero} from "@/components/public-page-hero";
 import {useState} from "react";
@@ -7,7 +8,7 @@ import {useQuery} from "@tanstack/react-query";
 import {getPricingPlans} from "@/lib/saas.functions";
 import {Button} from "@/components/ui/button";
 import {Check,ArrowRight,Users,Package} from "lucide-react";
-export const Route=createFileRoute("/pricing")({component:PricingPage,head:()=>({meta:[{title:"Plans & Pricing | AssetFlow 360"},{name:"description",content:"Compare three AssetFlow 360 plans with monthly and annual prices, users, assets and features."}]})});
+export const Route=createFileRoute("/pricing")({component:PricingPage,head:()=>publicHead("/pricing","AssetFlow 360 Pricing and Plans","Compare AssetFlow 360 subscription plans, available user seats, asset allowances and optional modules. Find a plan for your organisation.")});
 const money=(n:number,c:string)=>{try{return new Intl.NumberFormat("en-US",{style:"currency",currency:c,maximumFractionDigits:0}).format(n)}catch{return c+" "+n.toLocaleString()}};
 type PublicPlan = {
   id: string; name: string; description: string;
