@@ -55,7 +55,7 @@ export function PublicHeader() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-[#e8e2db] bg-white">
-      <div className="mx-auto flex h-[76px] max-w-7xl items-center gap-5 px-5 sm:px-8">
+      <div className="mx-auto flex h-[64px] max-w-7xl items-center gap-5 px-5 sm:h-[72px] sm:px-8">
         <Link to="/" className="shrink-0" aria-label="AssetFlow 360 home">
           <PlatformLogo variant="lockup" className="h-12 w-44" />
         </Link>

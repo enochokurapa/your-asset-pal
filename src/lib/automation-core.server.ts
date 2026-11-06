@@ -1,4 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { queryPostgres } from "@/lib/postgres.server";
+import { sendVerificationScheduleEmails } from "@/lib/verification-reminders.server";
 
 const admin = supabaseAdmin as any;
 let schedulerStarted = false;
@@ -13,6 +15,7 @@ type AutomationSettings = {
   depreciation_due_reminders_enabled: boolean;
   verification_due_reminders_enabled: boolean;
   verification_interval_days: number;
+  verification_notification_emails?: string[];
   last_approval_run_at: string | null;
   last_gate_pass_run_at: string | null;
   last_depreciation_run_at: string | null;
@@ -196,44 +199,34 @@ async function runDepreciationDueReminders(s: AutomationSettings, users: string[
     .eq("tenant_id", s.tenant_id);
 }
 
-async function runVerificationDueReminders(s: AutomationSettings, users: string[]) {
-  if (!s.verification_due_reminders_enabled || hoursSince(s.last_verification_run_at) < 24) return;
-  const cutoff = new Date(Date.now() - s.verification_interval_days * 86_400_000).toISOString();
-
-  const { data: assets, error } = await admin.from("assets")
-    .select("id")
-    .eq("tenant_id", s.tenant_id)
-    .neq("status", "disposed")
-    .neq("status", "retired");
-  if (error) throw error;
-
-  const { data: verifications, error: verificationError } = await admin.from("asset_verifications")
-    .select("asset_id,verified_at")
-    .eq("tenant_id", s.tenant_id)
-    .gte("verified_at", cutoff);
-  if (verificationError) throw verificationError;
-
-  const current = new Set((verifications ?? []).map((v: any) => v.asset_id));
-  const dueCount = (assets ?? []).filter((a: any) => !current.has(a.id)).length;
-
-  if (dueCount) {
-    for (const userId of users) {
+async function runVerificationDueReminders(s:AutomationSettings,users:string[]){
+  if(!s.verification_due_reminders_enabled||hoursSince(s.last_verification_run_at)<24)return;
+  const [due]=await queryPostgres<{count:string}>(`
+    SELECT COUNT(*)::text AS count FROM public.asset_verification_schedule
+    WHERE tenant_id=$1 AND verification_state IN ('overdue','due_soon')
+  `,[s.tenant_id]);
+  const dueCount=Number(due?.count||0);
+  if(dueCount){
+    for(const userId of users){
       await upsertNotification({
-        tenantId: s.tenant_id,
-        userId,
-        type: "verification_due",
-        title: "Asset verification due",
-        body: `${dueCount} asset${dueCount === 1 ? "" : "s"} have not been verified within the last ${s.verification_interval_days} days.`,
-        entityType: "tenants",
-        entityId: s.tenant_id,
-        requiresAction: true,
+        tenantId:s.tenant_id,userId,type:"verification_due",
+        title:"Asset verification due",
+        body:`${dueCount} asset${dueCount===1?"":"s"} are due or approaching their verification renewal date.`,
+        entityType:"tenants",entityId:s.tenant_id,requiresAction:true,
       });
     }
   }
-
-  await admin.from("tenant_automation_settings")
-    .update({ last_verification_run_at: new Date().toISOString() })
-    .eq("tenant_id", s.tenant_id);
+  if((s.verification_notification_emails||[]).length){
+    try{
+      await sendVerificationScheduleEmails(s.tenant_id,s.verification_notification_emails||[]);
+    }catch(error){
+      console.error("[Verification] Unable to deliver an email reminder; unsent claims were released",error);
+    }
+  }
+  const {error}=await admin.from("tenant_automation_settings")
+    .update({last_verification_run_at:new Date().toISOString()})
+    .eq("tenant_id",s.tenant_id);
+  if(error)throw error;
 }
 
 async function automationTick() {
