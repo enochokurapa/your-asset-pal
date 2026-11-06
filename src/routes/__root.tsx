@@ -65,6 +65,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { name: "theme-color", content: "#C77435" },
+      { name: "color-scheme", content: "light" },
       { title: "AssetFlow 360 | Fixed Asset Management Software" },
       { name: "description", content: "AssetFlow 360 manages fixed asset registers, locations, GPS verification, assignments, depreciation, gate passes, audit trails, reports and secure integrations." },
       { name: "keywords", content: "fixed asset management software, asset tracking, asset register, GPS asset verification, depreciation, gate pass, asset reports" },
@@ -72,14 +73,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "manifest", href: "/api/branding/manifest.webmanifest" },
-      { rel: "icon", type: "image/png", href: "/api/branding/icon-192.png" },
+      { rel: "icon", type: "image/svg+xml", href: "/assetflow-approved-mark.svg" },
+      { rel: "shortcut icon", type: "image/png", href: "/api/branding/icon-192.png" },
+      { rel: "preload", as: "image", href: "/assetflow-approved-logo.svg" },
 
       { rel: "apple-touch-icon", href: "/api/branding/icon-192.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Karla:wght@400;500;600;700&family=Lato:wght@400;700;900&family=Lora:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=Merriweather:wght@400;700;900&family=Montserrat:wght@400;500;600;700&family=Noto+Sans:wght@400;500;600;700&family=Nunito:wght@400;500;600;700&family=Open+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Raleway:wght@400;500;600;700&family=Roboto:wght@400;500;700&family=Rubik:wght@400;500;600;700&family=Source+Sans+3:wght@400;500;600;700&family=Work+Sans:wght@400;500;600;700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap",
       },
     ],
   }),
@@ -92,7 +95,22 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <head><HeadContent /></head>
+      <head>
+        <HeadContent />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify({
+          "@context":"https://schema.org",
+          "@graph":[
+            {"@type":"Organization","@id":"https://assetflow360.com/#organization",
+             "name":"AssetFlow 360","url":"https://assetflow360.com/",
+             "logo":"https://assetflow360.com/api/branding/logo.png"},
+            {"@type":"SoftwareApplication","@id":"https://assetflow360.com/#software",
+             "name":"AssetFlow 360","url":"https://assetflow360.com/",
+             "applicationCategory":"BusinessApplication","operatingSystem":"Web",
+             "description":"Fixed asset registration, verification, location, depreciation and reporting software.",
+             "publisher":{"@id":"https://assetflow360.com/#organization"}}
+          ]
+        })}}/>
+      </head>
       <body>
         {children}
         <Scripts />
