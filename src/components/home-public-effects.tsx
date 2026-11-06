@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { BarChart3, Building2, MapPinned, Package, ShieldCheck } from "lucide-react";
-import { getPublicStats } from "@/lib/platform-public-stats.functions";
+import { getPublicStats,type PublicHomepageStat } from "@/lib/platform-public-stats.functions";
 
 const icons = {assets:Package,companies:Building2,locations:MapPinned,verifications:ShieldCheck} as const;
 
@@ -12,7 +12,7 @@ function AnimatedNumber({value,visible,reduced}:{value:number;visible:boolean;re
     if (!visible || reduced) {setCurrent(value);return;}
     let frame=0;
     const start=performance.now();
-    const duration=1500;
+    const duration=950;
     const update=(now:number)=>{
       const progress=Math.min(1,(now-start)/duration);
       const eased=1-Math.pow(1-progress,4);
@@ -26,9 +26,9 @@ function AnimatedNumber({value,visible,reduced}:{value:number;visible:boolean;re
   return <span className="tabular-nums">{new Intl.NumberFormat("en-US").format(current)}</span>;
 }
 
-export function HomeLiveStats(){
+export function HomeLiveStats({initialStats}:{initialStats:PublicHomepageStat[]}){
   const get=useServerFn(getPublicStats);
-  const {data=[],isLoading}=useQuery({queryKey:["public-stats"],queryFn:()=>get(),staleTime:60_000});
+  const {data=initialStats}=useQuery({queryKey:["public-stats"],queryFn:()=>get(),initialData:initialStats,staleTime:90_000});
   const ref=useRef<HTMLElement>(null);
   const [visible,setVisible]=useState(false);
   const [reduced,setReduced]=useState(true);
@@ -48,8 +48,7 @@ export function HomeLiveStats(){
       The platform at a glance
     </p>
     <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-      {isLoading ? <p className="col-span-full rounded-xl border border-white/60 bg-white/75 p-3 text-xs text-[#55717d]">Loading current platform totals…</p> :
-      data.map((item,index)=>{
+      {data.map((item,index)=>{
         const Icon=icons[item.metric_key as keyof typeof icons] || BarChart3;
         return <div key={item.metric_key}
           style={{transitionDelay:reduced?"0ms":`${index*100}ms`}}

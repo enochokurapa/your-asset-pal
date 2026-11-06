@@ -6,6 +6,7 @@ import { ArrowRight } from "lucide-react";
 import { getHeroImage } from "@/lib/platform-hero.functions";
 import { HeroTypingLine } from "@/components/hero-typing-line";
 import { HomeLiveStats } from "@/components/home-public-effects";
+import type {PublicHomepageStat} from "@/lib/platform-public-stats.functions";
 
 const BACKGROUNDS = [
   { key:"home" as const, src:"/hero/assetflow-home-01-lifecycle.webp" },
@@ -24,7 +25,7 @@ const PHRASES = [
  * Backgrounds crossfade every 7s. Content, controls and seven stage labels
  * never change. Diagram labels belong inside the images, not beneath the hero.
  */
-export function HomeHeroCarousel() {
+export function HomeHeroCarousel({initialStats}:{initialStats:PublicHomepageStat[]}) {
   const [active,setActive] = useState(0);
   const [reducedMotion,setReducedMotion] = useState(true);
   const [visible,setVisible] = useState(true);
@@ -107,7 +108,7 @@ export function HomeHeroCarousel() {
             </Link>
           </div>
         </div>
-        <HomeLiveStats/>
+        <HomeLiveStats initialStats={initialStats}/>
       </div>
     </div>
   </section>;
