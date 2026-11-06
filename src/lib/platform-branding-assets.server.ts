@@ -25,6 +25,16 @@ async function readBranding(): Promise<Branding | null> {
   return rows[0] || null;
 }
 
+function uploadedLogo(data:Branding|null):Uint8Array|null{
+  return decodeUploadedImage(data?.platform_logo_data_url||data?.platform_icon_data_url);
+}
+function decodeUploadedImage(raw:string|null|undefined):Uint8Array|null{
+  if(typeof raw!=="string"||raw.length>2_800_000)return null;
+  const match=/^data:image\\/(?:png|webp|svg\\+xml);base64,([A-Za-z0-9+/=]+)$/.exec(raw);
+  if(!match)return null;
+  const bin=Buffer.from(match[1],"base64");
+  return bin.length>0&&bin.length<=2_000_000?bin:null;
+}
 function uploadedImage(data: Branding | null): Uint8Array | null {
   const raw = data?.platform_icon_data_url || data?.platform_logo_data_url;
   if (typeof raw !== "string" || raw.length > 2_800_000) return null;
@@ -55,16 +65,17 @@ export function resizedIcon(input: Uint8Array, size: 192 | 512): Promise<Uint8Ar
 }
 
 function defaultIcon(request: Request, size: 192 | 512): Response {
-  return Response.redirect(new URL(`/icon-${size}.png`, request.url), 302);
+  return Response.redirect(new URL("/assetflow-approved-mark.svg",request.url),302);
 }
 
 export async function maybeHandlePlatformBrandingAsset(request: Request): Promise<Response | null> {
   const pathname = new URL(request.url).pathname;
   const manifest = pathname === prefix + "manifest.webmanifest";
+  const logo = pathname === prefix + "logo.png";
   const size: 192 | 512 | null = pathname === prefix + "icon-192.png"
     ? 192
     : pathname === prefix + "icon-512.png" ? 512 : null;
-  if (!manifest && !size) return null;
+  if (!manifest && !size && !logo) return null;
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response(null, { status: 405, headers: { allow: "GET, HEAD" } });
   }
@@ -103,6 +114,28 @@ export async function maybeHandlePlatformBrandingAsset(request: Request): Promis
     });
   }
 
+  if(logo){
+    const raw=uploadedLogo(branding);
+    if(!raw)return Response.redirect(new URL("/assetflow-approved-logo.svg",request.url),302);
+    try{
+      const fingerprint=createHash("sha256").update(raw).digest("hex")+":logo";
+      let cached=cache.get(fingerprint);
+      if(!cached){
+        cached=sharp(raw,{limitInputPixels:16_000_000})
+          .resize({width:560,height:360,fit:"inside",withoutEnlargement:true})
+          .png().toBuffer().then(buf=>new Uint8Array(buf));
+        cache.set(fingerprint,cached);
+      }
+      const bytes=await cached;
+      return new Response(request.method==="HEAD"?null:new Uint8Array(bytes),{
+        headers:{"content-type":"image/png","cache-control":"public, max-age=300",
+          "content-length":String(bytes.byteLength)},
+      });
+    }catch(error){
+      console.error("[Branding] Unable to render logo",error);
+      return Response.redirect(new URL("/assetflow-approved-logo.svg",request.url),302);
+    }
+  }
   const input = uploadedImage(branding);
   if (!input) return defaultIcon(request, size!);
   try {
@@ -110,7 +143,7 @@ export async function maybeHandlePlatformBrandingAsset(request: Request): Promis
     return new Response(request.method === "HEAD" ? null : new Uint8Array(bytes), {
       headers: {
         "content-type": "image/png",
-        "cache-control": "no-store",
+        "cache-control": "public, max-age=300",
         "content-length": String(bytes.byteLength),
       },
     });
