@@ -58,7 +58,10 @@ export function PublicHeader() {
     <header className="sticky top-0 z-50 border-b border-[#e8e2db] bg-white">
       <div className="mx-auto flex h-[64px] max-w-7xl items-center gap-5 px-5 sm:h-[72px] sm:px-8">
         <Link to="/" className="shrink-0" aria-label="AssetFlow 360 home">
-          <PlatformLogo variant="lockup" className="h-12 w-44" />
+          <span className="inline-flex h-12 max-w-[190px] items-center gap-2.5 overflow-visible">
+            <PlatformLogo variant="mark" className="h-11 w-11 shrink-0" imageClassName="object-contain" />
+            <span className="whitespace-nowrap text-[15px] font-bold tracking-tight text-[#233c50]">AssetFlow <span className="text-[#ba6c37]">360</span></span>
+          </span>
         </Link>
         <nav aria-label="Main navigation" className="ml-auto hidden items-center gap-8 text-sm font-semibold text-[#283842] lg:flex">
           {nav.map(n => <Link key={n.to} to={n.to}
@@ -90,7 +93,10 @@ export function PublicHeader() {
           inert={!open}
           className={`absolute inset-y-0 right-0 flex h-full w-[78vw] max-w-[360px] flex-col overflow-y-auto bg-[#fffaf5] shadow-2xl transition-transform duration-300 ease-out motion-reduce:transition-none ${open ? "translate-x-0" : "translate-x-full"}`}>
           <div className="flex items-center justify-between gap-3 border-b border-[#eaded2] px-5 py-5">
-            <PlatformLogo variant="lockup" className="h-11 w-36" />
+            <span className="inline-flex h-11 items-center gap-2 overflow-visible">
+              <PlatformLogo variant="mark" className="h-10 w-10 shrink-0" />
+              <span className="whitespace-nowrap text-sm font-bold text-[#233c50]">AssetFlow <span className="text-[#ba6c37]">360</span></span>
+            </span>
             <button ref={closeRef} type="button" aria-label="Close menu"
               onClick={() => setOpen(false)}
               className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-[#29343a] hover:bg-[#f3e8df]">
@@ -152,7 +158,10 @@ export function PublicFooter(){
  return <footer className="mx-auto w-full max-w-7xl overflow-hidden bg-[#203946] text-white">
    <div className="mx-auto flex min-w-0 flex-wrap items-start justify-between gap-8 px-5 pb-8 pt-10 sm:px-8 sm:pb-10 sm:pt-12">
      <div className="max-w-md min-w-0">
-       <PlatformLogo variant="lockup" className="h-10 w-40"/>
+       <span className="inline-flex items-center gap-2.5">
+         <PlatformLogo variant="mark" className="h-11 w-11 shrink-0"/>
+         <span className="text-lg font-semibold tracking-tight text-white">AssetFlow 360</span>
+       </span>
        <p className="mt-4 text-sm leading-7 text-slate-300">
         Asset registration, verification, location control and lifecycle management in one adaptable platform.
        </p>
