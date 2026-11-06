@@ -53,11 +53,11 @@ export function PublicPageHero({page}:{page:MarketingPage}){
         className="pointer-events-none absolute inset-0 h-full w-full object-cover object-[66%_center] opacity-[.24] saturate-[.68] lg:object-center" />
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#e7eeed]/[.98] via-[#edf1ee]/[.90] to-[#e6e9e7]/[.34] lg:to-[#e2e8e9]/[.12]" />
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_13%_90%,rgba(199,116,53,.14),transparent_62%)]" />
-      <div className="relative z-10 mx-auto flex min-h-[240px] w-full max-w-7xl flex-col justify-center px-5 py-12 sm:min-h-[270px] sm:px-8 sm:py-14 lg:min-h-[300px]">
+      <div className="relative z-10 mx-auto flex min-h-[185px] w-full max-w-7xl flex-col justify-center px-5 py-7 sm:min-h-[225px] sm:px-8 sm:py-10 lg:min-h-[265px]">
         <div className="max-w-[620px]">
           <p className="text-[11px] font-semibold uppercase tracking-[.17em] text-[#aa673f]">{cfg.eyebrow}</p>
-          <h1 className="mt-3 text-[clamp(1.9rem,3vw,2.9rem)] font-semibold leading-[1.16] tracking-[-.035em] text-[#243744]">{cfg.title}</h1>
-          <p className="mt-4 max-w-[530px] text-[15px] leading-7 text-[#4b5f68] sm:text-base">{cfg.description}</p>
+          <h1 className="mt-2 text-[clamp(1.65rem,2.8vw,2.7rem)] font-semibold leading-[1.16] tracking-[-.035em] text-[#243744]">{cfg.title}</h1>
+          <p className="mt-2.5 max-w-[510px] text-[14px] leading-6 text-[#4b5f68] sm:text-base">{cfg.description}</p>
         </div>
       </div>
     </section>
