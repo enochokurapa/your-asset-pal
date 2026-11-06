@@ -51,6 +51,8 @@ const tenantNav: NavItem[] = [
 const saasAdminNav: NavItem[] = [
   { to: "/dashboard", label: "Control Center", icon: LayoutDashboard, exact: true },
   { to: "/saas-admin/analytics", label: "Platform Analytics", icon: Activity },
+  { to: "/saas-admin/traffic", label: "Visitor Traffic", icon: Activity },
+  { to: "/saas-admin/contact", label: "Contact Inbox", icon: Mail },
   { to: "/saas-admin/organizations", label: "Businesses", icon: Building2 },
   { to: "/saas-admin/settings", label: "Settings", icon: Settings },
   { to: "/profile", label: "My profile", icon: UserCircle },
