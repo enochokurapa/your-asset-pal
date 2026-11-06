@@ -70,32 +70,33 @@ export function PublicPageHero({page}:{page:MarketingPage}){
   const background=data?.url||cfg.background;
 
   return <section aria-label={cfg.eyebrow}
-    className="relative isolate overflow-hidden border-b border-[#2d5378] bg-[#10396b] text-white">
+    className="relative isolate w-full overflow-hidden border-b border-[#e8ddd0] bg-[#fff8ef] text-[#292b2d]">
+    {/* Background artwork is illustrative only; it must never dictate the brand palette. */}
     <img src={background} alt="" aria-hidden="true" width={1672} height={941}
       fetchPriority="high" decoding="async"
-      className="pointer-events-none absolute inset-0 h-full w-full object-cover object-[60%_center] lg:object-center"
+      className="pointer-events-none absolute inset-0 h-full w-full object-cover object-[65%_center] opacity-50 grayscale sepia-[.28] saturate-50 lg:object-center"
     />
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#0b3166]/[.98] via-[#103a70]/[.90] to-[#0f366d]/[.54]"/>
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[#071b3b]/10"/>
-    <div className="relative z-10 mx-auto flex min-h-[390px] max-w-7xl flex-col justify-center px-6 py-16 sm:min-h-[435px] sm:px-8 lg:px-10">
-      <div className="max-w-[770px]">
-        <p className="border-l-[3px] border-[#efa73b] pl-3 text-xs font-bold uppercase tracking-[.14em] text-[#f8c278]">{cfg.eyebrow}</p>
-        <h1 className="mt-6 text-[clamp(2.2rem,4.2vw,3.85rem)] font-extrabold leading-[1.12] tracking-[-.035em]">
-          {cfg.title} <span className="text-[#f0b44a]">{cfg.accent}</span>
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#fffaf5]/[.99] via-[#fffaf5]/[.95] to-[#fff6ed]/[.52] lg:via-[#fffaf5]/[.89] lg:to-[#fff6ed]/[.28]"/>
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#fff8f0]/70 via-transparent to-transparent"/>
+    <div className="relative z-10 mx-auto flex min-h-[470px] w-full max-w-7xl flex-col justify-center px-5 py-16 sm:min-h-[515px] sm:px-8 sm:py-20">
+      <div className="max-w-[690px]">
+        <p className="border-l-[3px] border-[#c77435] pl-3 text-xs font-bold uppercase tracking-[.16em] text-[#a7562c]">{cfg.eyebrow}</p>
+        <h1 className="mt-6 max-w-[690px] text-[clamp(2.25rem,4.2vw,4.15rem)] font-extrabold leading-[1.12] tracking-[-.035em] text-[#252d30]">
+          {cfg.title} <span className="text-[#bf6835]">{cfg.accent}</span>
         </h1>
-        <div className="mt-5">
-          <p className="text-sm font-bold text-[#f5b65a]">{cfg.lineLabel}</p>
-          <HeroTypingLine phrases={cfg.lines}
-            className="mt-1 min-h-[3.5rem] max-w-[630px] text-lg font-semibold leading-7 text-white sm:min-h-8 sm:text-xl"/>
+        <div className="mt-6 max-w-[610px]">
+          <p className="text-xs font-bold uppercase tracking-[.12em] text-[#ab582f]">{cfg.lineLabel}</p>
+          <HeroTypingLine phrases={cfg.lines} initialFullPhrase
+            className="mt-2 min-h-[3.5rem] max-w-[610px] text-lg font-semibold leading-7 text-[#3c4b51] sm:min-h-9 sm:text-xl"/>
         </div>
-        <p className="mt-3 max-w-[630px] text-base leading-7 text-slate-100">
+        <p className="mt-4 max-w-[610px] text-base leading-8 text-[#51616a]">
           {cfg.description}
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
-          <Link to="/register" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#c77435] px-5 text-sm font-bold text-white transition-colors hover:bg-[#ad5f2e] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
+          <Link to="/register" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-[#c77435] px-6 text-sm font-bold text-white transition-colors hover:bg-[#a85b2d] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#c77435]">
             Start free trial <ArrowRight className="h-4 w-4" aria-hidden="true"/>
           </Link>
-          <Link to={cfg.target} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-white/45 bg-[#173e71]/45 px-5 text-sm font-bold text-white transition-colors hover:bg-[#1a497f]/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
+          <Link to={cfg.target} className="inline-flex min-h-12 items-center justify-center rounded-lg border border-[#c9ad95] bg-white/90 px-6 text-sm font-bold text-[#68452f] transition-colors hover:border-[#c77435] hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#c77435]">
             {cfg.action}
           </Link>
         </div>
