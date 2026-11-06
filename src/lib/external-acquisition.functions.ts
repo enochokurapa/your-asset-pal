@@ -3,6 +3,7 @@ import {createServerFn} from "@tanstack/react-start";
 import {z} from "zod";
 import {queryPostgres} from "@/lib/postgres.server";
 import {requireSupabaseAuth} from "@/integrations/supabase/auth-middleware";
+import {classifyReferrer,isAIReferral,type AcquisitionChannel} from "@/lib/acquisition-channels";
 
 type Provider="google_search_console"|"cloudflare_web_analytics";
 type IntegrationRow={provider:Provider;config:Record<string,unknown>;encrypted_token:string|null;updated_at:string};
@@ -176,16 +177,10 @@ type AcquisitionReport={
   google:{state:"disconnected"|"ready"|"error"|"property_missing";property:string;error?:string;
     total:SearchInsight|null;queries:SearchInsight[];pages:SearchInsight[];countries:SearchInsight[];devices:SearchInsight[]};
   cloudflare:{state:"disconnected"|"ready"|"error";error?:string;total:{views:number;visits:number}|null;
-    referrers:CloudflareInsight[];pages:CloudflareInsight[];countries:CloudflareInsight[];aiReferrers:CloudflareInsight[]};
+    referrers:CloudflareInsight[];pages:CloudflareInsight[];countries:CloudflareInsight[];aiReferrers:CloudflareInsight[];channels:{label:AcquisitionChannel;views:number;visits:number}[]};
   period:{start:string;end:string};
 };
 const reportCache=new Map<string,{expires:number;promise:Promise<AcquisitionReport>}>();
-function isAIReferral(host:string){
- const hostname=host.toLowerCase().replace(/^www\./,"");
- return ["chatgpt.com","chat.openai.com","perplexity.ai","claude.ai","gemini.google.com",
-   "copilot.microsoft.com","you.com","poe.com","meta.ai","phind.com"].some(v=>hostname===v||hostname.endsWith("."+v));
-}
-export {isAIReferral};
 export const getAcquisitionReport=createServerFn({method:"GET"})
  .middleware([requireSupabaseAuth])
  .handler(async({context}):Promise<AcquisitionReport>=>{
@@ -205,7 +200,7 @@ async function loadAcquisition(start:string,end:string):Promise<AcquisitionRepor
  const report:AcquisitionReport={
   period:{start,end},
   google:{state:"disconnected",property:String(g?.config?.site||""),total:null,queries:[],pages:[],countries:[],devices:[]},
-  cloudflare:{state:"disconnected",total:null,referrers:[],pages:[],countries:[],aiReferrers:[]},
+  cloudflare:{state:"disconnected",total:null,referrers:[],pages:[],countries:[],aiReferrers:[],channels:[]},
  };
  await Promise.all([
   (async()=>{
@@ -232,7 +227,7 @@ async function loadAcquisition(start:string,end:string):Promise<AcquisitionRepor
    }
    const after=start+"T00:00:00Z",before=new Date(new Date(end+"T00:00:00Z").getTime()+86400000).toISOString();
    const filter=`{datetime_geq:"${after}",datetime_lt:"${before}",siteTag:"${siteTag}"}`;
-   const groups=(alias:string,field?:string,limit=30)=>`${alias}:rumPageloadEventsAdaptiveGroups(filter:${filter},limit:${limit},orderBy:[count_DESC]){count sum{visits} ${field?"dimensions{metric:"+field+"}":""}}`;
+   const groups=(alias:string,field?:string,limit=100)=>`${alias}:rumPageloadEventsAdaptiveGroups(filter:${filter},limit:${limit},orderBy:[count_DESC]){count sum{visits} ${field?"dimensions{metric:"+field+"}":""}}`;
    const query=`{viewer{accounts(filter:{accountTag:"${accountId}"}){${groups("total",undefined,1)} ${groups("referrers","refererHost")} ${groups("pages","requestPath")} ${groups("countries","countryName")}}}}`;
    try{
     const response=await jsonRequest<{errors?:{message:string}[];data?:{viewer?:{accounts?:{
@@ -248,10 +243,18 @@ async function loadAcquisition(start:string,end:string):Promise<AcquisitionRepor
       label:r.dimensions?.metric||"(direct / unknown)",views:Number(r.count||0),visits:Number(r.sum?.visits||0),
     }));
     const referrers=mapped(data.referrers);
+    const grouped=new Map<AcquisitionChannel,{views:number;visits:number}>();
+    for(const ref of referrers){
+      const category=classifyReferrer(ref.label);
+      const existing=grouped.get(category)||{views:0,visits:0};
+      existing.views+=ref.views;existing.visits+=ref.visits;grouped.set(category,existing);
+    }
+    const channels=[...grouped.entries()].map(([label,values])=>({label,...values}))
+      .sort((a,b)=>b.visits-a.visits);
     report.cloudflare={state:"ready",
       total:{views:Number(data.total?.[0]?.count||0),visits:Number(data.total?.[0]?.sum?.visits||0)},
       referrers,pages:mapped(data.pages),countries:mapped(data.countries),
-      aiReferrers:referrers.filter(r=>isAIReferral(r.label)),
+      aiReferrers:referrers.filter(r=>isAIReferral(r.label)),channels,
     };
    }catch(err){report.cloudflare.state="error";report.cloudflare.error=err instanceof Error?err.message:"Cloudflare unavailable"}
   })(),
