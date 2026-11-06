@@ -279,7 +279,7 @@ function AppLayout() {
           <Button variant="ghost" size="icon" title="Sign out" onClick={signOut} aria-label="Sign out"><LogOut className="h-4 w-4 text-muted-foreground hover:text-foreground" /></Button>
         </header>
 
-        <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
+        <main className="min-w-0 flex-1 overflow-x-clip px-3 py-4 sm:px-4 sm:py-6 md:px-8 md:py-8">
           {!isSaasAdmin && pathname.startsWith("/reports") && !exportAccess.allowed("reports") && subscriptionStatus === "trial" && !lockedPaidFeature && (
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
               <div className="flex items-center gap-2"><LockKeyhole className="h-4 w-4" /><span><strong>Free trial:</strong> reports are view-only. PDF and Excel downloads are locked until upgrade.</span></div>
