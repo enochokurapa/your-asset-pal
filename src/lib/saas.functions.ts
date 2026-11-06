@@ -1,4 +1,5 @@
 import { getYoCheckoutConfig, isYoCheckoutConfigured } from "@/lib/payment-gateway.server";
+import { ugandanMobileMoneyPhoneSchema } from "@/lib/uganda-mobile-money";
 import { currentUsdUgxQuote, usdToUgx } from "@/lib/pricing-fx.server";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -898,7 +899,7 @@ async function yoRequest(body: string, mode: "sandbox" | "production") {
 
 export const startYoUpgrade = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({phone:z.string().min(9).max(20),plan_id:z.enum(["starter","business","enterprise"]),period:z.enum(["monthly","annual"])}).parse(input))
+  .inputValidator((input) => z.object({phone:ugandanMobileMoneyPhoneSchema,plan_id:z.enum(["starter","business","enterprise"]),period:z.enum(["monthly","annual"])}).parse(input))
   .handler(async ({ data, context }) => {
     const p = await assertTenantAdmin(context.userId);
     const {username,password,mode}=await getYoCheckoutConfig();
@@ -917,8 +918,8 @@ export const startYoUpgrade = createServerFn({ method: "POST" })
     const amount=usdToUgx(baseAmountUsd,quote.rate);
     const currency="UGX";
 
-    const phone = data.phone.replace(/\s+/g, "").replace(/^\+/, "");
-    if (!/^256\d{9}$/.test(phone)) throw new Error("Use a mobile-money number in format 2567XXXXXXXX");
+    const phone = data.phone;
+    
 
     const { data: tx, error: txError } = await admin.from("billing_transactions").insert({
       tenant_id: p.tenant_id,
@@ -973,7 +974,7 @@ export const startYoAddonPurchase = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({
     module_key: z.string().min(1).max(100),
-    phone: z.string().min(9).max(20),
+    phone: ugandanMobileMoneyPhoneSchema,
   }).parse(input))
   .handler(async ({ data, context }) => {
     const p = await assertTenantAdmin(context.userId);
@@ -1001,8 +1002,8 @@ export const startYoAddonPurchase = createServerFn({ method: "POST" })
       .select("enabled").eq("tenant_id", p.tenant_id).eq("module_key", data.module_key).maybeSingle();
     if (existing.data?.enabled === true) throw new Error("This add-on is already active");
 
-    const phone = data.phone.replace(/\s+/g, "").replace(/^\+/, "");
-    if (!/^256\d{9}$/.test(phone)) throw new Error("Use a mobile-money number in format 2567XXXXXXXX");
+    const phone = data.phone;
+    
 
     const { data: tx, error: txError } = await admin.from("billing_transactions").insert({
       tenant_id: p.tenant_id,
@@ -1180,7 +1181,7 @@ export const getPublicPricing=createServerFn({method:"GET"}).handler(async()=>{
 
 export const startYoSeatPurchase=createServerFn({method:"POST"})
  .middleware([requireSupabaseAuth])
- .inputValidator(input=>z.object({phone:z.string().min(9).max(20),quantity:z.number().int().min(1).max(100)}).parse(input))
+ .inputValidator(input=>z.object({phone:ugandanMobileMoneyPhoneSchema,quantity:z.number().int().min(1).max(100)}).parse(input))
  .handler(async ({data,context})=>{
   const p=await assertTenantAdmin(context.userId);
   const {username,password,mode}=await getYoCheckoutConfig();
@@ -1197,8 +1198,8 @@ export const startYoSeatPurchase=createServerFn({method:"POST"})
   if(!quote)throw Error("Verified exchange rate unavailable");
   const unitPrice=usdToUgx(baseUnitPriceUsd,quote.rate);
   const amount=usdToUgx(baseAmountUsd,quote.rate);
-  const phone=data.phone.replace(/\s+/g,"").replace(/^\+/,"");
-  if(!/^256\d{9}$/.test(phone))throw Error("Use mobile money number 2567XXXXXXXX");
+  const phone=data.phone;
+  
   const {data:tx,error}=await admin.from("seat_purchase_transactions").insert({tenant_id:p.tenant_id,user_id:context.userId,quantity:data.quantity,unit_price:unitPrice,amount,currency:"UGX",base_amount_usd:baseAmountUsd,conversion_rate:quote.rate,conversion_timestamp:quote.updatedAt,phone}).select("id").single();
   if(error||!tx)throw Error(error?.message||"Could not create purchase");
   const xml='<?xml version="1.0" encoding="UTF-8"?><AutoCreate><Request>'+
@@ -1263,7 +1264,7 @@ export const saveAdminPricingPlan=createServerFn({method:"POST"}).middleware([re
  });
 export const startYoAssetCapacityPurchase=createServerFn({method:"POST"})
  .middleware([requireSupabaseAuth])
- .inputValidator(input=>z.object({phone:z.string().min(9).max(20),quantity:z.number().int().min(1).max(100)}).parse(input))
+ .inputValidator(input=>z.object({phone:ugandanMobileMoneyPhoneSchema,quantity:z.number().int().min(1).max(100)}).parse(input))
  .handler(async ({data,context})=>{
   const p=await assertTenantAdmin(context.userId);
   const {username,password,mode}=await getYoCheckoutConfig();
@@ -1278,8 +1279,8 @@ export const startYoAssetCapacityPurchase=createServerFn({method:"POST"})
   const quote=await currentUsdUgxQuote(true);
   if(!quote)throw Error("Verified exchange rate unavailable");
   const unitPrice=usdToUgx(baseUnitPriceUsd,quote.rate),amount=usdToUgx(baseAmountUsd,quote.rate);
-  const phone=data.phone.replace(/\s+/g,"").replace(/^\+/,"");
-  if(!/^256\d{9}$/.test(phone))throw Error("Use mobile money number 2567XXXXXXXX");
+  const phone=data.phone;
+  
   const {data:tx,error}=await admin.from("asset_capacity_purchases").insert({tenant_id:p.tenant_id,user_id:context.userId,blocks:data.quantity,block_size:Number(settings.extra_asset_block_size),unit_price:unitPrice,amount,currency:"UGX",base_amount_usd:baseAmountUsd,conversion_rate:quote.rate,conversion_timestamp:quote.updatedAt,phone}).select("id").single();
   if(error||!tx)throw Error(error?.message||"Could not create purchase");
   const xml='<?xml version="1.0" encoding="UTF-8"?><AutoCreate><Request>'+
