@@ -15,7 +15,7 @@ function DiagnosticsPage(){
   const getter=useServerFn(getTenantOperationsAnalytics);
   const {data,isLoading,error,isFetching,refetch}=useQuery({
     queryKey:["tenant-operations-analytics"],enabled:isTenantAdmin,
-    queryFn:()=>getter({headers:await getServerAuthHeaders()}),
+    queryFn:async()=>getter({headers:await getServerAuthHeaders()}),
     staleTime:60_000,
   });
   if(loading)return null;
