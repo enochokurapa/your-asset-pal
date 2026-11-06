@@ -1,85 +1,54 @@
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { cn } from "@/lib/utils";
-import { getPublicSaasBranding } from "@/lib/saas.functions";
+import {useEffect,useState} from "react";
+import {useQuery} from "@tanstack/react-query";
+import {useServerFn} from "@tanstack/react-start";
+import {cn} from "@/lib/utils";
+import {getPublicBrandingBasics} from "@/lib/public-branding.functions";
 
-export function usePlatformBranding() {
-  const getBranding = useServerFn(getPublicSaasBranding);
-  const query = useQuery({
-    queryKey: ["public-saas-branding"],
-    queryFn: () => getBranding(),
-    staleTime: 30_000,
-    refetchOnMount: false,
-  });
+// The first paint uses the approved administrator-uploaded artwork bundled with
+// this release. The unrelated legacy orange fallback is never displayed.
+const APPROVED_LOGO="/assetflow-approved-logo.svg";
+const APPROVED_MARK="/assetflow-approved-mark.svg";
+const SNAPSHOT_VERSION="2026-11-05T11:02:54.649Z";
 
-  return query;
+export function usePlatformBranding(){
+ const get=useServerFn(getPublicBrandingBasics);
+ return useQuery({queryKey:["public-branding-basics"],queryFn:()=>get(),
+   staleTime:300_000,refetchOnMount:false,retry:1});
 }
 
-/** Run once per application, not for every logo in the header/footer. */
-export function PlatformBrandingEffect() {
-  const { data } = usePlatformBranding();
-  useEffect(() => {
-    if (!data || typeof document === "undefined") return;
-
-    const root = document.documentElement;
-    root.style.setProperty("--platform-primary", data.primaryColor || "#C77435");
-    root.style.setProperty("--platform-secondary", data.secondaryColor || "#4B47DC");
-
-    // The favicon, installed app and Apple icon all use the admin-uploaded
-    // platform mark. Cache-bust after a branding update so browsers reload it.
-    const version = Date.now();
-    for (const [rel, path] of [
-      ["icon", "/api/branding/icon-192.png"],
-      ["apple-touch-icon", "/api/branding/icon-192.png"],
-      ["manifest", "/api/branding/manifest.webmanifest"],
-    ] as const) {
-      let link = document.head.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
-      if (!link) {
-        link = document.createElement("link");
-        link.rel = rel;
-        document.head.appendChild(link);
-      }
-      link.href = `${path}?v=${version}`;
-    }
-  }, [data]);
-
-  return null;
+export function PlatformBrandingEffect(){
+ const {data}=usePlatformBranding();
+ useEffect(()=>{
+  if(!data||typeof document==="undefined")return;
+  document.documentElement.style.setProperty("--platform-primary",data.primaryColor||"#C77435");
+  document.documentElement.style.setProperty("--platform-secondary",data.secondaryColor||"#4B47DC");
+  // The browser/PWA icons are linked in SSR metadata so no client-side
+  // Date.now() cache-busting or favicon replacement is required.
+ },[data]);
+ return null;
 }
 
 export function PlatformLogo({
-  className,
-  imageClassName,
-  alt,
-  variant = "mark",
-}: {
-  className?: string;
-  imageClassName?: string;
-  fallbackClassName?: string;
-  alt?: string;
-  variant?: "mark" | "lockup";
-}) {
-  const { data } = usePlatformBranding();
-  const uploaded = variant === "lockup"
-    ? (data?.logoDataUrl || data?.iconDataUrl)
-    : (data?.iconDataUrl || data?.logoDataUrl);
-  const [failedSrc,setFailedSrc] = useState<string|null>(null);
-  const src = uploaded && failedSrc !== uploaded
-    ? uploaded
-    : variant === "lockup" ? "/assetflow360-logo.svg" : "/assetflow360-mark.svg";
-  return (
-    <span className={cn("inline-flex items-center justify-center", className)}>
-      {src ? <img
-        src={src}
-        alt={alt || data?.name || "AssetFlow 360"}
-        onError={() => setFailedSrc(src)}
-        className={cn("block h-full w-full object-contain", imageClassName)}
-      /> : null}
-    </span>
-  );
+ className,imageClassName,alt,variant="mark",
+}:{
+ className?:string;imageClassName?:string;fallbackClassName?:string;alt?:string;
+ variant?:"mark"|"lockup";
+}){
+ const {data}=usePlatformBranding();
+ const initial=variant==="lockup"?APPROVED_LOGO:APPROVED_MARK;
+ const liveUrl=data?.updatedAt && data.updatedAt!==SNAPSHOT_VERSION
+  ? (variant==="lockup"?"/api/branding/logo.png":"/api/branding/icon-192.png")
+    +"?v="+encodeURIComponent(data.updatedAt)
+  : initial;
+ const [failed,setFailed]=useState<string|null>(null);
+ const src=failed===liveUrl?initial:liveUrl;
+ return <span className={cn("inline-flex items-center justify-center",className)}>
+  <img src={src} alt={alt||data?.name||"AssetFlow 360"} decoding="async"
+    fetchPriority="high" onError={()=>setFailed(liveUrl)}
+    className={cn("block h-full w-full object-contain",imageClassName)}/>
+ </span>;
 }
-
-export function PlatformName({ className }: { className?: string }) {
-  const { data } = usePlatformBranding();
-  return <span className={className}>{data?.name || "AssetFlow 360"}</span>;
+export function PlatformName({className}:{className?:string}){
+ const {data}=usePlatformBranding();
+ return <span className={className}>{data?.name||"AssetFlow 360"}</span>;
 }
