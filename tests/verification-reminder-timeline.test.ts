@@ -13,7 +13,7 @@ test("all pre-due milestones are distinct and chronological",()=>{
 test("due and monthly reminders stop after six months",()=>{
   expect(verificationMilestone(due,due)).toBe("due");
   for(let n=1;n<=6;n++){
-    const month=11+n;
+    const month=10+n; // November is month 10 in the UTC Date constructor
     const date=new Date(Date.UTC(2027+Math.floor(month/12),month%12,6,12));
     expect(verificationMilestone(due,date)).toBe(`overdue_${n}`);
   }
