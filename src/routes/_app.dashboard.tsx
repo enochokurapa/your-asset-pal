@@ -191,7 +191,7 @@ function TenantDashboard() {
   const pieData = (Array.isArray(data?.statusCounts) ? data.statusCounts : []).filter((s) => s.value > 0);
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-5 sm:space-y-6">
       <PublishedCanvases kind="dashboard_builder"/>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -220,12 +220,12 @@ function TenantDashboard() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="grid min-w-0 grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-5">
         {stats.map((s) => (
           <Card
             key={s.label}
             onClick={() => s.navigateTo ? nav({ to: s.navigateTo, search: (s.navigateSearch ?? {}) as any }) : setTile({ title: s.label, filter: s.filter })}
-            className="group cursor-pointer overflow-hidden p-5 transition hover:-translate-y-0.5 hover:shadow-lg"
+            className="group min-w-0 cursor-pointer overflow-hidden p-3 sm:p-5 transition hover:-translate-y-0.5 hover:shadow-lg"
             style={{
               borderTop: `3px solid ${s.color}`,
               background: `linear-gradient(135deg, color-mix(in oklab, ${s.color} 8%, transparent), transparent 70%)`,
@@ -233,14 +233,14 @@ function TenantDashboard() {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium" style={{ color: s.color }}>{s.label}</p>
-                <p className="mt-2 text-3xl font-bold tabular-nums">{isLoading ? "-" : s.value}</p>
+                <p className="break-words text-xs font-medium leading-4 sm:text-sm" style={{ color: s.color }}>{s.label}</p>
+                <p className="mt-2 text-xl font-semibold tabular-nums sm:text-3xl">{isLoading ? "-" : s.value}</p>
                 {s.subtotal !== undefined && s.subtotal > 0 && (
                   <p className="mt-1 text-xs font-medium text-muted-foreground tabular-nums">{formatUGX(s.subtotal)}</p>
                 )}
               </div>
               <div
-                className="flex h-11 w-11 items-center justify-center rounded-xl transition group-hover:scale-110"
+                className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl transition group-hover:scale-110 sm:flex"
                 style={{ backgroundColor: `color-mix(in oklab, ${s.color} 18%, transparent)`, color: s.color }}
               >
                 <s.icon className="h-5 w-5" />
@@ -271,7 +271,7 @@ function TenantDashboard() {
         {!data?.topLocations?.length ? (
           <p className="py-8 text-center text-sm text-muted-foreground">No located assets in this branch scope.</p>
         ) : (
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-4 grid min-w-0 grid-cols-1 gap-2 min-[420px]:grid-cols-2 lg:grid-cols-4">
             {data.topLocations.map((loc:any)=>(
               <button
                 key={loc.key}
@@ -280,7 +280,7 @@ function TenantDashboard() {
                   to:"/assets",
                   search: loc.type==="location" ? {location:loc.id} as any : {geo:loc.id} as any,
                 })}
-                className="group rounded-xl border bg-background p-3 text-left transition hover:border-primary/40 hover:bg-primary/5"
+                className="group min-w-0 overflow-hidden rounded-xl border bg-background p-3 text-left transition hover:border-primary/40 hover:bg-primary/5"
               >
                 <div className="flex items-start justify-between gap-2">
                   <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary"/>
@@ -294,13 +294,13 @@ function TenantDashboard() {
         )}
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid min-w-0 gap-4 md:grid-cols-2">
         <Card className="p-5">
           <h2 className="text-sm font-semibold">Asset condition</h2>
           {pieData.length === 0 ? (
             <p className="py-12 text-center text-sm text-muted-foreground">No assets yet.</p>
           ) : (
-            <div className="h-64">
+            <div className="h-64 min-w-0">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
