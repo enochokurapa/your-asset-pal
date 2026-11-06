@@ -5,7 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 type Key = string;
 type StatSource = "live"|"manual"|"hybrid";
-const predefined=new Set(["assets","companies","locations","verifications","site_visits","app_visits"]);
+const predefined=new Set(["assets","companies","locations","verifications"]);
 export type PublicStat = {
   metric_key: Key; label: string; source: StatSource;
   manual_value: number; live_anchor:number; anchor_recorded_at:string|null; is_visible: boolean; sort_order: number; value: number;
@@ -14,14 +14,12 @@ const rowSql = `SELECT metric_key,label,source,manual_value::int,live_anchor::in
   FROM public.platform_public_stats ORDER BY sort_order,metric_key`;
 async function readStats(): Promise<PublicStat[]> {
   const [counts] = await queryPostgres<{
-    assets: string; companies: string; locations: string; verifications: string; site_visits:string; app_visits:string;
+    assets: string; companies: string; locations: string; verifications: string; 
   }>(`SELECT
     (SELECT COUNT(*)::text FROM public.assets) AS assets,
     (SELECT COUNT(*)::text FROM public.tenants) AS companies,
     (SELECT COUNT(*)::text FROM public.locations WHERE is_active=TRUE) AS locations,
-    (SELECT COUNT(*)::text FROM public.asset_verifications WHERE status='verified') AS verifications,
-    (SELECT COALESCE(SUM(views),0)::text FROM public.platform_page_view_daily WHERE area='website') AS site_visits,
-    (SELECT COALESCE(SUM(views),0)::text FROM public.platform_page_view_daily WHERE area='application') AS app_visits`);
+    (SELECT COUNT(*)::text FROM public.asset_verifications WHERE status='verified') AS verifications`);
   const rows = await queryPostgres<Omit<PublicStat,"value">>(rowSql);
   return rows.map(row => {
     const live = Number(counts[row.metric_key as keyof typeof counts] || 0);
@@ -62,7 +60,7 @@ export const getPublicStats=createServerFn({method:"GET"}).handler(async():Promi
         (SELECT COUNT(*)::text FROM public.locations WHERE is_active=TRUE) AS locations,
         (SELECT COUNT(*)::text FROM public.asset_verifications WHERE status='verified') AS verifications
     ) counts
-    WHERE s.is_visible=TRUE AND s.metric_key NOT IN ('site_visits','app_visits')
+    WHERE s.is_visible=TRUE AND s.metric_key IN ('assets','companies','locations','verifications')
     ORDER BY s.sort_order,s.metric_key LIMIT 12
   `);
   return rows.map(r=>{
