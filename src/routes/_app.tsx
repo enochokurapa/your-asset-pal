@@ -16,7 +16,7 @@ import { applyBrowserBranding, BRANDING_CHANGED_EVENT, loadTenantBranding } from
 import { PlatformLogo, PlatformName } from "@/components/platform-logo";
 import {TrafficCapture} from "@/components/traffic-capture";
 
-export const Route = createFileRoute("/_app")({ component: AppLayout });
+export const Route = createFileRoute("/_app")({ component: AppLayout, head:()=>({meta:[{name:"robots",content:"noindex,nofollow,noarchive"}]}) });
 
 type NavItem = {
   to: string;
