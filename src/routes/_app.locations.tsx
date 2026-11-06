@@ -86,22 +86,22 @@ function LocationsPage() {
   const subLocations = (locations as any[]).filter((l)=>!!l.parent_id).length;
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-5 sm:space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Locations</h1>
         <p className="text-sm text-muted-foreground">Organisation locations and the global geography used by assets, movements and verification.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid min-w-0 grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
         {[
           ["Organisation locations", locations.length],
           ["Sub-locations", subLocations],
           ["Assets with location", locatedAssets],
           ["Assets without location", unlocatedAssets],
         ].map(([label,value])=>(
-          <Card key={String(label)} className="p-4">
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+          <Card key={String(label)} className="min-w-0 overflow-hidden p-3 sm:p-4">
+            <p className="break-words text-xs leading-4 text-muted-foreground">{label}</p>
+            <p className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">{value}</p>
           </Card>
         ))}
       </div>
@@ -109,7 +109,7 @@ function LocationsPage() {
         <p className="text-xs text-muted-foreground">{gpsVerifiedAssets} asset{gpsVerifiedAssets===1?"":"s"} currently have GPS verification.</p>
       )}
 
-      <Tabs defaultValue="organisation">
+      <Tabs defaultValue="organisation" className="min-w-0 max-w-full">
         <TabsList>
           <TabsTrigger value="organisation">Organisation</TabsTrigger>
           <TabsTrigger value="geography">Geography</TabsTrigger>
@@ -267,18 +267,18 @@ function OrganisationLocations({
 
   const render=(l:any,depth=0):any=>(
     <div key={l.id}>
-      <div className="group flex items-center justify-between gap-3 border-b px-3 py-3 last:border-0" style={{paddingLeft:12+depth*22}}>
+      <div className="group flex min-w-0 flex-col items-start gap-2 border-b px-3 py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between sm:gap-3" style={{paddingLeft:12+Math.min(depth,3)*8}}>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             {depth>0 && <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground"/>}
-            <p className="font-medium">{l.name}</p>
+            <p className="min-w-0 break-words text-sm font-medium">{l.name}</p>
             <Badge variant="outline">{TYPE_LABEL[l.location_type]||l.location_type}</Badge>
           </div>
           <p className="mt-1 truncate text-xs text-muted-foreground">
             {l.branches?.name ? `${l.branches.name} · ` : ""}{l.geo_places?.display_path || l.address || (l.parent_id ? "Sub-location" : "Organisation location")}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex max-w-full shrink-0 flex-wrap items-center gap-1">
           <Button
             size="sm"
             variant={assetsForLocation(l.id).length ? "outline" : "ghost"}
@@ -312,7 +312,7 @@ function OrganisationLocations({
   );
 
   return <Card>
-    <CardHeader className="flex-row items-center justify-between">
+    <CardHeader className="flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <CardTitle>Organisation locations</CardTitle>
         <p className="text-sm text-muted-foreground">Build your real structure: site → building → floor → room/store/office.</p>
@@ -460,7 +460,7 @@ function GeographyBrowser({countries,assets,onViewAssets}:{countries:any[];asset
           {countries.map((c:any)=>(
             <button key={c.code} type="button" onClick={()=>chooseCountry(c.code)}
               className="group rounded-xl border bg-background p-4 text-left transition hover:border-primary/40 hover:bg-primary/5">
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="font-semibold">{c.name}</p>
                   <p className="mt-1 text-xs text-muted-foreground">Open geographic hierarchy</p>
@@ -500,7 +500,7 @@ function GeographyBrowser({countries,assets,onViewAssets}:{countries:any[];asset
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-1 rounded-lg bg-muted/35 px-2 py-1.5 text-xs">
+      <div className="flex min-w-0 flex-wrap items-center gap-1 overflow-hidden rounded-lg bg-muted/35 px-2 py-1.5 text-xs">
         <button type="button" className="rounded px-2 py-1 font-medium hover:bg-background" onClick={()=>setStack([])}>
           {selectedCountry?.name||country}
         </button>
@@ -516,7 +516,7 @@ function GeographyBrowser({countries,assets,onViewAssets}:{countries:any[];asset
     <CardContent className="space-y-3">
       {stack.length>0 && <Button variant="ghost" size="sm" onClick={back}><ChevronLeft className="mr-1 h-4 w-4"/>Back one level</Button>}
 
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           {stack.length===0?config.label:"Areas inside "+selected?.name}
         </p>
