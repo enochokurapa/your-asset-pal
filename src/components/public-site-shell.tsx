@@ -133,6 +133,22 @@ const secondary=[
  {to:"/privacy",label:"Privacy Policy"},
  {to:"/terms",label:"Terms of Use"},
 ] as const;
+function FloatingSocialProfiles(){
+ const getter=useServerFn(getPublicSocialLinks);
+ const {data:links=[]}=useQuery({queryKey:["public-social-links"],queryFn:()=>getter(),staleTime:60_000,retry:1});
+ const profiles=links.filter(l=>l.platform!=="whatsapp").slice(0,6);
+ if(!profiles.length)return null;
+ return <nav aria-label="Official social media" className="fixed bottom-[88px] right-5 z-40 flex flex-col items-center gap-2 sm:bottom-[102px] sm:right-8">
+  {profiles.map(link=>{
+   const Icon=socialIcons[link.platform];
+   return <a key={link.platform} href={link.url} target="_blank" rel="noopener noreferrer"
+    title={"AssetFlow on "+link.platform} aria-label={"Open AssetFlow "+link.platform+" profile"}
+    className="flex h-10 w-10 items-center justify-center rounded-full border border-[#d9e4e8] bg-white text-[#23475a] shadow-md transition-transform duration-200 hover:scale-105 motion-reduce:transition-none">
+    <Icon className="h-4 w-4" aria-hidden="true"/>
+   </a>;
+  })}
+ </nav>;
+}
 function FloatingWhatsApp(){
  const getter=useServerFn(getPublicSocialLinks);
  const {data:links=[]}=useQuery({queryKey:["public-social-links"],queryFn:()=>getter(),staleTime:60_000,retry:1});
@@ -197,4 +213,4 @@ export function PublicFooter(){
    </div>
  </footer>;
 }
-export function PublicShell({children}:{children:React.ReactNode}){return <div className="min-h-screen bg-[#f7f9fa] text-[#112c3c]"><TrafficCapture area="website"/><style>{`@keyframes af-appear{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}@keyframes af-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}@keyframes af-pulse{0%,100%{opacity:.5}50%{opacity:1}}.af-enter{animation:af-appear .7s both}.af-enter-late{animation:af-appear .85s .2s both}.af-float{animation:af-float 7s ease-in-out infinite}.af-softpulse{animation:af-pulse 5s ease-in-out infinite}@media(prefers-reduced-motion:reduce){.af-enter,.af-enter-late,.af-float,.af-softpulse{animation:none!important}}`}</style><PublicHeader/>{children}<PublicFooter/><FloatingWhatsApp/></div>}
+export function PublicShell({children}:{children:React.ReactNode}){return <div className="min-h-screen bg-[#f7f9fa] text-[#112c3c]"><TrafficCapture area="website"/><style>{`@keyframes af-appear{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}@keyframes af-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}@keyframes af-pulse{0%,100%{opacity:.5}50%{opacity:1}}.af-enter{animation:af-appear .7s both}.af-enter-late{animation:af-appear .85s .2s both}.af-float{animation:af-float 7s ease-in-out infinite}.af-softpulse{animation:af-pulse 5s ease-in-out infinite}@media(prefers-reduced-motion:reduce){.af-enter,.af-enter-late,.af-float,.af-softpulse{animation:none!important}}`}</style><PublicHeader/>{children}<PublicFooter/><FloatingSocialProfiles/><FloatingWhatsApp/></div>}
