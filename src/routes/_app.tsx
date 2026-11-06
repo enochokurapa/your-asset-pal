@@ -5,7 +5,7 @@ import { useAuth, ModuleKey } from "@/hooks/use-auth";
 import {
   LayoutDashboard, Package, Tags, MapPin, Users, Boxes, LogOut, Menu, X, FileBarChart,
   Building2, History, UserCircle, TrendingDown, DoorOpen, Settings, ChevronDown, ClipboardCheck,
-  CreditCard, Globe2, ShieldCheck, Mail, LockKeyhole, DatabaseBackup, ImageIcon, PlugZap, Radar, SlidersHorizontal,
+  Activity, Wrench, CreditCard, Globe2, ShieldCheck, Mail, LockKeyhole, DatabaseBackup, ImageIcon, PlugZap, Radar, SlidersHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,8 @@ type NavItem = {
 
 const tenantNav: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
+  { to: "/analytics", label: "Analytics", icon: Activity, tenantAdminOnly: true },
+  { to: "/diagnostics", label: "Diagnostics", icon: Wrench, tenantAdminOnly: true },
   { to: "/assets", label: "Assets", icon: Package, module: "assets" },
   { to: "/categories", label: "Categories", icon: Tags, module: "categories" },
   { to: "/locations", label: "Locations", icon: MapPin, module: "locations" },
@@ -47,6 +49,7 @@ const tenantNav: NavItem[] = [
 
 const saasAdminNav: NavItem[] = [
   { to: "/dashboard", label: "Control Center", icon: LayoutDashboard, exact: true },
+  { to: "/saas-admin/analytics", label: "Platform Analytics", icon: Activity },
   { to: "/saas-admin/organizations", label: "Businesses", icon: Building2 },
   { to: "/saas-admin/settings", label: "Settings", icon: Settings },
   { to: "/profile", label: "My profile", icon: UserCircle },
