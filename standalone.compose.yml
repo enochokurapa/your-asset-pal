@@ -45,6 +45,11 @@ services:
       GOTRUE_JWT_AUD: authenticated
       GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
       GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      # Google OAuth remains disabled until the owner supplies a real OAuth app.
+      GOTRUE_EXTERNAL_GOOGLE_ENABLED: "${ASSETFLOW_GOOGLE_AUTH_ENABLED:-false}"
+      GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID: "${ASSETFLOW_GOOGLE_CLIENT_ID:-}"
+      GOTRUE_EXTERNAL_GOOGLE_SECRET: "${ASSETFLOW_GOOGLE_CLIENT_SECRET:-}"
+      GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI: "https://assetflow360.com/auth/v1/callback"
       GOTRUE_MAILER_AUTOCONFIRM: "true"
       GOTRUE_DISABLE_SIGNUP: "false"
     expose:
