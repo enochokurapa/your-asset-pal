@@ -4,26 +4,32 @@ import { queryPostgres } from "@/lib/postgres.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 type Key = string;
-const predefined=new Set(["assets","companies","locations","verifications"]);
+type StatSource = "live"|"manual"|"hybrid";
+const predefined=new Set(["assets","companies","locations","verifications","site_visits","app_visits"]);
 export type PublicStat = {
-  metric_key: Key; label: string; source: "live" | "manual";
-  manual_value: number; is_visible: boolean; sort_order: number; value: number;
+  metric_key: Key; label: string; source: StatSource;
+  manual_value: number; live_anchor:number; anchor_recorded_at:string|null; is_visible: boolean; sort_order: number; value: number;
 };
-const rowSql = `SELECT metric_key,label,source,manual_value::int,is_visible,sort_order
+const rowSql = `SELECT metric_key,label,source,manual_value::int,live_anchor::int,anchor_recorded_at,is_visible,sort_order
   FROM public.platform_public_stats ORDER BY sort_order,metric_key`;
 async function readStats(): Promise<PublicStat[]> {
   const [counts] = await queryPostgres<{
-    assets: string; companies: string; locations: string; verifications: string;
+    assets: string; companies: string; locations: string; verifications: string; site_visits:string; app_visits:string;
   }>(`SELECT
     (SELECT COUNT(*)::text FROM public.assets) AS assets,
     (SELECT COUNT(*)::text FROM public.tenants) AS companies,
     (SELECT COUNT(*)::text FROM public.locations WHERE is_active=TRUE) AS locations,
-    (SELECT COUNT(*)::text FROM public.asset_verifications WHERE status='verified') AS verifications`);
+    (SELECT COUNT(*)::text FROM public.asset_verifications WHERE status='verified') AS verifications,
+    (SELECT COALESCE(SUM(views),0)::text FROM public.platform_page_view_daily WHERE area='website') AS site_visits,
+    (SELECT COALESCE(SUM(views),0)::text FROM public.platform_page_view_daily WHERE area='application') AS app_visits`);
   const rows = await queryPostgres<Omit<PublicStat,"value">>(rowSql);
-  return rows.map(row => ({
-    ...row,
-    value: row.source === "manual" ? Number(row.manual_value) : Number(counts[row.metric_key as keyof typeof counts] || 0),
-  }));
+  return rows.map(row => {
+    const live = Number(counts[row.metric_key as keyof typeof counts] || 0);
+    const value = row.source==="manual" ? Number(row.manual_value)
+      : row.source==="hybrid" ? Number(row.manual_value) + Math.max(0,live-Number(row.live_anchor||0))
+      : live;
+    return {...row,value,live_value:live};
+  });
 }
 async function requirePlatformAdmin(userId: string) {
   const [admin] = await queryPostgres<{id:string}>(
@@ -46,27 +52,42 @@ export const updatePublicStat = createServerFn({method:"POST"})
   .inputValidator(input=>z.object({
     metric_key:z.string().regex(/^[a-z][a-z0-9_]{2,30}$/),
     label:z.string().trim().min(3).max(55),
-    source:z.enum(["live","manual"]),
+    source:z.enum(["live","manual","hybrid"]),
     manual_value:z.number().int().min(0).max(1_000_000_000),
     is_visible:z.boolean(),
   }).parse(input))
   .handler(async ({context,data}) => {
     await requirePlatformAdmin(context.userId);
     if(!predefined.has(data.metric_key) && data.source!=="manual")
-      throw new Error("Only built-in statistics can use a live database value");
+      throw new Error("Only built-in statistics can use live or hybrid database values");
     const [row]=await queryPostgres<{exists:boolean;count:string}>(`
       SELECT EXISTS(SELECT 1 FROM public.platform_public_stats WHERE metric_key=$1) AS exists,
              COUNT(*)::text AS count FROM public.platform_public_stats
     `,[data.metric_key]);
     if(!row.exists && Number(row.count)>=12)
       throw new Error("A maximum of 12 homepage statistics is supported");
+    const previous=await queryPostgres<{source:StatSource}>(`
+      SELECT source FROM public.platform_public_stats WHERE metric_key=$1`,[data.metric_key]);
+    // Capture the live total only on entering Hybrid. Editing the foundation thereafter
+    // must not reset the starting point or double-count earlier records.
+    const enteringHybrid=data.source==="hybrid" && previous[0]?.source!=="hybrid";
+    let anchor=0;
+    if(enteringHybrid){
+      const current=(await readStats()).find(row=>row.metric_key===data.metric_key) as
+        (PublicStat & {live_value:number})|undefined;
+      anchor=current?.live_value??0;
+    }
     await queryPostgres(`
-      INSERT INTO public.platform_public_stats(metric_key,label,source,manual_value,is_visible,sort_order)
-      VALUES($1,$2,$3,$4,$5,(SELECT COALESCE(MAX(sort_order),0)+10 FROM public.platform_public_stats))
+      INSERT INTO public.platform_public_stats(
+        metric_key,label,source,manual_value,is_visible,sort_order,live_anchor,anchor_recorded_at)
+      VALUES($1,$2,$3,$4,$5,(SELECT COALESCE(MAX(sort_order),0)+10 FROM public.platform_public_stats),
+             $6,CASE WHEN $3='hybrid' THEN NOW() ELSE NULL END)
       ON CONFLICT(metric_key) DO UPDATE SET
         label=EXCLUDED.label,source=EXCLUDED.source,
-        manual_value=EXCLUDED.manual_value,is_visible=EXCLUDED.is_visible
-    `,[data.metric_key,data.label,data.source,data.manual_value,data.is_visible]);
+        manual_value=EXCLUDED.manual_value,is_visible=EXCLUDED.is_visible,
+        live_anchor=CASE WHEN $7 THEN $6 ELSE public.platform_public_stats.live_anchor END,
+        anchor_recorded_at=CASE WHEN $7 THEN NOW() ELSE public.platform_public_stats.anchor_recorded_at END
+    `,[data.metric_key,data.label,data.source,data.manual_value,data.is_visible,anchor,enteringHybrid]);
     return {saved:true};
   });
 
