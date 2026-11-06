@@ -32,15 +32,21 @@ function StatEditor({row,onSave,onDelete}:{row:PublicStat;onSave:(row:PublicStat
     <div className="grid grid-cols-2 gap-3">
       <label className="block text-xs font-medium">Value source
         <select className="mt-1 h-10 w-full rounded-md border bg-background px-2 text-sm" value={form.source}
-          onChange={e=>setForm({...form,source:e.target.value as "live"|"manual"})}>
-          <option value="live">Live database</option><option value="manual">Manual override</option>
+          onChange={e=>setForm({...form,source:e.target.value as "live"|"manual"|"hybrid"})}>
+          <option value="live">Live database</option><option value="manual">Manual total</option><option value="hybrid">Hybrid: manual foundation + future live additions</option>
         </select>
       </label>
       <label className="block text-xs font-medium">Manual value
-        <Input type="number" min="0" max="1000000000" className="mt-1" disabled={form.source!=="manual"}
+        <Input type="number" min="0" max="1000000000" className="mt-1" disabled={form.source==="live"}
           value={form.manual_value} onChange={e=>setForm({...form,manual_value:Number(e.target.value)})}/>
       </label>
     </div>
+    {form.source==="hybrid"&&<p className="text-xs leading-5 text-muted-foreground">
+      Your manual value is the starting foundation. When you first save Hybrid,
+      AssetFlow captures the current live total and only adds new records beyond it.
+      Editing the foundation later does not erase the captured starting point.
+      {row.anchor_recorded_at&&<span className="block">Baseline captured: {new Date(row.anchor_recorded_at).toLocaleString()}</span>}
+    </p>}
     <label className="flex items-center gap-2 text-sm">
       <input type="checkbox" checked={form.is_visible} onChange={e=>setForm({...form,is_visible:e.target.checked})}/>
       Show on homepage
@@ -87,7 +93,7 @@ function StatisticsPage(){
   if(!isSaasAdmin)return <Navigate to="/dashboard"/>;
   return <div className="mx-auto max-w-5xl space-y-5">
     <div><h1 className="text-2xl font-semibold">Homepage statistics</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Live values update from PostgreSQL as assets, organisations and locations are added. Choose Manual for an approved published number.</p></div>
+      <p className="mt-1 text-sm text-muted-foreground">Live values update from PostgreSQL as assets, organisations and locations are added. Choose Live for current data, Manual for a fixed published number, or Hybrid to add future live activity to a manual foundation.</p></div>
     {error&&<p className="text-sm text-destructive">Could not load statistics.</p>}
     {isLoading?<p className="text-sm">Loading statistics…</p>:
     <div className="grid min-w-0 gap-4 md:grid-cols-2">
@@ -104,7 +110,7 @@ function StatisticsPage(){
     </div>}
     {data.length<12&&<Card className="space-y-3 p-4 sm:p-5">
       <h2 className="text-base font-semibold">Add a custom statistic</h2>
-      <p className="text-xs text-muted-foreground">Custom counters are entered manually. Built-in metrics can use live PostgreSQL totals.</p>
+      <p className="text-xs text-muted-foreground">Custom counters are manual; built-in metrics can be Live, Manual or Hybrid.</p>
       <div className="grid min-w-0 gap-3 sm:grid-cols-[1fr_180px]">
         <label className="text-xs font-medium">Display label
           <Input className="mt-1" value={customLabel} maxLength={55} placeholder="e.g. Years of service"
