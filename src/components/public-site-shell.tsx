@@ -57,7 +57,10 @@ export function PublicHeader() {
     <header className="sticky top-0 z-50 border-b border-[#e8e2db] bg-white">
       <div className="mx-auto flex h-[64px] max-w-7xl items-center gap-5 px-5 sm:h-[72px] sm:px-8">
         <Link to="/" className="shrink-0" aria-label="AssetFlow 360 home">
-          <PlatformLogo variant="lockup" className="h-12 w-44" />
+          <span className="inline-flex h-12 max-w-[190px] items-center gap-2.5 overflow-visible">
+            <PlatformLogo variant="mark" className="h-11 w-11 shrink-0" imageClassName="object-contain" />
+            <span className="whitespace-nowrap text-[15px] font-bold tracking-tight text-[#233c50]">AssetFlow <span className="text-[#ba6c37]">360</span></span>
+          </span>
         </Link>
         <nav aria-label="Main navigation" className="ml-auto hidden items-center gap-8 text-sm font-semibold text-[#283842] lg:flex">
           {nav.map(n => <Link key={n.to} to={n.to}
@@ -89,7 +92,10 @@ export function PublicHeader() {
           inert={!open}
           className={`absolute inset-y-0 right-0 flex h-full w-[78vw] max-w-[360px] flex-col overflow-y-auto bg-[#fffaf5] shadow-2xl transition-transform duration-300 ease-out motion-reduce:transition-none ${open ? "translate-x-0" : "translate-x-full"}`}>
           <div className="flex items-center justify-between gap-3 border-b border-[#eaded2] px-5 py-5">
-            <PlatformLogo variant="lockup" className="h-11 w-36" />
+            <span className="inline-flex h-11 items-center gap-2 overflow-visible">
+              <PlatformLogo variant="mark" className="h-10 w-10 shrink-0" />
+              <span className="whitespace-nowrap text-sm font-bold text-[#233c50]">AssetFlow <span className="text-[#ba6c37]">360</span></span>
+            </span>
             <button ref={closeRef} type="button" aria-label="Close menu"
               onClick={() => setOpen(false)}
               className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-[#29343a] hover:bg-[#f3e8df]">
@@ -126,11 +132,30 @@ const secondary=[
  {to:"/privacy",label:"Privacy Policy"},
  {to:"/terms",label:"Terms of Use"},
 ] as const;
+function FloatingSocialProfiles(){
+ const getter=useServerFn(getPublicSocialLinks);
+ const {data:links=[]}=useQuery({queryKey:["public-social-links"],queryFn:()=>getter(),staleTime:60_000,retry:1});
+ const profiles=links.filter(l=>l.platform!=="whatsapp").slice(0,6);
+ if(!profiles.length)return null;
+ return <nav aria-label="Official social media" className="fixed bottom-[88px] right-5 z-40 flex flex-col items-center gap-2 sm:bottom-[102px] sm:right-8">
+  {profiles.map(link=>{
+   const Icon=socialIcons[link.platform];
+   return <a key={link.platform} href={link.url} target="_blank" rel="noopener noreferrer"
+    title={"AssetFlow on "+link.platform} aria-label={"Open AssetFlow "+link.platform+" profile"}
+    className="flex h-10 w-10 items-center justify-center rounded-full border border-[#d9e4e8] bg-white text-[#23475a] shadow-md transition-transform duration-200 hover:scale-105 motion-reduce:transition-none">
+    <Icon className="h-4 w-4" aria-hidden="true"/>
+   </a>;
+  })}
+ </nav>;
+}
 function FloatingWhatsApp(){
  const getter=useServerFn(getPublicSocialLinks);
  const {data:links=[]}=useQuery({queryKey:["public-social-links"],queryFn:()=>getter(),staleTime:60_000,retry:1});
  const chat=links.find(link=>link.platform==="whatsapp");
- if(!chat)return null;
+ if(!chat)return <Link to="/contact" aria-label="Contact AssetFlow support" title="Contact AssetFlow support"
+   className="fixed bottom-5 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full border-2 border-white bg-[#bf7043] text-white shadow-lg transition-transform duration-200 hover:scale-105 motion-reduce:transition-none sm:bottom-7 sm:right-7">
+   <MessageCircle className="h-6 w-6" aria-hidden="true"/>
+ </Link>;
  return <a href={chat.url} target="_blank" rel="noopener noreferrer"
    aria-label="Chat with AssetFlow support on WhatsApp" title="Chat with us on WhatsApp"
    className="fixed bottom-5 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full border-2 border-white bg-[#25D366] text-white shadow-[0_8px_28px_rgba(10,70,45,.28)] transition-transform duration-200 hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#25D366] motion-reduce:transition-none sm:bottom-7 sm:right-7">
@@ -151,7 +176,10 @@ export function PublicFooter(){
  return <footer className="mx-auto w-full max-w-7xl overflow-hidden bg-[#203946] text-white">
    <div className="mx-auto flex min-w-0 flex-wrap items-start justify-between gap-8 px-5 pb-8 pt-10 sm:px-8 sm:pb-10 sm:pt-12">
      <div className="max-w-md min-w-0">
-       <PlatformLogo variant="lockup" className="h-10 w-40"/>
+       <span className="inline-flex items-center gap-2.5">
+         <PlatformLogo variant="mark" className="h-11 w-11 shrink-0"/>
+         <span className="text-lg font-semibold tracking-tight text-white">AssetFlow 360</span>
+       </span>
        <p className="mt-4 text-sm leading-7 text-slate-300">
         Asset registration, verification, location control and lifecycle management in one adaptable platform.
        </p>
@@ -184,4 +212,4 @@ export function PublicFooter(){
    </div>
  </footer>;
 }
-export function PublicShell({children}:{children:React.ReactNode}){return <div className="min-h-screen bg-[#f7f9fa] text-[#112c3c]"><style>{`@keyframes af-appear{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}@keyframes af-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}@keyframes af-pulse{0%,100%{opacity:.5}50%{opacity:1}}.af-enter{animation:af-appear .7s both}.af-enter-late{animation:af-appear .85s .2s both}.af-float{animation:af-float 7s ease-in-out infinite}.af-softpulse{animation:af-pulse 5s ease-in-out infinite}@media(prefers-reduced-motion:reduce){.af-enter,.af-enter-late,.af-float,.af-softpulse{animation:none!important}}`}</style><PublicHeader/>{children}<PublicFooter/><FloatingWhatsApp/></div>}
+export function PublicShell({children}:{children:React.ReactNode}){return <div className="min-h-screen bg-[#f7f9fa] text-[#112c3c]"><style>{`@keyframes af-appear{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}@keyframes af-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}@keyframes af-pulse{0%,100%{opacity:.5}50%{opacity:1}}.af-enter{animation:af-appear .7s both}.af-enter-late{animation:af-appear .85s .2s both}.af-float{animation:af-float 7s ease-in-out infinite}.af-softpulse{animation:af-pulse 5s ease-in-out infinite}@media(prefers-reduced-motion:reduce){.af-enter,.af-enter-late,.af-float,.af-softpulse{animation:none!important}}`}</style><PublicHeader/>{children}<PublicFooter/><FloatingSocialProfiles/><FloatingWhatsApp/></div>}
