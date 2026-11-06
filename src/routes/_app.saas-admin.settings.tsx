@@ -18,7 +18,8 @@ function SettingsPage(){
  {to:"/saas-admin/backups",title:"Backups & Restore",description:"Cloudflare R2 and automated backup schedules"},
  {to:"/saas-admin/policy",title:"Plans & Pricing",description:"Price and plan settings"},
  {to:"/saas-admin/branding",title:"Branding",description:"Application identity"},
- {to:"/saas-admin/hero-images",title:"Hero Images",description:"Update public page artwork in PNG, WebP or SVG"}
+ {to:"/saas-admin/hero-images",title:"Hero Images",description:"Update public page artwork in PNG, WebP or SVG"},
+ {to:"/saas-admin/links",title:"Important Links",description:"Manage external systems and websites shown in the public footer"}
  ].map(item=><Link key={item.to} to={item.to} className="rounded-xl border p-5 transition hover:border-primary">
  <span className="font-semibold">{item.title}</span><p className="text-sm text-muted-foreground">{item.description}</p></Link>)}
  </div>
