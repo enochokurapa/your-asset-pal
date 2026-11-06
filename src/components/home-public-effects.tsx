@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowUpRight, Building2, MapPinned, Package, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, BarChart3, Building2, MapPinned, Package, ShieldCheck } from "lucide-react";
 import { getPublicStats } from "@/lib/platform-public-stats.functions";
 
 const icons = {assets:Package,companies:Building2,locations:MapPinned,verifications:ShieldCheck} as const;
@@ -52,7 +52,7 @@ export function HomeLiveStats(){
     <div className="grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-4">
       {isLoading ? <p className="col-span-full text-sm text-[#657983]">Loading platform figures…</p> :
       data.map(item=>{
-        const Icon=icons[item.metric_key];
+        const Icon=icons[item.metric_key as keyof typeof icons] || BarChart3;
         return <div key={item.metric_key} className="min-w-0 rounded-xl border border-[#d8e4e6] bg-white/80 p-4 sm:p-5">
           <Icon aria-hidden="true" className="mb-4 h-5 w-5 text-[#b96b3f]"/>
           <p className="break-words text-[clamp(1.45rem,3vw,2.3rem)] font-semibold tracking-tight text-[#29404c]">
