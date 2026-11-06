@@ -184,7 +184,7 @@ export async function getConfiguredSmtpForApplication(category:MailCategory){
 
 /** Human-written support replies should never be presented as automated reports. */
 export async function sendPlatformContactReply(to:string,subject:string,body:string){
- if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(to)||to.length>250)throw new Error("Invalid contact recipient");
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)||to.length>250)throw new Error("Invalid contact recipient");
  const config=await getConfiguredSmtpForApplication("operations");
  const c=await connect(config);
  try{
@@ -200,8 +200,8 @@ export async function sendPlatformContactReply(to:string,subject:string,body:str
    "X-Auto-Response-Suppress: All",
    "",
    body.slice(0,7000)
-  ].join("\\r\\n").replace(/\\r\\n\\./g,"\\r\\n..");
-  await c.send(payload+"\\r\\n.",250);
+  ].join("\r\n").replace(/\r\n\./g,"\r\n..");
+  await c.send(payload+"\r\n.",250);
   // Once DATA receives 250, the server accepted the message. A later QUIT
   // error must not mark the already accepted reply as failed.
   try{await c.send("QUIT",221)}catch{/* best-effort shutdown */}
