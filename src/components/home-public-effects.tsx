@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowUpRight, BarChart3, Building2, MapPinned, Package, ShieldCheck } from "lucide-react";
+import { BarChart3, Building2, MapPinned, Package, ShieldCheck } from "lucide-react";
 import { getPublicStats } from "@/lib/platform-public-stats.functions";
 
 const icons = {assets:Package,companies:Building2,locations:MapPinned,verifications:ShieldCheck} as const;
@@ -43,22 +43,25 @@ export function HomeLiveStats(){
     return ()=>{media.removeEventListener("change",change);observer.disconnect();};
   },[]);
   return <section ref={ref} aria-label="AssetFlow platform statistics"
-    className="mx-auto w-full max-w-7xl overflow-hidden border-b border-[#dce5e8] bg-[#eef4f3] px-5 py-9 sm:px-8 sm:py-12">
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-      <div><p className="text-[11px] font-semibold uppercase tracking-[.17em] text-[#ab6339]">AssetFlow in numbers</p>
-        <h2 className="mt-2 text-xl font-semibold tracking-tight text-[#263d49] sm:text-2xl">A clearer picture of every asset.</h2></div>
-      <ArrowUpRight aria-hidden="true" className="h-5 w-5 text-[#b96b3f]"/>
-    </div>
-    <div className="grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-4">
-      {isLoading ? <p className="col-span-full text-sm text-[#657983]">Loading platform figures…</p> :
-      data.map(item=>{
+    className="relative mt-7 w-full min-w-0 sm:mt-9">
+    <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[.16em] text-[#3e6270] sm:mb-3">
+      The platform at a glance
+    </p>
+    <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+      {isLoading ? <p className="col-span-full rounded-xl border border-white/60 bg-white/75 p-3 text-xs text-[#55717d]">Loading current platform totals…</p> :
+      data.map((item,index)=>{
         const Icon=icons[item.metric_key as keyof typeof icons] || BarChart3;
-        return <div key={item.metric_key} className="min-w-0 rounded-xl border border-[#d8e4e6] bg-white/80 p-4 sm:p-5">
-          <Icon aria-hidden="true" className="mb-4 h-5 w-5 text-[#b96b3f]"/>
-          <p className="break-words text-[clamp(1.45rem,3vw,2.3rem)] font-semibold tracking-tight text-[#29404c]">
+        return <div key={item.metric_key}
+          style={{transitionDelay:reduced?"0ms":`${index*100}ms`}}
+          className={`min-w-0 rounded-xl border border-white/70 bg-white/75 p-3 shadow-[0_8px_24px_rgba(27,62,78,.10)] backdrop-blur-md transition-[opacity,transform,box-shadow] duration-700 ease-out hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(27,62,78,.15)] motion-reduce:transform-none motion-reduce:transition-none sm:p-4
+            ${visible||reduced?"translate-y-0 opacity-100":"translate-y-3 opacity-55"}`}>
+          <div className="flex min-w-0 items-center gap-2">
+            <Icon aria-hidden="true" className="h-4 w-4 shrink-0 text-[#b96b3f]"/>
+            <span className="min-w-0 break-words text-[10px] font-medium leading-4 text-[#44616f] sm:text-xs">{item.label}</span>
+          </div>
+          <p className="mt-2 break-words text-[clamp(1.25rem,2.2vw,1.85rem)] font-semibold leading-tight tracking-tight text-[#213e4d]">
             <AnimatedNumber value={item.value} visible={visible} reduced={reduced}/>
           </p>
-          <p className="mt-1 break-words text-xs font-medium text-[#5e747e] sm:text-sm">{item.label}</p>
         </div>;
       })}
     </div>

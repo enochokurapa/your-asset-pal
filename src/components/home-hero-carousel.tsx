@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { ArrowRight } from "lucide-react";
 import { getHeroImage } from "@/lib/platform-hero.functions";
 import { HeroTypingLine } from "@/components/hero-typing-line";
+import { HomeLiveStats } from "@/components/home-public-effects";
 
 const BACKGROUNDS = [
   { key:"home" as const, src:"/hero/assetflow-home-01-lifecycle.webp" },
@@ -106,6 +107,7 @@ export function HomeHeroCarousel() {
             </Link>
           </div>
         </div>
+        <HomeLiveStats/>
       </div>
     </div>
   </section>;

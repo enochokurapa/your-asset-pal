@@ -124,7 +124,7 @@ export function PublicFooter(){
     staleTime:60_000,
     retry:1,
   });
-  return <footer className="bg-[#203946] text-white">
+  return <footer className="mx-auto w-full max-w-7xl overflow-hidden bg-[#203946] text-white">
     <div className="mx-auto grid max-w-7xl gap-9 px-5 py-12 sm:px-8 md:grid-cols-[1.1fr_.9fr]">
       <div className="min-w-0">
         <PlatformLogo variant="lockup" className="h-10 w-40"/>
