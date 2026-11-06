@@ -6,15 +6,16 @@ import { useEffect, useState } from "react";
  * individual keystrokes aren't announced to screen readers.
  */
 export function HeroTypingLine({
-  phrases, className = "", label = "What we do",
+  phrases, className = "", label = "What we do", initialFullPhrase = false,
 }: {
   phrases: readonly string[];
   className?: string;
   label?: string;
+  initialFullPhrase?: boolean;
 }) {
   const [reducedMotion, setReducedMotion] = useState(true);
   const [phraseIndex, setPhraseIndex] = useState(0);
-  const [length, setLength] = useState(0);
+  const [length, setLength] = useState(initialFullPhrase ? (phrases[0]?.length ?? 0) : 0);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
