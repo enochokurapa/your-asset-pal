@@ -38,9 +38,40 @@ async function requirePlatformAdmin(userId: string) {
   );
   if (!admin) throw new Error("Platform administrator required");
 }
-export const getPublicStats = createServerFn({method:"GET"}).handler(async () =>
-  (await readStats()).filter(row=>row.is_visible && !["site_visits","app_visits"].includes(row.metric_key)).map(({metric_key,label,value})=>({metric_key,label,value})),
-);
+export type PublicHomepageStat={metric_key:string;label:string;value:number};
+/** One small query for the homepage: no unrelated traffic totals or admin records.
+ *  The route loader renders these figures directly into initial HTML. */
+export const getPublicStats=createServerFn({method:"GET"}).handler(async():Promise<PublicHomepageStat[]>=>{
+  const rows=await queryPostgres<{
+    metric_key:string;label:string;source:StatSource;manual_value:string;
+    live_anchor:string;live_value:string;
+  }>(`
+    SELECT s.metric_key,s.label,s.source,s.manual_value::text,s.live_anchor::text,
+      CASE s.metric_key
+        WHEN 'assets' THEN counts.assets
+        WHEN 'companies' THEN counts.companies
+        WHEN 'locations' THEN counts.locations
+        WHEN 'verifications' THEN counts.verifications
+        ELSE '0'
+      END AS live_value
+    FROM public.platform_public_stats s
+    CROSS JOIN (
+      SELECT
+        (SELECT COUNT(*)::text FROM public.assets) AS assets,
+        (SELECT COUNT(*)::text FROM public.tenants) AS companies,
+        (SELECT COUNT(*)::text FROM public.locations WHERE is_active=TRUE) AS locations,
+        (SELECT COUNT(*)::text FROM public.asset_verifications WHERE status='verified') AS verifications
+    ) counts
+    WHERE s.is_visible=TRUE AND s.metric_key NOT IN ('site_visits','app_visits')
+    ORDER BY s.sort_order,s.metric_key LIMIT 12
+  `);
+  return rows.map(r=>{
+    const live=Number(r.live_value||0),manual=Number(r.manual_value||0);
+    const value=r.source==="manual"?manual:r.source==="hybrid"
+      ?manual+Math.max(0,live-Number(r.live_anchor||0)):live;
+    return {metric_key:r.metric_key,label:r.label,value};
+  });
+});
 export const getAdminPublicStats = createServerFn({method:"GET"})
   .middleware([requireSupabaseAuth])
   .handler(async ({context}) => {
