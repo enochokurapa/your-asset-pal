@@ -14,7 +14,7 @@ function PlatformAnalyticsPage(){
   const getter=useServerFn(getPlatformOperationsAnalytics);
   const {data,isLoading,isFetching,error,refetch}=useQuery({
     queryKey:["platform-operations-analytics"],enabled:isSaasAdmin,
-    queryFn:()=>getter({headers:await getServerAuthHeaders()}),
+    queryFn:async()=>getter({headers:await getServerAuthHeaders()}),
     staleTime:60_000,
   });
   if(loading)return null;
