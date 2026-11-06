@@ -1,3 +1,4 @@
+import {publicHead} from "@/lib/public-seo";
 import {createFileRoute,Link} from "@tanstack/react-router";
 import {useQuery} from "@tanstack/react-query";
 import {useServerFn} from "@tanstack/react-start";
@@ -8,8 +9,7 @@ import {Button} from "@/components/ui/button";
 import {ArrowRight,CheckCircle2,ShieldCheck} from "lucide-react";
 export const Route=createFileRoute("/features")({
  component:Page,
- head:()=>({meta:[{title:"Features | AssetFlow 360"},
- {name:"description",content:"Explore currently available AssetFlow modules, workflow capabilities and optional integrations."}]})
+ head:()=>publicHead("/features","Fixed Asset Management Features | AssetFlow 360","Discover AssetFlow 360 features including asset registers, verification, locations, depreciation, gate passes, reports, audit trails and configurable builders.")
 });
 function Page(){
  const getter=useServerFn(getPublicFeatureCatalog);
