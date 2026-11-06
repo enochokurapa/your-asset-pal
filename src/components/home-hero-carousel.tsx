@@ -63,7 +63,7 @@ export function HomeHeroCarousel() {
     return ()=>window.clearInterval(timer);
   },[reducedMotion,visible]);
 
-  return <section aria-label="AssetFlow 360 fixed asset management" className="relative isolate mx-auto w-full max-w-7xl overflow-hidden border-y border-[#dce6e8] bg-[#e7eef1] text-[#243c48] sm:border-x lg:rounded-2xl">
+  return <section aria-label="AssetFlow 360 fixed asset management" className="relative isolate mx-auto w-full max-w-7xl overflow-hidden border-y border-[#dce6e8] bg-[#e7eef1] text-[#243c48] sm:border-x rounded-tr-none rounded-tl-none rounded-bl-none lg:rounded-br-[64px]">
     <div className="relative min-h-[475px] sm:min-h-[535px] lg:min-h-[575px]">
       {BACKGROUNDS.map((bg,i)=><div key={bg.key} aria-hidden="true"
         className={`pointer-events-none absolute inset-0 transition-opacity duration-1000 ease-in-out ${i===active?"opacity-100":"opacity-0"}`}>
