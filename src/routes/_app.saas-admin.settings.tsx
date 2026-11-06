@@ -23,6 +23,7 @@ function SettingsPage(){
  {to:"/saas-admin/statistics",title:"Homepage Statistics",description:"Live asset and company counters or approved manual totals"},
  {to:"/saas-admin/traffic",title:"Website & Application Traffic",description:"Page views, acquisition sources and referral trends"},
  {to:"/saas-admin/contact",title:"Contact & Support Inbox",description:"Respond to public enquiries, manage statuses and email templates"},
+ {to:"/saas-admin/social-links",title:"Social Media & WhatsApp",description:"Set official profile links and the floating WhatsApp contact number"},
  {to:"/saas-admin/links",title:"Important Links",description:"Manage external systems and websites shown in the public footer"}
  ].map(item=><Link key={item.to} to={item.to} className="rounded-xl border p-5 transition hover:border-primary">
  <span className="font-semibold">{item.title}</span><p className="text-sm text-muted-foreground">{item.description}</p></Link>)}
