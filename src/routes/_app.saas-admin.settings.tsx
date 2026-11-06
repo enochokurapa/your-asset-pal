@@ -15,6 +15,7 @@ function SettingsPage(){
  {to:"/saas-admin/modules",title:"Modules & Add-ons",description:"Explicit activation of integrations and GPS"},
  {to:"/saas-admin/organizations",title:"Organizations & Billing",description:"Manage subscriptions and tenant permissions"},
  {to:"/saas-admin/user-activity",title:"User Activity",description:"View recorded system activity"},
+ {to:"/saas-admin/analytics",title:"Platform Analytics",description:"Operational metrics, audit trends and renewal issues across organisations"},
  {to:"/saas-admin/backups",title:"Backups & Restore",description:"Cloudflare R2 and automated backup schedules"},
  {to:"/saas-admin/policy",title:"Plans & Pricing",description:"Price and plan settings"},
  {to:"/saas-admin/branding",title:"Branding",description:"Application identity"},
