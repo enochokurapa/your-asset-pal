@@ -24,7 +24,7 @@ export function TrafficCapture({area}:{area:"website"|"application"}){
   const appRecord=useServerFn(recordApplicationPageView);
   useEffect(()=>{
     if(typeof window==="undefined")return;
-    if(navigator.doNotTrack==="1" || navigator.globalPrivacyControl===true)return;
+    if(navigator.doNotTrack==="1" || (navigator as Navigator & {globalPrivacyControl?:boolean}).globalPrivacyControl===true)return;
     const path=pathname.slice(0,90);
     const key=`af-traffic-${area}-${path}`;
     try{
