@@ -5,7 +5,6 @@ import { getPublicImportantLinks } from "@/lib/platform-links.functions";
 import {getPublicSocialLinks,type SocialPlatform} from "@/lib/platform-social.functions";
 import { useEffect, useRef, useState } from "react";
 import { PlatformLogo } from "@/components/platform-logo";
-import {TrafficCapture} from "@/components/traffic-capture";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Menu, X, Facebook, Instagram, Linkedin, Youtube, Twitter, Send, MessageCircle, Music2 } from "lucide-react";
 
@@ -185,4 +184,4 @@ export function PublicFooter(){
    </div>
  </footer>;
 }
-export function PublicShell({children}:{children:React.ReactNode}){return <div className="min-h-screen bg-[#f7f9fa] text-[#112c3c]"><TrafficCapture area="website"/><style>{`@keyframes af-appear{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}@keyframes af-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}@keyframes af-pulse{0%,100%{opacity:.5}50%{opacity:1}}.af-enter{animation:af-appear .7s both}.af-enter-late{animation:af-appear .85s .2s both}.af-float{animation:af-float 7s ease-in-out infinite}.af-softpulse{animation:af-pulse 5s ease-in-out infinite}@media(prefers-reduced-motion:reduce){.af-enter,.af-enter-late,.af-float,.af-softpulse{animation:none!important}}`}</style><PublicHeader/>{children}<PublicFooter/><FloatingWhatsApp/></div>}
+export function PublicShell({children}:{children:React.ReactNode}){return <div className="min-h-screen bg-[#f7f9fa] text-[#112c3c]"><style>{`@keyframes af-appear{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}@keyframes af-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}@keyframes af-pulse{0%,100%{opacity:.5}50%{opacity:1}}.af-enter{animation:af-appear .7s both}.af-enter-late{animation:af-appear .85s .2s both}.af-float{animation:af-float 7s ease-in-out infinite}.af-softpulse{animation:af-pulse 5s ease-in-out infinite}@media(prefers-reduced-motion:reduce){.af-enter,.af-enter-late,.af-float,.af-softpulse{animation:none!important}}`}</style><PublicHeader/>{children}<PublicFooter/><FloatingWhatsApp/></div>}
