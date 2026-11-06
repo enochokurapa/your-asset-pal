@@ -3,7 +3,8 @@ import { z } from "zod";
 import { queryPostgres } from "@/lib/postgres.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-type Key = "assets" | "companies" | "locations" | "verifications";
+type Key = string;
+const predefined=new Set(["assets","companies","locations","verifications"]);
 export type PublicStat = {
   metric_key: Key; label: string; source: "live" | "manual";
   manual_value: number; is_visible: boolean; sort_order: number; value: number;
@@ -21,7 +22,7 @@ async function readStats(): Promise<PublicStat[]> {
   const rows = await queryPostgres<Omit<PublicStat,"value">>(rowSql);
   return rows.map(row => ({
     ...row,
-    value: row.source === "manual" ? Number(row.manual_value) : Number(counts[row.metric_key]),
+    value: row.source === "manual" ? Number(row.manual_value) : Number(counts[row.metric_key as keyof typeof counts] || 0),
   }));
 }
 async function requirePlatformAdmin(userId: string) {
@@ -43,7 +44,7 @@ export const getAdminPublicStats = createServerFn({method:"GET"})
 export const updatePublicStat = createServerFn({method:"POST"})
   .middleware([requireSupabaseAuth])
   .inputValidator(input=>z.object({
-    metric_key:z.enum(["assets","companies","locations","verifications"]),
+    metric_key:z.string().regex(/^[a-z][a-z0-9_]{2,30}$/),
     label:z.string().trim().min(3).max(55),
     source:z.enum(["live","manual"]),
     manual_value:z.number().int().min(0).max(1_000_000_000),
@@ -51,10 +52,32 @@ export const updatePublicStat = createServerFn({method:"POST"})
   }).parse(input))
   .handler(async ({context,data}) => {
     await requirePlatformAdmin(context.userId);
-    const rows = await queryPostgres<{metric_key:Key}>(`
-      UPDATE public.platform_public_stats SET label=$2,source=$3,manual_value=$4,is_visible=$5
-      WHERE metric_key=$1 RETURNING metric_key
+    if(!predefined.has(data.metric_key) && data.source!=="manual")
+      throw new Error("Only built-in statistics can use a live database value");
+    const [row]=await queryPostgres<{exists:boolean;count:string}>(`
+      SELECT EXISTS(SELECT 1 FROM public.platform_public_stats WHERE metric_key=$1) AS exists,
+             COUNT(*)::text AS count FROM public.platform_public_stats
+    `,[data.metric_key]);
+    if(!row.exists && Number(row.count)>=12)
+      throw new Error("A maximum of 12 homepage statistics is supported");
+    await queryPostgres(`
+      INSERT INTO public.platform_public_stats(metric_key,label,source,manual_value,is_visible,sort_order)
+      VALUES($1,$2,$3,$4,$5,(SELECT COALESCE(MAX(sort_order),0)+10 FROM public.platform_public_stats))
+      ON CONFLICT(metric_key) DO UPDATE SET
+        label=EXCLUDED.label,source=EXCLUDED.source,
+        manual_value=EXCLUDED.manual_value,is_visible=EXCLUDED.is_visible
     `,[data.metric_key,data.label,data.source,data.manual_value,data.is_visible]);
-    if (!rows.length) throw new Error("Statistic not found");
     return {saved:true};
+  });
+
+export const deletePublicStat = createServerFn({method:"POST"})
+  .middleware([requireSupabaseAuth])
+  .inputValidator(input=>z.object({
+    metric_key:z.string().regex(/^[a-z][a-z0-9_]{2,30}$/),
+  }).parse(input))
+  .handler(async ({context,data})=>{
+    await requirePlatformAdmin(context.userId);
+    if(predefined.has(data.metric_key))throw new Error("Built-in statistics cannot be deleted; hide them instead.");
+    await queryPostgres("DELETE FROM public.platform_public_stats WHERE metric_key=$1",[data.metric_key]);
+    return {deleted:true};
   });
