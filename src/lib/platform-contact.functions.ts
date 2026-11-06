@@ -125,7 +125,7 @@ export const sendAdminContactReply=createServerFn({method:"POST"})
      return {delivered:true};
    }catch(err){
      const errorText=err instanceof Error?err.message:"";
-     const code=/SMTP server rejected request \\((\\d{3})\\)/.exec(errorText)?.[1];
+     const code=/\((\d{3})\)/.exec(errorText)?.[1];
      const reason=/certificate|hostname.*match|altnames/i.test(errorText)
        ?"SMTP TLS certificate hostname mismatch"
        :code?"SMTP server rejected the reply ("+code+")"
