@@ -1,8 +1,8 @@
+import {publicHead} from "@/lib/public-seo";
 import {createFileRoute,Link} from "@tanstack/react-router";
 import {PublicShell} from "@/components/public-site-shell";
 export const Route=createFileRoute("/privacy")({component:PrivacyPage,
- head:()=>({meta:[{title:"Privacy Policy | AssetFlow 360"},
- {name:"description",content:"Learn how AssetFlow 360 handles account, enquiry and product usage information."}]})});
+ head:()=>publicHead("/privacy","Privacy Policy | AssetFlow 360","Read how AssetFlow 360 processes organisation data, account details, enquiries and aggregated website traffic information.")});
 function PrivacyPage(){return <PublicShell><main className="mx-auto w-full max-w-7xl bg-[#f3f7f8] px-5 py-10 sm:px-8 sm:py-14">
  <article className="mx-auto max-w-3xl space-y-6 text-sm leading-7 text-[#445d6a]">
   <header><p className="text-xs font-semibold uppercase tracking-[.15em] text-[#bb6b3f]">Privacy and data protection</p>
