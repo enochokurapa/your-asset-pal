@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ResponsiveTabsList as TabsList, ResponsiveTabsTrigger as TabsTrigger } from "@/components/ui/responsive-tabs";
-import { FileBarChart, FileDown, FileSpreadsheet, X } from "lucide-react";
+import { FileBarChart, FileDown, FileSpreadsheet, X, ChevronRight, ChevronLeft, CheckCircle2 } from "lucide-react";
 
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -126,8 +126,8 @@ async function exportPDF(r: Report, meta: ReportExportMeta, options?: {orientati
   const col = usable / 3;
   const labels = [
     ["Prepared by", meta.generatedBy || "________________"],
-    ["Reviewed by", "________________"],
-    ["Approved by", "________________"],
+    ["Reviewed by", ""],
+    ["Approved by", ""],
   ];
   labels.forEach(([label,name],i)=>{
     const x = template.margin_left + i * col;
@@ -135,12 +135,13 @@ async function exportPDF(r: Report, meta: ReportExportMeta, options?: {orientati
     doc.setFontSize(8);
     doc.text(label, x, y);
     doc.setFont(template.font_family, "bold");
-    doc.text(name, x, y + 5);
+    if(name)doc.text(name, x, y + 5);
     doc.setDrawColor(130,130,130);
-    doc.line(x, y + 10, x + col - 12, y + 10);
+    doc.setLineWidth(0.25);
+    doc.line(x, y + 13, x + col - 12, y + 13);
     doc.setFont(template.font_family, "normal");
     doc.setFontSize(7);
-    doc.text("Signature / Date", x, y + 14);
+    doc.text("Signature / Date", x, y + 18);
   });
 
   saveBranded(doc, template, `${r.title.replace(/\s+/g, "_")}.pdf`);
@@ -218,6 +219,16 @@ function applyText(val: any, q?: string) {
 function ReportsPage() {
   const { canView, loading, canSeeBranch, user, tenantName } = useAuth();
   const [tab, setTab] = useState("register");
+  const [wizardStep,setWizardStep]=useState<0|1|2|3>(0);
+  const chooseReport=(next:string)=>{setTab(next);setWizardStep(1);};
+  const reportOptions=[
+   ["register","Asset register"],["locations","Locations"],["movements","Asset movements"],
+   ["assigned","Assignments"],["disposals","Retirement and disposal"],
+   ["maintenance","Maintenance"],["approvals","Approval requests"],
+   ["verification","Verification"],["depreciation","Depreciation"],
+   ["gate-pass","Gate passes"],["branch","Branch summary"],
+   ["department","Department summary"],["condition","Asset condition"]
+  ];
 
   const { data: assets = [] } = useQuery({
     queryKey: ["report-assets"],
@@ -987,32 +998,33 @@ function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <PublishedCanvases kind="report_builder"/>
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
-        <p className="text-sm text-muted-foreground">Filter, visualise and export operational reports.</p>
+        <p className="text-sm text-muted-foreground">Create a report in guided steps. Only the controls needed for your selection are shown.</p>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab} className="grid items-start gap-5 lg:grid-cols-[230px_minmax(0,1fr)]">
-        <TabsList className="flex h-auto w-full flex-col items-stretch justify-start gap-1 rounded-xl border bg-card p-2 lg:sticky lg:top-5">
-          <TabsTrigger className="w-full justify-start text-left" value="register">Register</TabsTrigger>
-          <TabsTrigger className="w-full justify-start text-left" value="locations">Locations</TabsTrigger>
-          <TabsTrigger className="w-full justify-start text-left" value="movements">Movements</TabsTrigger>
-          <TabsTrigger className="w-full justify-start text-left" value="assigned">Assigned</TabsTrigger>
-          <TabsTrigger className="w-full justify-start text-left" value="disposals">Retire/Dispose</TabsTrigger>
-          <TabsTrigger className="w-full justify-start text-left" value="maintenance">Maintenance</TabsTrigger>
-          <TabsTrigger className="w-full justify-start text-left" value="approvals">Approvals</TabsTrigger>
-          <TabsTrigger className="w-full justify-start text-left" value="verification">Verification</TabsTrigger>
-          <TabsTrigger className="w-full justify-start text-left" value="depreciation">Depreciation</TabsTrigger>
-          <TabsTrigger className="w-full justify-start text-left" value="gate-pass">Gate Passes</TabsTrigger>
-          
-          <TabsTrigger className="w-full justify-start text-left" value="branch">Branch</TabsTrigger>
-          <TabsTrigger className="w-full justify-start text-left" value="department">Department</TabsTrigger>
-          <TabsTrigger className="w-full justify-start text-left" value="condition">Condition</TabsTrigger>
-        </TabsList>
+      <Card className="space-y-4 p-4 sm:p-5">
+       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground" aria-label="Report creation progress">
+        {[["1","Choose report"],["2","Filters"],["3","Fields and layout"],["4","Preview and export"]].map(([n,label],i)=><span key={n} className={`rounded-full px-3 py-1.5 ${wizardStep===i?"bg-primary text-primary-foreground":wizardStep>i?"bg-muted text-foreground":"border"}`}>{n}. {label}</span>)}
+       </div>
+       {wizardStep===0?<div className="space-y-3"><Label htmlFor="report-type">Select the report you need</Label>
+         <select id="report-type" className="h-11 w-full max-w-xl rounded-md border bg-background px-3 text-sm" value="" onChange={e=>{if(e.target.value)chooseReport(e.target.value)}}>
+           <option value="">Choose a report type…</option>
+           {reportOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}
+         </select><p className="text-xs text-muted-foreground">No report preview or fields will appear until you choose a report.</p></div>
+        :<div className="flex flex-wrap items-end justify-between gap-3">
+         <div className="space-y-1"><Label htmlFor="report-change">Report type</Label>
+          <select id="report-change" className="h-10 w-full min-w-[220px] rounded-md border bg-background px-3 text-sm" value={tab} onChange={e=>chooseReport(e.target.value)}>
+           {reportOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}
+          </select></div>
+         <div className="flex gap-2"><Button variant="outline" size="sm" onClick={()=>setWizardStep(p=>(Math.max(0,p-1) as 0|1|2|3))}><ChevronLeft className="mr-1 h-4 w-4"/>Back</Button>
+          {wizardStep<3&&<Button size="sm" onClick={()=>setWizardStep(p=>(Math.min(3,p+1) as 0|1|2|3))}>Next <ChevronRight className="ml-1 h-4 w-4"/></Button>}</div>
+        </div>}
+      </Card>
+      {wizardStep>0&&<Tabs value={tab} onValueChange={chooseReport} className="space-y-3">
         <div className="min-w-0 space-y-4">
         <TabsContent value="register" className="mt-4 space-y-3">
-          <Card className="p-3">
+          {wizardStep===1&&<Card className="p-3">
             <p className="mb-3 text-sm font-semibold">Geographic filter</p>
             <GeoHierarchyFilter
               countries={reportCountries as any[]}
@@ -1021,12 +1033,12 @@ function ReportsPage() {
               initialCountry={(reportLocationSettings as any)?.default_country_code || undefined}
               compact
             />
-          </Card>
-          <FilterBar defs={registerDefs} values={fRegister} onChange={setFRegister} />
-          <ReportTable r={register} exportMeta={reportExportMeta} />
+          </Card>}
+          {wizardStep===1&&<FilterBar defs={registerDefs} values={fRegister} onChange={setFRegister} />}
+          {wizardStep>=2&&<ReportTable key={tab} stage={wizardStep} r={register} exportMeta={reportExportMeta} />}
         </TabsContent>
         <TabsContent value="locations" className="mt-4 space-y-3">
-          <Card className="p-3">
+          {wizardStep===1&&<Card className="p-3">
             <div className="mb-3">
               <p className="text-sm font-semibold">Geographic area</p>
               <p className="text-xs text-muted-foreground">Choose a country, then drill down only as far as needed.</p>
@@ -1038,46 +1050,49 @@ function ReportsPage() {
               initialCountry={(reportLocationSettings as any)?.default_country_code || undefined}
               compact
             />
-          </Card>
-          <FilterBar defs={locationReportDefs} values={fLocationReport} onChange={setFLocationReport} />
-          <ReportTable r={locationReport} exportMeta={reportExportMeta} />
+          </Card>}
+          {wizardStep===1&&<FilterBar defs={locationReportDefs} values={fLocationReport} onChange={setFLocationReport} />}
+          {wizardStep>=2&&<ReportTable key={tab} stage={wizardStep} r={locationReport} exportMeta={reportExportMeta} />}
         </TabsContent>
         <TabsContent value="movements" className="mt-4">
-          <FilterBar defs={movementDefs} values={fMove} onChange={setFMove} />
-          <ReportTable r={movementReport} exportMeta={reportExportMeta} />
+          {wizardStep===1&&<FilterBar defs={movementDefs} values={fMove} onChange={setFMove} />}
+          {wizardStep>=2&&<ReportTable key={tab} stage={wizardStep} r={movementReport} exportMeta={reportExportMeta} />}
         </TabsContent>
         <TabsContent value="assigned" className="mt-4">
-          <FilterBar defs={assignDefs} values={fAssign} onChange={setFAssign} />
-          <ReportTable r={assignedReport} exportMeta={reportExportMeta} />
+          {wizardStep===1&&<FilterBar defs={assignDefs} values={fAssign} onChange={setFAssign} />}
+          {wizardStep>=2&&<ReportTable key={tab} stage={wizardStep} r={assignedReport} exportMeta={reportExportMeta} />}
         </TabsContent>
         <TabsContent value="disposals" className="mt-4">
-          <FilterBar defs={disposalDefs} values={fDisposal} onChange={setFDisposal} />
-          <ReportTable r={disposalReport} exportMeta={reportExportMeta} />
+          {wizardStep===1&&<FilterBar defs={disposalDefs} values={fDisposal} onChange={setFDisposal} />}
+          {wizardStep>=2&&<ReportTable key={tab} stage={wizardStep} r={disposalReport} exportMeta={reportExportMeta} />}
         </TabsContent>
         <TabsContent value="maintenance" className="mt-4">
-          <FilterBar defs={maintenanceDefs} values={fMaint} onChange={setFMaint} />
-          <ReportTable r={maintenanceReport} exportMeta={reportExportMeta} />
+          {wizardStep===1&&<FilterBar defs={maintenanceDefs} values={fMaint} onChange={setFMaint} />}
+          {wizardStep>=2&&<ReportTable key={tab} stage={wizardStep} r={maintenanceReport} exportMeta={reportExportMeta} />}
         </TabsContent>
         <TabsContent value="approvals" className="mt-4">
-          <FilterBar defs={approvalDefs} values={fApprov} onChange={setFApprov} />
-          <ReportTable r={approvalReport} exportMeta={reportExportMeta} />
+          {wizardStep===1&&<FilterBar defs={approvalDefs} values={fApprov} onChange={setFApprov} />}
+          {wizardStep>=2&&<ReportTable key={tab} stage={wizardStep} r={approvalReport} exportMeta={reportExportMeta} />}
         </TabsContent>
         <TabsContent value="verification" className="mt-4">
-          <FilterBar defs={verificationDefs} values={fVerification} onChange={setFVerification} />
-          <ReportTable r={verificationReport} exportMeta={reportExportMeta} />
+          {wizardStep===1&&<FilterBar defs={verificationDefs} values={fVerification} onChange={setFVerification} />}
+          {wizardStep>=2&&<ReportTable key={tab} stage={wizardStep} r={verificationReport} exportMeta={reportExportMeta} />}
         </TabsContent>
         <TabsContent value="depreciation" className="mt-4">
-          <FilterBar defs={depreciationDefs} values={fDepreciation} onChange={setFDepreciation} />
-          <ReportTable r={depreciationReport} exportMeta={reportExportMeta} />
+          {wizardStep===1&&<FilterBar defs={depreciationDefs} values={fDepreciation} onChange={setFDepreciation} />}
+          {wizardStep>=2&&<ReportTable key={tab} stage={wizardStep} r={depreciationReport} exportMeta={reportExportMeta} />}
         </TabsContent>
         <TabsContent value="gate-pass" className="mt-4">
-          <FilterBar defs={gatePassDefs} values={fGatePass} onChange={setFGatePass} />
-          <ReportTable r={gatePassReport} exportMeta={reportExportMeta} />
+          {wizardStep===1&&<FilterBar defs={gatePassDefs} values={fGatePass} onChange={setFGatePass} />}
+          {wizardStep>=2&&<ReportTable key={tab} stage={wizardStep} r={gatePassReport} exportMeta={reportExportMeta} />}
         </TabsContent>
-        <TabsContent value="branch" className="mt-4"><ReportTable r={branchReport} exportMeta={reportExportMeta} /></TabsContent>
-        <TabsContent value="department" className="mt-4"><ReportTable r={departmentReport} exportMeta={reportExportMeta} /></TabsContent>
+        <TabsContent value="branch" className="mt-4">{wizardStep>=2&&<ReportTable key={tab} stage={wizardStep} r={branchReport} exportMeta={reportExportMeta} />}</TabsContent>
+        <TabsContent value="department" className="mt-4">{wizardStep>=2&&<ReportTable key={tab} stage={wizardStep} r={departmentReport} exportMeta={reportExportMeta} />}</TabsContent>
 
         <TabsContent value="condition" className="mt-4">
+         {wizardStep===1&&<p className="text-sm text-muted-foreground">This report summarizes asset conditions by status and branch. No filters are required.</p>}
+         {wizardStep===2&&<p className="text-sm text-muted-foreground">This report uses a visual chart layout.</p>}
+         {wizardStep===3&&<>
           <Card className="p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-semibold">Asset Condition Report</h2>
@@ -1120,20 +1135,24 @@ function ReportsPage() {
               </div>
             </div>
           </Card>
+        </> }
         </TabsContent>
         </div>
-      </Tabs>
+      </Tabs>}
+      <details className="rounded-lg border bg-card p-4"><summary className="cursor-pointer text-sm font-medium">Advanced: saved report builder</summary>
+       <div className="mt-4"><PublishedCanvases kind="report_builder"/></div>
+      </details>
     </div>
   );
 }
 
-function ReportTable({ r, exportMeta }: { r: Report; exportMeta: ReportExportMeta }) {
+function ReportTable({ r, exportMeta,stage }: { r: Report; exportMeta: ReportExportMeta; stage:2|3 }) {
   const exportAccess=useExportAccess();
   const [columns,setColumns]=useState<string[]|null>(null);
   const [orientation,setOrientation]=useState<"portrait"|"landscape">("landscape");
   const [paper,setPaper]=useState<"a4"|"letter"|"legal">("a4");
   const [signature,setSignature]=useState<string>();
-  const [showOptions,setShowOptions]=useState(false);
+
   const automaticColumns=r.columns.filter(c=>r.rows.length===0||r.rows.some(row=>{
     const value=row[c.key];
     return value!==null&&value!==undefined&&value!==""&&(!Array.isArray(value)||value.length>0);
@@ -1142,20 +1161,21 @@ function ReportTable({ r, exportMeta }: { r: Report; exportMeta: ReportExportMet
   const report={...r,columns:selectedColumns};
   const readSignature=(file?:File)=>{if(!file){setSignature(undefined);return;}if(!["image/png","image/jpeg"].includes(file.type)||file.size>1_000_000){window.alert("Upload a PNG or JPEG signature under 1 MB.");return;}const reader=new FileReader();reader.onload=()=>setSignature(String(reader.result));reader.readAsDataURL(file)};
   return (
-    <Card className="p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">{r.title} <span className="ml-2 text-xs font-normal text-muted-foreground">({r.rows.length})</span></h2>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" disabled={!selectedColumns.length||!exportAccess.allowed("reports")} onClick={() => runPermittedExport("reports",()=>exportPDF(report, exportMeta,{orientation,paper,signature}))}>
-            <FileDown className="mr-1 h-4 w-4" /> PDF
-          </Button>
-          <Button size="sm" variant="outline" disabled={!selectedColumns.length||!exportAccess.allowed("reports")} onClick={() => runPermittedExport("reports",()=>exportXLSX(report, exportMeta))}>
-            <FileSpreadsheet className="mr-1 h-4 w-4" /> Excel
-          </Button>
-        </div>
-      </div>
-      <div className="mb-3"><Button size="sm" variant="ghost" onClick={()=>setShowOptions(v=>!v)}>{showOptions?"Hide report customization":"Customize report columns & PDF"}</Button></div>
-      {showOptions&&<div className="mb-4 space-y-3 rounded-lg border p-4"><p className="text-sm font-medium">Choose fields for PDF and Excel exports (only fields containing data are selected automatically)</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{r.columns.map(c=><label key={c.key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={selectedColumns.some(v=>v.key===c.key)} onChange={e=>setColumns(previous=>{const all=previous??automaticColumns.map(v=>v.key);return e.target.checked?[...all,c.key]:all.filter(v=>v!==c.key)})}/>{c.header}</label>)}</div><Button size="sm" variant="outline" onClick={()=>setColumns(r.columns.map(c=>c.key))}>Select all</Button><div className="grid gap-3 sm:grid-cols-2"><div><Label>Paper size</Label><select className="h-10 w-full rounded-md border bg-background px-2" value={paper} onChange={e=>setPaper(e.target.value as typeof paper)}><option value="a4">A4</option><option value="letter">Letter</option><option value="legal">Legal</option></select></div><div><Label>Orientation</Label><select className="h-10 w-full rounded-md border bg-background px-2" value={orientation} onChange={e=>setOrientation(e.target.value as typeof orientation)}><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></div></div><div><Label>Optional signature for this PDF export (PNG/JPEG, max 1 MB)</Label><Input type="file" accept="image/png,image/jpeg" onChange={e=>readSignature(e.target.files?.[0])}/></div></div>}
+    <Card className="space-y-4 p-4">
+     <div className="flex flex-wrap items-center justify-between gap-2"><div><h2 className="text-lg font-semibold">{r.title}</h2>
+      <p className="text-xs text-muted-foreground">{r.rows.length} matching records · {selectedColumns.length} selected fields</p></div>
+      {stage===3&&<span className="flex items-center gap-1 text-xs text-muted-foreground"><CheckCircle2 className="h-4 w-4"/>Ready to review</span>}
+     </div>
+     {stage===2?<section className="space-y-4 rounded-lg border p-4" aria-label="Select report fields and layout">
+       <p className="text-sm font-medium">Choose report fields</p>
+       <p className="text-xs text-muted-foreground">Only fields containing data are selected by default. Optional fields may be included manually.</p>
+       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{r.columns.map(c=><label key={c.key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={selectedColumns.some(v=>v.key===c.key)} onChange={e=>setColumns(previous=>{const all=previous??automaticColumns.map(v=>v.key);return e.target.checked?[...all,c.key]:all.filter(v=>v!==c.key)})}/>{c.header}</label>)}</div>
+       <div className="flex gap-2"><Button size="sm" variant="outline" onClick={()=>setColumns(null)}>Use recommended fields</Button><Button size="sm" variant="outline" onClick={()=>setColumns(r.columns.map(c=>c.key))}>Select all</Button></div>
+       <div className="grid gap-3 sm:grid-cols-2"><div className="space-y-1"><Label htmlFor="report-paper">Paper size</Label><select id="report-paper" className="h-10 w-full rounded-md border bg-background px-2" value={paper} onChange={e=>setPaper(e.target.value as typeof paper)}><option value="a4">A4</option><option value="letter">Letter</option><option value="legal">Legal</option></select></div><div className="space-y-1"><Label htmlFor="report-orientation">Orientation</Label><select id="report-orientation" className="h-10 w-full rounded-md border bg-background px-2" value={orientation} onChange={e=>setOrientation(e.target.value as typeof orientation)}><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></div></div>
+       <div className="space-y-1"><Label htmlFor="report-signature">Optional prepared-by signature (PNG or JPEG)</Label><Input id="report-signature" type="file" accept="image/png,image/jpeg" onChange={e=>readSignature(e.target.files?.[0])}/></div>
+      </section>:<>
+      <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={!selectedColumns.length||!exportAccess.allowed("reports")} onClick={()=>runPermittedExport("reports",()=>exportPDF(report,exportMeta,{orientation,paper,signature}))}><FileDown className="mr-1 h-4 w-4"/>Export PDF</Button>
+      <Button size="sm" variant="outline" disabled={!selectedColumns.length||!exportAccess.allowed("reports")} onClick={()=>runPermittedExport("reports",()=>exportXLSX(report,exportMeta))}><FileSpreadsheet className="mr-1 h-4 w-4"/>Export Excel</Button></div>
       <div className="overflow-x-auto">
         {r.rows.length === 0 ? (
           <div className="py-12 text-center">
@@ -1195,6 +1215,7 @@ function ReportTable({ r, exportMeta }: { r: Report; exportMeta: ReportExportMet
           </table>
         )}
       </div>
+      </>}
     </Card>
   );
 }
