@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { sendPlatformReportEmail } from "@/lib/platform-smtp.server";
+import { sendPlatformPdfReportEmail } from "@/lib/platform-smtp.server";
+import { jsPDF } from "jspdf";
 
 const db=supabaseAdmin as any;
 export type DigestFrequency="daily"|"monthly";
@@ -63,19 +64,63 @@ async function sendOneTenant(tenant:{id:string;name:string},frequency:DigestFreq
    countRows("assets",tenant.id),countRows("assets",tenant.id,from),
    countRows("profiles",tenant.id),countRows("audit_log",tenant.id,from)
   ]);
-  const content=[
-   "Organization: "+tenant.name,
-   "Reporting period: "+key+" ("+frequency+")",
-   "Total registered assets: "+assets,
-   "Assets registered during reporting window: "+newAssets,
-   "Registered user accounts: "+users,
-   "Recorded audit events during reporting window: "+activity,
-   "",
-   "For detailed records and approved exports, sign in to https://assetflow360.com.",
-   "This summary intentionally excludes individual asset identifiers and personal information."
-  ].join("\n");
+  const pdf=new jsPDF({unit:"mm",format:"a4"});
+  const width=210,margin=18;
+  pdf.setFillColor(25,54,80);
+  pdf.rect(0,0,width,49,"F");
+  pdf.setFillColor(210,108,54);
+  pdf.rect(0,0,5,49,"F");
+  pdf.setFont("helvetica","bold");
+  pdf.setFontSize(22);
+  pdf.setTextColor(255,255,255);
+  pdf.text("AssetFlow360",margin,23);
+  pdf.setFontSize(10);
+  pdf.setFont("helvetica","normal");
+  pdf.text("ASSET MANAGEMENT  /  REPORTING",margin,32);
+  pdf.setTextColor(35,52,68);
+  pdf.setFont("helvetica","bold");
+  pdf.setFontSize(17);
+  pdf.text(frequency==="monthly"?"Monthly Asset Summary":"Daily Asset Summary",margin,67);
+  pdf.setFontSize(10);
+  pdf.setFont("helvetica","normal");
+  const organization=tenant.name.replace(/[\r\n]/g," ").slice(0,115);
+  const orgLines=pdf.splitTextToSize("Organization: "+organization,width-2*margin);
+  pdf.text(orgLines,margin,77);
+  let y=77+orgLines.length*5+5;
+  pdf.text("Reporting period: "+key,margin,y);
+  y+=12;
+  const metrics=[
+   ["Total registered assets",assets],
+   ["Assets registered during reporting window",newAssets],
+   ["Registered user accounts",users],
+   ["Recorded audit events",activity]
+  ] as const;
+  for(const [label,value] of metrics){
+   pdf.setFillColor(245,248,251);
+   pdf.roundedRect(margin,y,width-2*margin,17,2,2,"F");
+   pdf.setTextColor(51,68,83);
+   pdf.setFont("helvetica","normal");
+   pdf.setFontSize(10);
+   pdf.text(label,margin+5,y+10);
+   pdf.setFont("helvetica","bold");
+   pdf.setFontSize(14);
+   pdf.text(value.toLocaleString("en-GB"),width-margin-6,y+11,{align:"right"});
+   y+=22;
+  }
+  y+=8;
+  pdf.setFont("helvetica","normal");
+  pdf.setTextColor(88,102,115);
+  pdf.setFontSize(9);
+  pdf.text(pdf.splitTextToSize("This report provides aggregate statistics only. It does not include individual asset identifiers or personal information.",width-2*margin),margin,y);
+  pdf.setDrawColor(213,222,230);
+  pdf.line(margin,269,width-margin,269);
+  pdf.setFontSize(8);
+  pdf.text("AssetFlow360  |  Confidential operational summary",margin,276);
+  pdf.text("assetflow360.com",width-margin,276,{align:"right"});
+  const buffer=Buffer.from(pdf.output("arraybuffer"));
+  const filename="AssetFlow360-"+frequency+"-summary-"+key+".pdf";
   for(const to of verified.slice(0,3)){
-   await sendPlatformReportEmail(to,"AssetFlow Operations | "+(frequency==="monthly"?"Monthly":"Daily")+" asset summary",content);
+   await sendPlatformPdfReportEmail(to,"AssetFlow360 | "+(frequency==="monthly"?"Monthly":"Daily")+" Asset Summary",buffer,filename);
   }
  }catch(e){
   await db.from("platform_email_report_deliveries").delete().eq("tenant_id",tenant.id)

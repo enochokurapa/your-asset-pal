@@ -239,3 +239,46 @@ export async function sendPlatformReportEmail(to:string,subject:string,body:stri
   return {accepted:true};
  }finally{c.close()}
 }
+
+
+/** Monthly/daily reports: short message with a PDF attachment, never a text digest. */
+export async function sendPlatformPdfReportEmail(to:string,subject:string,pdf:Buffer,filename:string){
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)||to.length>250)throw new Error("Invalid report recipient");
+ if(!/^[a-zA-Z0-9_.-]+\.pdf$/.test(filename))throw new Error("Invalid report filename");
+ if(!pdf.length||pdf.length>10*1024*1024)throw new Error("Invalid report PDF size");
+ const config=await getConfiguredSmtpForApplication("operations");
+ const c=await connect(config);
+ const boundary="assetflow-report-"+randomBytes(18).toString("hex");
+ const base64=pdf.toString("base64").match(/.{1,76}/g)?.join("\r\n")||"";
+ try{
+  await c.send("MAIL FROM:<"+config.fromEmail+">");
+  await c.send("RCPT TO:<"+to+">");
+  await c.send("DATA",354);
+  const payload=[
+   "From: AssetFlow360 Reports <"+config.fromEmail+">",
+   "To: "+safe(to),
+   "Subject: "+safe(subject).slice(0,180),
+   "MIME-Version: 1.0",
+   'Content-Type: multipart/mixed; boundary="'+boundary+'"',
+   "X-Auto-Response-Suppress: All",
+   "",
+   "--"+boundary,
+   "Content-Type: text/plain; charset=UTF-8",
+   "Content-Transfer-Encoding: 7bit",
+   "",
+   "Your AssetFlow360 asset summary is attached as a PDF.",
+   "View asset records securely at https://assetflow360.com.",
+   "",
+   "--"+boundary,
+   'Content-Type: application/pdf; name="'+filename+'"',
+   "Content-Transfer-Encoding: base64",
+   'Content-Disposition: attachment; filename="'+filename+'"',
+   "",
+   base64,
+   "--"+boundary+"--"
+  ].join("\r\n").replace(/\r\n\./g,"\r\n..");
+  await c.send(payload+"\r\n.",250);
+  try{await c.send("QUIT",221)}catch{/* accepted after DATA 250 */}
+  return {accepted:true};
+ }finally{c.close()}
+}
