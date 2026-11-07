@@ -238,13 +238,16 @@ function drawHeader(
   y = Math.max(logoBottom, t.margin_top) + 4;
 
   if (title) {
-    const [r, g, b] = primaryColorRgb(t);
-    doc.setTextColor(r, g, b);
-    doc.setFont(t.font_family, "bold");
-    doc.setFontSize(t.base_font_size + 5);
-    doc.text(title, left, y);
+    // Report name is supporting document information, never the dominant
+    // brand element. Keep it modest and neutral even if the tenant selects
+    // a vivid primary colour for dividers and table headers.
+    doc.setFont(t.font_family, "normal");
+    doc.setFontSize(Math.min(11, Math.max(9, t.base_font_size + 1)));
+    doc.setTextColor(47, 69, 84);
+    const titleLines = doc.splitTextToSize(title, right - left);
+    doc.text(titleLines, left, y);
     doc.setTextColor(0, 0, 0);
-    y += 7;
+    y += Math.max(5.5, titleLines.length * 4.5 + 1);
   }
   if (subtitle) {
     doc.setFont(t.font_family, "normal");
