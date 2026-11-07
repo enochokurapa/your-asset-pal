@@ -92,6 +92,26 @@ export async function loadTemplate(force = false): Promise<DocumentTemplate> {
     .maybeSingle();
   if (error) throw error;
   const t = (data ? { ...DEFAULT_TEMPLATE, ...(data as any) } : { ...DEFAULT_TEMPLATE }) as DocumentTemplate;
+  // Use the saved organization logo where present; otherwise include the
+  // permanent AssetFlow360 platform mark instead of generated initials.
+  if(!t.logo_data_url){
+    try{
+      const response=await fetch("/api/branding/icon-192.png",{credentials:"same-origin"});
+      if(response.ok){
+        const image=await response.blob();
+        if(image.type.startsWith("image/")&&image.size<=1_000_000){
+          t.logo_data_url=await new Promise<string>((resolve,reject)=>{
+            const reader=new FileReader();
+            reader.onload=()=>resolve(String(reader.result));
+            reader.onerror=()=>reject(reader.error);
+            reader.readAsDataURL(image);
+          });
+          t.logo_position="left";
+          t.logo_max_height=Math.max(13,t.logo_max_height);
+        }
+      }
+    }catch{ /* If offline, retain the original fallback. */ }
+  }
   t.generated_by_name = (membership as any)?.full_name || (membership as any)?.email || auth.user.email || "";
   cache = { t, at: Date.now(), userId: auth.user.id, tenantId };
   return t;
@@ -208,7 +228,7 @@ function drawHeader(
     doc.setFont(t.font_family, "bold");
     doc.setFontSize(t.base_font_size);
     const headerText = t.header_text || t.organization_name;
-    const lines = doc.splitTextToSize(headerText, pageWidth / 2 - 4);
+    const lines = doc.splitTextToSize(headerText, Math.max(25,(pageWidth - t.margin_left - t.margin_right) / 2 - 8)).slice(0,3);
     const align = t.logo_position === "right" ? "left" : "right";
     const tx = align === "right" ? right : left;
     doc.text(lines, tx, y + 4, { align });
