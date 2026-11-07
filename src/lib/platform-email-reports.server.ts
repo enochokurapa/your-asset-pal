@@ -1,6 +1,8 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { sendPlatformPdfReportEmail } from "@/lib/platform-smtp.server";
 import { jsPDF } from "jspdf";
+import sharp from "sharp";
+import { readFile } from "node:fs/promises";
 
 const db=supabaseAdmin as any;
 export type DigestFrequency="daily"|"monthly";
@@ -70,13 +72,23 @@ async function sendOneTenant(tenant:{id:string;name:string},frequency:DigestFreq
   pdf.rect(0,0,width,49,"F");
   pdf.setFillColor(210,108,54);
   pdf.rect(0,0,5,49,"F");
+  // Use the administrator's live platform logo, falling back to the bundled icon.
+  try {
+   const {data:brand}=await db.from("saas_settings").select("platform_logo_data_url,platform_icon_data_url").eq("id",true).maybeSingle();
+   const raw=String(brand?.platform_logo_data_url||brand?.platform_icon_data_url||"");
+   const match=/^data:image\/(?:png|webp|svg\+xml);base64,([A-Za-z0-9+/=]+)$/.exec(raw);
+   let icon:Buffer;
+   if(match){icon=Buffer.from(await sharp(Buffer.from(match[1],"base64"),{limitInputPixels:16000000}).resize(144,144,{fit:"contain"}).png().toBuffer());}
+   else {icon=await readFile(".output/public/icon-192.png");}
+   pdf.addImage(icon.toString("base64"),"PNG",margin,10,27,27);
+  }catch(error){console.error("[Email reports] Could not render platform logo",error);}
   pdf.setFont("helvetica","bold");
   pdf.setFontSize(22);
   pdf.setTextColor(255,255,255);
-  pdf.text("AssetFlow360",margin,23);
+  pdf.text("AssetFlow360",margin+34,23);
   pdf.setFontSize(10);
   pdf.setFont("helvetica","normal");
-  pdf.text("ASSET MANAGEMENT  /  REPORTING",margin,32);
+  pdf.text("ASSET MANAGEMENT  /  REPORTING",margin+34,32);
   pdf.setTextColor(35,52,68);
   pdf.setFont("helvetica","bold");
   pdf.setFontSize(17);
@@ -123,8 +135,8 @@ async function sendOneTenant(tenant:{id:string;name:string},frequency:DigestFreq
    await sendPlatformPdfReportEmail(to,"AssetFlow360 | "+(frequency==="monthly"?"Monthly":"Daily")+" Asset Summary",buffer,filename);
   }
  }catch(e){
-  await db.from("platform_email_report_deliveries").delete().eq("tenant_id",tenant.id)
-   .eq("frequency",frequency).eq("period_key",key);
+  // Retain the period claim even after an error: SMTP may already have
+  // accepted a recipient, so automatic retries could deliver duplicates.
   console.error("[Email reports] Delivery failed for tenant",tenant.id,e instanceof Error?e.message:"unknown");
  }
 }
@@ -137,6 +149,7 @@ async function reportTick(){
   if(error||policy?.enabled!==true)return;
   const now=new Date(),t=localParts(now);
   if(t.hour<Number(policy.send_hour))return;
+  if(policy.frequency==="monthly" && t.day!=="01")return;
   const frequency:DigestFrequency=policy.frequency==="daily"?"daily":"monthly";
   const key=t.year+"-"+t.month+(frequency==="daily"?"-"+t.day:"");
   const {data:tenants,error:tenantsError}=await db.from("tenants")

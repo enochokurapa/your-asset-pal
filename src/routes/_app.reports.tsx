@@ -64,6 +64,21 @@ async function exportPDF(r: Report, meta: ReportExportMeta, options?: {orientati
         ? meta.organization
         : loadedTemplate.organization_name,
   };
+  if(!template.logo_data_url){
+   try{
+    const response=await fetch("/api/branding/icon-192.png");
+    if(!response.ok)throw Error("Brand image unavailable");
+    const blob=await response.blob();
+    const data=await new Promise<string>((resolve,reject)=>{
+      const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(reader.error);reader.readAsDataURL(blob);
+    });
+    template.logo_data_url=data;
+    template.logo_position="left";
+    template.logo_max_height=15;
+   }catch{ /* keep existing tenant-template fallback */ }
+  }
+  template.header_show=true;
+  template.header_text=template.organization_name;
   const reportRef = `AF-${new Date().toISOString().replace(/[-:TZ.]/g, "").slice(0, 14)}`;
   const { doc, startY, pageWidth, pageHeight } = createBrandedPdf({
     template,
@@ -1119,7 +1134,11 @@ function ReportTable({ r, exportMeta }: { r: Report; exportMeta: ReportExportMet
   const [paper,setPaper]=useState<"a4"|"letter"|"legal">("a4");
   const [signature,setSignature]=useState<string>();
   const [showOptions,setShowOptions]=useState(false);
-  const selectedColumns=r.columns.filter(c=>columns===null||columns.includes(c.key));
+  const automaticColumns=r.columns.filter(c=>r.rows.length===0||r.rows.some(row=>{
+    const value=row[c.key];
+    return value!==null&&value!==undefined&&value!==""&&(!Array.isArray(value)||value.length>0);
+  }));
+  const selectedColumns=r.columns.filter(c=>columns===null?automaticColumns.includes(c):columns.includes(c.key));
   const report={...r,columns:selectedColumns};
   const readSignature=(file?:File)=>{if(!file){setSignature(undefined);return;}if(!["image/png","image/jpeg"].includes(file.type)||file.size>1_000_000){window.alert("Upload a PNG or JPEG signature under 1 MB.");return;}const reader=new FileReader();reader.onload=()=>setSignature(String(reader.result));reader.readAsDataURL(file)};
   return (
@@ -1136,7 +1155,7 @@ function ReportTable({ r, exportMeta }: { r: Report; exportMeta: ReportExportMet
         </div>
       </div>
       <div className="mb-3"><Button size="sm" variant="ghost" onClick={()=>setShowOptions(v=>!v)}>{showOptions?"Hide report customization":"Customize report columns & PDF"}</Button></div>
-      {showOptions&&<div className="mb-4 space-y-3 rounded-lg border p-4"><p className="text-sm font-medium">Select columns to include in PDF and Excel exports</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{r.columns.map(c=><label key={c.key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={columns===null||columns.includes(c.key)} onChange={e=>setColumns(previous=>{const all=previous??r.columns.map(v=>v.key);return e.target.checked?[...all,c.key]:all.filter(v=>v!==c.key)})}/>{c.header}</label>)}</div><Button size="sm" variant="outline" onClick={()=>setColumns(null)}>Select all</Button><div className="grid gap-3 sm:grid-cols-2"><div><Label>Paper size</Label><select className="h-10 w-full rounded-md border bg-background px-2" value={paper} onChange={e=>setPaper(e.target.value as typeof paper)}><option value="a4">A4</option><option value="letter">Letter</option><option value="legal">Legal</option></select></div><div><Label>Orientation</Label><select className="h-10 w-full rounded-md border bg-background px-2" value={orientation} onChange={e=>setOrientation(e.target.value as typeof orientation)}><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></div></div><div><Label>Optional signature for this PDF export (PNG/JPEG, max 1 MB)</Label><Input type="file" accept="image/png,image/jpeg" onChange={e=>readSignature(e.target.files?.[0])}/></div></div>}
+      {showOptions&&<div className="mb-4 space-y-3 rounded-lg border p-4"><p className="text-sm font-medium">Choose fields for PDF and Excel exports (only fields containing data are selected automatically)</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{r.columns.map(c=><label key={c.key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={selectedColumns.some(v=>v.key===c.key)} onChange={e=>setColumns(previous=>{const all=previous??automaticColumns.map(v=>v.key);return e.target.checked?[...all,c.key]:all.filter(v=>v!==c.key)})}/>{c.header}</label>)}</div><Button size="sm" variant="outline" onClick={()=>setColumns(r.columns.map(c=>c.key))}>Select all</Button><div className="grid gap-3 sm:grid-cols-2"><div><Label>Paper size</Label><select className="h-10 w-full rounded-md border bg-background px-2" value={paper} onChange={e=>setPaper(e.target.value as typeof paper)}><option value="a4">A4</option><option value="letter">Letter</option><option value="legal">Legal</option></select></div><div><Label>Orientation</Label><select className="h-10 w-full rounded-md border bg-background px-2" value={orientation} onChange={e=>setOrientation(e.target.value as typeof orientation)}><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></div></div><div><Label>Optional signature for this PDF export (PNG/JPEG, max 1 MB)</Label><Input type="file" accept="image/png,image/jpeg" onChange={e=>readSignature(e.target.files?.[0])}/></div></div>}
       <div className="overflow-x-auto">
         {r.rows.length === 0 ? (
           <div className="py-12 text-center">
