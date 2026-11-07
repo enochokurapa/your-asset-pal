@@ -37,6 +37,8 @@ export function AssetVerificationSchedule() {
  const qc=useQueryClient();
  const [months,setMonths]=useState<number|null>(null);
  const [saving,setSaving]=useState(false);
+ const [legacyDate,setLegacyDate]=useState("");
+ const [savingLegacy,setSavingLegacy]=useState(false);
  const branchIds=branchScope?Array.from(branchScope).sort():null;
  const branchKey=branchIds?.join(",")??"all";
 
@@ -80,6 +82,29 @@ export function AssetVerificationSchedule() {
   }catch(e:any){toast.error(e?.message||"Unable to save verification policy");}
   finally{setSaving(false);}
  };
+ const updateLegacyDate=async()=>{
+  if(!tenantId||!isTenantAdmin||!/^\d{4}-\d{2}-\d{2}$/.test(legacyDate))return;
+  const actual=new Date(legacyDate+"T12:00:00+03:00");
+  if(!Number.isFinite(actual.getTime())||actual>new Date()||actual.getFullYear()<2000){toast.error("Enter a valid historical inspection date, not a future date.");return;}
+  setSavingLegacy(true);
+  try{
+   // Only historical owner-attested records can be adjusted here. Formal
+   // inspections and later mismatch findings are never overwritten.
+   const {error}=await (supabase as any).from("asset_verifications")
+    .update({verified_at:actual.toISOString(),
+      notes:"Legacy physical inspection confirmed by the tenant administrator. Inspection date supplied through the historical-verification date control.",
+      changes:{source:"owner_attested_legacy",inspection_date_confirmed:true,effective_date_type:"owner_supplied_inspection_date"}} ,{count:"exact"})
+    .eq("tenant_id",tenantId).contains("changes",{source:"owner_attested_legacy"});
+   if(error)throw error;
+   await Promise.all([
+    qc.invalidateQueries({queryKey:["verification-overview",tenantId]}),
+    qc.invalidateQueries({queryKey:["dashboard-stats"]}),
+    qc.invalidateQueries({queryKey:["verifications"]}),
+   ]);
+   toast.success("Historical inspection date saved. Verification due dates will recalculate.");
+  }catch(e:any){toast.error(e?.message||"Unable to update historical verification dates. Check administrator permissions.");}
+  finally{setSavingLegacy(false)}
+ };
  const currentMonths=months??policy?.intervalMonths??12;
  return <div className="space-y-4">
    <Card className="space-y-4 p-5">
@@ -103,6 +128,14 @@ export function AssetVerificationSchedule() {
        {saving?"Saving…":"Save validity"}
       </Button>
       <p className="w-full text-xs text-muted-foreground">Only business administrators can change this setting. Existing verification dates stay unchanged; overdue status recalculates from the new interval.</p>
+     </div>}
+    {isTenantAdmin&&<div className="space-y-3 rounded-lg border p-3">
+      <div><p className="text-sm font-semibold">Historical asset inspection date</p>
+       <p className="mt-1 text-xs text-muted-foreground">The imported assets were marked as owner-attested from your earlier confirmation. Their present effective date is the migration baseline, not a claimed inspection date. If your team knows the actual date, set it here for this business. Formal inspections and mismatch findings are not changed.</p></div>
+      <div className="flex flex-wrap items-end gap-3"><div className="space-y-1"><Label htmlFor="legacy-inspection-date">Actual historical inspection date</Label>
+       <Input id="legacy-inspection-date" type="date" max={new Date().toISOString().slice(0,10)} value={legacyDate} onChange={e=>setLegacyDate(e.target.value)} className="w-52"/></div>
+       <Button disabled={savingLegacy||!legacyDate} onClick={updateLegacyDate}>{savingLegacy?"Saving…":"Update historical verification dates"}</Button></div>
+      <p className="text-xs text-muted-foreground">This change is audited and restricted to tenant administrators. It updates only owner-attested legacy records for the active business.</p>
      </div>}
     {overviewError && <p className="text-sm text-destructive">Verification status could not be loaded. Contact your administrator if this continues.</p>}
     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">

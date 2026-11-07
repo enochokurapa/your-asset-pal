@@ -97,7 +97,7 @@ const empty: AssetForm = {
 };
 
 function AssetsPage() {
-  const { canWrite, isAdmin, user, canDo, canSeeBranch, canView, tenantId } = useAuth();
+  const { canWrite, isAdmin, isTenantAdmin, user, canDo, canSeeBranch, canView, tenantId } = useAuth();
   const [companyLogo,setCompanyLogo]=useState<string|null>(null);
   useEffect(()=>{
     if(!tenantId){setCompanyLogo(null);return;}
@@ -705,6 +705,9 @@ function AssetsPage() {
   };
   const [importing, setImporting] = useState(false);
   const [importProgress,setImportProgress]=useState<string>("");
+  const [importVerified,setImportVerified]=useState(false);
+  const [importInspectionDate,setImportInspectionDate]=useState("");
+  const canCertifyImport=canDo("perform_verification")||isTenantAdmin;
   const onImport = async (f: File) => {
     setImporting(true);
     setImportProgress("Preparing import…");
@@ -712,9 +715,10 @@ function AssetsPage() {
       if(registerCatalogPending||registerCatalogError||!catalog)throw new Error("The company register has not finished loading.");
       
       const r = await importAssetsFromFile(f, user?.id ?? null,registers.find(r=>r.id===registerChoice),importBranchId||undefined,locationSettings as any,
-        (done,total,saved,skipped,failed)=>setImportProgress(`${done}/${total} processed · ${saved} saved · ${skipped} already present · ${failed} failed`));
+        (done,total,saved,skipped,failed)=>setImportProgress(`${done}/${total} processed · ${saved} saved · ${skipped} already present · ${failed} failed`),
+        importVerified?{confirmed:true,inspectionDate:importInspectionDate}:undefined);
       if(r.success===0&&r.skipped===0){toast.error(`No assets imported. ${r.errors[0]?.error??"Check the selected register and spreadsheet."}`);return;}
-      toast.success(`Imported ${r.success} new assets; ${r.skipped} already existed`, {description:r.errors.length ? `${r.errors.length} rows failed. First error (row ${r.errors[0].row}): ${r.errors[0].error}` : `Processed ${r.total} rows successfully.`});
+      toast.success(`Imported ${r.success} new assets; ${r.verifiedOnImport??0} recorded as verified; ${r.skipped} already existed`, {description:r.errors.length ? `${r.errors.length} rows failed. First error (row ${r.errors[0].row}): ${r.errors[0].error}` : `Processed ${r.total} rows successfully.`});
       qc.invalidateQueries({ queryKey: ["assets"] });
     } catch (e: any) { toast.error(e?.message ?? "Import failed"); }
     finally { setImporting(false); }
@@ -739,9 +743,15 @@ function AssetsPage() {
             <Download className="mr-2 h-4 w-4" /> Template
           </Button>
           {canAdd&&registerChoice!=="default"&&visibleBranches.length>1&&<Select value={importBranchId||"choose"} onValueChange={v=>setImportBranchId(v==="choose"?"":v)}><SelectTrigger className="w-52"><SelectValue placeholder="Import into branch"/></SelectTrigger><SelectContent><SelectItem value="choose">Choose import branch</SelectItem>{visibleBranches.map(branch=><SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}</SelectContent></Select>}
+          {canAdd&&canCertifyImport&&<div className="w-full rounded-lg border bg-card p-3 text-sm">
+           <label className="flex items-start gap-2"><input type="checkbox" className="mt-1" checked={importVerified} disabled={importing} onChange={e=>setImportVerified(e.target.checked)}/>
+            <span><strong>Imported assets already inspected</strong><span className="mt-1 block text-xs text-muted-foreground">Check only when your team physically inspected these assets before import. A dated verification record will be created for each successfully imported asset.</span></span></label>
+           {importVerified&&<div className="mt-3 max-w-sm space-y-1"><Label htmlFor="import-inspection-date">Confirmed physical inspection date</Label>
+            <Input id="import-inspection-date" type="date" max={new Date().toISOString().slice(0,10)} value={importInspectionDate} onChange={e=>setImportInspectionDate(e.target.value)}/></div>}
+          </div>}
           {canAdd && (
             <label className="inline-flex">
-              <input type="file" accept=".xlsx,.xls" className="hidden" disabled={importing||registerCatalogPending||!!registerCatalogError}
+              <input type="file" accept=".xlsx,.xls" className="hidden" disabled={importing||registerCatalogPending||!!registerCatalogError||(importVerified&&!importInspectionDate)}
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) onImport(f); e.target.value = ""; }} />
               <Button variant="outline" disabled={importing} type="button" asChild>
                 <span><Upload className="mr-2 h-4 w-4" /> {importing ? "Importing…" : "Import"}</span>

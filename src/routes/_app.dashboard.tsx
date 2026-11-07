@@ -48,7 +48,7 @@ function TenantDashboard() {
         supabase.from("branches").select("id,name,code,is_active"),
         supabase.from("approval_requests").select("id,kind,asset_id,status,payload").eq("status", "pending"),
         (supabase as any).from("gate_passes").select("id,status,branch_id,asset_id").in("status", ["pending", "approved", "checked_out"]),
-        (supabase as any).from("asset_verifications").select("id,asset_id,branch_id,status,verified_at"),
+        (supabase as any).from("asset_verification_schedule").select("asset_id,branch_id,latest_verification_status,verification_state,verification_basis"),
       ]);
       const list = (assets.data ?? [])
         .filter((a: any) => canSeeBranch(a.branch_id))
@@ -91,16 +91,19 @@ function TenantDashboard() {
       const vList = (verifs.data ?? []).filter((v: any) =>
         canSeeBranch(v.branch_id) && (selectedBranch === "all" || v.branch_id === selectedBranch)
       );
-      const latestPerAsset = new Map<string, any>();
-      for (const v of [...vList].sort((a: any, b: any) => new Date(a.verified_at).getTime() - new Date(b.verified_at).getTime())) {
-        if (v.asset_id) latestPerAsset.set(v.asset_id, v);
-      }
       const verifiedIds = new Set<string>();
       const mismatchedIds = new Set<string>();
-      latestPerAsset.forEach((v, id) => {
-        if (v.status === "verified") verifiedIds.add(id);
-        else if (v.status === "mismatched") mismatchedIds.add(id);
-      });
+      for (const v of vList) {
+        if (!v.asset_id) continue;
+        // A previously verified asset is current only until the configured
+        // renewal deadline. Historical owner-attested records remain traceable.
+        if (v.latest_verification_status === "verified" &&
+            (v.verification_state === "current" || v.verification_state === "due_soon")) {
+          verifiedIds.add(v.asset_id);
+        } else if (v.latest_verification_status === "mismatched" || v.latest_verification_status === "not_found") {
+          mismatchedIds.add(v.asset_id);
+        }
+      }
       const verifiedCount = Array.from(verifiedIds).filter((id) => visibleAssetIds.has(id)).length;
       const mismatchedCount = Array.from(mismatchedIds).filter((id) => visibleAssetIds.has(id)).length;
       const unverifiedCount = Math.max(0, list.length - verifiedCount - mismatchedCount);
@@ -184,7 +187,7 @@ function TenantDashboard() {
     { label: "Out of Premises", value: data?.gpOutside ?? 0, icon: PackageCheck, color: "#0369A1", filter: { kind: "all" }, navigateTo: "/gate-pass" },
     { label: "Gate Pass Pending", value: data?.gpPending ?? 0, icon: DoorOpen, color: "#9333EA", filter: { kind: "all" }, navigateTo: "/gate-pass" },
     { label: "Verified Assets", value: data?.verifiedCount ?? 0, icon: ClipboardCheck, color: "#15803D", filter: { kind: "all" }, navigateTo: "/verification" },
-    { label: "Mismatched / Unverified", value: (data?.mismatchedCount ?? 0) + (data?.unverifiedCount ?? 0), icon: ClipboardX, color: "#DC2626", filter: { kind: "all" }, navigateTo: "/verification" },
+    { label: "Unverified / Expired", value: (data?.mismatchedCount ?? 0) + (data?.unverifiedCount ?? 0), icon: ClipboardX, color: "#DC2626", filter: { kind: "all" }, navigateTo: "/verification" },
   ];
 
   const [tile, setTile] = useState<{ title: string; filter: TileFilter } | null>(null);

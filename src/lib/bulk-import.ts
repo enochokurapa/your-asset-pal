@@ -81,9 +81,19 @@ export type ImportResult = {
   success: number;
   skipped: number;
   errors: { row: number; tag?: string; error: string }[];
+  verifiedOnImport?: number;
+  verificationFailures?: number;
 };
 
-export async function importAssetsFromFile(file: File, userId: string | null,register?:RegisterTemplate, importBranchId?:string,config?:RegisterLocationConfig,onProgress?:(completed:number,total:number,success:number,skipped:number,failed:number)=>void): Promise<ImportResult> {
+export async function importAssetsFromFile(file: File, userId: string | null,register?:RegisterTemplate, importBranchId?:string,config?:RegisterLocationConfig,onProgress?:(completed:number,total:number,success:number,skipped:number,failed:number)=>void,
+ verification?:{confirmed:boolean;inspectionDate:string}): Promise<ImportResult> {
+  if(verification?.confirmed){
+    const date=verification.inspectionDate;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw Error("Choose the confirmed physical inspection date before importing.");
+    const when=new Date(date+"T12:00:00+03:00");
+    if(!Number.isFinite(when.getTime())||when>new Date()||when.getUTCFullYear()<2000)throw Error("Inspection date must be a valid date in the past.");
+    if(!userId)throw Error("Sign in to certify imported assets.");
+  }
   const MAX_IMPORT_BYTES = 20 * 1024 * 1024;
   const MAX_IMPORT_ROWS = 10_000;
   if (file.size <= 0 || file.size > MAX_IMPORT_BYTES) {
@@ -276,6 +286,22 @@ export async function importAssetsFromFile(file: File, userId: string | null,reg
         created_by: userId,
       }).select().single();
       if (insErr) throw insErr;
+
+      if(verification?.confirmed && created){
+       // Explicit, dated owner attestation. Never imply that uploading a file
+       // alone proves that an asset has been physically inspected.
+       const {error:verificationError}=await (supabase as any).from("asset_verifications").insert({
+        asset_id:created.id,branch_id:created.branch_id,location_id:created.location_id,
+        condition:created.condition,status:"verified",verified_by:userId,
+        verified_at:new Date(verification.inspectionDate+"T12:00:00+03:00").toISOString(),
+        notes:"Previously physically inspected; dated verification attested by the importing user.",
+        changes:{source:"owner_attested_import",inspection_date_confirmed:true},
+       });
+       if(verificationError){
+         result.verificationFailures=(result.verificationFailures??0)+1;
+         result.errors.push({row:rowNum,tag:tag||undefined,error:"Asset imported, but verification could not be recorded: "+verificationError.message});
+       }else result.verifiedOnImport=(result.verifiedOnImport??0)+1;
+      }
 
       if ((textValue(r,"Custodian","custodian") || textValue(r,"Department","department")) && created) {
         await supabase.from("asset_assignments").insert({
