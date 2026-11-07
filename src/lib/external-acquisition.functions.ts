@@ -87,6 +87,15 @@ export const startSearchConsoleOAuth=createServerFn({method:"POST"})
       scope,access_type:"offline",prompt:"consent",state})){url.searchParams.set(key,value)}
    return {url:url.toString()};
  });
+async function listSearchConsoleSites(accessToken:string){
+ return jsonRequest<{siteEntry?:{siteUrl:string;permissionLevel:string}[]}>(
+  "https://www.googleapis.com/webmasters/v3/sites",{
+    headers:{Authorization:"Bearer "+accessToken},
+  });
+}
+function matchingSite(rows:{siteUrl:string;permissionLevel:string}[]=[]){
+ return rows.find(r=>belongsToSite(r.siteUrl)&&r.permissionLevel!=="siteUnverifiedUser")?.siteUrl||"";
+}
 export const completeSearchConsoleOAuth=createServerFn({method:"POST"})
  .middleware([requireSupabaseAuth])
  .inputValidator(input=>z.object({code:z.string().min(5).max(2500),state:z.string().min(20).max(100)}).parse(input))
@@ -105,11 +114,8 @@ export const completeSearchConsoleOAuth=createServerFn({method:"POST"})
          redirect_uri:oauthRedirect,grant_type:"authorization_code"}).toString(),
      });
    if(!tokens.refresh_token||!tokens.access_token)throw Error("Google did not provide offline read-only permission. Reconnect and approve access.");
-   const sites=await jsonRequest<{siteEntry?:{siteUrl:string;permissionLevel:string}[]}>(
-      "https://www.googleapis.com/webmasters/v3/sites",{
-        headers:{Authorization:"Bearer "+tokens.access_token},
-      });
-   const site=sites.siteEntry?.find(r=>belongsToSite(r.siteUrl)&&r.permissionLevel!=="siteUnverifiedUser")?.siteUrl||"";
+   const sites=await listSearchConsoleSites(tokens.access_token);
+   const site=matchingSite(sites.siteEntry);
    await queryPostgres(`INSERT INTO public.platform_acquisition_integrations(provider,config,encrypted_token,updated_by,updated_at)
       VALUES('google_search_console',$1,$2,$3,NOW())
       ON CONFLICT(provider) DO UPDATE SET config=EXCLUDED.config,
@@ -205,10 +211,18 @@ async function loadAcquisition(start:string,end:string):Promise<AcquisitionRepor
  await Promise.all([
   (async()=>{
    if(!g?.encrypted_token)return;
-   const site=String(g.config?.site||"");
-   if(!site){report.google.state="property_missing";return}
+   let site=String(g.config?.site||"");
    try{
     const token=await googleAccessToken(decrypt(g.encrypted_token));
+    if(!site){
+     const available=await listSearchConsoleSites(token);
+     site=matchingSite(available.siteEntry);
+     if(!site){report.google.state="property_missing";return;}
+     await queryPostgres(`UPDATE public.platform_acquisition_integrations
+       SET config=jsonb_set(COALESCE(config,'{}'::jsonb),'{site}',to_jsonb($1::text)),updated_at=NOW()
+       WHERE provider='google_search_console'`,[site]);
+    }
+    report.google.property=site;
     const [totals,queries,pages,countries,devices]=await Promise.all([
       searchConsoleReport(token,site,[],start,end),
       searchConsoleReport(token,site,["query"],start,end),

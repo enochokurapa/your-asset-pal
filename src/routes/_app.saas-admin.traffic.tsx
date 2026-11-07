@@ -183,7 +183,7 @@ function AcquisitionPage(){
   {data&&<>
     <p className="text-xs text-muted-foreground">Google Search reporting period: {data.period.start} to {data.period.end}. Google data is delayed and may omit low-volume queries.</p>
     {google?.state==="error"&&<p role="alert" className="rounded-lg border border-amber-200 p-3 text-xs text-amber-700">Google Search Console: {google.error}</p>}
-    {google?.state==="property_missing"&&<p className="rounded-lg border border-amber-200 p-3 text-xs text-amber-700">The connected Google account has not granted access to the assetflow360.com property. Add the user in Search Console and reconnect.</p>}
+    {google?.state==="property_missing"&&<p className="rounded-lg border border-amber-200 p-3 text-xs text-amber-700">The Google account used for this connection cannot access the assetflow360.com property. Sign in with a verified owner or full user of this property, then reconnect.</p>}
     {google?.state==="ready"&&<>
      <section className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4" aria-label="Google search performance">
       {[
