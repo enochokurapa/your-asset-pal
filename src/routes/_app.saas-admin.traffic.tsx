@@ -118,67 +118,30 @@ function AcquisitionPage(){
   </header>
   {connectedError&&<p role="alert" className="text-sm text-destructive">Unable to read analytics connections. Check SaaS Admin access.</p>}
   {error&&<p role="alert" className="text-sm text-destructive">Unable to load the external analytics reports.</p>}
-  <div className="grid min-w-0 gap-4 xl:grid-cols-2">
-   <Card className="min-w-0 space-y-4 p-4 sm:p-5">
-    <div className="flex flex-wrap items-start justify-between gap-3">
-     <div><h2 className="flex items-center gap-2 text-base font-semibold"><Search className="h-5 w-5 text-[#4285f4]"/>Google Search Console</h2>
-      <p className="mt-1 text-xs text-muted-foreground">Google organic discovery: search keywords, ranking, clicks and impressions.</p>
-     </div>
-     <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold">{connected?.google.connected?"Connected":"Not connected"}</span>
+  <section aria-label="Analytics sources" className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+   <span className="rounded-full border bg-background px-3 py-1.5">Google Search Console · {connected?.google.connected?"Connected":"Not connected"}</span>
+   <span className="rounded-full border bg-background px-3 py-1.5">Cloudflare Web Analytics · {connected?.cloudflare.connected?"Connected":"Not connected"}</span>
+   {connected?.google.site&&<span className="truncate">Property: {connected.google.site}</span>}
+  </section>
+  <Card className="space-y-4 p-4 sm:p-5" aria-label="AI agent and browsing monitoring">
+   <div className="flex flex-wrap items-start justify-between gap-3">
+    <div><h2 className="flex items-center gap-2 text-base font-semibold"><BrainCircuit className="h-5 w-5 text-[#b96c40]"/>AI agents & browsing intelligence</h2>
+     <p className="mt-1 text-xs text-muted-foreground">Measured AI referrals and automated crawler activity are different data sources.</p></div>
+    <span className="rounded-full border bg-muted/30 px-2.5 py-1 text-xs">Provider verified only</span>
+   </div>
+   <div className="grid gap-3 sm:grid-cols-2">
+    <div className="rounded-lg border bg-muted/20 p-3"><p className="text-xs font-medium text-muted-foreground">AI assistant referral visits</p>
+     <p className="mt-1 text-2xl font-semibold tabular-nums">{cf?.state==="ready"?cf.aiReferrers.reduce((sum,r)=>sum+r.visits,0).toLocaleString():"—"}</p>
+     <p className="mt-1 text-xs text-muted-foreground">{cf?.state==="ready"?"From identified referrer domains":"Connect Cloudflare Web Analytics to measure referrals"}</p>
     </div>
-    {connected?.google.site&&<p className="break-all text-xs text-muted-foreground">Verified property: {connected.google.site}</p>}
-    {connected?.google.connected&&<Button variant="outline" size="sm" disabled={busy}
-       onClick={async()=>{if(!window.confirm("Disconnect Google Search Console? Reports will stop, but account data stays in Google."))return;
-        try{await disconnectGoogle({headers:await auth()});await Promise.all([
-          qc.invalidateQueries({queryKey:["acquisition-connections"]}),
-          qc.invalidateQueries({queryKey:["verified-acquisition-report"]})]);toast.success("Disconnected");}
-        catch(e:any){toast.error(e?.message||"Unable to disconnect");}}}>Disconnect</Button>}
-    {!connected?.google.oauthReady&&<p className="text-xs leading-5 text-amber-700">Google OAuth credentials are not yet configured on the application server. A Google Cloud OAuth web client is required before connecting.</p>}
-    <Button size="sm" disabled={busy||!connected?.google.oauthReady||loadingConnections}
-      onClick={async()=>{setBusy(true);try{
-        const response=await start({headers:await auth()});window.location.assign(response.url);
-      }catch(e:any){toast.error(e?.message||"Unable to start Google authorization");setBusy(false)}}}>
-      <Link2 className="mr-2 h-4 w-4"/>{connected?.google.connected?"Reconnect Google":"Connect Google Search Console"}
-    </Button>
-   </Card>
-   <Card className="min-w-0 space-y-3 p-4 sm:p-5">
-    <div className="flex flex-wrap items-start justify-between gap-3">
-     <div><h2 className="flex items-center gap-2 text-base font-semibold"><Cloud className="h-5 w-5 text-[#e48231]"/>Cloudflare Web Analytics</h2>
-      <p className="mt-1 text-xs text-muted-foreground">Measured web sessions, referring domains, top pages and known AI referrals.</p>
-     </div>
-     <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold">{connected?.cloudflare.connected?"Connected":"Not connected"}</span>
+    <div className="rounded-lg border bg-muted/20 p-3"><p className="text-xs font-medium text-muted-foreground">AI crawler / agent browsing</p>
+     <p className="mt-1 text-lg font-semibold">Not configured</p>
+     <p className="mt-1 text-xs text-muted-foreground">Requires verified bot or request analytics from Cloudflare. Website referral totals cannot measure crawlers.</p>
     </div>
-    <label className="block text-xs font-medium">Cloudflare account ID
-     <Input className="mt-1" value={accountId} maxLength={32} onChange={e=>setAccountId(e.target.value.trim())} placeholder="32-character account ID"/>
-    </label>
-    <label className="block text-xs font-medium">Web Analytics site tag
-     <Input className="mt-1" value={siteTag} maxLength={70} onChange={e=>setSiteTag(e.target.value.trim())} placeholder="Site tag from Cloudflare Web Analytics"/>
-    </label>
-    <label className="block text-xs font-medium">Analytics read-only API token
-     <Input className="mt-1" type="password" autoComplete="off" value={apiToken} maxLength={500}
-       onChange={e=>setApiToken(e.target.value)} placeholder={connected?.cloudflare.connected?"Saved securely; leave empty to keep existing token":"Cloudflare API token"}/>
-    </label>
-    <div className="flex flex-wrap gap-2">
-     <Button size="sm" disabled={busy||loadingConnections||!accountId||!siteTag}
-       onClick={async()=>{setBusy(true);try{
-        await saveCloudflare({headers:await auth(),data:{accountId,siteTag,apiToken}});
-        setApiToken("");await Promise.all([
-          qc.invalidateQueries({queryKey:["acquisition-connections"]}),
-          qc.invalidateQueries({queryKey:["verified-acquisition-report"]})]);
-        toast.success("Cloudflare settings saved");
-       }catch(e:any){toast.error(e?.message||"Unable to save Cloudflare settings")}
-       finally{setBusy(false)}}}>Save Cloudflare connection</Button>
-     {connected?.cloudflare.connected&&<Button variant="outline" size="sm" disabled={busy}
-       onClick={async()=>{if(!window.confirm("Disconnect Cloudflare analytics?"))return;try{
-        await disconnectCloudflare({headers:await auth()});
-        await Promise.all([qc.invalidateQueries({queryKey:["acquisition-connections"]}),
-          qc.invalidateQueries({queryKey:["verified-acquisition-report"]})]);
-        toast.success("Disconnected");
-       }catch(e:any){toast.error(e?.message||"Unable to disconnect")}}}>Disconnect</Button>}
-    </div>
-    <p className="text-xs leading-5 text-muted-foreground">Requires Cloudflare Web Analytics for assetflow360.com and a token with Account Analytics Read. Credentials are encrypted and never displayed after saving.</p>
-   </Card>
-  </div>
+   </div>
+   {cf?.state==="ready"&&cf.aiReferrers.length>0&&<div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{cf.aiReferrers.slice(0,6).map(item=><div key={item.label} className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-xs"><span className="truncate">{item.label}</span><span className="font-semibold tabular-nums">{item.visits.toLocaleString()} visits</span></div>)}</div>}
+   <p className="text-xs leading-5 text-muted-foreground">AI agent monitoring covers identifiable visits from assistants such as ChatGPT, Perplexity, Claude and Copilot when an analytics provider reports their referrers. Bot browsing requires separate verified crawler-request data and is not counted as human visits.</p>
+  </Card>
   {isLoading&&<p className="text-sm text-muted-foreground">Checking available external analytics sources…</p>}
   {data&&<>
     <p className="text-xs text-muted-foreground">Google Search reporting period: {data.period.start} to {data.period.end}. Google data is delayed and may omit low-volume queries.</p>
@@ -240,6 +203,75 @@ function AcquisitionPage(){
       <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">There are no verified traffic or Google search figures to display yet. Connect Search Console and/or Cloudflare above. This page will not substitute manually entered counters, internal page views or estimates for external attribution.</p>
     </Card>}
   </>}
+  <details className="group rounded-xl border bg-card p-3 sm:p-4" id="analytics-connections">
+   <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold marker:hidden">
+    <span className="flex items-center gap-2"><Link2 className="h-4 w-4 text-[#b96c40]"/>Manage data source connections</span>
+    <span className="text-xs font-normal text-muted-foreground group-open:hidden">Expand settings</span>
+    <span className="hidden text-xs font-normal text-muted-foreground group-open:inline">Hide settings</span>
+   </summary>
+   <p className="mt-2 text-xs text-muted-foreground">Connection settings are hidden by default to keep analytics and monitoring in focus.</p>
+  <div className="mt-4 grid min-w-0 gap-3 lg:grid-cols-2">
+   <Card className="min-w-0 space-y-3 p-3 sm:p-4">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+     <div><h2 className="flex items-center gap-2 text-base font-semibold"><Search className="h-5 w-5 text-[#4285f4]"/>Google Search Console</h2>
+      <p className="mt-1 text-xs text-muted-foreground">Google organic discovery: search keywords, ranking, clicks and impressions.</p>
+     </div>
+     <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold">{connected?.google.connected?"Connected":"Not connected"}</span>
+    </div>
+    {connected?.google.site&&<p className="break-all text-xs text-muted-foreground">Verified property: {connected.google.site}</p>}
+    {connected?.google.connected&&<Button variant="outline" size="sm" disabled={busy}
+       onClick={async()=>{if(!window.confirm("Disconnect Google Search Console? Reports will stop, but account data stays in Google."))return;
+        try{await disconnectGoogle({headers:await auth()});await Promise.all([
+          qc.invalidateQueries({queryKey:["acquisition-connections"]}),
+          qc.invalidateQueries({queryKey:["verified-acquisition-report"]})]);toast.success("Disconnected");}
+        catch(e:any){toast.error(e?.message||"Unable to disconnect");}}}>Disconnect</Button>}
+    {!connected?.google.oauthReady&&<p className="text-xs leading-5 text-amber-700">Google OAuth credentials are not yet configured on the application server. A Google Cloud OAuth web client is required before connecting.</p>}
+    <Button size="sm" disabled={busy||!connected?.google.oauthReady||loadingConnections}
+      onClick={async()=>{setBusy(true);try{
+        const response=await start({headers:await auth()});window.location.assign(response.url);
+      }catch(e:any){toast.error(e?.message||"Unable to start Google authorization");setBusy(false)}}}>
+      <Link2 className="mr-2 h-4 w-4"/>{connected?.google.connected?"Reconnect Google":"Connect Google Search Console"}
+    </Button>
+   </Card>
+   <Card className="min-w-0 space-y-3 p-3 sm:p-4">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+     <div><h2 className="flex items-center gap-2 text-base font-semibold"><Cloud className="h-5 w-5 text-[#e48231]"/>Cloudflare Web Analytics</h2>
+      <p className="mt-1 text-xs text-muted-foreground">Measured web sessions, referring domains, top pages and known AI referrals.</p>
+     </div>
+     <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold">{connected?.cloudflare.connected?"Connected":"Not connected"}</span>
+    </div>
+    <label className="block text-xs font-medium">Cloudflare account ID
+     <Input className="mt-1" autoComplete="off" value={accountId} maxLength={32} onChange={e=>setAccountId(e.target.value.trim())} placeholder="32-character account ID"/>
+    </label>
+    <label className="block text-xs font-medium">Web Analytics site tag
+     <Input className="mt-1" value={siteTag} maxLength={70} onChange={e=>setSiteTag(e.target.value.trim())} placeholder="Site tag from Cloudflare Web Analytics"/>
+    </label>
+    <label className="block text-xs font-medium">Analytics read-only API token
+     <Input className="mt-1" type="password" autoComplete="off" value={apiToken} maxLength={500}
+       onChange={e=>setApiToken(e.target.value)} placeholder={connected?.cloudflare.connected?"Saved securely; leave empty to keep existing token":"Cloudflare API token"}/>
+    </label>
+    <div className="flex flex-wrap gap-2">
+     <Button size="sm" disabled={busy||loadingConnections||!accountId||!siteTag}
+       onClick={async()=>{setBusy(true);try{
+        await saveCloudflare({headers:await auth(),data:{accountId,siteTag,apiToken}});
+        setApiToken("");await Promise.all([
+          qc.invalidateQueries({queryKey:["acquisition-connections"]}),
+          qc.invalidateQueries({queryKey:["verified-acquisition-report"]})]);
+        toast.success("Cloudflare settings saved");
+       }catch(e:any){toast.error(e?.message||"Unable to save Cloudflare settings")}
+       finally{setBusy(false)}}}>Save Cloudflare connection</Button>
+     {connected?.cloudflare.connected&&<Button variant="outline" size="sm" disabled={busy}
+       onClick={async()=>{if(!window.confirm("Disconnect Cloudflare analytics?"))return;try{
+        await disconnectCloudflare({headers:await auth()});
+        await Promise.all([qc.invalidateQueries({queryKey:["acquisition-connections"]}),
+          qc.invalidateQueries({queryKey:["verified-acquisition-report"]})]);
+        toast.success("Disconnected");
+       }catch(e:any){toast.error(e?.message||"Unable to disconnect")}}}>Disconnect</Button>}
+    </div>
+    <p className="text-xs leading-5 text-muted-foreground">Requires Cloudflare Web Analytics for assetflow360.com and a token with Account Analytics Read. Credentials are encrypted and never displayed after saving.</p>
+   </Card>
+  </div>
+  </details>
   <p className="text-xs leading-5 text-muted-foreground">Google Search Console search clicks and Cloudflare website visits have different definitions and must not be added together. AI referrals reflect referrer information, not a complete record of AI-driven discovery. All connection actions require SaaS Admin access.</p>
  </main>;
 }
