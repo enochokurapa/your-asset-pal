@@ -35,6 +35,7 @@ const tenantNav: NavItem[] = [
   { to: "/categories", label: "Categories", icon: Tags, module: "categories" },
   { to: "/locations", label: "Locations", icon: MapPin, module: "locations" },
   { to: "/live-tracking", label: "Live Tracking", icon: Radar, module: "live_tracking" },
+  { to: "/integrations", label: "Integrations", icon: PlugZap, module: "api_access", tenantAdminOnly: true },
   { to: "/branches", label: "Branches", icon: Building2, module: "branches", tenantAdminOnly: true },
   { to: "/depreciation", label: "Depreciation", icon: TrendingDown, module: "depreciation" },
   { to: "/gate-pass", label: "Gate Pass", icon: DoorOpen, module: "gate_pass" },
@@ -80,17 +81,19 @@ function AppLayout() {
   const [mfaChecked,setMfaChecked]=useState(false);
   const [mfaRequired,setMfaRequired]=useState(false);
   useEffect(()=>{
-    if(!user){setMfaChecked(false);setMfaRequired(false);return;}
+    if(!user||loading){setMfaChecked(false);setMfaRequired(false);return;}
     let active=true;
+    setMfaChecked(false);
     import("@/integrations/supabase/client").then(async({supabase})=>{
       const {data,error}=await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
       if(!active)return;
-      if(error){console.error("[Auth] MFA status unavailable",error);setMfaRequired(false);}
-      else setMfaRequired(data.currentLevel!=="aal2"&&data.nextLevel==="aal2");
+      if(error){console.error("[Auth] MFA status unavailable",error);setMfaRequired(true);}
+      else setMfaRequired(data.currentLevel!=="aal2"&&
+        (isSaasAdmin||isTenantAdmin||data.nextLevel==="aal2"));
       setMfaChecked(true);
-    }).catch(()=>{if(active)setMfaChecked(true)});
+    }).catch(()=>{if(active){setMfaRequired(true);setMfaChecked(true);}});
     return ()=>{active=false;};
-  },[user?.id]);
+  },[user?.id,loading,isSaasAdmin,isTenantAdmin]);
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   useEffect(()=>{
@@ -308,7 +311,6 @@ function AppLayout() {
                 {[
                   {to:"/settings",label:"General",icon:Settings,module:"settings",tenantAdminOnly:true},
                   {to:"/users",label:"Users",icon:Users,module:"users",tenantAdminOnly:true},
-                  {to:"/integrations",label:"Integrations",icon:PlugZap,module:"api_access",tenantAdminOnly:true},
                   {to:"/domains",label:"Domain",icon:Globe2,tenantAdminOnly:true},
                 ].filter(item=>!item.module||canView(item.module as ModuleKey)||isPaidFeature(item.module as ModuleKey)||isAddOnFeature(item.module as ModuleKey)).map(renderNavItem)}
               </div>}

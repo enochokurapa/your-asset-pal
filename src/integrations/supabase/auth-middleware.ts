@@ -123,6 +123,34 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' })
       throw new Response("Authentication service unavailable", { status: 503 });
     }
 
+    // MFA is mandatory for SaaS and tenant administrators, including those
+    // who have not enrolled a factor. This is enforced at the server boundary,
+    // rather than relying solely on a browser redirect.
+    const accessRestBase = (process.env.SUPABASE_REST_INTERNAL_URL?.trim() ||
+      `${SUPABASE_URL.replace(/\/$/, "")}/rest/v1`).replace(/\/$/, "");
+    try {
+      const headers={Authorization:`Bearer ${token}`,apikey:SUPABASE_PUBLISHABLE_KEY};
+      const [profileResponse,rolesResponse]=await Promise.all([
+        fetch(`${accessRestBase}/profiles?select=is_saas_admin,tenant_role&id=eq.${encodeURIComponent(verifiedUserId)}&limit=1`,{headers,signal:AbortSignal.timeout(10000)}),
+        fetch(`${accessRestBase}/user_roles?select=role&user_id=eq.${encodeURIComponent(verifiedUserId)}`,{headers,signal:AbortSignal.timeout(10000)}),
+      ]);
+      if(!profileResponse.ok||!rolesResponse.ok)throw new Response("Administrator MFA policy lookup unavailable",{status:503});
+      const profiles=await profileResponse.json() as Array<{is_saas_admin?:boolean;tenant_role?:string}>;
+      const roles=await rolesResponse.json() as Array<{role?:string}>;
+      if(!profiles.length)throw new Response("User profile is unavailable",{status:403});
+      const admin=profiles[0].is_saas_admin===true||profiles[0].tenant_role==="tenant_admin"||roles.some(r=>r.role==="admin");
+      if(admin){
+        let aal="";
+        try{aal=String((JSON.parse(Buffer.from(token.split(".")[1]||"","base64url").toString("utf8")) as {aal?:string}).aal||"");}
+        catch{throw new Response("Invalid authentication assurance claim",{status:401});}
+        if(aal!=="aal2")throw new Response("Administrator MFA enrollment or verification required",{status:403});
+      }
+    }catch(error){
+      if(error instanceof Response)throw error;
+      console.error("[Auth] Could not verify administrator MFA policy");
+      throw new Response("Administrator MFA policy unavailable",{status:503});
+    }
+
     // Validate the verified JWT directly against PostgREST.
     const restBase = (process.env.SUPABASE_REST_INTERNAL_URL?.trim() ||
       `${SUPABASE_URL.replace(/\/$/, "")}/rest/v1`).replace(/\/$/, "");
