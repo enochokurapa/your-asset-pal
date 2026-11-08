@@ -397,7 +397,7 @@ function GeographyBrowser({countries,assets,onViewAssets}:{countries:any[];asset
   const [country,setCountry]=useState("");
   const [stack,setStack]=useState<any[]>([]);
   const parent=stack.length?stack[stack.length-1]:null;
-  const config=CURRENT_ADMIN_CONFIG[country] ?? {level:1,label:"Region"};
+  const config={level:1,label:CURRENT_ADMIN_CONFIG[country]?.level===1?CURRENT_ADMIN_CONFIG[country].label:"Region / state / province"};
 
   const {data:rawPlaces=[],isLoading}=useQuery({
     queryKey:["geo-browser-hierarchy",country,parent?.geoname_id,config.level],
@@ -407,12 +407,9 @@ function GeographyBrowser({countries,assets,onViewAssets}:{countries:any[];asset
         .select("geoname_id,name,display_path,feature_class,feature_code,admin_level,population,parent_geoname_id,country_code")
         .eq("country_code",country);
       if(parent) {
-        if(currentAdminSource(country)) return [];
         q=q.eq("parent_geoname_id",parent.geoname_id).order("feature_class",{ascending:true}).order("name").limit(1500);
       } else {
         q=q.eq("feature_code",`ADM${config.level}`);
-        const source=currentAdminSource(country);
-        if(source) q=q.eq("source",source);
         q=q.order("name").limit(1200);
       }
       const {data,error}=await q;
@@ -422,8 +419,13 @@ function GeographyBrowser({countries,assets,onViewAssets}:{countries:any[];asset
   });
 
   const places=useMemo(()=>{
-    if(!parent) return rawPlaces as any[];
-    return (rawPlaces as any[]).filter((p:any)=>p.feature_class==="A");
+    if(parent)return (rawPlaces as any[]).filter((p:any)=>p.feature_class==="A");
+    const unique=new Map<string,any>();
+    for(const place of (rawPlaces as any[])){
+      const key=String(place.name).toLowerCase();
+      if(!unique.has(key))unique.set(key,place);
+    }
+    return [...unique.values()];
   },[rawPlaces,parent?.geoname_id]);
 
   const countAssets=(p:any)=>assets.filter((a:any)=>{

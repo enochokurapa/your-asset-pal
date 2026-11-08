@@ -248,7 +248,7 @@ export function AssetLocationFields({
         {showGeo && (
           <div className="space-y-3 sm:col-span-2">
             {allowedCountryCodes.length===1&&<div className="rounded-lg border border-[#cfdfe9] bg-[#f4f9fc] p-3">
-              <p className="flex items-center gap-2 text-sm font-semibold"><Globe2 className="h-4 w-4 text-primary"/> Country: {(countries as any[]).find(c=>c.code===allowedCountryCodes[0])?.name||({UG:"Uganda",ZM:"Zambia",KE:"Kenya"} as Record<string,string>)[allowedCountryCodes[0]]||allowedCountryCodes[0]}</p>
+              <p className="flex items-center gap-2 text-sm font-semibold"><Globe2 className="h-4 w-4 text-primary"/> Country: {(countries as any[]).find(c=>c.code===allowedCountryCodes[0])?.name||allowedCountryCodes[0]}</p>
               <p className="mt-1 text-xs text-muted-foreground">Configured by your organisation. To change it: Settings → Asset location setup → Save changes.</p>
             </div>}
             {allowedCountryCodes.length !== 1 && (

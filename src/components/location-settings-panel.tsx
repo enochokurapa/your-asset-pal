@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ export function LocationSettingsPanel() {
   const qc=useQueryClient();
   const [form, setForm] = useState<Settings>(DEFAULTS);
   const [saving, setSaving] = useState(false);
+  const [countrySearch,setCountrySearch]=useState("");
 
   const { data: countries = [] } = useQuery({
     queryKey: ["geo-countries"],
@@ -177,21 +179,21 @@ export function LocationSettingsPanel() {
               <>
                 <div className="space-y-2 md:col-span-2">
                   <Label>Organisation country (choose one)</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {(countries as any[]).map((c) => {
-                      const active = form.allowed_country_codes.includes(c.code);
-                      return (
-                        <button
-                          key={c.code}
-                          type="button"
-                          onClick={() => toggleCountry(c.code)}
-                          className={`rounded-lg border px-3 py-2 text-sm transition-colors ${active ? "border-primary bg-primary/10 text-primary" : "bg-background text-muted-foreground"}`}
-                        >
+                  <Input className="h-11" placeholder="Search any country worldwide…" aria-label="Search available countries"
+                    value={countrySearch} onChange={e=>setCountrySearch(e.target.value)}/>
+                  <div className="max-h-52 overflow-y-auto rounded-lg border bg-background p-2">
+                    <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 lg:grid-cols-3">
+                      {(countries as any[]).filter(c=>!countrySearch.trim() || `${c.name} ${c.code}`.toLowerCase().includes(countrySearch.toLowerCase())).map((c) => {
+                        const active=form.allowed_country_codes.includes(c.code);
+                        return <button key={c.code} type="button" onClick={()=>toggleCountry(c.code)}
+                          aria-pressed={active}
+                          className={`min-h-10 rounded-md border px-3 py-2 text-left text-sm transition-colors ${active?"border-primary bg-primary/10 font-semibold text-primary":"border-transparent hover:bg-muted"}`}>
                           {c.name}
-                        </button>
-                      );
-                    })}
+                        </button>;
+                      })}
+                    </div>
                   </div>
+                  <p className="text-xs text-muted-foreground">{(countries as any[]).length} available countries · Your organisation selects one active country at a time.</p>
                   <p className="text-xs text-muted-foreground">Tap the country to make it active, then press Save country settings below. The previous country is replaced for new entries, but existing asset locations remain unchanged.</p>
                 </div>
 

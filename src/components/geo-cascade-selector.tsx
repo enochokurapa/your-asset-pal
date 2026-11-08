@@ -57,21 +57,29 @@ function GenericGeoCascadeSelector({
   onChange:(place:GeoPlace|null)=>void;
   required?:boolean;
 }) {
-  const config = countryCode==="UG"?{level:1,label:"Region"}:CURRENT_ADMIN_CONFIG[countryCode] ?? {level:1,label:"Region"};
+  const config = {level:1,label:CURRENT_ADMIN_CONFIG[countryCode]?.level===1?CURRENT_ADMIN_CONFIG[countryCode].label:"Region / state / province"};
   const [path,setPath]=useState<GeoPlace[]>([]);
+
 
   const {data:adminAreas=[]}=useQuery({
     queryKey:["geo-admin-options",countryCode,config.level],
     queryFn:async()=>{
       let q=(supabase as any).from("geo_places")
-        .select("geoname_id,name,display_path,feature_class,feature_code,admin_level,admin1_code,admin2_code,admin3_code,admin4_code,latitude,longitude,population,parent_geoname_id")
+        .select("geoname_id,name,display_path,feature_class,feature_code,admin_level,admin1_code,admin2_code,admin3_code,admin4_code,latitude,longitude,population,parent_geoname_id,source")
         .eq("country_code",countryCode)
         .eq("feature_code",`ADM${config.level}`);
-      const source=currentAdminSource(countryCode);
-      if(source&&!(countryCode==="UG"&&config.level===1)) q=q.eq("source",source);
       const {data,error}=await q.order("name").limit(1000);
       if(error) throw error;
-      return (data??[]) as GeoPlace[];
+      // Existing countries may have official and GeoNames rows for the same
+      // division. Prefer GeoNames parent IDs for a navigable hierarchy.
+      const candidates=(data??[]) as (GeoPlace & {source?:string})[];
+      const unique=new Map<string,GeoPlace>();
+      for(const area of candidates){
+        const k=area.name.toLocaleLowerCase();
+        const previous=unique.get(k) as (GeoPlace&{source?:string})|undefined;
+        if(!previous || ((area.source==="geonames" || area.source==="geonames-global") && previous.source!=="geonames" && previous.source!=="geonames-global"))unique.set(k,area);
+      }
+      return [...unique.values()];
     }
   });
 
@@ -111,38 +119,26 @@ function GenericGeoCascadeSelector({
 
   const {data:level1Children=[]}=useQuery({
     queryKey:["geo-child-options",level1Parent?.geoname_id],
-    enabled:!!level1Parent && !currentAdminSource(countryCode),
+    enabled:!!level1Parent,
     queryFn:()=>fetchChildren(level1Parent!.geoname_id),
   });
   const {data:level2Children=[]}=useQuery({
     queryKey:["geo-child-options",level2Parent?.geoname_id],
-    enabled:!!level2Parent && !currentAdminSource(countryCode),
+    enabled:!!level2Parent,
     queryFn:()=>fetchChildren(level2Parent!.geoname_id),
   });
   const {data:level3Children=[]}=useQuery({
     queryKey:["geo-child-options",level3Parent?.geoname_id],
-    enabled:!!level3Parent && !currentAdminSource(countryCode),
+    enabled:!!level3Parent,
     queryFn:()=>fetchChildren(level3Parent!.geoname_id),
   });
   const {data:level4Children=[]}=useQuery({
     queryKey:["geo-child-options",level4Parent?.geoname_id],
-    enabled:!!level4Parent && !currentAdminSource(countryCode),
+    enabled:!!level4Parent,
     queryFn:()=>fetchChildren(level4Parent!.geoname_id),
   });
 
-  const {data:ugandaDistricts=[]}=useQuery({
-    queryKey:["geo-uganda-districts",primary?.geoname_id],
-    enabled:countryCode==="UG"&&!!primary?.geoname_id,
-    queryFn:async()=>{
-      const {data,error}=await (supabase as any).from("geo_places")
-        .select("geoname_id,name,display_path,feature_class,feature_code,admin_level,admin1_code,admin2_code,admin3_code,admin4_code,latitude,longitude,population,parent_geoname_id")
-        .eq("country_code","UG").eq("feature_code","ADM2")
-        .eq("source","UBOS NPHC 2024").ilike("display_path",`%${primary!.name}%`).order("name").limit(500);
-      if(error)throw error;
-      return data as GeoPlace[];
-    }
-  });
-  const childSets = [countryCode==="UG"?ugandaDistricts:level1Children,level2Children,level3Children,level4Children] as GeoPlace[][];
+  const childSets = [level1Children,level2Children,level3Children,level4Children] as GeoPlace[][];
 
   useEffect(()=>{
     // If GeoNames contains one administrative bridge only (common for cities/counties),
@@ -213,6 +209,7 @@ function GenericGeoCascadeSelector({
         Stop at any administrative level that is sufficient. Use a custom organisation place for the exact site, building, office, room or locally known place.
       </p>
     )}
+    <p className="text-[11px] text-muted-foreground">Geographic reference: <a className="underline hover:text-primary" href="https://www.geonames.org/" target="_blank" rel="noopener noreferrer">GeoNames</a>. Coverage varies by country.</p>
   </div>;
 }
 
@@ -270,36 +267,42 @@ function UgandaGeoCascadeSelector({value,onChange,required=false}:{value:number|
   if(existingPlace&&Number(existingPlace.geoname_id)===Number(value))setRegionId(inferRegion(existingPlace));
  },[value,existingPlace?.geoname_id,regions]);
  const region=regions.find(item=>String(item.geoname_id)===regionId);
- const available=useMemo(()=>region?districts.filter(d=>(d.display_path||"").split(" · ").some(part=>part.trim().toLowerCase()===region.name.toLowerCase())):[],[region?.geoname_id,districts]);
- const matches=useMemo(()=>available.filter(d=>`${d.name} ${d.display_path??""}`.toLowerCase().includes(search.trim().toLowerCase())).slice(0,150),[available,search]);
- const selectedDistrict=available.find(d=>Number(d.geoname_id)===Number(value));
+ const available=useMemo(()=>region?districts.filter(d=>(d.display_path||"").split(" · ").some(part=>part.trim().toLowerCase()===region.name.toLowerCase())):districts,[region?.geoname_id,districts]);
+ // A typed search must search every district in the country, even when a
+ // previous region was selected. Choosing a hit updates the region too.
+ const matches=useMemo(()=>districts.filter(d=>{
+  const query=search.trim().toLowerCase();
+  return query?`${d.name} ${d.display_path??""}`.toLowerCase().includes(query):available.includes(d);
+ }).sort((a,b)=>a.name.localeCompare(b.name)),[available,districts,search]);
+ const selectedDistrict=districts.find(d=>Number(d.geoname_id)===Number(value));
  return <div className="space-y-3 rounded-xl border bg-white p-3 sm:p-4">
   <p className="flex items-center gap-2 text-sm font-semibold"><MapPin className="h-4 w-4 text-primary"/> Uganda · Geographic location</p>
-  <div className="space-y-1.5"><Label>1. Region {required?"*":""}</Label>
+  <div className="space-y-1.5"><Label>1. Region (optional filter)</Label>
    <Select value={regionId||"none"} onValueChange={id=>{setRegionId(id==="none"?"":id);setSearch("");onChange(null);}}>
     <SelectTrigger className="h-11 w-full"><SelectValue placeholder="Choose region"/></SelectTrigger>
-    <SelectContent><SelectItem value="none">Choose region</SelectItem>{regions.map(r=><SelectItem key={r.geoname_id} value={String(r.geoname_id)}>{r.name}</SelectItem>)}</SelectContent>
+    <SelectContent><SelectItem value="none">All regions (entire country)</SelectItem>{regions.map(r=><SelectItem key={r.geoname_id} value={String(r.geoname_id)}>{r.name}</SelectItem>)}</SelectContent>
    </Select>
   </div>
   {loadingRegions&&<p className="text-xs text-muted-foreground">Loading regions…</p>}
   {regionsError&&<button type="button" className="text-sm text-destructive underline" onClick={()=>void retryRegions()}>Could not load regions · Retry</button>}
-  {region&&<div className="space-y-2">
-   <Label>2. District {required?"*":""}</Label>
+  <div className="space-y-2">
+   <Label>2. District {required?"*":""} · {districts.length} available nationwide</Label>
    <div className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground"/>
-    <Input className="h-11 w-full pl-9" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search districts, e.g. Kampala" aria-label="Search districts"/>
+    <Input className="h-11 w-full pl-9" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search all districts in Uganda" aria-label="Search districts nationwide"/>
    </div>
-   <Select value={selectedDistrict?String(selectedDistrict.geoname_id):"none"} onValueChange={id=>onChange(available.find(d=>String(d.geoname_id)===id)??null)}>
+   <Select value={selectedDistrict?String(selectedDistrict.geoname_id):"none"} onValueChange={id=>{const place=districts.find(d=>String(d.geoname_id)===id)??null;onChange(place);if(place)setRegionId(inferRegion(place));setSearch("");}}>
     <SelectTrigger className="h-11 w-full"><SelectValue placeholder="Choose district"/></SelectTrigger>
     <SelectContent className="max-h-64"><SelectItem value="none">Choose district</SelectItem>
      {matches.map(d=><SelectItem key={d.geoname_id} value={String(d.geoname_id)}>{d.name}{d.name.toLowerCase().endsWith("district")?"":" District"}</SelectItem>)}
     </SelectContent>
    </Select>
-   {!loadingDistricts&&!districtsError&&<p className="text-xs text-muted-foreground">{matches.length} matching districts in {region.name}{search?" · Clear search to see all":""}</p>}
+   {!loadingDistricts&&!districtsError&&<p className="text-xs text-muted-foreground">{matches.length} matching districts {search?"across Uganda":region?`in ${region.name}`:"across Uganda"}</p>}
    {loadingDistricts&&<p className="text-xs text-muted-foreground">Loading districts…</p>}
    {districtsError&&<button type="button" className="text-sm text-destructive underline" onClick={()=>void retryDistricts()}>Could not load districts · Retry</button>}
-   {!loadingDistricts&&!districtsError&&!available.length&&<p className="text-xs text-destructive">No districts found in this region. Please retry.</p>}
-   {selectedDistrict&&<p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-900">Selected: Uganda / {region.name} / {selectedDistrict.name}</p>}
-  </div>}
+   {!loadingDistricts&&!districtsError&&!districts.length&&<p className="text-xs text-destructive">District data is unavailable. Please retry.</p>}
+   {selectedDistrict&&<p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-900">Selected: Uganda / {selectedDistrict.display_path||selectedDistrict.name}</p>}
+   <p className="text-[11px] text-muted-foreground">Districts: UBOS NPHC 2024 · Geographic reference: <a className="underline" href="https://www.geonames.org/" target="_blank" rel="noopener noreferrer">GeoNames</a></p>
+  </div>
  </div>;
 }
 

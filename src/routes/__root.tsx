@@ -68,7 +68,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "color-scheme", content: "light" },
       { title: "AssetFlow 360 | Fixed Asset Management Software" },
       { name: "description", content: "AssetFlow 360 manages fixed asset registers, locations, GPS verification, assignments, depreciation, gate passes, audit trails, reports and secure integrations." },
-      { name: "keywords", content: "fixed asset management software, asset register, asset tracking system, asset verification, depreciation, asset lifecycle management, Uganda, Kenya, Nigeria" },
+      { name: "keywords", content: "fixed asset management software, asset register, asset tracking system, asset verification, depreciation, asset lifecycle management, global asset tracking, international fixed asset registers, multi-location asset management, Uganda, Kenya, Nigeria" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -108,7 +108,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
              "applicationCategory":"BusinessApplication","operatingSystem":"Web",
              "description":"Fixed asset management and asset tracking software for organisations. Register, verify, track, depreciate and report on assets across multiple locations.",
              "featureList":["Fixed asset register","Asset tagging","Verification and inspection","Location and custody tracking","Depreciation reports","Asset lifecycle reporting"],
-             "inLanguage":"en",
+             "inLanguage":"en","areaServed":"Worldwide",
              "publisher":{"@id":"https://assetflow360.com/#organization"}}
           ]
         })}}/>
