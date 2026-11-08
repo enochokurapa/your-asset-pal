@@ -13,6 +13,7 @@ import { SaasAdminOverview } from "@/components/saas-admin-overview";
 import { formatUGX } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {verificationGroup} from "@/lib/asset-verification-kpi";
 
 export const Route = createFileRoute("/_app/dashboard")({
   component: Dashboard,
@@ -91,27 +92,12 @@ function TenantDashboard() {
       const vList = (verifs.data ?? []).filter((v: any) =>
         canSeeBranch(v.branch_id) && (selectedBranch === "all" || v.branch_id === selectedBranch)
       );
-      const verifiedIds = new Set<string>();
-      const registeredIds = new Set<string>();
-      const mismatchedIds = new Set<string>();
-      for (const v of vList) {
-        if (!v.asset_id) continue;
-        // A previously verified asset is current only until the configured
-        // renewal deadline. Historical owner-attested records remain traceable.
-        if ((v.verification_state === "current" || v.verification_state === "due_soon") &&
-            v.verification_basis === "registration_baseline") {
-          registeredIds.add(v.asset_id);
-        } else if (v.latest_verification_status === "verified" &&
-            (v.verification_state === "current" || v.verification_state === "due_soon")) {
-          verifiedIds.add(v.asset_id);
-        } else if (v.latest_verification_status === "mismatched" || v.latest_verification_status === "not_found") {
-          mismatchedIds.add(v.asset_id);
-        }
-      }
-      const verifiedCount = Array.from(verifiedIds).filter((id) => visibleAssetIds.has(id)).length;
-      const registeredCount = Array.from(registeredIds).filter(id=>visibleAssetIds.has(id)).length;
-      const mismatchedCount = Array.from(mismatchedIds).filter((id) => visibleAssetIds.has(id)).length;
-      const unverifiedCount = Math.max(0, list.length - verifiedCount - registeredCount - mismatchedCount);
+      const scheduleById=new Map(vList.map((v:any)=>[v.asset_id,v]));
+      const verifiedCount=list.filter((a:any)=>verificationGroup(scheduleById.get(a.id))==="inspected").length;
+      const registeredCount=list.filter((a:any)=>verificationGroup(scheduleById.get(a.id))==="registered").length;
+      const attentionCount=list.filter((a:any)=>verificationGroup(scheduleById.get(a.id))==="attention").length;
+      const mismatchedCount=list.filter((a:any)=>["mismatched","not_found"].includes(scheduleById.get(a.id)?.latest_verification_status)).length;
+      const unverifiedCount=attentionCount-mismatchedCount;
 
       const locationGroups = new Map<string, any>();
       for (const a of list as any[]) {
@@ -179,8 +165,8 @@ function TenantDashboard() {
     { label: "Total Assets", value: data?.total ?? 0, icon: Package, color: "#1E3A8A", filter: { kind: "all" }, subtotal: data?.totalValue },
     { label: "Active Assets", value: data?.active ?? 0, icon: CheckCircle2, color: "#047857", filter: { kind: "active" }, subtotal: data?.activeValue },
     { label: "Branches", value: data?.branchCount ?? 0, icon: Building2, color: "#7C3AED", filter: { kind: "all" } },
-    { label: "Located Assets", value: data?.locatedAssets ?? 0, icon: MapPin, color: "#0F766E", filter: { kind: "all" }, navigateTo: "/assets", navigateSearch: { located: "1" } },
-    { label: "No Location", value: data?.unlocatedAssets ?? 0, icon: AlertTriangle, color: "#B45309", filter: { kind: "all" }, navigateTo: "/assets", navigateSearch: { unlocated: "1" } },
+    { label: "Located Assets", value: data?.locatedAssets ?? 0, icon: MapPin, color: "#0F766E", filter: { kind: "located" } },
+    { label: "No Location", value: data?.unlocatedAssets ?? 0, icon: AlertTriangle, color: "#B45309", filter: { kind: "unlocated" } },
     { label: "In Storage", value: (Array.isArray(data?.statusCounts) ? data.statusCounts : []).find((s) => s.key === "in_storage")?.value ?? 0, icon: Boxes, color: "#475569", filter: { kind: "status", status: "in_storage" }, subtotal: data?.inStorageValue },
     { label: "In Use", value: data?.inUse ?? 0, icon: CheckCircle2, color: "#0E7490", filter: { kind: "status", status: "in_use" }, subtotal: data?.inUseValue },
     { label: "Under Repair", value: data?.repair ?? 0, icon: Wrench, color: "#B45309", filter: { kind: "status", status: "under_repair" } },
@@ -190,11 +176,11 @@ function TenantDashboard() {
     { label: "For Disposal", value: data?.forDisposal ?? 0, icon: Trash2, color: "#C2410C", filter: { kind: "for_disposal" } },
     { label: "For Retirement", value: data?.forRetirement ?? 0, icon: Archive, color: "#A16207", filter: { kind: "pending_retirement" } },
     { label: "For Repair", value: data?.forRepair ?? 0, icon: Wrench, color: "#BE185D", filter: { kind: "pending_repair" }, subtotal: data?.repairAmount },
-    { label: "Out of Premises", value: data?.gpOutside ?? 0, icon: PackageCheck, color: "#0369A1", filter: { kind: "all" }, navigateTo: "/gate-pass" },
-    { label: "Gate Pass Pending", value: data?.gpPending ?? 0, icon: DoorOpen, color: "#9333EA", filter: { kind: "all" }, navigateTo: "/gate-pass" },
-    { label: "Registered — Current", value: data?.registeredCount ?? 0, icon: ClipboardCheck, color: "#0E7490", filter: { kind: "all" }, navigateTo: "/verification" },
-    { label: "Inspection Verified", value: data?.verifiedCount ?? 0, icon: ClipboardCheck, color: "#15803D", filter: { kind: "all" }, navigateTo: "/verification" },
-    { label: "Due / Needs Attention", value: (data?.mismatchedCount ?? 0) + (data?.unverifiedCount ?? 0), icon: ClipboardX, color: "#DC2626", filter: { kind: "all" }, navigateTo: "/verification" },
+    { label: "Out of Premises", value: data?.gpOutside ?? 0, icon: PackageCheck, color: "#0369A1", filter: { kind: "gate_outside" } },
+    { label: "Gate Pass Pending", value: data?.gpPending ?? 0, icon: DoorOpen, color: "#9333EA", filter: { kind: "gate_pending" } },
+    { label: "Registered — Current", value: data?.registeredCount ?? 0, icon: ClipboardCheck, color: "#0E7490", filter: { kind: "verification", group: "registered" } },
+    { label: "Inspection Verified", value: data?.verifiedCount ?? 0, icon: ClipboardCheck, color: "#15803D", filter: { kind: "verification", group: "inspected" } },
+    { label: "Due / Needs Attention", value: (data?.mismatchedCount ?? 0) + (data?.unverifiedCount ?? 0), icon: ClipboardX, color: "#DC2626", filter: { kind: "verification", group: "attention" } },
   ];
 
   const [tile, setTile] = useState<{ title: string; filter: TileFilter } | null>(null);
@@ -234,7 +220,7 @@ function TenantDashboard() {
         {stats.map((s) => (
           <Card
             key={s.label}
-            onClick={() => s.navigateTo ? nav({ to: s.navigateTo, search: (s.navigateSearch ?? {}) as any }) : setTile({ title: s.label, filter: s.filter })}
+            onClick={() => setTile({ title: s.label, filter: s.filter })}
             className="group min-w-0 cursor-pointer overflow-hidden p-3 sm:p-5 transition hover:-translate-y-0.5 hover:shadow-lg"
             style={{
               borderTop: `3px solid ${s.color}`,

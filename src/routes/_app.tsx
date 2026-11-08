@@ -51,7 +51,7 @@ const tenantNav: NavItem[] = [
 const REPORT_MENU=[
  ["register","Asset register"],["locations","Locations"],["movements","Asset movements"],
  ["assigned","Assignments"],["disposals","Retirement and disposal"],["maintenance","Maintenance"],
- ["approvals","Approval requests"],["verification","Verification"],["depreciation","Depreciation"],
+ ["approvals","Approval requests"],["verification","Verification history"],["verification-status","Verification status by asset"],["depreciation","Depreciation"],
  ["gate-pass","Gate passes"],["branch","Branch summary"],["department","Department summary"],
  ["condition","Asset condition"],
 ] as const;

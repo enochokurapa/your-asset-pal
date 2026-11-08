@@ -3,6 +3,7 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { formatUGX } from "@/lib/utils";
 import { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } from "@/lib/pdf-template";
+import {verificationGroupLabel,type VerificationGroup} from "@/lib/asset-verification-kpi";
 
 const ASSET_COLUMNS: { key: string; header: string; currency?: boolean }[] = [
   { key: "asset_tag", header: "Tag" },
@@ -24,6 +25,7 @@ function normalize(a: any) {
     name: a.name ?? "",
     serial_number: a.serial_number ?? "",
     status: (a.status ?? "").replace(/_/g, " "),
+    verification: a.verification_group ? verificationGroupLabel[a.verification_group as VerificationGroup] : (a.verification_status??""),
     category: a.categories?.name ?? a.category ?? "",
     location: a.locations?.name ?? a.location ?? "",
     branch: a.branches?.name ?? a.branch ?? "",
@@ -44,7 +46,8 @@ const safe = (s: string) => s.replace(/[^a-z0-9_-]+/gi, "_");
 
 export function exportAssetsXLSX(title:string,assets:any[],customFields:Array<{key:string,label:string}>=[],locationConfig?:RegisterLocationConfig){
  const custom=customFields.length>0;
- const originalHeaders=custom?getCustomRegisterHeaders({id:"export",name:title,configuration:{fields:customFields.map(f=>({...f,type:"text",required:false}))}},locationConfig):ASSET_COLUMNS.map(c=>c.header);
+ const visibleColumns=assets.some(a=>a.verification_group||a.verification_status)?[...ASSET_COLUMNS,{key:"verification",header:"Verification"}]:ASSET_COLUMNS;
+ const originalHeaders=custom?getCustomRegisterHeaders({id:"export",name:title,configuration:{fields:customFields.map(f=>({...f,type:"text",required:false}))}},locationConfig):visibleColumns.map(c=>c.header);
  const headers=["Asset ID",...originalHeaders.filter(h=>h!=="Asset ID")];
  const row=(asset:any)=>{
   const base=normalize(asset);
@@ -64,7 +67,7 @@ export function exportAssetsXLSX(title:string,assets:any[],customFields:Array<{k
    "Geo Place ID":asset.geo_place_id,"Latitude":asset.location_latitude,"Longitude":asset.location_longitude
   };
   const customValues=Object.fromEntries(customFields.map(f=>[f.label,asset.custom_fields?.[f.key]??""]));
-  return headers.map(name=>name==="Asset ID"?asset.id:custom?customValues[name]??lookup[name]??"":fmt((base as any)[ASSET_COLUMNS.find(c=>c.header===name)?.key??""]));
+  return headers.map(name=>name==="Asset ID"?asset.id:custom?customValues[name]??lookup[name]??"":fmt((base as any)[visibleColumns.find(c=>c.header===name)?.key??""]));
  };
  const wb=XLSX.utils.book_new();
  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([headers,...assets.map(row)]),"Assets");
@@ -80,10 +83,11 @@ export async function exportAssetsPDF(title: string, assets: any[]) {
     subtitle: `${assets.length} asset(s)`,
   });
   const rows = assets.map(normalize);
+  const visibleColumns=assets.some(a=>a.verification_group||a.verification_status)?[...ASSET_COLUMNS,{key:"verification",header:"Verification"}]:ASSET_COLUMNS;
   autoTable(doc, {
     startY,
-    head: [ASSET_COLUMNS.map((c) => c.header)],
-    body: rows.map((r) => ASSET_COLUMNS.map((c) => fmt((r as any)[c.key], c.currency))),
+    head: [visibleColumns.map((c) => c.header)],
+    body: rows.map((r) => visibleColumns.map((c) => fmt((r as any)[c.key], c.currency))),
     styles: { fontSize: 7, font: template.font_family },
     headStyles: { fillColor: tableHeadFill(template) },
     margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },

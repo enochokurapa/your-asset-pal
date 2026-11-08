@@ -14,6 +14,7 @@ import {
   exportAssetDetailPDF, exportAssetDetailXLSX,
 } from "@/lib/asset-export";
 import { AssetDetailTabs } from "@/components/asset-detail-tabs";
+import {verificationGroup,verificationGroupLabel,type VerificationGroup} from "@/lib/asset-verification-kpi";
 
 export type TileFilter =
   | { kind: "all" }
@@ -21,7 +22,9 @@ export type TileFilter =
   | { kind: "status"; status: string }
   | { kind: "for_disposal" }
   | { kind: "pending_retirement" }
-  | { kind: "pending_repair" };
+  | { kind: "pending_repair" }
+  | { kind: "located"|"unlocated"|"gate_pending"|"gate_outside" }
+  | { kind: "verification";group:VerificationGroup };
 
 export function TileAssetsDialog({
   open, onOpenChange, title, filter, branchId,
@@ -37,13 +40,13 @@ export function TileAssetsDialog({
   const [selected, setSelected] = useState<any>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-  useEffect(() => { setPage(1); setSelected(null); }, [open, title, branchId, filter.kind, filter.kind === "status" ? filter.status : ""]);
+  useEffect(() => { setPage(1); setSelected(null); }, [open, title, branchId, JSON.stringify(filter)]);
 
 
 
-  const { data: assets = [], isLoading } = useQuery({
+  const { data: assets = [], isLoading, isError, error, refetch } = useQuery({
     enabled: open,
-    queryKey: ["tile-assets"],
+    queryKey: ["tile-assets-verification-v2"],
     queryFn: async () => {
       // PostgREST limits a single response to 1,000 rows on many deployments.
       // Fetch in pages so large KPI cards show the full set, not just the first 1,000.
@@ -59,15 +62,20 @@ export function TileAssetsDialog({
         }
         throw new Error("Too many assets to load into this report. Narrow the view.");
       }
-      const [a, assigns, pendings] = await Promise.all([
+      const [a, assigns, pendings, schedules, gatePasses] = await Promise.all([
         fetchAll("assets","*, categories(name), locations(name), branches(name,code)","created_at"),
         fetchAll("asset_assignments","asset_id, assigned_to_name, department, assignment_date","assignment_date"),
         fetchAll("approval_requests","asset_id, kind, status","created_at",true),
+        (async()=>{const all:any[]=[];for(let offset=0;offset<100000;offset+=500){const {data,error}=await (supabase as any).from("asset_verification_schedule").select("asset_id,verification_state,verification_basis,latest_verification_status").range(offset,offset+499);if(error)throw error;all.push(...(data??[]));if((data?.length??0)<500)return all;}throw Error("Verification results exceed report limit")})(),
+        (async()=>{const all:any[]=[];for(let offset=0;offset<100000;offset+=500){const {data,error}=await (supabase as any).from("gate_passes").select("asset_id,status,branch_id").in("status",["pending","approved","checked_out"]).range(offset,offset+499);if(error)throw error;all.push(...(data??[]));if((data?.length??0)<500)return all;}throw Error("Gate-pass results exceed report limit")})(),
       ]);
       const cur: Record<string, any> = {};
       (assigns ?? []).forEach((x: any) => { if (!cur[x.asset_id]) cur[x.asset_id] = x; });
       const pendingRet = new Set((pendings ?? []).filter((p: any) => p.kind === "retirement").map((p: any) => p.asset_id));
       const pendingRep = new Set((pendings ?? []).filter((p: any) => p.kind === "maintenance").map((p: any) => p.asset_id));
+      const bySchedule=new Map(schedules.map((v:any)=>[v.asset_id,v]));
+      const pendingGate=new Set(gatePasses.filter((g:any)=>g.status==="pending").map((g:any)=>g.asset_id));
+      const outsideGate=new Set(gatePasses.filter((g:any)=>g.status==="approved"||g.status==="checked_out").map((g:any)=>g.asset_id));
       return (a ?? []).map((row: any) => ({
         ...row,
         custodian: cur[row.id]?.assigned_to_name ?? "",
@@ -76,6 +84,9 @@ export function TileAssetsDialog({
         _pending_retirement: pendingRet.has(row.id),
         _pending_repair: pendingRep.has(row.id),
         _parked: row.set_for_disposal || pendingRet.has(row.id) || pendingRep.has(row.id),
+        verification_group:verificationGroup(bySchedule.get(row.id)),
+        _gate_pending:pendingGate.has(row.id),
+        _gate_outside:outsideGate.has(row.id),
       }));
     },
   });
@@ -90,6 +101,11 @@ export function TileAssetsDialog({
     else if (filter.kind === "for_disposal") list = list.filter((a) => a.set_for_disposal);
     else if (filter.kind === "pending_retirement") list = list.filter((a) => a._pending_retirement);
     else if (filter.kind === "pending_repair") list = list.filter((a) => a._pending_repair);
+    else if(filter.kind==="located")list=list.filter(a=>a.location_id||a.geo_place_id);
+    else if(filter.kind==="unlocated")list=list.filter(a=>!a.location_id&&!a.geo_place_id);
+    else if(filter.kind==="verification")list=list.filter(a=>a.verification_group===filter.group);
+    else if(filter.kind==="gate_pending")list=list.filter(a=>a._gate_pending);
+    else if(filter.kind==="gate_outside")list=list.filter(a=>a._gate_outside);
     if (q) {
       const n = q.toLowerCase();
       list = list.filter((a) =>
@@ -128,15 +144,16 @@ export function TileAssetsDialog({
               </DialogDescription>
             </DialogHeader>
 
+            {isError&&<div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">Could not load the asset list. {error instanceof Error?error.message:"Please retry."}<Button size="sm" variant="outline" className="ml-3" onClick={()=>void refetch()}>Retry</Button></div>}
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input className="pl-8" placeholder="Search…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
               </div>
-              <Button size="sm" variant="outline" disabled={!filtered.length} onClick={() => runPermittedExport("register",()=>exportAssetsXLSX(title, filtered))}>
+              <Button size="sm" variant="outline" disabled={!filtered.length||isLoading||isError} onClick={() => runPermittedExport("register",()=>exportAssetsXLSX(title, filtered))}>
                 <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
               </Button>
-              <Button size="sm" variant="outline" disabled={!filtered.length} onClick={() => runPermittedExport("register",()=>exportAssetsPDF(title, filtered))}>
+              <Button size="sm" variant="outline" disabled={!filtered.length||isLoading||isError} onClick={() => runPermittedExport("register",()=>exportAssetsPDF(title, filtered))}>
                 <FileText className="mr-2 h-4 w-4" /> PDF
               </Button>
             </div>
@@ -148,6 +165,7 @@ export function TileAssetsDialog({
                     <th className="px-3 py-2">Tag</th>
                     <th className="px-3 py-2">Name</th>
                     <th className="px-3 py-2">Condition</th>
+                    <th className="px-3 py-2">Verification</th>
                     <th className="px-3 py-2">Department</th>
                     <th className="px-3 py-2">Branch</th>
                     <th className="px-3 py-2">Custodian</th>
@@ -161,6 +179,7 @@ export function TileAssetsDialog({
                       <td className="px-3 py-2 font-mono text-xs">{a.asset_tag}</td>
                       <td className="px-3 py-2">{a.name}</td>
                       <td className="px-3 py-2"><Badge variant="secondary">{a.condition}</Badge></td>
+                      <td className="px-3 py-2 whitespace-nowrap text-xs">{verificationGroupLabel[a.verification_group as VerificationGroup]}</td>
                       <td className="px-3 py-2">{a.department || "-"}</td>
                       <td className="px-3 py-2">{a.branches?.name ?? ""}</td>
                       <td className="px-3 py-2">{a.custodian || "-"}</td>
@@ -168,7 +187,7 @@ export function TileAssetsDialog({
                     </tr>
                   ))}
                   {!filtered.length && !isLoading && (
-                    <tr><td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">No assets.</td></tr>
+                    <tr><td colSpan={8} className="px-3 py-10 text-center text-muted-foreground">No assets.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -218,6 +237,7 @@ export function TileAssetsDialog({
 
             <div className="grid gap-3 sm:grid-cols-2 text-sm">
               <Row k="Status" v={(selected.status ?? "").replace(/_/g, " ")} />
+              <Row k="Verification" v={verificationGroupLabel[selected.verification_group as VerificationGroup]} />
               <Row k="Serial" v={selected.serial_number} />
               <Row k="Category" v={selected.categories?.name} />
               <Row k="Location" v={selected.locations?.name} />

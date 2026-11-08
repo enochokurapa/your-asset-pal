@@ -21,6 +21,7 @@ import { formatUGX } from "@/lib/utils";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } from "@/lib/pdf-template";
 import { fmtDateEAT, fmtDateTimeEAT } from "@/lib/time";
+import {verificationGroup,verificationGroupLabel,type VerificationGroup} from "@/lib/asset-verification-kpi";
 
 
 export const Route = createFileRoute("/_app/reports")({
@@ -226,7 +227,7 @@ function ReportsPage() {
    ["register","Asset register"],["locations","Locations"],["movements","Asset movements"],
    ["assigned","Assignments"],["disposals","Retirement and disposal"],
    ["maintenance","Maintenance"],["approvals","Approval requests"],
-   ["verification","Verification"],["depreciation","Depreciation"],
+   ["verification","Verification history"],["verification-status","Verification status by asset"],["depreciation","Depreciation"],
    ["gate-pass","Gate passes"],["branch","Branch summary"],
    ["department","Department summary"],["condition","Asset condition"]
   ];
@@ -294,6 +295,21 @@ function ReportsPage() {
     queryFn: async () => (await supabase.from("profiles").select("id,email,full_name")).data ?? [],
   });
   const profileMap = useMemo(() => Object.fromEntries(profiles.map((p: any) => [p.id, p])), [profiles]);
+  const {data:verificationSchedule=[]}=useQuery({
+    queryKey:["report-asset-verification-schedule"],
+    queryFn:async()=>{
+      const rows:any[]=[];
+      for(let page=0;page<200;page++){
+        const {data,error}=await (supabase as any).from("asset_verification_schedule")
+         .select("asset_id,verification_state,verification_basis,latest_verification_status,verification_due_at,last_verified_at")
+         .range(page*500,page*500+499);
+        if(error)throw error;
+        rows.push(...(data||[]));
+        if((data?.length??0)<500)return rows;
+      }
+      throw Error("Too many verification records for report. Narrow your scope.");
+    },
+  });
   const { data: verifications = [] } = useQuery({
     queryKey: ["report-verifications"],
     queryFn: async () => (await (supabase as any).from("asset_verifications")
@@ -846,6 +862,35 @@ function ReportsPage() {
   };
 
   /* ----------- Verification ----------- */
+  const [fVerificationStatus,setFVerificationStatus]=useState<Record<string,string>>({});
+  const scheduleByAsset=new Map((verificationSchedule as any[]).map((v:any)=>[v.asset_id,v]));
+  const verificationStatusDefs:FilterDef[]=[
+   {key:"q",label:"Search asset or tag",type:"text"},
+   {key:"branch_id",label:"Branch",type:"select",options:branchOpts},
+   {key:"group",label:"Verification status",type:"select",options:[
+    {value:"registered",label:"Registered — Current"},
+    {value:"inspected",label:"Inspection Verified"},
+    {value:"attention",label:"Due / Needs Attention"},
+   ]},
+  ];
+  const verificationStatusReport:Report={
+   title:"Asset Verification Status Report",
+   columns:[
+    {header:"Asset Tag",key:"asset_tag"},{header:"Asset",key:"name"},
+    {header:"Serial #",key:"serial_number"},{header:"Branch",key:"branch"},
+    {header:"Location",key:"location"},{header:"Status",key:"verification_status"},
+    {header:"Inspection Result",key:"inspection_result"},{header:"Last Inspected",key:"last_inspected",isDateTime:true},
+    {header:"Next Due",key:"due_at",isDateTime:true},{header:"Purchase Value",key:"purchase_value",isCurrency:true},
+   ],
+   rows:enrichedAssets.map((a:any)=>{
+    const v=scheduleByAsset.get(a.id);
+    const group=verificationGroup(v);
+    return {...a,verification_status:verificationGroupLabel[group],inspection_result:v?.latest_verification_status??"Not inspected",last_inspected:v?.last_verified_at??"",due_at:v?.verification_due_at??"",_group:group};
+   }).filter((a:any)=>(!fVerificationStatus.group||a._group===fVerificationStatus.group)&&
+    (!fVerificationStatus.branch_id||a.branch_id===fVerificationStatus.branch_id)&&
+    (!fVerificationStatus.q||applyText(a.asset_tag,fVerificationStatus.q)||applyText(a.name,fVerificationStatus.q)||applyText(a.serial_number,fVerificationStatus.q))),
+  };
+
   const verificationDefs: FilterDef[] = [
     { key: "q", label: "Search (tag/asset/custodian)", type: "text" },
     { key: "branch_id", label: "Branch", type: "select", options: branchOpts },
@@ -1074,6 +1119,10 @@ function ReportsPage() {
         <TabsContent value="approvals" className="mt-4">
           {wizardStep===1&&<FilterBar defs={approvalDefs} values={fApprov} onChange={setFApprov} />}
           {wizardStep>=2&&<ReportTable key={tab} stage={wizardStep} r={approvalReport} exportMeta={reportExportMeta} />}
+        </TabsContent>
+        <TabsContent value="verification-status" className="mt-4">
+          {wizardStep===1&&<FilterBar defs={verificationStatusDefs} values={fVerificationStatus} onChange={setFVerificationStatus}/>}
+          {wizardStep>=2&&<ReportTable key={tab} stage={wizardStep} r={verificationStatusReport} exportMeta={reportExportMeta}/>}
         </TabsContent>
         <TabsContent value="verification" className="mt-4">
           {wizardStep===1&&<FilterBar defs={verificationDefs} values={fVerification} onChange={setFVerification} />}
