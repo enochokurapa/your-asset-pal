@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   backupEnvironmentStatus,
+  RETENTION_COUNT,
   createDatabaseBackup,
   createR2PresignedUrl,
   createRestoreUpload,
@@ -45,7 +46,7 @@ export const getBackupDashboard = createServerFn({ method: "GET" })
 
     try {
       policy = await readBackupPolicy();
-      if (environment.r2Configured) backups = (await listBackupObjects()).slice(0, 14);
+      if (environment.r2Configured) backups = (await listBackupObjects()).slice(0, RETENTION_COUNT);
     } catch (error: any) {
       configurationError = error?.message || "Backup configuration could not be loaded";
     }
@@ -54,7 +55,7 @@ export const getBackupDashboard = createServerFn({ method: "GET" })
       environment,
       policy,
       backups,
-      retentionCount: 14,
+      retentionCount: RETENTION_COUNT,
       emailConfigured: Boolean(
         process.env.RESEND_API_KEY?.trim() && process.env.BACKUP_EMAIL_FROM?.trim(),
       ),

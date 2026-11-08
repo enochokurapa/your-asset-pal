@@ -85,7 +85,7 @@ export function SaasBackupManager() {
           return {...response,policy};
         }
       } catch(e){console.error("[Backup] Full dashboard unavailable",e);}
-      return {policy,environment:{databaseConfigured:false,r2Configured:false},backups:[],retentionCount:14,
+      return {policy,environment:{databaseConfigured:false,r2Configured:false},backups:[],retentionCount:3,
         configurationError:"Backup storage and restore services could not be verified. Backup actions remain unavailable until server validation succeeds.",
         emailConfigured:false};
     },
@@ -204,7 +204,7 @@ export function SaasBackupManager() {
           <div>
             <h2 className="font-semibold">Database backup & restore</h2>
             <p className="text-sm text-muted-foreground">
-              Private Cloudflare R2 backups. The system always keeps only the newest {data?.retentionCount ?? 14} database backups.
+              Private Cloudflare R2 backups. The system always keeps only the newest {data?.retentionCount ?? 3} database backups.{data?.environment && !data.environment.schedulerRunning && <span className="ml-2 font-semibold text-red-700">Automatic backup scheduler is offline.</span>}
             </p>
           </div>
         </div>
@@ -229,7 +229,7 @@ export function SaasBackupManager() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <Label>Automated backups</Label>
-            <p className="text-xs text-muted-foreground">Runs while the application server is online.</p>
+            <p className="text-xs text-muted-foreground">Runs automatically on the server every selected interval.</p>
           </div>
           <Switch checked={enabled} onCheckedChange={setEnabled} disabled={!data?.policy} />
         </div>

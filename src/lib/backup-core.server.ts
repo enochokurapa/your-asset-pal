@@ -11,7 +11,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 const admin = supabaseAdmin as any;
 const BACKUP_PREFIX = "backups/";
 const RESTORE_UPLOAD_PREFIX = "restore-uploads/";
-const RETENTION_COUNT = 14;
+export const RETENTION_COUNT = 3;
 const MAX_LOCAL_RESTORE_BYTES = 5 * 1024 * 1024 * 1024;
 
 type BackupKind = "manual" | "automatic" | "pre-restore";
@@ -51,6 +51,7 @@ function requiredEnv(name: string) {
 
 export function backupEnvironmentStatus() {
   return {
+    schedulerRunning: process.env.BACKUP_SCHEDULER_DISABLED !== "true" && schedulerStarted,
     databaseConfigured: Boolean(process.env.DATABASE_URL?.trim()),
     r2Configured: Boolean(
       process.env.R2_ACCOUNT_ID?.trim() &&
@@ -225,9 +226,13 @@ async function deleteR2Object(key: string) {
   }
 }
 
-async function enforceRetention() {
+async function enforceRetention(protectedKeys: ReadonlySet<string> = new Set()) {
   const backups = await listBackupObjects();
+  // A pending restore must never lose its selected source while creating its
+  // fresh safety snapshot. Once that restore finishes, prune to three.
+  const newest = backups.slice(0, RETENTION_COUNT);
   for (const oldBackup of backups.slice(RETENTION_COUNT)) {
+    if (protectedKeys.has(oldBackup.key)) continue;
     await deleteR2Object(oldBackup.key);
   }
   return (await listBackupObjects()).slice(0, RETENTION_COUNT);
@@ -358,12 +363,31 @@ async function downloadR2ToFile(key: string, filePath: string) {
   }
   await pipeline(Readable.fromWeb(response.body as any), createWriteStream(filePath));
 }
+async function hashFile(filePath: string) {
+  const digest=createHash("sha256");
+  for await(const chunk of createReadStream(filePath))digest.update(chunk as Buffer);
+  return digest.digest("hex");
+}
+
+/** A 2xx PUT is insufficient to remove the only good copies. Validate the
+ * remote object's length, downloadability, checksum and pg_restore manifest
+ * before applying retention. Failed uploads are never counted as backups. */
+async function verifyRemoteBackup(original: string, key: string, expectedSize: number, destination: string) {
+  const head=await fetch(createR2PresignedUrl("HEAD",key,300),{method:"HEAD"});
+  if(!head.ok)throw new Error(`Cloudflare R2 backup verification failed with HTTP ${head.status}`);
+  const size=Number(head.headers.get("content-length"));
+  if(!Number.isFinite(size)||size!==expectedSize)throw new Error("Cloudflare R2 stored backup size mismatch");
+  await downloadR2ToFile(key,destination);
+  if((await stat(destination)).size!==expectedSize)throw new Error("Cloudflare R2 downloaded backup size mismatch");
+  if((await hashFile(destination))!==(await hashFile(original)))throw new Error("Cloudflare R2 backup checksum mismatch");
+  await validateDumpFile(destination);
+}
 
 function timestampForKey() {
   return new Date().toISOString().replace(/[:.]/g, "-");
 }
 
-async function createDatabaseBackupInternal(kind: BackupKind) {
+async function createDatabaseBackupInternal(kind: BackupKind, protectedKeys: ReadonlySet<string> = new Set()) {
   const dir = await mkdtemp(join(tmpdir(), "assetflow-backup-"));
   const filePath = join(dir, "database.dump");
   try {
@@ -371,7 +395,8 @@ async function createDatabaseBackupInternal(kind: BackupKind) {
     await validateDumpFile(filePath);
     const key = `${BACKUP_PREFIX}${timestampForKey()}-${kind}.dump`;
     const size = await uploadFileToR2(filePath, key);
-    const backups = await enforceRetention();
+    await verifyRemoteBackup(filePath,key,size,join(dir,"remote-verified.dump"));
+    const backups = await enforceRetention(protectedKeys);
     return {
       key,
       size,
@@ -417,8 +442,9 @@ export async function restoreDatabaseBackup(key: string) {
       await validateDumpFile(filePath);
 
       // Always create a fresh safety backup immediately before a destructive restore.
-      await createDatabaseBackupInternal("pre-restore");
+      await createDatabaseBackupInternal("pre-restore",new Set([key]));
       await restoreDumpFile(filePath);
+      await enforceRetention();
       return { ok: true, restoredKey: key, restoredAt: new Date().toISOString() };
     } finally {
       if (temporaryUpload) {
@@ -482,7 +508,8 @@ async function scheduledBackupTick() {
   const policy = await readBackupPolicy();
   if (!policy.enabled) return;
   const backups = await listBackupObjects();
-  const newest = backups[0];
+  // Recent manual backups must not quietly suppress the daily automatic job.
+  const newest = backups.find(backup=>backup.kind==="automatic");
   const ageMs = newest
     ? Date.now() - new Date(newest.createdAt).getTime()
     : Number.POSITIVE_INFINITY;
