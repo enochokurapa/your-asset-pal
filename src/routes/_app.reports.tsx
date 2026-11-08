@@ -15,7 +15,7 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { ResponsiveTabsList as TabsList, ResponsiveTabsTrigger as TabsTrigger } from "@/components/ui/responsive-tabs";
 import { FileBarChart, FileDown, FileSpreadsheet, X, ChevronRight, ChevronLeft, CheckCircle2 } from "lucide-react";
 
-import autoTable from "jspdf-autotable";
+import {renderReadableReportTables} from "@/lib/readable-report-pdf";
 import * as XLSX from "xlsx";
 import { formatUGX } from "@/lib/utils";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts";
@@ -91,29 +91,9 @@ async function exportPDF(r: Report, meta: ReportExportMeta, options?: {orientati
     generatedBy: meta.generatedBy,
     reportRef,
   });
-  autoTable(doc, {
-    startY,
-    head: [r.columns.map((c) => c.header)],
-    body: r.rows.map((row) => r.columns.map((c) => fmtColumn(row, c))),
-    styles: {
-      fontSize: 7.2,
-      font: template.font_family,
-      cellPadding: 2,
-      lineColor: [225, 225, 225],
-      lineWidth: 0.1,
-      valign: "middle",
-    },
-    headStyles: {
-      fillColor: tableHeadFill(template),
-      textColor: [255,255,255],
-      fontStyle: "bold",
-    },
-    alternateRowStyles: { fillColor: [248, 250, 252] },
-    margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom + 4 },
-    showHead: "everyPage",
-  });
+  const endY=renderReadableReportTables(doc,r,template,startY,(row,col)=>fmtColumn(row,col as Column));
 
-  let y = ((doc as any).lastAutoTable?.finalY ?? startY) + 12;
+  let y = endY + 12;
   if (y > pageHeight - 35) {
     doc.addPage();
     y = template.margin_top + 10;
@@ -162,6 +142,8 @@ function exportXLSX(r: Report, meta: ReportExportMeta) {
   ];
   const ws = XLSX.utils.aoa_to_sheet(metaRows);
   XLSX.utils.sheet_add_json(ws, data, { origin: "A7" });
+  ws["!cols"]=r.columns.map(c=>({wch:Math.min(48,Math.max(14,c.header.length+3,...r.rows.slice(0,100).map(row=>String(fmtColumn(row,c)).length+2)))}));
+  if(r.columns.length&&r.rows.length)ws["!autofilter"]={ref:`A7:${XLSX.utils.encode_col(r.columns.length-1)}${7+r.rows.length}`};
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, r.title.slice(0, 30));
   XLSX.writeFile(wb, `${r.title.replace(/\s+/g, "_")}.xlsx`);

@@ -19,6 +19,7 @@ import { ScannerDialog } from "@/components/scanner-dialog";
 import { toast } from "sonner";
 import { ClipboardCheck, ScanLine, Search, Download, FileText, AlertTriangle, CheckCircle2, XCircle, GitCompare, ExternalLink, ArrowRight } from "lucide-react";
 import autoTable from "jspdf-autotable";
+import {renderReadableReportTables} from "@/lib/readable-report-pdf";
 import * as XLSX from "xlsx";
 import { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } from "@/lib/pdf-template";
 
@@ -171,14 +172,11 @@ function VerificationPage() {
     });
     const rows = toRows(filtered);
     const head = ["Date","Tag","Name","Branch","Location","Custodian","Condition","Status","Verified by"];
-    autoTable(doc, {
-      startY,
-      head: [head],
-      body: rows.map(r => [r.Date, r["Asset Tag"], r["Asset Name"], r.Branch, r.Location, r.Custodian, r.Condition, r.Status, r["Verified by"]]),
-      styles: { fontSize: 7, font: tpl.font_family },
-      headStyles: { fillColor: tableHeadFill(tpl) },
-      margin: { left: tpl.margin_left, right: tpl.margin_right, bottom: tpl.margin_bottom },
-    });
+    const cols=head.map((header,index)=>({header,key:`col_${index}`}));
+    const items=rows.map(r=>Object.fromEntries([
+      r.Date,r["Asset Tag"],r["Asset Name"],r.Branch,r.Location,r.Custodian,r.Condition,r.Status,r["Verified by"]
+    ].map((value,index)=>[cols[index].key,value??""])));
+    renderReadableReportTables(doc,{title:"Fixed Asset Verification Report",columns:cols,rows:items},tpl,startY,(item,col)=>String(item[col.key]??""));
     saveBranded(doc, tpl, "verification-report.pdf");
   });
 

@@ -1,5 +1,6 @@
 import {getCustomRegisterHeaders,type RegisterTemplate,type RegisterLocationConfig} from "@/lib/bulk-import";
 import autoTable from "jspdf-autotable";
+import {renderReadableReportTables} from "@/lib/readable-report-pdf";
 import * as XLSX from "xlsx";
 import { formatUGX } from "@/lib/utils";
 import { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } from "@/lib/pdf-template";
@@ -99,26 +100,8 @@ export async function exportAssetsPDF(title: string, assets: any[]) {
     subtitle: `${assets.length} asset(s)`,
   });
   const rows = assets.map(normalize);
-  const main=[...ASSET_COLUMNS,{key:"verification",header:"Verification"}];
-  autoTable(doc, {
-    startY,
-    head: [main.map((c) => c.header)],
-    body: rows.map((r) => main.map((c) => fmt((r as any)[c.key], c.currency))),
-    styles: { fontSize: 7, font: template.font_family },
-    headStyles: { fillColor: tableHeadFill(template) },
-    margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
-  });
-  doc.addPage();
-  doc.setFontSize(11);doc.text("Registration & verification audit",template.margin_left,template.margin_top+4);
-  const audit=[{key:"asset_tag",header:"Tag"},{key:"name",header:"Asset"},...AUDIT_COLUMNS];
-  autoTable(doc, {
-    startY:template.margin_top+9,
-    head:[audit.map(c=>c.header)],
-    body:rows.map(a=>audit.map(c=>fmt((a as any)[c.key]))),
-    styles:{fontSize:7,font:template.font_family},
-    headStyles:{fillColor:tableHeadFill(template)},
-    margin:{left:template.margin_left,right:template.margin_right,bottom:template.margin_bottom},
-  });
+  const allColumns=[...ASSET_COLUMNS,{key:"verification",header:"Verification"},...AUDIT_COLUMNS];
+  renderReadableReportTables(doc,{title:"Asset Listing",rows,columns:allColumns},template,startY,(row,col)=>fmt((row as any)[col.key],col.key==="purchase_value"));
   saveBranded(doc, template, `${safe(title) || "assets"}.pdf`);
 }
 

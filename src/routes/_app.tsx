@@ -234,7 +234,7 @@ function AppLayout() {
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-sidebar text-sidebar-foreground transition-transform md:static md:translate-x-0",
+          "af-premium-sidebar fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-sidebar text-sidebar-foreground transition-transform md:static md:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >

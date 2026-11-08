@@ -446,3 +446,23 @@
  .af-public-footer nav[aria-label="Footer social media"] a{height:36px;width:36px;}
  .af-public-footer nav[aria-label="Legal and company information"] a{min-width:0;overflow-wrap:anywhere;}
 }
+
+/* Navigation-only premium palette. Cards, reports, and workspace surfaces
+   retain their own colours and organization-level themes. */
+.af-premium-sidebar{
+ --sidebar:#202f70;
+ --sidebar-foreground:#f4f5ff;
+ --sidebar-primary:#5155d8;
+ --sidebar-primary-foreground:#ffffff;
+ --sidebar-accent:#334486;
+ --sidebar-accent-foreground:#ffffff;
+ --sidebar-border:#394a88;
+ --sidebar-ring:#898cff;
+ background-color:#202f70!important;
+ color:#f4f5ff;
+ border-right:1px solid #46548c;
+}
+.af-premium-sidebar a,.af-premium-sidebar button{transition:background-color .18s ease,color .18s ease;}
+.af-premium-sidebar .bg-sidebar-primary{background-color:#5155d8;color:#fff;box-shadow:inset 3px 0 #c87831,0 2px 6px rgba(12,20,60,.12);}
+.af-premium-sidebar .bg-sidebar-accent{background-color:#334486;}
+@media(prefers-reduced-motion:reduce){.af-premium-sidebar a,.af-premium-sidebar button{transition:none;}}

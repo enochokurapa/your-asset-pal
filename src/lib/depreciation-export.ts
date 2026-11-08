@@ -1,4 +1,5 @@
 import autoTable from "jspdf-autotable";
+import {renderReadableReportTables} from "@/lib/readable-report-pdf";
 import * as XLSX from "xlsx";
 import { formatUGX } from "@/lib/utils";
 import { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } from "@/lib/pdf-template";
@@ -63,14 +64,9 @@ export async function exportReportPDF(title: string, headers: string[], rows: (s
   const { doc, startY } = createBrandedPdf({
     template, orientation: "landscape", title, subtitle: `${rows.length} row(s)`,
   });
-  autoTable(doc, {
-    startY,
-    head: [headers],
-    body: rows.map((r) => r.map((c) => (typeof c === "number" ? formatUGX(c) : c))),
-    styles: { fontSize: 8, font: template.font_family },
-    headStyles: { fillColor: tableHeadFill(template) },
-    margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
-  });
+  const columns=headers.map((header,index)=>({header,key:`field_${index}`}));
+  const recordRows=rows.map(row=>Object.fromEntries(columns.map((col,index)=>[col.key,typeof row[index]==="number"?formatUGX(row[index] as number):String(row[index]??"")])));
+  renderReadableReportTables(doc,{title,columns,rows:recordRows},template,startY,(row,col)=>String(row[col.key]??""));
   saveBranded(doc, template, `${safe(title) || "report"}.pdf`);
 }
 
