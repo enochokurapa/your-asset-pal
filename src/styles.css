@@ -433,3 +433,16 @@
  .af-illustrated-pages .af-public-page-hero img{object-position:67% center;opacity:.4;}
  .af-illustrated-pages .af-home-illustrated::before{opacity:.08;}
 }
+
+/* Public navigation and footer: dark main surface across every breakpoint,
+   unlike the white centered content frame. */
+.af-public-site.af-illustrated-pages>footer.af-site-frame.af-public-footer{background:#252a87!important;color:#fff;}
+.af-public-site.af-illustrated-pages>footer.af-site-frame.af-public-footer>.af-public-footer-copyright{background:#171d60!important;color:#ececff;}
+.af-public-footer p,.af-public-footer nav,.af-public-footer a{color:#e5e7ff;}
+.af-public-footer a:hover{color:#fff;}
+@media(max-width:639px){
+ .af-public-footer{width:100%;}
+ .af-public-footer nav[aria-label="Footer social media"]{gap:8px;}
+ .af-public-footer nav[aria-label="Footer social media"] a{height:36px;width:36px;}
+ .af-public-footer nav[aria-label="Legal and company information"] a{min-width:0;overflow-wrap:anywhere;}
+}

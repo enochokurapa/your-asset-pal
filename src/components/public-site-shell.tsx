@@ -6,7 +6,7 @@ import {getPublicSocialLinks,type SocialPlatform} from "@/lib/platform-social.fu
 import { useEffect, useRef, useState } from "react";
 import { PlatformLogo } from "@/components/platform-logo";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Menu, X, Facebook, Instagram, Linkedin, Youtube, Twitter, Send, MessageCircle, Music2 } from "lucide-react";
+import { ArrowRight, Menu, X, Facebook, Instagram, Linkedin, Youtube, Twitter, Send, MessageCircle, Music2, UserRound, ChevronDown, LogIn, UserPlus } from "lucide-react";
 
 const nav = [
   { to: "/features", label: "Features" },
@@ -17,12 +17,22 @@ const nav = [
 
 export function PublicHeader() {
   const [open, setOpen] = useState(false);
+  const [profileOpen,setProfileOpen]=useState(false);
+  const profileRef=useRef<HTMLDivElement>(null);
   const pathname = useLocation().pathname;
   const triggerRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLElement>(null);
 
-  useEffect(() => { setOpen(false); }, [pathname]);
+  useEffect(() => { setOpen(false);setProfileOpen(false); }, [pathname]);
+  useEffect(()=>{
+    if(!profileOpen)return;
+    const dismiss=(event:PointerEvent)=>{if(!profileRef.current?.contains(event.target as Node))setProfileOpen(false)};
+    const escape=(event:KeyboardEvent)=>{if(event.key==="Escape")setProfileOpen(false)};
+    document.addEventListener("pointerdown",dismiss);
+    document.addEventListener("keydown",escape);
+    return()=>{document.removeEventListener("pointerdown",dismiss);document.removeEventListener("keydown",escape)};
+  },[profileOpen]);
 
   useEffect(() => {
     if (!open) return;
@@ -67,11 +77,17 @@ export function PublicHeader() {
             activeProps={{ className: "text-[#b96334]" }}
             className="transition-colors hover:text-[#b96334]">{n.label}</Link>)}
         </nav>
-        <div className="ml-auto hidden items-center gap-3 lg:ml-5 lg:flex">
-          <Button variant="ghost" asChild><Link to="/login">Sign in</Link></Button>
-          <Button asChild className="bg-[#CB7B30] text-white hover:bg-[#b36720]">
-            <Link to="/register">Start free trial <ArrowRight className="ml-2 h-4 w-4" /></Link>
-          </Button>
+        <div ref={profileRef} className="relative ml-auto hidden lg:ml-4 lg:block">
+          <button type="button" aria-label="Account options" aria-expanded={profileOpen} aria-haspopup="menu"
+            aria-controls="af-public-account-options" onClick={()=>setProfileOpen(o=>!o)}
+            className="inline-flex h-11 items-center gap-1 rounded-lg border border-[#e6dfda] bg-white px-3 text-[#3A3EC2] transition-colors hover:border-[#a7a9e3] hover:bg-[#f7f7ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#4E51DB]">
+            <UserRound className="h-5 w-5" aria-hidden="true"/><ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+          {profileOpen&&<div id="af-public-account-options" role="menu" aria-label="Account options"
+            className="absolute right-0 top-[calc(100%+9px)] z-[60] w-56 rounded-xl border border-[#e7e0d9] bg-white p-2 shadow-[0_12px_34px_rgba(31,36,75,.14)]">
+            <Link role="menuitem" to="/login" onClick={()=>setProfileOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-semibold text-[#232a62] hover:bg-[#f2f2ff]"><LogIn className="h-4 w-4"/>Sign in</Link>
+            <Link role="menuitem" to="/register" onClick={()=>setProfileOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-semibold text-[#232a62] hover:bg-[#f2f2ff]"><UserPlus className="h-4 w-4"/>Create a free account</Link>
+          </div>}
         </div>
         <button ref={triggerRef} type="button" aria-label="Open navigation menu"
           aria-controls="assetflow-mobile-drawer" aria-expanded={open}
@@ -108,13 +124,12 @@ export function PublicHeader() {
               className="rounded-lg px-4 py-3.5 text-base font-semibold text-[#2b3940] transition-colors hover:bg-[#f5e8dc]">
               {n.label}
             </Link>)}
-            <div className="my-4 border-t border-[#eaded2]" />
+            <div className="mt-auto border-t border-[#eaded2] pt-4" />
+            <p className="px-4 pb-1 text-xs font-semibold uppercase tracking-wider text-[#64708b]">Account</p>
             <Link to="/login" onClick={() => setOpen(false)}
-              className="rounded-lg px-4 py-3.5 text-base font-semibold text-[#2b3940] hover:bg-[#f5e8dc]">Sign in</Link>
+              className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-semibold text-[#232a62] hover:bg-[#f5e8dc]"><LogIn className="h-4 w-4"/>Sign in</Link>
             <Link to="/register" onClick={() => setOpen(false)}
-              className="mt-3 inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-[#c77435] px-4 text-sm font-bold text-white hover:bg-[#a85b2d]">
-              Start free trial <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
+              className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-semibold text-[#232a62] hover:bg-[#f5e8dc]"><UserPlus className="h-4 w-4"/>Create a free account</Link>
           </nav>
         </aside>
       </div>
@@ -175,8 +190,8 @@ export function PublicFooter(){
   queryKey:["public-social-links"],queryFn:()=>getSocial(),staleTime:60_000,retry:1,
  });
  return <footer className="af-site-frame af-public-footer overflow-hidden text-white">
-   <div className="mx-auto flex min-w-0 flex-wrap items-start justify-between gap-8 px-5 pb-8 pt-10 sm:px-8 sm:pb-10 sm:pt-12">
-     <div className="max-w-md min-w-0">
+   <div className="mx-auto grid min-w-0 grid-cols-1 gap-7 px-5 pb-7 pt-8 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-8 sm:px-8 sm:pb-10 sm:pt-12">
+     <div className="min-w-0 max-w-md">
        <span className="inline-flex items-center gap-2.5">
          <PlatformLogo variant="mark" className="h-11 w-11 shrink-0"/>
          <span className="text-lg font-semibold tracking-tight text-white">AssetFlow 360</span>
@@ -185,7 +200,7 @@ export function PublicFooter(){
         Asset registration, verification, location control and lifecycle management in one adaptable platform.
        </p>
      </div>
-     <div className="flex min-w-0 flex-col gap-4">
+     <div className="flex min-w-0 flex-col gap-3 sm:items-end">
        <nav aria-label="Footer social media" className="flex flex-wrap items-center gap-2">
          {social.map(link=>{
            const Icon=socialIcons[link.platform];
@@ -197,16 +212,16 @@ export function PublicFooter(){
            </a>;
          })}
        </nav>
-       {links.length>0&&<nav aria-label="Other websites" className="flex max-w-md flex-wrap gap-x-4 gap-y-2 text-xs text-slate-300">
+       {links.length>0&&<nav aria-label="Other websites" className="flex max-w-md flex-wrap gap-x-3 gap-y-2 text-xs text-slate-200 sm:justify-end">
          {links.map(link=><a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer"
            title={link.description||undefined} className="max-w-full break-words hover:text-white">{link.title}</a>)}
        </nav>}
      </div>
    </div>
    <div className="af-public-footer-copyright border-t border-white/15">
-     <div className="mx-auto flex min-w-0 max-w-7xl flex-col gap-3 px-5 py-5 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-       <span className="shrink-0">© {new Date().getFullYear()} AssetFlow 360. All rights reserved.</span>
-       <nav aria-label="Legal and company information" className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2">
+     <div className="mx-auto flex min-w-0 flex-col gap-3 px-5 py-5 text-xs leading-5 text-[#ececff] sm:flex-row sm:items-center sm:justify-between sm:px-8">
+       <span className="text-xs">© {new Date().getFullYear()} AssetFlow 360. All rights reserved.</span>
+       <nav aria-label="Legal and company information" className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-2 sm:flex sm:flex-wrap sm:items-center sm:gap-x-5">
          {secondary.map(n=><Link key={n.to} to={n.to} className="transition-colors hover:text-white">{n.label}</Link>)}
        </nav>
      </div>
