@@ -15,6 +15,7 @@ import {
 } from "@/lib/asset-export";
 import { AssetDetailTabs } from "@/components/asset-detail-tabs";
 import {verificationGroup,verificationGroupLabel,type VerificationGroup} from "@/lib/asset-verification-kpi";
+import {assetReportAudit} from "@/lib/asset-report-audit";
 
 export type TileFilter =
   | { kind: "all" }
@@ -62,12 +63,14 @@ export function TileAssetsDialog({
         }
         throw new Error("Too many assets to load into this report. Narrow the view.");
       }
-      const [a, assigns, pendings, schedules, gatePasses] = await Promise.all([
+      const [a, assigns, pendings, schedules, gatePasses, histories, profiles] = await Promise.all([
         fetchAll("assets","*, categories(name), locations(name), branches(name,code)","created_at"),
         fetchAll("asset_assignments","asset_id, assigned_to_name, department, assignment_date","assignment_date"),
         fetchAll("approval_requests","asset_id, kind, status","created_at",true),
         (async()=>{const all:any[]=[];for(let offset=0;offset<100000;offset+=500){const {data,error}=await (supabase as any).from("asset_verification_schedule").select("asset_id,verification_state,verification_basis,latest_verification_status").range(offset,offset+499);if(error)throw error;all.push(...(data??[]));if((data?.length??0)<500)return all;}throw Error("Verification results exceed report limit")})(),
         (async()=>{const all:any[]=[];for(let offset=0;offset<100000;offset+=500){const {data,error}=await (supabase as any).from("gate_passes").select("asset_id,status,branch_id").in("status",["pending","approved","checked_out"]).range(offset,offset+499);if(error)throw error;all.push(...(data??[]));if((data?.length??0)<500)return all;}throw Error("Gate-pass results exceed report limit")})(),
+        (async()=>{const all:any[]=[];for(let offset=0;offset<100000;offset+=500){const {data,error}=await (supabase as any).from("asset_verifications").select("asset_id,status,verified_by,verified_at,changes").order("verified_at",{ascending:false}).range(offset,offset+499);if(error)throw error;all.push(...(data??[]));if((data?.length??0)<500)return all;}throw Error("Verification history exceeds report limit")})(),
+        (async()=>{const {data,error}=await supabase.from("profiles").select("id,full_name,email");if(error)throw error;return data??[]})(),
       ]);
       const cur: Record<string, any> = {};
       (assigns ?? []).forEach((x: any) => { if (!cur[x.asset_id]) cur[x.asset_id] = x; });
@@ -76,6 +79,10 @@ export function TileAssetsDialog({
       const bySchedule=new Map(schedules.map((v:any)=>[v.asset_id,v]));
       const pendingGate=new Set(gatePasses.filter((g:any)=>g.status==="pending").map((g:any)=>g.asset_id));
       const outsideGate=new Set(gatePasses.filter((g:any)=>g.status==="approved"||g.status==="checked_out").map((g:any)=>g.asset_id));
+      const latestHistory=new Map<string,any>();
+      for(const entry of histories as any[])if(entry.asset_id&&!latestHistory.has(entry.asset_id))latestHistory.set(entry.asset_id,entry);
+      const userNames=new Map(profiles.map((profile:any)=>[profile.id,profile.full_name||profile.email]));
+      const label=(id:string|null|undefined)=>id?String(userNames.get(id)||""):"";
       return (a ?? []).map((row: any) => ({
         ...row,
         custodian: cur[row.id]?.assigned_to_name ?? "",
@@ -85,6 +92,7 @@ export function TileAssetsDialog({
         _pending_repair: pendingRep.has(row.id),
         _parked: row.set_for_disposal || pendingRet.has(row.id) || pendingRep.has(row.id),
         verification_group:verificationGroup(bySchedule.get(row.id)),
+        ...assetReportAudit(row,latestHistory.get(row.id),label),
         _gate_pending:pendingGate.has(row.id),
         _gate_outside:outsideGate.has(row.id),
       }));

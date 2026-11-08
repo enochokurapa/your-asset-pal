@@ -8,7 +8,7 @@ import {
   startYoUpgrade,getPricingPlans,
   checkYoUpgrade,
   startYoAddonPurchase,
-  checkYoAddonPurchase,
+  checkYoAddonPurchase,getTenantPaymentHistory,
   startYoSeatPurchase,checkYoSeatPurchase,startYoAssetCapacityPurchase,checkYoAssetCapacityPurchase,
 } from "@/lib/saas.functions";
 import { getServerAuthHeaders } from "@/lib/auth-headers";
@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { CreditCard, CheckCircle2, Clock, LockKeyhole, PlugZap, Radar } from "lucide-react";
 
-const BILLING_SECTIONS=["overview","plans","seats","capacity","addons"] as const;
+const BILLING_SECTIONS=["overview","plans","seats","capacity","addons","history"] as const;
 type BillingSection=typeof BILLING_SECTIONS[number];
 export const Route = createFileRoute("/_app/billing")({
  validateSearch:(search:Record<string,unknown>)=>({section:BILLING_SECTIONS.includes(search.section as BillingSection)?search.section as BillingSection:"overview"}),
@@ -39,6 +39,7 @@ function BillingPage() {
   const { isTenantAdmin, subscriptionStatus, tenantName, trialEndsAt } = useAuth();
   const qc = useQueryClient();
   const getCtx = useServerFn(getSaasContext);
+  const getHistory=useServerFn(getTenantPaymentHistory);
   const getPlans=useServerFn(getPricingPlans);
   const {data:publicPlans}=useQuery({queryKey:["pricing-plans"],queryFn:()=>getPlans()});
   const [selectedPlan,setSelectedPlan]=useState("business"),[period,setPeriod]=useState<"monthly"|"annual">("monthly");
@@ -59,6 +60,10 @@ function BillingPage() {
   const [addonTransaction, setAddonTransaction] = useState<string | null>(null);
   const [addonKey, setAddonKey] = useState<string | null>(null);
 
+  const {data:paymentHistory=[],isLoading:historyLoading}=useQuery({
+    queryKey:["tenant-payment-history"],queryFn:async()=>getHistory({headers:await getServerAuthHeaders()}),
+    enabled:section==="history"&&isTenantAdmin,
+  });
   const { data: ctx, refetch } = useQuery({
     queryKey: ["saas-context"],
     queryFn: async () => getCtx({ headers: await getServerAuthHeaders() }),
@@ -122,10 +127,17 @@ function BillingPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <div><h1 className="text-xl font-bold tracking-tight sm:text-2xl">Plan & billing</h1>
+      <div><h1 className="text-xl font-bold tracking-tight sm:text-2xl">{section==="history"?"Payments & receipts":section==="addons"?"Add-ons":"Subscription & billing"}</h1>
        <p className="mt-1 text-xs text-muted-foreground">{tenantName || "Workspace"}</p></div>
 
 
+      {section==="history"&&<Card className="space-y-3 p-4"><div><h2 className="font-semibold">Payment history</h2><p className="text-xs text-muted-foreground">Recorded transactions from your workspace. A payment record is not a tax invoice.</p></div>
+       {historyLoading?<p className="text-sm">Loading payments…</p>:!paymentHistory.length?<p className="text-sm text-muted-foreground">No payments recorded yet.</p>:
+       <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b bg-muted/30"><tr><th className="px-3 py-2">Date</th><th className="px-3 py-2">Purchase</th><th className="px-3 py-2">Amount</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Reference</th></tr></thead><tbody>
+       {paymentHistory.map((tx:any)=><tr key={tx.id} className="border-b"><td className="whitespace-nowrap px-3 py-3">{new Date(tx.created_at).toLocaleDateString()}</td><td className="px-3 py-3">{tx.type}</td><td className="whitespace-nowrap px-3 py-3">{money(Number(tx.amount),tx.currency||"UGX")}</td><td className="px-3 py-3 capitalize">{tx.status}</td><td className="px-3 py-3 font-mono text-xs">{tx.provider_reference||"—"}</td></tr>)}
+       </tbody></table></div>}
+       <p className="text-xs text-muted-foreground">Formal invoices, where issued, should use the business's approved invoicing process. This page does not manufacture invoice numbers or tax documents.</p>
+      </Card>}
       {section==="seats"&&<Card className="space-y-4 border-primary/20 p-4">
         <div><h2 className="text-lg font-semibold">Team seats</h2><p className="text-xs text-muted-foreground">Available seats: {totalSeats}</p></div>
         <div className="flex flex-wrap items-end gap-3"><div className="space-y-2"><Label>Additional users</Label><Input className="w-28" type="number" min={1} max={100} value={seatQuantity} onChange={e=>setSeatQuantity(Math.max(1,Math.min(100,Number(e.target.value)||1)))}/></div><div className="space-y-1"><p className="text-lg font-semibold">{money(extraUserPrice*seatQuantity,currency)}</p>{fxRate>0&&<p className="text-xs text-muted-foreground">≈ {money(Math.round(extraUserPrice*seatQuantity*fxRate),"UGX")} payable</p>}</div><Button disabled={busy||!isTenantAdmin||subscriptionStatus!=="active"||extraUserPrice<=0||!ctx?.paymentConfigured||!fxRate} onClick={()=>requestPayment(seatQuantity+" additional user seat(s)",extraUserPrice*seatQuantity,async normalizedPhone=>{setBusy(true);try{const result=await startSeatPay({headers:await getServerAuthHeaders(),data:{phone:normalizedPhone,quantity:seatQuantity}});setSeatTx(result.transactionId);toast.success("Payment request sent. Approve on your phone.")}catch(e:any){throw e}finally{setBusy(false)}})}>Buy extra users</Button>{seatTx&&<Button variant="outline" disabled={checking} onClick={async()=>{setChecking(true);try{const result=await checkSeatPay({headers:await getServerAuthHeaders(),data:{transactionId:seatTx}});if(result.successful){toast.success("Extra user seats activated");setSeatTx(null);await refetch()}else toast.message("Payment: "+result.status)}catch(e:any){toast.error(e.message||"Could not check payment")}finally{setChecking(false)}}}>Check seat payment</Button>}</div>

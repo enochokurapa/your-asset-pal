@@ -353,6 +353,25 @@ export const getSaasContext = createServerFn({ method: "GET" })
     };
   });
 
+/** Historical payment records, scoped strictly to the requesting business. */
+export const getTenantPaymentHistory=createServerFn({method:"GET"})
+ .middleware([requireSupabaseAuth])
+ .handler(async({context})=>{
+  const p=await assertTenantAdmin(context.userId);
+  const [plans,seats,capacity]=await Promise.all([
+   admin.from("billing_transactions").select("id,amount,currency,status,created_at,provider_reference,module_key").eq("tenant_id",p.tenant_id).order("created_at",{ascending:false}).limit(200),
+   admin.from("seat_purchase_transactions").select("id,amount,currency,status,created_at,provider_reference").eq("tenant_id",p.tenant_id).order("created_at",{ascending:false}).limit(200),
+   admin.from("asset_capacity_purchases").select("id,amount,currency,status,created_at,provider_reference").eq("tenant_id",p.tenant_id).order("created_at",{ascending:false}).limit(200),
+  ]);
+  for(const result of [plans,seats,capacity])if(result.error)throw Error("Payment history unavailable");
+  const rows=[
+   ...(plans.data||[]).map((tx:any)=>({...tx,type:tx.module_key?"Add-on · "+tx.module_key:"Subscription"})),
+   ...(seats.data||[]).map((tx:any)=>({...tx,type:"Additional user seats"})),
+   ...(capacity.data||[]).map((tx:any)=>({...tx,type:"Additional asset capacity"})),
+  ];
+  return rows.sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,300);
+ });
+
 export const updateSaasSettings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({

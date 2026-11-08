@@ -122,14 +122,7 @@ function VerificationPage() {
       .maybeSingle();
     if (error) { toast.error(error.message); return; }
     if (!data) {
-      // Record as not_found
-      if (!canPerform) { toast.error("Asset not found"); return; }
-      const conf = window.confirm(`Asset "${q}" not in register. Record as NOT FOUND?`);
-      if (!conf) return;
-      await (supabase as any).from("asset_verifications").insert({
-        asset_id: null as any, // not allowed (NOT NULL). Skip.
-      });
-      toast.error("Asset not found in register");
+      toast.error("No matching asset was found. Check the tag or serial number in the asset register.");
       return;
     }
     // Last assignment for custodian autofill
@@ -199,7 +192,7 @@ function VerificationPage() {
       {section==="scan"&&<Card className="p-5">
         <div className="grid gap-3 sm:grid-cols-[260px_1fr_auto_auto]">
           <div className="space-y-1">
-            <Label>Branch being verified</Label>
+            <Label>Verification branch</Label>
             <Select value={branchId} onValueChange={setBranchId}>
               <SelectTrigger><SelectValue placeholder="Choose branch…" /></SelectTrigger>
               <SelectContent>
@@ -216,7 +209,7 @@ function VerificationPage() {
               value={tag}
               onChange={(e) => setTag(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") lookup(tag); }}
-              placeholder="Type and press Enter, or scan…"
+              placeholder="Enter asset tag or serial number"
               disabled={!branchId}
             />
           </div>

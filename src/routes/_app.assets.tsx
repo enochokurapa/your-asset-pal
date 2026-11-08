@@ -162,6 +162,9 @@ function AssetsPage() {
 
   useEffect(()=>{if(catalog)setRegisterChoice(catalog.primaryId??"default");},[catalog]);
   const [open, setOpen] = useState(false);
+  const [inspectedOnEntry,setInspectedOnEntry]=useState(false);
+  const [inspectionCondition,setInspectionCondition]=useState("");
+  const [inspectionNotes,setInspectionNotes]=useState("");
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<AssetForm>(empty);
   const [wizardStep, setWizardStep] = useState(0);
@@ -345,7 +348,7 @@ function AssetsPage() {
     nav({ to: "/assets", search: {} as any, replace: true });
   };
 
-  const openNew = async () => { const result=await refreshRegisterCatalog();if(result.error||!result.data){toast.error("Cannot load your company register. Try again.");return;}const preferred=result.data.primaryId??"default";if(preferred!=="default"&&!result.data.definitions.some((d:any)=>d.id===preferred)){toast.error("Your active register is unavailable. Please contact your administrator.");return;}setRegisterChoice(preferred);setCustomValues({});setForm({...empty,branch_id:visibleBranches.length===1?visibleBranches[0].id:null});setWizardStep(0);setFinancialOpen(false);setOpen(true); };
+  const openNew = async () => { setInspectedOnEntry(false);setInspectionCondition("");setInspectionNotes("");const result=await refreshRegisterCatalog();if(result.error||!result.data){toast.error("Cannot load your company register. Try again.");return;}const preferred=result.data.primaryId??"default";if(preferred!=="default"&&!result.data.definitions.some((d:any)=>d.id===preferred)){toast.error("Your active register is unavailable. Please contact your administrator.");return;}setRegisterChoice(preferred);setCustomValues({});setForm({...empty,branch_id:visibleBranches.length===1?visibleBranches[0].id:null});setWizardStep(0);setFinancialOpen(false);setOpen(true); };
   const openEdit = (a: any) => {
     setRegisterChoice(a.register_definition_id??"default");
     setCustomValues(Object.fromEntries(Object.entries(a.custom_fields??{}).map(([k,v])=>[k,String(v??"")])));
@@ -443,6 +446,7 @@ function AssetsPage() {
 
   const save = async (saveAndNext = false) => {
     if (saving) return;
+    if(!form.id&&inspectedOnEntry&&!inspectionCondition){toast.error("Select the observed asset condition before confirming an inspection");return;}
     if(registerCatalogPending||registerCatalogError||!catalog){toast.error("The business register has not loaded. Please retry.");return;}
     const customRegister=registerChoice!=="default";
     const normalizeField=(v:string)=>v.toLowerCase().replace(/[^a-z0-9]/g,"");
@@ -570,6 +574,22 @@ function AssetsPage() {
         if (form.location_id || form.geo_place_id || (form.location_latitude && form.location_longitude)) {
           await recordLocationEvent(created.id, "registered", "Initial asset location recorded during registration.");
         }
+        // A freshly registered asset is current but not physically inspected.
+        // Only an explicit, authorized onsite confirmation creates evidence.
+        if(inspectedOnEntry){
+          const {error:verificationError}=await (supabase as any).from("asset_verifications").insert({
+            asset_id:created.id,branch_id:created.branch_id||null,location_id:created.location_id||null,
+            custodian_name:form.assigned_to_name.trim()||null,department:form.department.trim()||null,
+            condition:inspectionCondition,status:"verified",verified_by:user?.id??null,
+            notes:["Physical asset inspection explicitly confirmed during initial registration.",inspectionNotes.trim()].filter(Boolean).join(" "),
+            changes:{source:"inspected_at_registration",inspection_date_confirmed:true},
+          });
+          if(verificationError){
+            toast.warning("Asset registered, but inspection was not recorded",{
+              description:"Use Verification → Scan & verify to finish the inspection. " + verificationError.message,
+            });
+          }else toast.success("Asset registered and physically verified");
+        }
         // Assignment is secondary activity: a failure must not disguise a
         // successfully created asset, but it must be made visible to the user.
         if (form.assigned_to_name.trim() || form.department.trim()) {
@@ -591,6 +611,7 @@ function AssetsPage() {
         }
       }
       if (!form.id && saveAndNext) {
+        setInspectedOnEntry(false);setInspectionCondition("");setInspectionNotes("");
         setCustomValues({});
         setForm((previous) => ({
           ...empty,
@@ -605,9 +626,14 @@ function AssetsPage() {
         setFinancialOpen(false);
         toast.message("Ready for the next asset");
       } else {
+        setInspectedOnEntry(false);setInspectionCondition("");setInspectionNotes("");
         setOpen(false);
         setWizardStep(0);
       }
+      qc.invalidateQueries({ queryKey: ["asset_verification_schedule"] });
+      qc.invalidateQueries({ queryKey: ["report-verifications"] });
+      qc.invalidateQueries({ queryKey: ["report-asset-verification-schedule"] });
+      qc.invalidateQueries({ queryKey: ["verifications"] });
       qc.invalidateQueries({ queryKey: ["assets"] });
       qc.invalidateQueries({ queryKey: ["asset-assignments-current"] });
       qc.invalidateQueries({ queryKey: ["dashboard-stats"] }); qc.invalidateQueries({ queryKey: ["tile-assets"] });
@@ -815,6 +841,7 @@ function AssetsPage() {
           </details>
           {canAdd && (
           <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) setWizardStep(0); }}>
+            {canDo("perform_verification")&&<Button asChild variant="outline"><Link to="/verification" search={{section:"scan"}}><Check className="mr-2 h-4 w-4"/>Verify asset</Link></Button>}
             <Button className="bg-[#c77435] text-white hover:bg-[#aa602e]" onClick={openNew} disabled={registerCatalogPending}><Plus className="mr-2 h-4 w-4" /> {registerCatalogPending?"Loading register…":"New asset"}</Button>
             <DialogContent className="flex max-h-[92vh] max-w-3xl flex-col overflow-hidden p-0">
               <DialogHeader className="border-b px-5 pb-4 pt-5 sm:px-6">
@@ -1074,6 +1101,19 @@ function AssetsPage() {
                     </div>
                     {registerChoice!=="default"&&<div className="rounded-xl border p-3 text-sm"><p className="font-semibold">Asset: {form.name||"—"} · Tag: {form.asset_tag||"—"} · Serial: {form.serial_number||"—"}</p><p className="mt-1">Location: {reviewLocation}</p><p className="mt-1 text-xs text-muted-foreground">{form.location_latitude&&form.location_longitude?"GPS captured":"GPS not captured"}</p></div>}
                     {registerChoice!=="default"&&<div className="grid gap-2 rounded-xl border p-3">{customEntryFields.map(field=><div key={field.key} className="flex justify-between gap-3 text-sm"><span>{field.label}</span><span className="font-semibold">{customValues[field.key]||"—"}</span></div>)}</div>}
+                    {!form.id&&<div className="space-y-2 rounded-xl border border-[#dce7e9] bg-[#f7fafb] p-3">
+                      <label className="flex items-start gap-3 text-sm">
+                        <input type="checkbox" className="mt-1 h-4 w-4" checked={inspectedOnEntry} disabled={!canDo("perform_verification")||!user?.id} onChange={e=>{setInspectedOnEntry(e.target.checked);setInspectionCondition("");setInspectionNotes("");}}/>
+                        <span><strong>Physically inspected this asset now</strong><span className="mt-1 block text-xs text-muted-foreground">Optional. Check only after seeing the actual asset and confirming its tag, serial, condition, and location. This creates a dated verification under your account.</span></span>
+                      </label>
+                      {inspectedOnEntry&&<div className="grid gap-2 sm:grid-cols-2">
+                        <div className="space-y-1"><Label>Observed condition *</Label>
+                          <Select value={inspectionCondition} onValueChange={setInspectionCondition}><SelectTrigger><SelectValue placeholder="Choose actual condition"/></SelectTrigger><SelectContent>{["mint","good","fair","poor","damaged"].map(value=><SelectItem key={value} value={value} className="capitalize">{value}</SelectItem>)}</SelectContent></Select>
+                        </div>
+                        <div className="space-y-1"><Label>Inspection notes</Label><Input value={inspectionNotes} onChange={e=>setInspectionNotes(e.target.value)} placeholder="Optional physical findings"/></div>
+                      </div>}
+                      {!canDo("perform_verification")&&<p className="text-xs text-muted-foreground">Your role cannot certify inspections. An authorized verifier can do this later under Verification.</p>}
+                    </div>}
                     {registerChoice==="default" && <div className="overflow-hidden rounded-xl border">
                       {[
                         ["Asset", form.name || "-"],

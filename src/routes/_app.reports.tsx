@@ -22,6 +22,7 @@ import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Resp
 import { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } from "@/lib/pdf-template";
 import { fmtDateEAT, fmtDateTimeEAT } from "@/lib/time";
 import {verificationGroup,verificationGroupLabel,type VerificationGroup} from "@/lib/asset-verification-kpi";
+import {assetReportAudit,type VerificationEvidence,historicalBaseline} from "@/lib/asset-report-audit";
 
 
 export const Route = createFileRoute("/_app/reports")({
@@ -312,9 +313,18 @@ function ReportsPage() {
   });
   const { data: verifications = [] } = useQuery({
     queryKey: ["report-verifications"],
-    queryFn: async () => (await (supabase as any).from("asset_verifications")
-      .select("*, assets(asset_tag,name,serial_number), branches(name), locations(name)")
-      .order("verified_at", { ascending: false })).data ?? [],
+    queryFn: async () => {
+      const all:any[]=[];
+      for(let offset=0;offset<100000;offset+=500){
+        const {data,error}=await (supabase as any).from("asset_verifications")
+          .select("*, assets(asset_tag,name,serial_number), branches(name), locations(name)")
+          .order("verified_at",{ascending:false}).range(offset,offset+499);
+        if(error)throw error;
+        all.push(...(data??[]));
+        if((data?.length??0)<500)return all;
+      }
+      throw Error("Verification history exceeds export limit. Narrow your selection.");
+    },
   });
   const { data: depreciationEntries = [] } = useQuery({
     queryKey: ["report-depreciation-entries"],
@@ -333,6 +343,11 @@ function ReportsPage() {
     const p = profileMap[id];
     return p?.full_name || p?.email || "";
   };
+  const latestEvidenceByAsset=new Map<string,VerificationEvidence>();
+  for(const evidence of verifications as any[]){
+    if(evidence.asset_id&&!latestEvidenceByAsset.has(evidence.asset_id))latestEvidenceByAsset.set(evidence.asset_id,evidence);
+  }
+  const withAudit=(asset:any)=>assetReportAudit(asset,latestEvidenceByAsset.get(asset.id),userLabel);
   const reportExportMeta: ReportExportMeta = {
     organization: tenantName || "AssetFlow 360",
     generatedBy: userLabel(user?.id) || user?.email || "Authorized user",
@@ -517,7 +532,7 @@ function ReportsPage() {
     applyDate(a.purchase_date, fRegister.from, fRegister.to) &&
     (!fRegister.q ||
       applyText(a.asset_tag, fRegister.q) || applyText(a.name, fRegister.q) || applyText(a.serial_number, fRegister.q)),
-  );
+  ).map((a:any)=>({...a,...withAudit(a)}));
   const register: Report = {
     title: "Fixed Asset Register",
     columns: [
@@ -530,6 +545,13 @@ function ReportsPage() {
       { header: "Department", key: "department" }, { header: "Status", key: "status" },
       { header: "Purchase Date", key: "purchase_date" },
       { header: "Purchase Value", key: "purchase_value", isCurrency: true },
+      { header: "Registered on", key: "registered_at", isDateTime: true },
+      { header: "Registered by", key: "registered_by" },
+      { header: "Capture method", key: "capture_method" },
+      { header: "Inspection result", key: "inspection_result" },
+      { header: "Verified on", key: "inspected_at", isDateTime: true },
+      { header: "Verified by", key: "inspected_by" },
+      { header: "Verification evidence", key: "inspection_evidence" },
     ],
     rows: registerRows,
   };
@@ -879,13 +901,16 @@ function ReportsPage() {
     {header:"Asset Tag",key:"asset_tag"},{header:"Asset",key:"name"},
     {header:"Serial #",key:"serial_number"},{header:"Branch",key:"branch"},
     {header:"Location",key:"location"},{header:"Status",key:"verification_status"},
-    {header:"Inspection Result",key:"inspection_result"},{header:"Last Inspected",key:"last_inspected",isDateTime:true},
+    {header:"Registered on",key:"registered_at",isDateTime:true},{header:"Registered by",key:"registered_by"},
+    {header:"Capture method",key:"capture_method"},
+    {header:"Inspection result",key:"inspection_result"},{header:"Verified on",key:"inspected_at",isDateTime:true},
+    {header:"Verified by",key:"inspected_by"},{header:"Verification evidence",key:"inspection_evidence"},
     {header:"Next Due",key:"due_at",isDateTime:true},{header:"Purchase Value",key:"purchase_value",isCurrency:true},
    ],
    rows:enrichedAssets.map((a:any)=>{
     const v=scheduleByAsset.get(a.id);
     const group=verificationGroup(v);
-    return {...a,verification_status:verificationGroupLabel[group],inspection_result:v?.latest_verification_status??"Not inspected",last_inspected:v?.last_verified_at??"",due_at:v?.verification_due_at??"",_group:group};
+    return {...a,...withAudit(a),verification_status:verificationGroupLabel[group],due_at:v?.verification_due_at??"",_group:group};
    }).filter((a:any)=>(!fVerificationStatus.group||a._group===fVerificationStatus.group)&&
     (!fVerificationStatus.branch_id||a.branch_id===fVerificationStatus.branch_id)&&
     (!fVerificationStatus.q||applyText(a.asset_tag,fVerificationStatus.q)||applyText(a.name,fVerificationStatus.q)||applyText(a.serial_number,fVerificationStatus.q))),
@@ -903,7 +928,11 @@ function ReportsPage() {
     branch: v.branches?.name ?? "", location: v.locations?.name ?? "",
     custodian_name: v.custodian_name ?? "", department: v.department ?? "",
     condition: v.condition ?? "", status: v.status ?? "",
-    verified_by: userLabel(v.verified_by), verified_at: v.verified_at,
+    registered_at:assetFor(v.asset_id)?.created_at??"",registered_by:userLabel(assetFor(v.asset_id)?.created_by),
+    verified_by: historicalBaseline(v)?"Not recorded":userLabel(v.verified_by),
+    verified_at: historicalBaseline(v)?"":v.verified_at,
+    baseline_effective_at:historicalBaseline(v)?v.verified_at:"",
+    inspection_evidence:historicalBaseline(v)?"Owner-attested baseline; physical inspection not confirmed":"Inspection record",
     notes: v.notes ?? "", changes: v.changes && Object.keys(v.changes).length ? JSON.stringify(v.changes) : "",
     _branch_id: v.branch_id,
   })).filter((v: any) =>
@@ -919,7 +948,11 @@ function ReportsPage() {
       { header: "Branch", key: "branch" }, { header: "Location", key: "location" },
       { header: "Custodian", key: "custodian_name" }, { header: "Department", key: "department" },
       { header: "Condition", key: "condition" }, { header: "Status", key: "status" },
-      { header: "Verified by", key: "verified_by" }, { header: "Verified at", key: "verified_at", isDateTime: true },
+      { header: "Registered on", key: "registered_at", isDateTime: true },
+      { header: "Registered by", key: "registered_by" },
+      { header: "Verified by", key: "verified_by" }, { header: "Verified on", key: "verified_at", isDateTime: true },
+      { header: "Baseline effective date", key: "baseline_effective_at", isDateTime: true },
+      { header: "Evidence type", key: "inspection_evidence" },
       { header: "Notes", key: "notes" }, { header: "Changes", key: "changes" },
     ],
     rows: verificationRows,

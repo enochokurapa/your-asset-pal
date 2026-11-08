@@ -19,6 +19,15 @@ const ASSET_COLUMNS: { key: string; header: string; currency?: boolean }[] = [
   { key: "purchase_value", header: "Purchase value", currency: true },
 ];
 
+const AUDIT_COLUMNS:{key:string;header:string}[]=[
+ {key:"registered_at",header:"Registered on"},
+ {key:"registered_by",header:"Registered by"},
+ {key:"capture_method",header:"Capture method"},
+ {key:"inspection_result",header:"Inspection result"},
+ {key:"inspected_at",header:"Verified on"},
+ {key:"inspected_by",header:"Verified by"},
+ {key:"inspection_evidence",header:"Verification evidence"},
+];
 function normalize(a: any) {
   return {
     asset_tag: a.asset_tag ?? "",
@@ -26,6 +35,13 @@ function normalize(a: any) {
     serial_number: a.serial_number ?? "",
     status: (a.status ?? "").replace(/_/g, " "),
     verification: a.verification_group ? verificationGroupLabel[a.verification_group as VerificationGroup] : (a.verification_status??""),
+    registered_at:a.registered_at??a.created_at??"",
+    registered_by:a.registered_by??"Not recorded",
+    capture_method:a.capture_method??"Not recorded",
+    inspection_result:a.inspection_result??"Not inspected",
+    inspected_at:a.inspected_at??"",
+    inspected_by:a.inspected_by??"Not recorded",
+    inspection_evidence:a.inspection_evidence??"No inspection recorded",
     category: a.categories?.name ?? a.category ?? "",
     location: a.locations?.name ?? a.location ?? "",
     branch: a.branches?.name ?? a.branch ?? "",
@@ -46,9 +62,9 @@ const safe = (s: string) => s.replace(/[^a-z0-9_-]+/gi, "_");
 
 export function exportAssetsXLSX(title:string,assets:any[],customFields:Array<{key:string,label:string}>=[],locationConfig?:RegisterLocationConfig){
  const custom=customFields.length>0;
- const visibleColumns=assets.some(a=>a.verification_group||a.verification_status)?[...ASSET_COLUMNS,{key:"verification",header:"Verification"}]:ASSET_COLUMNS;
+ const visibleColumns=[...ASSET_COLUMNS,{key:"verification",header:"Verification"},...AUDIT_COLUMNS];
  const originalHeaders=custom?getCustomRegisterHeaders({id:"export",name:title,configuration:{fields:customFields.map(f=>({...f,type:"text",required:false}))}},locationConfig):visibleColumns.map(c=>c.header);
- const headers=["Asset ID",...originalHeaders.filter(h=>h!=="Asset ID")];
+ const headers=["Asset ID",...originalHeaders.filter(h=>h!=="Asset ID"),...(custom?AUDIT_COLUMNS.map(c=>c.header):[])];
  const row=(asset:any)=>{
   const base=normalize(asset);
   const geoParts=String(asset.geo_places?.display_path??"").split("·").map((v:string)=>v.trim()).filter(Boolean);
@@ -67,7 +83,7 @@ export function exportAssetsXLSX(title:string,assets:any[],customFields:Array<{k
    "Geo Place ID":asset.geo_place_id,"Latitude":asset.location_latitude,"Longitude":asset.location_longitude
   };
   const customValues=Object.fromEntries(customFields.map(f=>[f.label,asset.custom_fields?.[f.key]??""]));
-  return headers.map(name=>name==="Asset ID"?asset.id:custom?customValues[name]??lookup[name]??"":fmt((base as any)[visibleColumns.find(c=>c.header===name)?.key??""]));
+  return headers.map(name=>name==="Asset ID"?asset.id:custom?(AUDIT_COLUMNS.some(c=>c.header===name)?fmt((base as any)[AUDIT_COLUMNS.find(c=>c.header===name)!.key]):customValues[name]??lookup[name]??""):fmt((base as any)[visibleColumns.find(c=>c.header===name)?.key??""]));
  };
  const wb=XLSX.utils.book_new();
  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([headers,...assets.map(row)]),"Assets");
@@ -83,14 +99,25 @@ export async function exportAssetsPDF(title: string, assets: any[]) {
     subtitle: `${assets.length} asset(s)`,
   });
   const rows = assets.map(normalize);
-  const visibleColumns=assets.some(a=>a.verification_group||a.verification_status)?[...ASSET_COLUMNS,{key:"verification",header:"Verification"}]:ASSET_COLUMNS;
+  const main=[...ASSET_COLUMNS,{key:"verification",header:"Verification"}];
   autoTable(doc, {
     startY,
-    head: [visibleColumns.map((c) => c.header)],
-    body: rows.map((r) => visibleColumns.map((c) => fmt((r as any)[c.key], c.currency))),
+    head: [main.map((c) => c.header)],
+    body: rows.map((r) => main.map((c) => fmt((r as any)[c.key], c.currency))),
     styles: { fontSize: 7, font: template.font_family },
     headStyles: { fillColor: tableHeadFill(template) },
     margin: { left: template.margin_left, right: template.margin_right, bottom: template.margin_bottom },
+  });
+  doc.addPage();
+  doc.setFontSize(11);doc.text("Registration & verification audit",template.margin_left,template.margin_top+4);
+  const audit=[{key:"asset_tag",header:"Tag"},{key:"name",header:"Asset"},...AUDIT_COLUMNS];
+  autoTable(doc, {
+    startY:template.margin_top+9,
+    head:[audit.map(c=>c.header)],
+    body:rows.map(a=>audit.map(c=>fmt((a as any)[c.key]))),
+    styles:{fontSize:7,font:template.font_family},
+    headStyles:{fillColor:tableHeadFill(template)},
+    margin:{left:template.margin_left,right:template.margin_right,bottom:template.margin_bottom},
   });
   saveBranded(doc, template, `${safe(title) || "assets"}.pdf`);
 }
@@ -112,7 +139,13 @@ function detailPairs(a: any): [string, string][] {
     ["Description", a.description ?? ""],
     ...Object.entries(a.custom_fields??{}).map(([key,value]):[string,string]=>[key,String(value??"")]),
     ["Set for disposal", a.set_for_disposal ? "Yes" : "No"],
-    ["Created", a.created_at ? new Date(a.created_at).toLocaleString() : ""],
+    ["Registered on", n.registered_at],
+    ["Registered by", n.registered_by],
+    ["Capture method", n.capture_method],
+    ["Inspection result", n.inspection_result],
+    ["Verified on", n.inspected_at],
+    ["Verified by", n.inspected_by],
+    ["Verification evidence", n.inspection_evidence],
   ];
 }
 

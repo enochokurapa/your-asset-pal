@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { DEFAULT_TEMPLATE, type DocumentTemplate } from "@/lib/pdf-template";
 import { applyBrowserBranding, BRANDING_CHANGED_EVENT, loadTenantBranding } from "@/lib/branding";
 import { PlatformLogo, PlatformName } from "@/components/platform-logo";
+import {AddOnInlineCheckout} from "@/components/addon-inline-checkout";
 
 export const Route = createFileRoute("/_app")({ component: AppLayout, head:()=>({meta:[{name:"robots",content:"noindex,nofollow,noarchive"}]}) });
 
@@ -102,7 +103,7 @@ function AppLayout() {
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   useEffect(()=>{
-    if(["/settings","/users","/integrations","/domains"].some(path=>pathname.startsWith(path)))setSettingsOpen(true);
+    if(["/settings","/users","/domains","/billing"].some(path=>pathname.startsWith(path)))setSettingsOpen(true);
     if(pathname.startsWith("/reports"))setReportsOpen(true);
     if(pathname.startsWith("/billing"))setBillingOpen(true);
     if(pathname.startsWith("/verification"))setVerificationOpen(true);
@@ -169,7 +170,7 @@ function AppLayout() {
 
   const groupedNavPaths=new Set(["/categories","/locations","/branches","/analytics","/diagnostics","/audit","/builders","/integrations","/live-tracking"]);
   const groupItems=(paths:string[])=>visibleTenantNav.filter(n=>paths.includes(n.to));
-  const visibleNav = isSaasAdmin ? saasAdminNav : visibleTenantNav.filter(n=>!groupedNavPaths.has(n.to));
+  const visibleNav = isSaasAdmin ? saasAdminNav : visibleTenantNav.filter(n=>!groupedNavPaths.has(n.to)&&n.to!=="/billing");
 
   const currentModuleItem = !isSaasAdmin && currentNavItem?.module ? currentNavItem : undefined;
   const lockedPaidFeature = currentModuleItem?.module && (isPaidFeature(currentModuleItem.module) || isAddOnFeature(currentModuleItem.module))
@@ -273,7 +274,6 @@ function AppLayout() {
               {([
                 {key:"asset-setup",label:"Asset setup",icon:Tags,items:groupItems(["/categories","/locations","/branches"]),expanded:assetSetupOpen,toggle:()=>setAssetSetupOpen(v=>!v)},
                 {key:"management",label:"Management",icon:SlidersHorizontal,items:groupItems(["/analytics","/diagnostics","/audit","/builders"]),expanded:managementOpen,toggle:()=>setManagementOpen(v=>!v)},
-                {key:"add-ons",label:"Add-ons",icon:PlugZap,items:groupItems(["/integrations","/live-tracking"]),expanded:addonsOpen,toggle:()=>setAddonsOpen(v=>!v)},
               ]).filter(g=>g.items.length>0).map(g=><div key={g.key}>
                 <button type="button" onClick={g.toggle} aria-expanded={g.expanded} aria-controls={`${g.key}-sidebar-items`}
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
@@ -313,19 +313,6 @@ function AppLayout() {
                   className="block rounded-md px-3 py-2 text-xs font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">{label}</Link>)}
               </div>}
             </div>
-          ) : item.to === "/billing" && !isSaasAdmin ? (
-            <div key="billing-group">
-              <button type="button" onClick={()=>setBillingOpen(v=>!v)} aria-expanded={billingOpen} aria-controls="billing-sidebar-options"
-                className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  pathname.startsWith("/billing")?"bg-sidebar-primary text-sidebar-primary-foreground":"text-sidebar-foreground/80 hover:bg-sidebar-accent")}>
-                <CreditCard className="h-4 w-4"/><span className="flex-1 text-left">Plan & Billing</span>
-                <ChevronDown className={cn("h-4 w-4 transition-transform",billingOpen&&"rotate-180")}/>
-              </button>
-              {billingOpen&&<div id="billing-sidebar-options" className="ml-4 space-y-0.5 border-l border-sidebar-border pl-2">
-                {([ ["overview","Overview"],["plans","Packages & payment"],["seats","Team seats"],["capacity","Asset capacity"],["addons","Add-ons"] ] as const).map(([section,label])=><Link key={section} to="/billing" search={{section}} onClick={()=>setOpen(false)}
-                  className="block rounded-md px-3 py-2 text-xs font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">{label}</Link>)}
-              </div>}
-            </div>
           ) : item.to === "/settings" && !isSaasAdmin ? (
             <div key="settings-group">
               <button type="button" onClick={()=>setSettingsOpen(v=>!v)}
@@ -339,9 +326,25 @@ function AppLayout() {
                   {to:"/users",label:"Users",icon:Users,module:"users",tenantAdminOnly:true},
                   {to:"/domains",label:"Domain",icon:Globe2,tenantAdminOnly:true},
                 ].filter(item=>!item.module||canView(item.module as ModuleKey)||isPaidFeature(item.module as ModuleKey)||isAddOnFeature(item.module as ModuleKey)).map(renderNavItem)}
+                {isTenantAdmin&&<div className="mt-1 border-t border-sidebar-border/50 pt-1">
+                  <Link to="/billing" search={{section:"overview"}} onClick={()=>setOpen(false)} className="block rounded-md px-3 py-2 text-xs font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent">Subscription overview</Link>
+                  <Link to="/billing" search={{section:"history"}} onClick={()=>setOpen(false)} className="block rounded-md px-3 py-2 text-xs font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent">Billing · Payments & receipts</Link>
+                  <Link to="/billing" search={{section:"plans"}} onClick={()=>setOpen(false)} className="block rounded-md px-3 py-2 text-xs font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent">Change package</Link>
+                  <Link to="/billing" search={{section:"seats"}} onClick={()=>setOpen(false)} className="block rounded-md px-3 py-2 text-xs font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent">Additional users</Link>
+                  <Link to="/billing" search={{section:"capacity"}} onClick={()=>setOpen(false)} className="block rounded-md px-3 py-2 text-xs font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent">Asset capacity</Link>
+                </div>}
               </div>}
             </div>
           ) : renderNavItem(item))}
+          {!isSaasAdmin&&groupItems(["/integrations","/live-tracking"]).length>0&&<div className="mt-3 border-t border-sidebar-border/60 pt-3">
+            <button type="button" onClick={()=>setAddonsOpen(v=>!v)} aria-expanded={addonsOpen} aria-controls="addons-bottom-sidebar" className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent">
+              <PlugZap className="h-4 w-4"/><span className="flex-1 text-left">Add-ons</span><ChevronDown className={cn("h-4 w-4 transition-transform",addonsOpen&&"rotate-180")}/>
+            </button>
+            {addonsOpen&&<div id="addons-bottom-sidebar" className="ml-4 space-y-0.5 border-l border-sidebar-border pl-2">
+              {groupItems(["/integrations","/live-tracking"]).map(renderNavItem)}
+              {isTenantAdmin&&<Link to="/billing" search={{section:"addons"}} onClick={()=>setOpen(false)} className="block rounded-md px-3 py-2 text-xs text-sidebar-foreground/80 hover:bg-sidebar-accent">See add-on prices & buy</Link>}
+            </div>}
+          </div>}
         </nav>
 
         <div className="border-t border-sidebar-border p-3">
@@ -397,10 +400,7 @@ function AppLayout() {
                     <p className="mx-auto mt-2 max-w-lg text-sm text-muted-foreground">
                       This is an optional paid add-on. It is activated and billed separately from your AssetFlow plan.
                     </p>
-                    <p className="mx-auto mt-3 max-w-lg text-sm font-medium text-muted-foreground">
-                      Activate this feature from Plan & Billing.
-                    </p>
-                    {isTenantAdmin&&<Button asChild className="mt-5"><Link to="/billing">View add-on pricing & pay</Link></Button>}
+                    <AddOnInlineCheckout moduleKey={lockedPaidFeature.item.module!}/>
                   </>
                 ) : (
                   <>
