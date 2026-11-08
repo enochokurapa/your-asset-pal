@@ -387,7 +387,8 @@
 .af-site-frame{width:100%;max-width:1250px;margin-inline:auto;}
 @media(min-width:1280px){.af-site-frame{width:72%;max-width:1250px;}}
 .af-public-header{background:white;border-color:var(--af-line);}
-.af-public-footer{background:#202c70;}
+.af-public-footer{background:#252a87;}
+.af-public-footer-copyright{background:#171d60;border-color:rgba(255,255,255,.13);}
 .af-public-site .assetflow-homepage{border-color:#ebe2d9;box-shadow:0 12px 44px rgba(58,62,194,.075);}
 .af-public-site .assetflow-homepage [data-home-reveal]{transition-duration:450ms!important;}
 .af-public-site .af-hero-button-primary{background:var(--af-brand-ochre);border:1px solid #b66b28;color:white;}

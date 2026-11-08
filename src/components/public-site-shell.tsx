@@ -203,7 +203,7 @@ export function PublicFooter(){
        </nav>}
      </div>
    </div>
-   <div className="border-t border-white/15">
+   <div className="af-public-footer-copyright border-t border-white/15">
      <div className="mx-auto flex min-w-0 max-w-7xl flex-col gap-3 px-5 py-5 text-xs text-slate-300 sm:flex-row sm:items-center sm:justify-between sm:px-8">
        <span className="shrink-0">© {new Date().getFullYear()} AssetFlow 360. All rights reserved.</span>
        <nav aria-label="Legal and company information" className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2">
