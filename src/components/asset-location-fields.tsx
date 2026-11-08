@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Crosshair, MapPin, Plus } from "lucide-react";
+import { Crosshair, MapPin, Plus, Globe2 } from "lucide-react";
 import { GeoCascadeSelector } from "@/components/geo-cascade-selector";
 import { toast } from "sonner";
 
@@ -88,7 +88,6 @@ export function AssetLocationFields({
       setSelectedCountry("");
       return;
     }
-    const remembered = settings.remember_last_selection ? localStorage.getItem("assetflow:last-country") : null;
     // Never preselect a business default when several countries are allowed.
     // Existing saved assets retain their true country via the currentGeo hook.
     const next = allowed.length===1?allowed[0]:"";
@@ -243,6 +242,10 @@ export function AssetLocationFields({
 
         {showGeo && (
           <div className="space-y-3 sm:col-span-2">
+            {allowedCountryCodes.length===1&&<div className="rounded-lg border border-[#cfdfe9] bg-[#f4f9fc] p-3">
+              <p className="flex items-center gap-2 text-sm font-semibold"><Globe2 className="h-4 w-4 text-primary"/> Country: {(countries as any[]).find(c=>c.code===allowedCountryCodes[0])?.name||({UG:"Uganda",ZM:"Zambia",KE:"Kenya"} as Record<string,string>)[allowedCountryCodes[0]]||allowedCountryCodes[0]}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Your organisation currently uses this country for new asset locations. Only an administrator can change country settings.</p>
+            </div>}
             {allowedCountryCodes.length !== 1 && (
               <div className="space-y-2">
                 <Label>Country {settings?.require_geography ? "*" : ""}</Label>
@@ -311,10 +314,10 @@ export function AssetLocationFields({
                   </div>
                 )}
               </>
+            ) : allowedCountryCodes.length ? (
+              <p className="rounded-lg border bg-background p-3 text-sm text-muted-foreground">Select one of your organisation’s configured countries above.</p>
             ) : (
-              <p className="rounded-lg border bg-background p-3 text-sm text-muted-foreground">
-                Location countries are not configured for this organisation. Ask an administrator to complete Asset Location Setup.
-              </p>
+              <p className="rounded-lg border bg-background p-3 text-sm text-muted-foreground">No country is configured. Ask a business administrator to set the country under Settings → Asset location setup.</p>
             )}
           </div>
         )}

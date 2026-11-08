@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Search,MapPin } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CURRENT_ADMIN_CONFIG, currentAdminSource } from "@/lib/current-admin-sources";
 
@@ -44,7 +46,7 @@ async function fetchChildren(parentId:number) {
   return rows.filter((p) => p.feature_class === "A");
 }
 
-export function GeoCascadeSelector({
+function GenericGeoCascadeSelector({
   countryCode,
   value,
   onChange,
@@ -212,4 +214,95 @@ export function GeoCascadeSelector({
       </p>
     )}
   </div>;
+}
+
+/** Uganda's official geographic hierarchy. UBOS district rows do not carry
+ * admin1_code, so match their canonical display_path to the four regions.
+ * This avoids empty district menus and mixed regional results on mobile. */
+function UgandaGeoCascadeSelector({value,onChange,required=false}:{value:number|null;onChange:(place:GeoPlace|null)=>void;required?:boolean}){
+ const [regionId,setRegionId]=useState<string>("");
+ const [search,setSearch]=useState("");
+ const {data:regions=[],isPending:loadingRegions,isError:regionsError,refetch:retryRegions}=useQuery({
+  queryKey:["geo-uganda-region-v3"],
+  queryFn:async()=>{
+   const {data,error}=await (supabase as any).from("geo_places")
+    .select("geoname_id,name,display_path,feature_class,feature_code,admin_level,admin1_code,admin2_code,admin3_code,admin4_code,latitude,longitude,population,parent_geoname_id")
+    .eq("country_code","UG").eq("feature_code","ADM1").order("name");
+   if(error)throw error;
+   return data as GeoPlace[];
+  },
+ });
+ const {data:districts=[],isPending:loadingDistricts,isError:districtsError,refetch:retryDistricts}=useQuery({
+  queryKey:["geo-uganda-all-districts-v3"],
+  queryFn:async()=>{
+   const all:GeoPlace[]=[];
+   for(let offset=0;offset<400;offset+=200){
+    const {data,error}=await (supabase as any).from("geo_places")
+     .select("geoname_id,name,display_path,feature_class,feature_code,admin_level,admin1_code,admin2_code,admin3_code,admin4_code,latitude,longitude,population,parent_geoname_id")
+     .eq("country_code","UG").eq("feature_code","ADM2").eq("source","UBOS NPHC 2024")
+     .order("name").range(offset,offset+199);
+    if(error)throw error;
+    all.push(...(data??[]));
+    if((data?.length??0)<200)break;
+   }
+   return all;
+  }
+ });
+ const {data:existingPlace}=useQuery({
+  queryKey:["geo-uganda-selected-v3",value],enabled:!!value,
+  queryFn:async()=>{
+   const {data,error}=await (supabase as any).from("geo_places")
+    .select("geoname_id,name,display_path,feature_class,feature_code,admin_level,admin1_code,admin2_code,admin3_code,admin4_code,latitude,longitude,population,parent_geoname_id")
+    .eq("geoname_id",value).maybeSingle();
+   if(error)throw error;
+   return data as GeoPlace|null;
+  },
+ });
+ const inferRegion=(place:GeoPlace|null|undefined)=>{
+  if(!place)return "";
+  const location=place.display_path||"";
+  const matched=regions.find(r=>r.geoname_id===place.geoname_id||location.split(" · ").some(part=>part.trim().toLowerCase()===r.name.toLowerCase()));
+  return matched?String(matched.geoname_id):"";
+ };
+ useEffect(()=>{
+  if(!regions.length)return;
+  if(!value){setRegionId("");return;}
+  if(existingPlace&&Number(existingPlace.geoname_id)===Number(value))setRegionId(inferRegion(existingPlace));
+ },[value,existingPlace?.geoname_id,regions]);
+ const region=regions.find(item=>String(item.geoname_id)===regionId);
+ const available=useMemo(()=>region?districts.filter(d=>(d.display_path||"").split(" · ").some(part=>part.trim().toLowerCase()===region.name.toLowerCase())):[],[region?.geoname_id,districts]);
+ const matches=useMemo(()=>available.filter(d=>`${d.name} ${d.display_path??""}`.toLowerCase().includes(search.trim().toLowerCase())).slice(0,150),[available,search]);
+ const selectedDistrict=available.find(d=>Number(d.geoname_id)===Number(value));
+ return <div className="space-y-3 rounded-xl border bg-white p-3 sm:p-4">
+  <p className="flex items-center gap-2 text-sm font-semibold"><MapPin className="h-4 w-4 text-primary"/> Uganda · Geographic location</p>
+  <div className="space-y-1.5"><Label>1. Region {required?"*":""}</Label>
+   <Select value={regionId||"none"} onValueChange={id=>{setRegionId(id==="none"?"":id);setSearch("");onChange(null);}}>
+    <SelectTrigger className="h-11 w-full"><SelectValue placeholder="Choose region"/></SelectTrigger>
+    <SelectContent><SelectItem value="none">Choose region</SelectItem>{regions.map(r=><SelectItem key={r.geoname_id} value={String(r.geoname_id)}>{r.name}</SelectItem>)}</SelectContent>
+   </Select>
+  </div>
+  {loadingRegions&&<p className="text-xs text-muted-foreground">Loading regions…</p>}
+  {regionsError&&<button type="button" className="text-sm text-destructive underline" onClick={()=>void retryRegions()}>Could not load regions · Retry</button>}
+  {region&&<div className="space-y-2">
+   <Label>2. District {required?"*":""}</Label>
+   <div className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground"/>
+    <Input className="h-11 w-full pl-9" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search districts, e.g. Kampala" aria-label="Search districts"/>
+   </div>
+   <Select value={selectedDistrict?String(selectedDistrict.geoname_id):"none"} onValueChange={id=>onChange(available.find(d=>String(d.geoname_id)===id)??null)}>
+    <SelectTrigger className="h-11 w-full"><SelectValue placeholder="Choose district"/></SelectTrigger>
+    <SelectContent className="max-h-64"><SelectItem value="none">Choose district</SelectItem>
+     {matches.map(d=><SelectItem key={d.geoname_id} value={String(d.geoname_id)}>{d.name}{d.name.toLowerCase().endsWith("district")?"":" District"}</SelectItem>)}
+    </SelectContent>
+   </Select>
+   {!loadingDistricts&&!districtsError&&<p className="text-xs text-muted-foreground">{matches.length} matching districts in {region.name}{search?" · Clear search to see all":""}</p>}
+   {loadingDistricts&&<p className="text-xs text-muted-foreground">Loading districts…</p>}
+   {districtsError&&<button type="button" className="text-sm text-destructive underline" onClick={()=>void retryDistricts()}>Could not load districts · Retry</button>}
+   {!loadingDistricts&&!districtsError&&!available.length&&<p className="text-xs text-destructive">No districts found in this region. Please retry.</p>}
+   {selectedDistrict&&<p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-900">Selected: Uganda / {region.name} / {selectedDistrict.name}</p>}
+  </div>}
+ </div>;
+}
+
+export function GeoCascadeSelector(props:{countryCode:string;value:number|null;onChange:(place:GeoPlace|null)=>void;required?:boolean}){
+ return props.countryCode==="UG"?<UgandaGeoCascadeSelector value={props.value} onChange={props.onChange} required={props.required}/>:<GenericGeoCascadeSelector {...props}/>;
 }
