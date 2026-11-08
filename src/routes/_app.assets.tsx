@@ -141,6 +141,9 @@ function AssetsPage() {
   const [importBranchId,setImportBranchId]=useState("");
   const [customValues,setCustomValues]=useState<Record<string,string>>({});
   const registers=(catalog?.definitions??[]) as Array<{id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean,options?:string[],section?:string}>,tag_policy?:string,core_fields?:string[]}} >;
+  const primaryRegisterId=catalog?.primaryId??"default";
+  const primaryRegisterName=primaryRegisterId==="default"?"System Asset Register":registers.find(r=>r.id===primaryRegisterId)?.name??"Active register";
+  const displayedRegisterName=registerChoice==="default"?"System Asset Register":registers.find(r=>r.id===registerChoice)?.name??"Archived register";
   const registerFields=registers.find(r=>r.id===registerChoice)?.configuration?.fields??[];
   const customEntryFields=registerFields.filter(field=>!nativeRegisterKey(field));
   const selectedCoreFields=registers.find(r=>r.id===registerChoice)?.configuration?.core_fields;
@@ -406,7 +409,10 @@ function AssetsPage() {
       openEdit(found);
       toast.success(`Asset found: ${found.name}`);
     } else if (canAdd) {
-      setForm({ ...empty, asset_tag: code });
+      setRegisterChoice(primaryRegisterId);
+      setCustomValues({});
+      setWizardStep(0);
+      setForm({ ...empty, asset_tag: code,branch_id:visibleBranches.length===1?visibleBranches[0].id:null });
       setOpen(true);
       toast.message("New tag detected", { description: "Fill in details to register this asset." });
     } else {
@@ -750,13 +756,19 @@ function AssetsPage() {
           <p className="text-sm text-muted-foreground">Search, scan or add an asset.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={registerChoice} onValueChange={setRegisterChoice}><SelectTrigger className="w-52"><SelectValue placeholder="Select register"/></SelectTrigger><SelectContent><SelectItem value="default">Default register</SelectItem>{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select>
+          <div className="flex min-w-0 max-w-full items-center gap-2 rounded-lg border border-[#dce8ed] bg-[#f7fafc] px-3 py-2 text-xs sm:text-sm">
+            <span className="font-semibold text-[#30516a]">Active register:</span><span className="max-w-48 truncate font-medium" title={primaryRegisterName}>{primaryRegisterName}</span>
+          </div>
           <Button variant="outline" onClick={() => { setScanMode("lookup"); setScanOpen(true); }}>
             <ScanLine className="mr-2 h-4 w-4" /> Scan asset
           </Button>
           <details className="order-last w-full rounded-lg border border-[#dce6eb] bg-white px-3 py-2">
             <summary className="cursor-pointer select-none text-xs font-semibold text-[#365a6e]">More tools · Import, export, templates & bulk updates</summary>
             <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+              <div className="flex w-full flex-col gap-1 sm:max-w-xs"><Label className="text-xs">View assets from another register</Label>
+               <Select value={registerChoice} onValueChange={setRegisterChoice}><SelectTrigger className="h-9"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="default">System Asset Register</SelectItem>{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}{r.id===primaryRegisterId?" (Active)":""}</SelectItem>)}</SelectContent></Select>
+               <span className="text-[11px] text-muted-foreground">This changes the asset list only. New entries always use your active register.</span>
+              </div>
               {canView("register_builder")&&<Button asChild variant="outline" size="sm"><Link to="/builders" search={{type:"register_builder"}}>Manage custom registers</Link></Button>}
               <Button size="sm" variant="outline" onClick={()=>setRegisterPreview(registerChoice)}>Preview register</Button>
           <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError||!exportAccess.allowed("register")} onClick={()=>runPermittedExport("register",()=>exportAssetsXLSX(registers.find(r=>r.id===registerChoice)?.name??"Default Asset Register", (assets as any[]).filter(a=>registerChoice==="default"?a.register_definition_id==null:a.register_definition_id===registerChoice),registerFields,locationSettings as any))} title="Export assets for selected register"><Download className="mr-2 h-4 w-4"/> Export register</Button>
@@ -805,8 +817,8 @@ function AssetsPage() {
             <DialogContent className="flex max-h-[92vh] max-w-3xl flex-col overflow-hidden p-0">
               <DialogHeader className="border-b px-5 pb-4 pt-5 sm:px-6">
                 {companyLogo && <div className="mb-2 flex justify-start"><img src={companyLogo} alt="Company logo" className="h-14 w-auto max-w-[210px] object-contain sm:h-16" /></div>}
-                <DialogTitle>{form.id ? "Edit asset" : registerChoice!=="default" ? `New ${registers.find(r=>r.id===registerChoice)?.name??"asset"}` : "Register asset"}</DialogTitle>
-                <div className="flex flex-wrap items-center gap-2"><Label className="whitespace-nowrap text-xs">Asset register</Label><Select value={registerChoice} onValueChange={v=>{setRegisterChoice(v);setCustomValues({});setWizardStep(0);if(!form.id)setForm({...empty,branch_id:visibleBranches.length===1?visibleBranches[0].id:null})}}><SelectTrigger className="h-9 flex-1"><SelectValue/></SelectTrigger><SelectContent>{(!catalog?.primaryId||!!form.id)&&<SelectItem value="default">Default register</SelectItem>}{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select></div>
+                <DialogTitle>{form.id ? "Edit asset" : "New asset"}</DialogTitle>
+                <p className="text-xs text-muted-foreground">Register: <strong className="text-foreground">{displayedRegisterName}</strong> {form.id?"· Existing asset": "· Active for new entries"}</p>
                 <DialogDescription className="sm:hidden">Step {registerChoice==="default"?wizardStep+1:customStepOrder.indexOf(wizardStep)+1} of {displayedSteps.length} · {wizardSteps[wizardStep].title}</DialogDescription>
 
                 <div className="hidden pt-4 sm:block">

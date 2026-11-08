@@ -19,6 +19,7 @@ function MfaChallenge(){
  const [error,setError]=useState("");
  const [method,setMethod]=useState<"choose"|"email"|"app">("choose");
  const [emailSent,setEmailSent]=useState(false);
+ const [retrySeconds,setRetrySeconds]=useState(0);
  const [sendingEmail,setSendingEmail]=useState(false);
  const [emailFailed,setEmailFailed]=useState(false);
  const [registeredEmail,setRegisteredEmail]=useState("");
@@ -37,11 +38,12 @@ function MfaChallenge(){
    if(!session?.access_token){setError("Please sign in again");return;}
    const statusResponse=await fetch("/api/security/email-mfa/status",{method:"POST",headers:{Authorization:"Bearer "+session.access_token},cache:"no-store"});
    if(!statusResponse.ok){setError("Verification temporarily unavailable");return;}
-   const status=await statusResponse.json() as {verified?:boolean;registeredEmail?:string;preferredMethod?:"email"|"app"|null;hasAuthenticator?:boolean};
+   const status=await statusResponse.json() as {verified?:boolean;registeredEmail?:string;preferredMethod?:"email"|"app"|null;hasAuthenticator?:boolean;pendingCode?:boolean;retryAfterSeconds?:number};
    if(!active)return;
    if(status.verified){setReady(true);return;}
    if(levels.nextLevel!=="aal2"&&!isSaasAdmin&&!isTenantAdmin){setReady(true);return;}
    setRegisteredEmail(status.registeredEmail||user.email||"");
+   if(status.pendingCode){setEmailSent(true);setRetrySeconds(status.retryAfterSeconds||0);didAutoSend.current=true;}
    const {data,error}=await supabase.auth.mfa.listFactors();
    if(!active)return;
    if(error){setError(error.message);return;}
@@ -68,6 +70,11 @@ function MfaChallenge(){
   if(error){setError(error.message);return;}
   setEnrollment({factorId:data.id,qr:data.totp.qr_code,secret:data.totp.secret});
  };
+ useEffect(()=>{
+  if(!retrySeconds)return;
+  const timer=window.setInterval(()=>setRetrySeconds(v=>Math.max(0,v-1)),1000);
+  return ()=>window.clearInterval(timer);
+ },[retrySeconds>0]);
  const emailAction=async(action:"send"|"verify")=>{
   const {data:{session}}=await supabase.auth.getSession();
   if(!session?.access_token){setError("Please sign in again");return false;}
@@ -75,7 +82,9 @@ function MfaChallenge(){
    method:"POST",cache:"no-store",headers:{Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},
    body:action==="verify"?JSON.stringify({code}):"{}",
   });
-  const result=await response.json().catch(()=>({})) as {error?:string;verified?:boolean;sent?:boolean};
+  const result=await response.json().catch(()=>({})) as {error?:string;verified?:boolean;sent?:boolean;retryAfterSeconds?:number};
+  if(result.retryAfterSeconds)setRetrySeconds(result.retryAfterSeconds);
+  else if(!response.ok&&response.headers.get("retry-after"))setRetrySeconds(Number(response.headers.get("retry-after"))||0);
   if(!response.ok){setError(result.error||"Security verification unavailable");return false;}
   return true;
  };
@@ -126,10 +135,10 @@ function MfaChallenge(){
    <button type="button" onClick={()=>{setMethod("app");setError("")}} className="flex w-full items-center justify-between gap-3 rounded-lg border p-4 text-left hover:bg-muted/40"><span><strong className="block text-sm">Authenticator app</strong><span className="mt-1 block text-xs text-muted-foreground">Use your authenticator's six-digit code</span></span><span className="text-xs font-semibold">Select</span></button>
   </div>}
   {method==="email"&&<div className="mt-5 space-y-4">
-   <div className="rounded-lg border bg-[#f5f8fb] px-3 py-2.5 text-sm"><span className="block text-xs text-muted-foreground">Code sent to</span><strong className="break-all">{registeredEmail||user?.email||"Your registered email"}</strong></div>
-   {!emailSent?<div role="status" className="space-y-2"><p className="text-sm text-muted-foreground">{sendingEmail?"Sending your verification code…":emailFailed?"Unable to send the code.":"Preparing verification…"}</p>{emailFailed&&<Button variant="outline" className="w-full" onClick={sendEmail}>Try sending again</Button>}</div>
+   <div className="rounded-lg border bg-[#f5f8fb] px-3 py-2.5 text-sm"><span className="block text-xs text-muted-foreground">Verification email</span><strong className="break-all">{registeredEmail||user?.email||"Your registered email"}</strong></div>
+   {!emailSent?<div role="status" className="space-y-2"><p className="text-sm text-muted-foreground">{sendingEmail?"Sending your verification code…":emailFailed?"Unable to send the code.":"Preparing verification…"}</p>{emailFailed&&<Button variant="outline" className="w-full" onClick={sendEmail} disabled={retrySeconds>0}>{retrySeconds>0?`Retry in ${retrySeconds}s`:"Try sending again"}</Button>}</div>
    :<form onSubmit={verifyEmail} className="space-y-3"><p className="text-sm text-muted-foreground">Check your email. Code expires in 10 minutes.</p><Label htmlFor="email-mfa-code">Six-digit code</Label><Input id="email-mfa-code" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))} maxLength={6} required/><Button className="w-full" disabled={busy||code.length!==6}>{busy?"Verifying…":"Verify and continue"}</Button></form>}
-   {emailSent&&<Button variant="link" className="px-0 text-sm" disabled={sendingEmail} onClick={sendEmail}>Resend code</Button>}
+   {emailSent&&<Button variant="link" className="px-0 text-sm" disabled={sendingEmail||retrySeconds>0} onClick={sendEmail}>{retrySeconds>0?`Resend available in ${retrySeconds}s`:"Resend code"}</Button>}
   </div>}
   {method==="app"&&<div className="mt-5 space-y-3">
    {!factor&&!enrollment&&<Button className="w-full" onClick={enroll} disabled={enrolling}>{enrolling?"Preparing…":"Set up authenticator"}</Button>}

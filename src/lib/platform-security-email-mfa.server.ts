@@ -107,9 +107,16 @@ export async function maybeHandleEmailMfa(request:Request):Promise<Response|null
   }
   const proof=who.aal==="aal2"||await getEmailMfaProof(who.userId,who.sessionId);
   const trusted=await trustedDevice(who.userId,request.headers.get("cookie")||"");
-  if(action==="status")return okJson({required:true,verified:proof||trusted,
-   emailAvailable:who.confirmed,registeredEmail:who.email,hasAuthenticator:await hasVerifiedTotp(who.userId),
-   preferredMethod:await savedMethod(who.userId),trustedDevice:trusted});
+  if(action==="status"){
+   const previous=await queryPostgres<{pending:boolean;retry_after:number}>(`
+    SELECT (code_hash IS NOT NULL AND code_expires_at>now()) AS pending,
+     GREATEST(0,CEIL(EXTRACT(EPOCH FROM(last_sent_at+interval '60 seconds'-now()))))::integer AS retry_after
+    FROM public.platform_security_email_mfa WHERE user_id=$1 AND session_id=$2`,[who.userId,who.sessionId]);
+   return okJson({required:true,verified:proof||trusted,
+    emailAvailable:who.confirmed,registeredEmail:who.email,hasAuthenticator:await hasVerifiedTotp(who.userId),
+    preferredMethod:await savedMethod(who.userId),trustedDevice:trusted,
+    pendingCode:previous[0]?.pending===true,retryAfterSeconds:previous[0]?.retry_after||0});
+  }
   if(action==="remember"){
    if(!proof)return errorJson(403,"Complete verification before trusting this device");
    const payload=await request.json().catch(()=>({})) as {remember?:boolean;method?:string};
@@ -125,6 +132,16 @@ export async function maybeHandleEmailMfa(request:Request):Promise<Response|null
   if(action==="send"){
    if(!who.confirmed)return errorJson(403,"Verify your registered email address before using email codes");
    if(await getEmailMfaProof(who.userId,who.sessionId))return okJson({verified:true});
+   const previous=await queryPostgres<{pending:boolean;retry_after:number;hourly_limit:boolean}>(`
+    SELECT (code_hash IS NOT NULL AND code_expires_at>now()) AS pending,
+      GREATEST(0,CEIL(EXTRACT(EPOCH FROM(last_sent_at+interval '60 seconds'-now()))))::integer AS retry_after,
+      (window_started_at>now()-interval '1 hour' AND sends_in_window>=5) AS hourly_limit
+    FROM public.platform_security_email_mfa WHERE user_id=$1 AND session_id=$2`,[who.userId,who.sessionId]);
+   // An accepted code is still usable when an automatic send or refresh
+   // happens during the cooldown. Do not replace it unnecessarily.
+   if(previous[0]?.pending&&previous[0].retry_after>0)return okJson({sent:true,alreadySent:true,retryAfterSeconds:previous[0].retry_after});
+   if(previous[0]?.hourly_limit)return errorJson(429,"Email code limit reached. Use your authenticator or try again later.");
+   if(previous[0]?.retry_after>0){const response=errorJson(429,"Please wait before requesting another code.");response.headers.set("retry-after",String(previous[0].retry_after));return response;}
    const code=String(randomInt(0,1000000)).padStart(6,"0");
    const salt=randomBytes(18).toString("hex");const value=salt+":"+hashCode(code,salt);
    const db=getPostgresPool();
@@ -139,7 +156,11 @@ export async function maybeHandleEmailMfa(request:Request):Promise<Response|null
       AND (platform_security_email_mfa.last_sent_at IS NULL OR platform_security_email_mfa.last_sent_at < now()-interval '60 seconds')
       AND (platform_security_email_mfa.window_started_at<now()-interval '1 hour' OR platform_security_email_mfa.sends_in_window<5)
     RETURNING user_id`,[who.userId,who.sessionId,value]);
-   if(!response.rows.length)return errorJson(429,"Please wait before requesting another code");
+   if(!response.rows.length){
+    const pending=await queryPostgres<{pending:boolean}>(`SELECT (code_hash IS NOT NULL AND code_expires_at>now()) AS pending FROM public.platform_security_email_mfa WHERE user_id=$1 AND session_id=$2`,[who.userId,who.sessionId]);
+    if(pending[0]?.pending)return okJson({sent:true,alreadySent:true});
+    return errorJson(429,"Please wait before requesting another code.");
+   }
    try{await sendPlatformSecurityCodeEmail(who.email,code)}catch(e){
     await db.query(`DELETE FROM public.platform_security_email_mfa WHERE user_id=$1 AND session_id=$2 AND code_hash=$3 AND verified_at IS NULL`,[who.userId,who.sessionId,value]);
     console.error("[Security email] SMTP delivery rejected",e instanceof Error?e.message:"Unknown error");
