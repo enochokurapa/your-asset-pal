@@ -1,10 +1,14 @@
 import {createFileRoute,Navigate} from "@tanstack/react-router";
 import {useState} from "react";
 import {useQuery} from "@tanstack/react-query";
+import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription,DialogFooter} from "@/components/ui/dialog";
+import {Label} from "@/components/ui/label";
+import {toast} from "sonner";
 import {useServerFn} from "@tanstack/react-start";
 import {useAuth} from "@/hooks/use-auth";
 import {getServerAuthHeaders} from "@/lib/auth-headers";
 import {getPlatformActivity} from "@/lib/platform-activity.functions";
+import {requestSaasEmailRecovery} from "@/lib/platform-email-recovery.functions";
 import {Card} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
@@ -14,6 +18,22 @@ export const Route=createFileRoute("/_app/saas-admin/user-activity")({component:
 function UserActivity(){
  const {isSaasAdmin,loading}=useAuth();
  const get=useServerFn(getPlatformActivity);
+ const requestEmailChange=useServerFn(requestSaasEmailRecovery);
+ const [recovering,setRecovering]=useState<{id:string;email:string;name:string}|null>(null);
+ const [currentConfirm,setCurrentConfirm]=useState("");
+ const [replacement,setReplacement]=useState("");
+ const [busy,setBusy]=useState(false);
+ const openRecovery=(u:{id:string;email:string;name:string})=>{setRecovering(u);setCurrentConfirm("");setReplacement("");};
+ const submitRecovery=async()=>{
+  if(!recovering||busy)return;
+  setBusy(true);
+  try{
+   await requestEmailChange({data:{user_id:recovering.id,current_email:currentConfirm.trim().toLowerCase(),replacement_email:replacement.trim().toLowerCase()}});
+   toast.success("Verification link sent to the replacement email. The current login remains unchanged until confirmed.");
+   setRecovering(null);
+  }catch(e:any){toast.error(e?.message||"Could not request an email change");}
+  finally{setBusy(false);}
+ };
  const [page,setPage]=useState(1);
  const [search,setSearch]=useState("");
  const {data,error,isLoading}=useQuery({
@@ -39,14 +59,15 @@ function UserActivity(){
     <Input aria-label="Search visible users" placeholder="Search users on this page" value={search} onChange={e=>setSearch(e.target.value)} className="max-w-xs"/>
    </div>
    <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm">
-    <thead className="border-b bg-muted/40"><tr><th className="p-3">User</th><th className="p-3">Role</th><th className="p-3">Account</th><th className="p-3">Last recorded activity</th></tr></thead>
+    <thead className="border-b bg-muted/40"><tr><th className="p-3">User</th><th className="p-3">Role</th><th className="p-3">Account</th><th className="p-3">Last recorded activity</th><th className="p-3">Recovery</th></tr></thead>
     <tbody>{users.map((u:any)=><tr key={u.id} className="border-b last:border-0">
      <td className="p-3"><p className="font-medium">{u.name||"Not specified"}</p><p className="text-xs text-muted-foreground">{u.email}</p></td>
      <td className="p-3">{u.role||"Member"}</td>
      <td className="p-3">{u.isActive?"Active":"Disabled"}</td>
      <td className="p-3 text-muted-foreground">{stamp(u.lastActivityAt)}</td>
+     <td className="p-3">{u.role!=="SaaS Admin"&&<Button size="sm" variant="outline" onClick={()=>openRecovery(u)}>Change email</Button>}</td>
     </tr>)}
-    {!isLoading&&!users.length&&<tr><td colSpan={4} className="p-5 text-center">No matching users on this page.</td></tr>}
+    {!isLoading&&!users.length&&<tr><td colSpan={5} className="p-5 text-center">No matching users on this page.</td></tr>}
     </tbody>
    </table></div>
    <div className="flex justify-between gap-3">
@@ -69,5 +90,14 @@ function UserActivity(){
     {!data?.events?.length&&<p className="text-sm text-muted-foreground">No recorded events for these users.</p>}
    </div>
   </Card>
+  <Dialog open={!!recovering} onOpenChange={open=>{if(!open&&!busy)setRecovering(null)}}>
+   <DialogContent className="max-w-md"><DialogHeader><DialogTitle>Recover login email</DialogTitle><DialogDescription>The account's current email remains active until the replacement inbox verifies the change. Only SaaS Admin can request this.</DialogDescription></DialogHeader>
+    <div className="space-y-4"><div className="rounded-lg border bg-muted/20 p-3"><p className="text-sm font-medium">{recovering?.name||"User"}</p><p className="break-all text-xs text-muted-foreground">Current login: {recovering?.email}</p></div>
+     <div className="space-y-1.5"><Label htmlFor="confirm-current-login">Type current login email to confirm identity</Label><Input id="confirm-current-login" autoComplete="off" value={currentConfirm} onChange={e=>setCurrentConfirm(e.target.value)}/></div>
+     <div className="space-y-1.5"><Label htmlFor="new-login-email">Replacement email</Label><Input id="new-login-email" type="email" autoComplete="off" placeholder="name@company.com" value={replacement} onChange={e=>setReplacement(e.target.value)}/></div>
+     <p className="text-xs text-muted-foreground">A secure one-time confirmation link goes to the new mailbox. The link expires in 24 hours. After confirmation, existing sessions are signed out; the password and MFA remain unchanged.</p>
+    </div><DialogFooter><Button variant="outline" disabled={busy} onClick={()=>setRecovering(null)}>Cancel</Button><Button disabled={busy||!recovering||currentConfirm.trim().toLowerCase()!==recovering.email.toLowerCase()||!/^\S+@\S+\.\S+$/.test(replacement)||replacement.trim().toLowerCase()===recovering.email.toLowerCase()} onClick={submitRecovery}>{busy?"Sending…":"Send verification link"}</Button></DialogFooter>
+   </DialogContent>
+  </Dialog>
  </div>;
 }

@@ -63,6 +63,7 @@ const saasAdminNav: NavItem[] = [
   { to: "/saas-admin/contact", label: "Contact Inbox", icon: Mail },
   { to: "/saas-admin/social-links", label: "Social Media & WhatsApp", icon: Globe2 },
   { to: "/saas-admin/organizations", label: "Businesses", icon: Building2 },
+  { to: "/saas-admin/user-activity", label: "User Accounts", icon: Users },
   { to: "/saas-admin/partners", label: "Partners", icon: Building2 },
   { to: "/saas-admin/settings", label: "Settings", icon: Settings },
   { to: "/profile", label: "My profile", icon: UserCircle },

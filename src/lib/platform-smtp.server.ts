@@ -309,3 +309,32 @@ export async function sendPlatformSecurityCodeEmail(to:string,code:string){
   return {accepted:true};
  }finally{c.close()}
 }
+
+/** Confirm a SaaS Admin-initiated login-email recovery through the destination
+ * mailbox, using the existing encrypted AssetFlow360 SMTP credentials. */
+export async function sendPlatformEmailRecoveryLink(to:string,url:string){
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)||to.length>250)throw Error("Invalid recovery email");
+ if(!/^https:\/\/assetflow360\.com\/confirm-login-email#token=[a-f0-9]{64}$/.test(url))throw Error("Invalid recovery link");
+ const config=await getConfiguredSmtpForApplication("security");
+ const smtp=await connect(config);
+ try{
+  await smtp.send("MAIL FROM:<"+config.fromEmail+">");
+  await smtp.send("RCPT TO:<"+to+">");
+  await smtp.send("DATA",354);
+  const body=[
+   "From: AssetFlow360 Security <"+config.fromEmail+">",
+   "To: "+safe(to),
+   "Subject: AssetFlow360 Security | Confirm your new login email",
+   "MIME-Version: 1.0","Content-Type: text/plain; charset=UTF-8",
+   "X-Auto-Response-Suppress: All","Cache-Control: no-store","",
+   "An AssetFlow360 SaaS administrator requested a correction to your account's login email.",
+   "", "Confirm that you own this address by opening this secure link:",url,"",
+   "The link expires in 24 hours. Your previous login email remains active until confirmation.",
+   "If you did not request this change, do not open the link. Contact your organization's administrator.",
+   "This message was sent automatically. Please do not reply."
+  ].join("\r\n").replace(/\r\n\./g,"\r\n..");
+  await smtp.send(body+"\r\n.",250);
+  try{await smtp.send("QUIT",221)}catch{/* Delivery already accepted */}
+  return {accepted:true};
+ }finally{smtp.close()}
+}

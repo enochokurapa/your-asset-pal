@@ -9,6 +9,7 @@ import { createHash } from "node:crypto";
 import { maybeHandlePlatformBrandingAsset } from "./lib/platform-branding-assets.server";
 import { supabaseAdmin } from "./integrations/supabase/client.server";
 import {maybeHandleEmailMfa,shouldRequireEmailMfa} from "./lib/platform-security-email-mfa.server";
+import {confirmSaasEmailRecovery} from "./lib/platform-email-recovery.server";
 import { completeMicrosoftOAuth } from "./lib/microsoft365.server";
 
 type ServerEntry = {
@@ -457,6 +458,9 @@ export default {
 
       const microsoftResponse = await maybeHandleMicrosoftOAuth(request);
       if (microsoftResponse) return withSecurityHeaders(microsoftResponse, request);
+
+      const recoveryResponse=await confirmSaasEmailRecovery(request);
+      if(recoveryResponse)return withSecurityHeaders(recoveryResponse,request);
 
       const emailMfa=await maybeHandleEmailMfa(request);
       if(emailMfa)return withSecurityHeaders(emailMfa,request);
