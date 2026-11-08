@@ -74,6 +74,7 @@ function AppLayout() {
   const [open, setOpen] = useState(false);
   const [settingsOpen,setSettingsOpen]=useState(false);
   const [reportsOpen,setReportsOpen]=useState(false);
+  const [billingOpen,setBillingOpen]=useState(false);
   const [branding, setBranding] = useState<DocumentTemplate | null>(null);
   const [mfaChecked,setMfaChecked]=useState(false);
   const [mfaRequired,setMfaRequired]=useState(false);
@@ -94,6 +95,7 @@ function AppLayout() {
   useEffect(()=>{
     if(["/settings","/users","/integrations","/domains"].some(path=>pathname.startsWith(path)))setSettingsOpen(true);
     if(pathname.startsWith("/reports"))setReportsOpen(true);
+    if(pathname.startsWith("/billing"))setBillingOpen(true);
   },[pathname]);
   const exportAccess=useExportAccess();
 
@@ -265,6 +267,19 @@ function AppLayout() {
                     className="block rounded-md px-3 py-2 text-xs font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     activeOptions={{exact:true}}
                   >{label}</Link>)}
+              </div>}
+            </div>
+          ) : item.to === "/billing" && !isSaasAdmin ? (
+            <div key="billing-group">
+              <button type="button" onClick={()=>setBillingOpen(v=>!v)} aria-expanded={billingOpen} aria-controls="billing-sidebar-options"
+                className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  pathname.startsWith("/billing")?"bg-sidebar-primary text-sidebar-primary-foreground":"text-sidebar-foreground/80 hover:bg-sidebar-accent")}>
+                <CreditCard className="h-4 w-4"/><span className="flex-1 text-left">Plan & Billing</span>
+                <ChevronDown className={cn("h-4 w-4 transition-transform",billingOpen&&"rotate-180")}/>
+              </button>
+              {billingOpen&&<div id="billing-sidebar-options" className="ml-4 space-y-0.5 border-l border-sidebar-border pl-2">
+                {([ ["overview","Overview"],["plans","Packages & payment"],["seats","Team seats"],["capacity","Asset capacity"],["addons","Add-ons"] ] as const).map(([section,label])=><Link key={section} to="/billing" search={{section}} onClick={()=>setOpen(false)}
+                  className="block rounded-md px-3 py-2 text-xs font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">{label}</Link>)}
               </div>}
             </div>
           ) : item.to === "/settings" && !isSaasAdmin ? (

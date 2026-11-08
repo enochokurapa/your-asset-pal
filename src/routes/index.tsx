@@ -17,8 +17,8 @@ const steps=[{icon:Package,name:"Register",info:"Bring assets and their importan
 
 function Home(){const {initialStats}=Route.useLoaderData();return <PublicShell><main className="assetflow-homepage min-w-0 overflow-hidden bg-[#eaf0f3] text-[#112e40]"><HomeScrollMotion/>
  <HomeHeroCarousel initialStats={initialStats}/>
- <section aria-label="Platform by the numbers" className="relative z-10 border-b border-[#d5e2e8] bg-[#eaf0f3] px-5 py-8 sm:px-8 sm:py-10">
-  <div className="mx-auto max-w-7xl"><div className="mb-5 flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[.17em] text-[#c56835]">Our platform at a glance</p><h2 className="mt-1 text-2xl font-bold tracking-tight text-[#15364a]">A clearer view of every asset.</h2></div><span className="rounded-full border border-[#cddde5] bg-[#dce8ee] px-3 py-1.5 text-xs font-semibold text-[#31576b]">Live platform metrics</span></div><HomeLiveStats initialStats={initialStats}/></div>
+ <section aria-label="Platform by the numbers" className="relative z-10 border-b border-[#d5e2e8] bg-[#eaf0f3] px-4 py-5 sm:px-8 sm:py-8">
+  <div className="mx-auto max-w-7xl"><h2 className="mb-3 text-sm font-bold text-[#15364a] sm:mb-5 sm:text-lg">Platform stats</h2><HomeLiveStats initialStats={initialStats}/></div>
  </section>
  <section className="bg-[#f7f5f0] px-5 py-16 sm:px-8 sm:py-24" aria-labelledby="why-af-title"><div className="mx-auto max-w-7xl">
   <div data-home-reveal className="mb-11 flex flex-col justify-between gap-6 lg:flex-row lg:items-end"><div className="max-w-3xl"><p className="text-xs font-bold uppercase tracking-[.2em] text-[#c16b39]">Why AssetFlow360</p><h2 id="why-af-title" className="mt-4 text-3xl font-bold tracking-[-.035em] text-[#123348] sm:text-5xl">Everything connected.<br/><span className="text-[#c46c3b]">Nothing left to guess.</span></h2></div><p className="max-w-md text-sm leading-7 text-[#546b7b] sm:text-base">Fixed assets move through departments, branches and different teams. Keep the full story connected—without digging through spreadsheets.</p></div>
