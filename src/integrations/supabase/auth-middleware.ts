@@ -112,7 +112,7 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' })
     }
 
     try{
-      if(await shouldRequireEmailMfa(token))throw new Response("Administrator MFA enrollment or verification required",{status:403});
+      if(await shouldRequireEmailMfa(token,request.headers.get("cookie")||""))throw new Response("Administrator MFA enrollment or verification required",{status:403});
     }catch(error){
       if(error instanceof Response)throw error;
       console.error("[Auth] Administrator MFA policy validation failed");

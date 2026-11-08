@@ -129,6 +129,7 @@ const socialIcons={
 } satisfies Record<SocialPlatform,typeof MessageCircle>;
 const secondary=[
  {to:"/about",label:"About"},
+ {to:"/fixed-asset-management-africa",label:"Asset Management in Africa"},
  {to:"/contact",label:"Contact Us"},
  {to:"/privacy",label:"Privacy Policy"},
  {to:"/terms",label:"Terms of Use"},

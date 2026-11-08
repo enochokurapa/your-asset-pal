@@ -92,7 +92,7 @@ async function maybeProxySupabase(request: Request): Promise<Response | null> {
       const loginSessionRpc=request.method==="POST"&&
         /^\/rest\/v1\/rpc\/(current_login_session_valid|other_login_sessions|replace_other_login_sessions)$/.test(path);
       if(!enrollmentMetadata&&!loginSessionRpc){
-        try{if(await shouldRequireEmailMfa(token))return jsonResponse(403,{error:"mfa_required",message:"Complete sign-in verification before continuing"});}
+        try{if(await shouldRequireEmailMfa(token,request.headers.get("cookie")||""))return jsonResponse(403,{error:"mfa_required",message:"Complete sign-in verification before continuing"});}
         catch{return jsonResponse(503,{error:"security_check_unavailable",message:"Sign-in security check unavailable"});}
       }
     }

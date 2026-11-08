@@ -4,7 +4,7 @@ import {sendPlatformSecurityCodeEmail} from "@/lib/platform-smtp.server";
 
 type JwtPayload={sub?:string;session_id?:string;aal?:string;exp?:number};
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
-const G=<T>(x:T)=>x;
+
 function jwtPayload(token:string):JwtPayload{
  try{return JSON.parse(Buffer.from(token.split(".")[1]||"","base64url").toString("utf8")) as JwtPayload;}
  catch{throw new Response("Invalid authentication token",{status:401})}
@@ -25,16 +25,49 @@ export async function getEmailMfaProof(userId:string,sessionId:string){
  ) AS ok`,[userId,sessionId]);
  return result[0]?.ok===true;
 }
-export async function shouldRequireEmailMfa(token:string){
+const TRUST_COOKIE="af_mfa_trusted";
+const TRUST_DAYS=14;
+function trustedHash(token:string){
+ const secret=process.env.SMTP_SETTINGS_ENCRYPTION_KEY?.trim();
+ if(!secret||!/^[a-f0-9]{64}$/i.test(secret))throw new Error("Security signing key is missing");
+ return createHmac("sha256",Buffer.from(secret,"hex")).update("trusted-device:"+token).digest("hex");
+}
+async function trustedDevice(userId:string,cookieHeader:string){
+ const token=(cookieHeader.match(/(?:^|;\s*)af_mfa_trusted=([a-f0-9]{64})(?:;|$)/i)||[])[1];
+ if(!token)return false;
+ const result=await queryPostgres<{valid:boolean}>(`SELECT EXISTS(
+ SELECT 1 FROM public.platform_mfa_trusted_devices
+ WHERE user_id=$1 AND token_hash=$2 AND revoked_at IS NULL AND expires_at>now()
+ ) AS valid`,[userId,trustedHash(token)]);
+ return result[0]?.valid===true;
+}
+async function savedMethod(id:string){
+ const pref=await queryPostgres<{method:string}>(`SELECT method FROM public.platform_mfa_preferences WHERE user_id=$1`,[id]);
+ return pref[0]?.method==="email"||pref[0]?.method==="app"?pref[0].method:null;
+}
+async function hasVerifiedTotp(userId:string){
+ const rows=await queryPostgres<{enrolled:boolean}>(`SELECT EXISTS(
+ SELECT 1 FROM auth.mfa_factors WHERE user_id=$1 AND factor_type='totp' AND status='verified'
+ ) AS enrolled`,[userId]);
+ return rows[0]?.enrolled===true;
+}
+async function saveMethod(userId:string,method:"email"|"app"){
+ await queryPostgres(`INSERT INTO public.platform_mfa_preferences(user_id,method,updated_at) VALUES($1,$2,now())
+  ON CONFLICT(user_id) DO UPDATE SET method=EXCLUDED.method,updated_at=now()`,[userId,method]);
+}
+function trustedCookie(token:string){
+ return `${TRUST_COOKIE}=${token}; Path=/; Max-Age=${TRUST_DAYS*86400}; HttpOnly; Secure; SameSite=Lax`;
+}
+export async function shouldRequireEmailMfa(token:string,cookies=""){
  const jwt=jwtPayload(token);
  if(!jwt.sub||!UUID.test(jwt.sub))return false;
  const who=await adminIdentity(jwt.sub);
  if(!who.active)return false;
  if(!who.admin){
-  const factors=await queryPostgres<{enrolled:boolean}>(`SELECT EXISTS(SELECT 1 FROM auth.mfa_factors WHERE user_id=$1 AND factor_type='totp' AND status='verified') AS enrolled`,[jwt.sub]);
-  return factors[0]?.enrolled===true&&jwt.aal!=="aal2";
+  return await hasVerifiedTotp(jwt.sub)&&jwt.aal!=="aal2";
  }
  if(jwt.aal==="aal2")return false;
+ if(cookies&&await trustedDevice(jwt.sub,cookies))return false;
  return !(jwt.session_id&&await getEmailMfaProof(jwt.sub,jwt.session_id));
 }
 async function authorized(request:Request){
@@ -72,8 +105,23 @@ export async function maybeHandleEmailMfa(request:Request):Promise<Response|null
     if(action==="status")return okJson({required:false,verified:!(await shouldRequireEmailMfa(request.headers.get("authorization")!.slice(7)))});
     return errorJson(403,"Administrator account required");
   }
-  if(action==="status")return okJson({required:true,verified:who.aal==="aal2"||await getEmailMfaProof(who.userId,who.sessionId),emailAvailable:who.confirmed});
-  if(who.aal==="aal2")return okJson({verified:true});
+  const proof=who.aal==="aal2"||await getEmailMfaProof(who.userId,who.sessionId);
+  const trusted=await trustedDevice(who.userId,request.headers.get("cookie")||"");
+  if(action==="status")return okJson({required:true,verified:proof||trusted,
+   emailAvailable:who.confirmed,registeredEmail:who.email,hasAuthenticator:await hasVerifiedTotp(who.userId),
+   preferredMethod:await savedMethod(who.userId),trustedDevice:trusted});
+  if(action==="remember"){
+   if(!proof)return errorJson(403,"Complete verification before trusting this device");
+   const payload=await request.json().catch(()=>({})) as {remember?:boolean;method?:string};
+   if(payload.method==="app"||payload.method==="email")await saveMethod(who.userId,payload.method);
+   if(payload.remember!==true)return okJson({saved:true,remembered:false});
+   const token=randomBytes(32).toString("hex");
+   await queryPostgres(`DELETE FROM public.platform_mfa_trusted_devices WHERE user_id=$1 AND expires_at<now()`,[who.userId]);
+   await queryPostgres(`INSERT INTO public.platform_mfa_trusted_devices(user_id,token_hash,expires_at)
+    VALUES($1,$2,now()+interval '14 days')`,[who.userId,trustedHash(token)]);
+   const response=okJson({saved:true,remembered:true});response.headers.set("set-cookie",trustedCookie(token));return response;
+  }
+  if(proof||trusted)return okJson({verified:true});
   if(action==="send"){
    if(!who.confirmed)return errorJson(403,"Verify your registered email address before using email codes");
    if(await getEmailMfaProof(who.userId,who.sessionId))return okJson({verified:true});

@@ -7,7 +7,7 @@ import {HomeScrollMotion,HomeLiveStats} from "@/components/home-public-effects";
 import {PublicPartners} from "@/components/public-partners";
 import {ArrowRight,ScanLine,MapPinned,ClipboardCheck,FileSpreadsheet,Route as RouteIcon,Package,ShieldCheck,Building2,FileBarChart2,CheckCircle2,MoveRight,Layers3,CalendarCheck2,ArrowUpRight} from "lucide-react";
 
-export const Route=createFileRoute("/")({component:Home,loader:async()=>({initialStats:await getPublicStats().catch(()=>[])}),head:()=>publicHead("/","AssetFlow 360 | Fixed Asset Management Software","Register, verify, tag, locate and manage fixed assets with AssetFlow 360. Control asset assignments, gate passes, depreciation and reports.")});
+export const Route=createFileRoute("/")({component:Home,loader:async()=>({initialStats:await getPublicStats().catch(()=>[])}),head:()=>publicHead("/","Fixed Asset Management Software | AssetFlow360","AssetFlow360 is fixed asset management software for organisations in Uganda, Kenya, Nigeria and beyond. Register, track, verify, depreciate and report on assets across locations.")});
 const capabilities=[
  {icon:ScanLine,index:"01",title:"Register with confidence",desc:"Create a consistent asset record, assign tags and keep the information that matters in one place."},
  {icon:MapPinned,index:"02",title:"See every location",desc:"Understand where equipment is held, which branch owns it and who is responsible."},

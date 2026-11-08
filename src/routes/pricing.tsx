@@ -8,7 +8,7 @@ import {useQuery} from "@tanstack/react-query";
 import {getPricingPlans} from "@/lib/saas.functions";
 import {Button} from "@/components/ui/button";
 import {Check,ArrowRight,Users,Package} from "lucide-react";
-export const Route=createFileRoute("/pricing")({component:PricingPage,head:()=>publicHead("/pricing","AssetFlow 360 Pricing and Plans","Compare AssetFlow 360 subscription plans, available user seats, asset allowances and optional modules. Find a plan for your organisation.")});
+export const Route=createFileRoute("/pricing")({component:PricingPage,head:()=>publicHead("/pricing","Fixed Asset Management Software Pricing | AssetFlow360","Compare AssetFlow360 Starter, Business and Enterprise plans, user seats, asset limits and optional tracking and integration add-ons.")});
 const money=(n:number,c:string)=>{try{return new Intl.NumberFormat("en-US",{style:"currency",currency:c,maximumFractionDigits:0}).format(n)}catch{return c+" "+n.toLocaleString()}};
 type PublicPlan = {
   id: string; name: string; description: string;

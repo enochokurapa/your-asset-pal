@@ -9,7 +9,7 @@ import {Button} from "@/components/ui/button";
 import {ArrowRight,CheckCircle2,ShieldCheck} from "lucide-react";
 export const Route=createFileRoute("/features")({
  component:Page,
- head:()=>publicHead("/features","Fixed Asset Management Features | AssetFlow 360","Discover AssetFlow 360 features including asset registers, verification, locations, depreciation, gate passes, reports, audit trails and configurable builders.")
+ head:()=>publicHead("/features","Asset Tracking, Verification & Depreciation Features | AssetFlow360","Manage fixed asset registers, tracking, inspections, branch locations, depreciation, custody, gate passes, reporting and audit trails in one asset lifecycle platform.")
 });
 function Page(){
  const getter=useServerFn(getPublicFeatureCatalog);
