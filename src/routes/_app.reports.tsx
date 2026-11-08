@@ -1,6 +1,6 @@
 import { runPermittedExport, useExportAccess } from "@/lib/export-permissions";
 import {PublishedCanvases} from "@/components/visual-canvas-builder";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { GeoHierarchyFilter, type GeoHierarchyPlace } from "@/components/geo-hierarchy-filter";
@@ -24,6 +24,7 @@ import { fmtDateEAT, fmtDateTimeEAT } from "@/lib/time";
 
 
 export const Route = createFileRoute("/_app/reports")({
+  validateSearch:(search:Record<string,unknown>)=>({report:typeof search.report==="string"?search.report:undefined}),
   component: ReportsPage,
 });
 
@@ -218,9 +219,9 @@ function applyText(val: any, q?: string) {
 
 function ReportsPage() {
   const { canView, loading, canSeeBranch, user, tenantName } = useAuth();
-  const [tab, setTab] = useState("register");
-  const [wizardStep,setWizardStep]=useState<0|1|2|3>(0);
-  const chooseReport=(next:string)=>{setTab(next);setWizardStep(1);};
+  const {report:requestedReport}=Route.useSearch();
+  const [tab,setTab]=useState("register");
+  const [wizardStep,setWizardStep]=useState<1|2|3>(1);
   const reportOptions=[
    ["register","Asset register"],["locations","Locations"],["movements","Asset movements"],
    ["assigned","Assignments"],["disposals","Retirement and disposal"],
@@ -229,6 +230,12 @@ function ReportsPage() {
    ["gate-pass","Gate passes"],["branch","Branch summary"],
    ["department","Department summary"],["condition","Asset condition"]
   ];
+
+  useEffect(()=>{
+    const next=reportOptions.some(([key])=>key===requestedReport)?requestedReport!:"register";
+    setTab(next);
+    setWizardStep(1);
+  },[requestedReport]);
 
   const { data: assets = [] } = useQuery({
     queryKey: ["report-assets"],
@@ -1000,28 +1007,22 @@ function ReportsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
-        <p className="text-sm text-muted-foreground">Create a report in guided steps. Only the controls needed for your selection are shown.</p>
+        <p className="text-sm text-muted-foreground">Choose the report type from the sidebar, then set its filters, fields and export options here.</p>
       </div>
 
       <Card className="space-y-4 p-4 sm:p-5">
+       <div className="flex flex-wrap items-center justify-between gap-3"><div>
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Selected from Reports sidebar</p>
+        <h2 className="mt-1 text-lg font-bold">{reportOptions.find(([key])=>key===tab)?.[1]||"Asset register"}</h2>
+       </div><div className="flex flex-wrap gap-2">
+        {wizardStep>1&&<Button size="sm" variant="outline" onClick={()=>setWizardStep(step=>(Math.max(1,step-1) as 1|2|3))}><ChevronLeft className="mr-1 h-4 w-4"/>Back</Button>}
+        {wizardStep<3&&<Button size="sm" onClick={()=>setWizardStep(step=>(Math.min(3,step+1) as 1|2|3))}>Next <ChevronRight className="ml-1 h-4 w-4"/></Button>}
+       </div></div>
        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground" aria-label="Report creation progress">
-        {[["1","Choose report"],["2","Filters"],["3","Fields and layout"],["4","Preview and export"]].map(([n,label],i)=><span key={n} className={`rounded-full px-3 py-1.5 ${wizardStep===i?"bg-primary text-primary-foreground":wizardStep>i?"bg-muted text-foreground":"border"}`}>{n}. {label}</span>)}
+        {[["1","Filters"],["2","Fields and layout"],["3","Preview and export"]].map(([n,label],i)=><span key={n} className={`rounded-full px-3 py-1.5 ${wizardStep===i+1?"bg-primary text-primary-foreground":wizardStep>i+1?"bg-muted text-foreground":"border"}`}>{n}. {label}</span>)}
        </div>
-       {wizardStep===0?<div className="space-y-3"><Label htmlFor="report-type">Select the report you need</Label>
-         <select id="report-type" className="h-11 w-full max-w-xl rounded-md border bg-background px-3 text-sm" value="" onChange={e=>{if(e.target.value)chooseReport(e.target.value)}}>
-           <option value="">Choose a report type…</option>
-           {reportOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}
-         </select><p className="text-xs text-muted-foreground">No report preview or fields will appear until you choose a report.</p></div>
-        :<div className="flex flex-wrap items-end justify-between gap-3">
-         <div className="space-y-1"><Label htmlFor="report-change">Report type</Label>
-          <select id="report-change" className="h-10 w-full min-w-[220px] rounded-md border bg-background px-3 text-sm" value={tab} onChange={e=>chooseReport(e.target.value)}>
-           {reportOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}
-          </select></div>
-         <div className="flex gap-2"><Button variant="outline" size="sm" onClick={()=>setWizardStep(p=>(Math.max(0,p-1) as 0|1|2|3))}><ChevronLeft className="mr-1 h-4 w-4"/>Back</Button>
-          {wizardStep<3&&<Button size="sm" onClick={()=>setWizardStep(p=>(Math.min(3,p+1) as 0|1|2|3))}>Next <ChevronRight className="ml-1 h-4 w-4"/></Button>}</div>
-        </div>}
       </Card>
-      {wizardStep>0&&<Tabs value={tab} onValueChange={chooseReport} className="space-y-3">
+      <Tabs value={tab} className="space-y-3">
         <div className="min-w-0 space-y-4">
         <TabsContent value="register" className="mt-4 space-y-3">
           {wizardStep===1&&<Card className="p-3">
@@ -1138,7 +1139,7 @@ function ReportsPage() {
         </> }
         </TabsContent>
         </div>
-      </Tabs>}
+      </Tabs>
       <details className="rounded-lg border bg-card p-4"><summary className="cursor-pointer text-sm font-medium">Advanced: saved report builder</summary>
        <div className="mt-4"><PublishedCanvases kind="report_builder"/></div>
       </details>

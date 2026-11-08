@@ -47,6 +47,14 @@ const tenantNav: NavItem[] = [
   { to: "/profile", label: "My profile", icon: UserCircle },
 ];
 
+const REPORT_MENU=[
+ ["register","Asset register"],["locations","Locations"],["movements","Asset movements"],
+ ["assigned","Assignments"],["disposals","Retirement and disposal"],["maintenance","Maintenance"],
+ ["approvals","Approval requests"],["verification","Verification"],["depreciation","Depreciation"],
+ ["gate-pass","Gate passes"],["branch","Branch summary"],["department","Department summary"],
+ ["condition","Asset condition"],
+] as const;
+
 const saasAdminNav: NavItem[] = [
   { to: "/dashboard", label: "Control Center", icon: LayoutDashboard, exact: true },
   { to: "/saas-admin/analytics", label: "Platform Analytics", icon: Activity },
@@ -65,6 +73,7 @@ function AppLayout() {
   } = useAuth();
   const [open, setOpen] = useState(false);
   const [settingsOpen,setSettingsOpen]=useState(false);
+  const [reportsOpen,setReportsOpen]=useState(false);
   const [branding, setBranding] = useState<DocumentTemplate | null>(null);
   const [mfaChecked,setMfaChecked]=useState(false);
   const [mfaRequired,setMfaRequired]=useState(false);
@@ -84,6 +93,7 @@ function AppLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   useEffect(()=>{
     if(["/settings","/users","/integrations","/domains"].some(path=>pathname.startsWith(path)))setSettingsOpen(true);
+    if(pathname.startsWith("/reports"))setReportsOpen(true);
   },[pathname]);
   const exportAccess=useExportAccess();
 
@@ -240,7 +250,24 @@ function AppLayout() {
         )}
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {visibleNav.map(item => item.to === "/settings" && !isSaasAdmin ? (
+          {visibleNav.map(item => item.to === "/reports" && !isSaasAdmin ? (
+            <div key="reports-group">
+              <button type="button" onClick={()=>setReportsOpen(v=>!v)} aria-expanded={reportsOpen}
+                aria-controls="report-sidebar-options"
+                className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  pathname.startsWith("/reports")?"bg-sidebar-primary text-sidebar-primary-foreground":"text-sidebar-foreground/80 hover:bg-sidebar-accent")}>
+                <FileBarChart className="h-4 w-4"/><span className="flex-1 text-left">Reports</span>
+                <ChevronDown className={cn("h-4 w-4 transition-transform",reportsOpen&&"rotate-180")}/>
+              </button>
+              {reportsOpen&&<div id="report-sidebar-options" className="ml-4 max-h-[45vh] space-y-0.5 overflow-y-auto border-l border-sidebar-border pl-2">
+                {REPORT_MENU.map(([report,label])=><Link key={report} to="/reports" search={{report}}
+                    onClick={()=>setOpen(false)}
+                    className="block rounded-md px-3 py-2 text-xs font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    activeOptions={{exact:true}}
+                  >{label}</Link>)}
+              </div>}
+            </div>
+          ) : item.to === "/settings" && !isSaasAdmin ? (
             <div key="settings-group">
               <button type="button" onClick={()=>setSettingsOpen(v=>!v)}
                 aria-expanded={settingsOpen} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent">
