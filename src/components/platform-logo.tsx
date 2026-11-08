@@ -4,11 +4,10 @@ import {useServerFn} from "@tanstack/react-start";
 import {cn} from "@/lib/utils";
 import {getPublicBrandingBasics} from "@/lib/public-branding.functions";
 
-// The first paint uses the approved administrator-uploaded artwork bundled with
-// this release. The unrelated legacy orange fallback is never displayed.
+// Bundled approved artwork is a last-resort fallback when the live saved image
+// cannot load. The public endpoint always serves SaaS Admin's configured logo.
 const APPROVED_LOGO="/assetflow-approved-logo.svg";
 const APPROVED_MARK="/assetflow-approved-mark.svg";
-const SNAPSHOT_VERSION="2026-11-05T11:02:54.649Z";
 
 export function usePlatformBranding(){
  const get=useServerFn(getPublicBrandingBasics);
@@ -36,16 +35,14 @@ export function PlatformLogo({
 }){
  const {data}=usePlatformBranding();
  const initial=variant==="lockup"?APPROVED_LOGO:APPROVED_MARK;
- const liveUrl=data?.updatedAt && data.updatedAt!==SNAPSHOT_VERSION
-  ? (variant==="lockup"?"/api/branding/logo.png":"/api/branding/icon-192.png")
-    +"?v="+encodeURIComponent(data.updatedAt)
-  : initial;
+ const liveUrl=(variant==="lockup"?"/api/branding/logo.png":"/api/branding/icon-192.png")
+   +(data?.updatedAt?"?v="+encodeURIComponent(data.updatedAt):"");
  const [failed,setFailed]=useState<string|null>(null);
  const src=failed===liveUrl?initial:liveUrl;
- return <span className={cn("inline-flex items-center justify-center",className)}>
+ return <span className={cn("inline-flex min-h-0 min-w-0 items-center justify-center overflow-visible",className)}>
   <img src={src} alt={alt||data?.name||"AssetFlow 360"} decoding="async"
     fetchPriority="high" onError={()=>setFailed(liveUrl)}
-    className={cn("block h-full w-full object-contain",imageClassName)}/>
+    className={cn("block h-full w-full max-h-full max-w-full object-contain object-center",imageClassName)}/>
  </span>;
 }
 export function PlatformName({className}:{className?:string}){

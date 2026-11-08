@@ -41,8 +41,8 @@ function PreviewBox({ value, label }: { value: string | null; label: string }) {
   return (
     <div>
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-      <div className="flex h-40 items-center justify-center overflow-hidden rounded-2xl border bg-white p-5">
-        {value ? <img src={value} alt={label} className="max-h-full max-w-full object-contain" /> : <span className="text-sm text-muted-foreground">No image uploaded</span>}
+      <div className="flex h-40 min-w-0 items-center justify-center overflow-visible rounded-2xl border bg-white p-3 sm:p-4">
+        {value ? <img src={value} alt={label} className="block h-full w-full max-h-full max-w-full object-contain object-center" /> : <span className="text-sm text-muted-foreground">No image uploaded</span>}
       </div>
     </div>
   );
@@ -116,7 +116,10 @@ function SaasAdminBrandingPage() {
       document.documentElement.style.setProperty("--platform-primary", result.primaryColor);
       document.documentElement.style.setProperty("--platform-secondary", result.secondaryColor);
 
-      await qc.invalidateQueries({ queryKey: ["public-saas-branding"] });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["public-saas-branding"] }),
+        qc.invalidateQueries({ queryKey: ["public-branding-basics"] }),
+      ]);
       toast.success("Platform branding saved and applied");
     } catch (e: any) {
       toast.error(e?.message || "Could not save platform branding");
@@ -136,7 +139,7 @@ function SaasAdminBrandingPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Platform branding</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Control the public AssetFlow 360 identity, logo, browser/app icon and platform colors.
+          The uploaded main logo is used across public pages and SaaS Control. The app icon is used for browser and home-screen icons.
         </p>
       </div>
 
@@ -152,7 +155,7 @@ function SaasAdminBrandingPage() {
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><ImageIcon className="h-5 w-5" /></span>
             <div>
               <h2 className="font-semibold">Brand assets</h2>
-              <p className="mt-1 text-sm text-muted-foreground">PNG, WebP or safe SVG. Maximum 2 MB per image.</p>
+              <p className="mt-1 text-sm text-muted-foreground">PNG, WebP or safe SVG, up to 2 MB. The full logo is scaled to fit without cropping.</p>
             </div>
           </div>
 

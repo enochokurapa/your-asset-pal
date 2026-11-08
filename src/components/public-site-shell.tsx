@@ -58,9 +58,8 @@ export function PublicHeader() {
     <header className="sticky top-0 z-50 border-b border-[#e8e2db] bg-white">
       <div className="mx-auto flex h-[64px] max-w-7xl items-center gap-5 px-5 sm:h-[72px] sm:px-8">
         <Link to="/" className="shrink-0" aria-label="AssetFlow 360 home">
-          <span className="inline-flex h-12 max-w-[190px] items-center gap-2.5 overflow-visible">
-            <PlatformLogo variant="mark" className="h-11 w-11 shrink-0" imageClassName="object-contain" />
-            <span className="whitespace-nowrap text-[15px] font-bold tracking-tight text-[#233c50]">AssetFlow <span className="text-[#ba6c37]">360</span></span>
+          <span className="inline-flex h-[58px] w-[188px] max-w-[45vw] items-center justify-start overflow-visible sm:h-[64px] sm:w-[210px]">
+            <PlatformLogo variant="lockup" className="h-full w-full" imageClassName="object-contain object-left p-1" />
           </span>
         </Link>
         <nav aria-label="Main navigation" className="ml-auto hidden items-center gap-8 text-sm font-semibold text-[#283842] lg:flex">

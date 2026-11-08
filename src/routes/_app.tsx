@@ -230,25 +230,25 @@ function AppLayout() {
         )}
       >
         <div className="flex min-h-20 items-center justify-between border-b border-sidebar-border px-4 py-2 sm:px-5">
-          <div className="flex items-center gap-2">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white text-sidebar-primary sm:h-14 sm:w-14">
-              {isSaasAdmin ? (
-                <PlatformLogo className="h-full w-full bg-transparent" imageClassName="bg-white p-0.5" fallbackClassName="bg-sidebar-primary text-sidebar-primary-foreground" />
-              ) : branding?.logo_data_url ? (
-                <img src={branding.logo_data_url} alt="Company logo" className="h-full w-full bg-white object-contain p-0.5" />
-              ) : (
-                <PlatformLogo className="h-full w-full bg-transparent" imageClassName="bg-white p-0.5" />
-              )}
+          {isSaasAdmin ? (
+            <div className="flex min-w-0 flex-1 flex-col items-start justify-center py-1">
+              <PlatformLogo variant="lockup" className="h-[52px] w-[186px] max-w-full" imageClassName="object-contain object-left p-0.5" />
+              <p className="ml-1 mt-0.5 text-[10px] uppercase tracking-wider text-sidebar-foreground/70">Platform Control</p>
             </div>
-            <div>
-              <p className="max-w-36 truncate text-sm font-semibold leading-tight sm:max-w-44 sm:text-base">
-                {isSaasAdmin ? <PlatformName /> : (branding?.organization_name && branding.organization_name !== "Your Organization" ? branding.organization_name : tenantName || "AssetFlow 360")}
-              </p>
-              <p className="mt-0.5 text-[10px] uppercase tracking-wider text-sidebar-foreground/60">
-                {isSaasAdmin ? "Platform Control" : "Asset Manager"}
-              </p>
+          ) : (
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-white text-sidebar-primary sm:h-14 sm:w-14">
+                {branding?.logo_data_url ? (
+                  <img src={branding.logo_data_url} alt="Company logo" className="h-full w-full rounded-lg bg-white object-contain p-0.5" />
+                ) : (
+                  <PlatformLogo className="h-full w-full" imageClassName="bg-white p-0.5" />
+                )}
+              </div>
+              <div className="min-w-0"><p className="max-w-36 truncate text-sm font-semibold leading-tight sm:max-w-44 sm:text-base">
+                {branding?.organization_name && branding.organization_name !== "Your Organization" ? branding.organization_name : tenantName || "AssetFlow 360"}
+              </p><p className="mt-0.5 text-[10px] uppercase tracking-wider text-sidebar-foreground/60">Asset Manager</p></div>
             </div>
-          </div>
+          )}
           <button className="md:hidden" onClick={() => setOpen(false)} aria-label="Close menu"><X className="h-5 w-5" /></button>
         </div>
 
