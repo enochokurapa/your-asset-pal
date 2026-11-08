@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
@@ -44,6 +44,7 @@ const DEFAULTS: Settings = {
 
 export function LocationSettingsPanel() {
   const { tenantId, isTenantAdmin } = useAuth();
+  const qc=useQueryClient();
   const [form, setForm] = useState<Settings>(DEFAULTS);
   const [saving, setSaving] = useState(false);
 
@@ -57,6 +58,9 @@ export function LocationSettingsPanel() {
   });
   const { data: saved } = useQuery({
     queryKey: ["tenant-location-settings", tenantId],
+    staleTime:0,
+    refetchOnMount:"always",
+    refetchOnWindowFocus:"always",
     enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await (supabase as any).from("tenant_location_settings").select("*").eq("tenant_id", tenantId).maybeSingle();
@@ -78,7 +82,7 @@ export function LocationSettingsPanel() {
         : [...current.allowed_country_codes, code];
       const defaultCountry = current.default_country_code && selected.includes(current.default_country_code)
         ? current.default_country_code
-        : null;
+        : selected.length===1?selected[0]:null;
       return { ...current, allowed_country_codes: selected, default_country_code: defaultCountry };
     });
   };
@@ -106,7 +110,8 @@ export function LocationSettingsPanel() {
         updated_by: auth.user?.id ?? null,
       }, { onConflict: "tenant_id" });
       if (error) throw error;
-      toast.success("Asset location defaults saved");
+      await qc.invalidateQueries({queryKey:["tenant-location-settings",tenantId],refetchType:"all"});
+      toast.success("Asset location settings updated for this organisation");
     } catch (error: any) {
       toast.error(error?.message ?? "Could not save location settings");
     } finally {
@@ -192,7 +197,7 @@ export function LocationSettingsPanel() {
                       );
                     })}
                   </div>
-                  <p className="text-xs text-muted-foreground">Select only countries where this organisation actually places or manages assets.</p>
+                  <p className="text-xs text-muted-foreground">These are your organisation's choices, not system defaults. Changing them does not move existing assets. Save changes to update entry forms.</p>
                 </div>
 
                 <div className="space-y-2">

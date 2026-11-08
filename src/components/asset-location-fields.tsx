@@ -48,6 +48,9 @@ export function AssetLocationFields({
 
   const { data: settings } = useQuery({
     queryKey: ["tenant-location-settings", tenantId],
+    staleTime:0,
+    refetchOnMount:"always",
+    refetchOnWindowFocus:"always",
     enabled: !!tenantId,
     queryFn: async () => {
       const { data } = await (supabase as any).from("tenant_location_settings").select("*").eq("tenant_id", tenantId).maybeSingle();
@@ -90,8 +93,10 @@ export function AssetLocationFields({
     }
     // Never preselect a business default when several countries are allowed.
     // Existing saved assets retain their true country via the currentGeo hook.
-    const next = allowed.length===1?allowed[0]:"";
-    setSelectedCountry((current) => current && allowed.includes(current) ? current : next);
+    const defaultCountry=settings.default_country_code&&allowed.includes(settings.default_country_code)
+      ? settings.default_country_code : "";
+    const next=allowed.length===1?allowed[0]:defaultCountry;
+    setSelectedCountry(current=>current&&allowed.includes(current)?current:next);
   }, [settings?.tenant_id, settings?.default_country_code, JSON.stringify(settings?.allowed_country_codes)]);
 
   useEffect(() => {
@@ -244,7 +249,7 @@ export function AssetLocationFields({
           <div className="space-y-3 sm:col-span-2">
             {allowedCountryCodes.length===1&&<div className="rounded-lg border border-[#cfdfe9] bg-[#f4f9fc] p-3">
               <p className="flex items-center gap-2 text-sm font-semibold"><Globe2 className="h-4 w-4 text-primary"/> Country: {(countries as any[]).find(c=>c.code===allowedCountryCodes[0])?.name||({UG:"Uganda",ZM:"Zambia",KE:"Kenya"} as Record<string,string>)[allowedCountryCodes[0]]||allowedCountryCodes[0]}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Your organisation currently uses this country for new asset locations. Only an administrator can change country settings.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Configured by your organisation. To change it: Settings → Asset location setup → Save changes.</p>
             </div>}
             {allowedCountryCodes.length !== 1 && (
               <div className="space-y-2">
@@ -254,7 +259,8 @@ export function AssetLocationFields({
                   onValueChange={(code) => {
                     const next = code === "none" ? "" : code;
                     setSelectedCountry(next);
-                    patch({ geo_place_id: null });
+                    patch({ geo_place_id: null, location_id:null,
+                      location_latitude:"",location_longitude:"",location_accuracy_m:"",location_source:"" });
                     if (settings?.remember_last_selection) {
                       if (next) localStorage.setItem("assetflow:last-country", next);
                       else localStorage.removeItem("assetflow:last-country");
@@ -317,7 +323,7 @@ export function AssetLocationFields({
             ) : allowedCountryCodes.length ? (
               <p className="rounded-lg border bg-background p-3 text-sm text-muted-foreground">Select one of your organisation’s configured countries above.</p>
             ) : (
-              <p className="rounded-lg border bg-background p-3 text-sm text-muted-foreground">No country is configured. Ask a business administrator to set the country under Settings → Asset location setup.</p>
+              <p className="rounded-lg border bg-background p-3 text-sm text-muted-foreground">No country is configured for this organisation. Ask your administrator to select one under Settings → Asset location setup, then save.</p>
             )}
           </div>
         )}
