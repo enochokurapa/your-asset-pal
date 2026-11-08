@@ -386,6 +386,9 @@ function AssetsPage() {
       if (existing) { setDupAsset(existing); setDupOpen(true); return; }
       if (scanMode === "tag") setForm((f) => ({ ...f, asset_tag: code }));
       else setForm((f) => ({ ...f, serial_number: code }));
+      const aliases=scanMode==="tag"?["tag","assettag","tagnumber","tagno"]:["serialnumber","manufacturerserial","serial"];
+      const linked=registerFields.find(field=>aliases.includes((field.label||field.key).toLowerCase().replace(/[^a-z0-9]/g,"")));
+      if(linked)setCustomValues(values=>({...values,[linked.key]:code}));
       toast.success(`${scanMode === "tag" ? "Tag" : "Serial"} scanned: ${code}`);
       return;
     }
@@ -599,7 +602,8 @@ function AssetsPage() {
     { title: "Review", short: "Review" },
   ];
 
-  const displayedSteps=registerChoice==="default"?wizardSteps:[wizardSteps[0],wizardSteps[4]];
+  const displayedSteps=registerChoice==="default"?wizardSteps:[wizardSteps[0],wizardSteps[2],wizardSteps[4]];
+  const customStepOrder=[0,2,4];
   const validateWizardStep = (step: number) => {
     if (step === 0) {
       if (!form.asset_tag.trim()&&registers.find(r=>r.id===registerChoice)?.configuration?.tag_policy==="required") { toast.error("An asset tag is required for this register"); return false; }
@@ -624,9 +628,9 @@ function AssetsPage() {
   };
 
   const nextWizardStep = () => {
-    if(registerChoice!=="default"){for(const field of registerFields){const value=String(customValues[field.key]??"").trim();const label=(field.label||field.key).toLowerCase().replace(/[^a-z0-9]/g,"");if(field.required&&!value&&!["tagnumber","assettag","tag"].includes(label)){toast.error(`${field.label} is required`);return;}}}
-    if(registerChoice==="default"&&!validateWizardStep(wizardStep)) return;
-    setWizardStep((step) => registerChoice==="default"?Math.min(step+1,wizardSteps.length-1):4);
+    if(registerChoice!=="default"&&wizardStep===0){for(const field of registerFields){const value=String(customValues[field.key]??"").trim();const label=(field.label||field.key).toLowerCase().replace(/[^a-z0-9]/g,"");if(field.required&&!value&&!["tagnumber","assettag","tag"].includes(label)){toast.error(`${field.label} is required`);return;}}}
+    if((registerChoice==="default"||wizardStep===2)&&!validateWizardStep(wizardStep))return;
+    setWizardStep(step=>registerChoice==="default"?Math.min(step+1,wizardSteps.length-1):step===0?2:4);
   };
 
   const reviewCategory = (categories as any[]).find((c) => c.id === form.category_id)?.name ?? "Not specified";
@@ -726,18 +730,21 @@ function AssetsPage() {
 
   return (
     <div className="space-y-6">
-      <Card className="space-y-3 p-4"><div><h2 className="text-base font-semibold">Asset register catalog</h2><p className="text-xs text-muted-foreground">Open a register to view its assets or preview its column layout before using it.</p></div><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{[{id:"default",name:"Default asset register",configuration:{fields:[] as any[]} },...registers].map(r=><div key={r.id} className="rounded-lg border p-3"><p className="font-medium">{r.name}</p><p className="mb-2 text-xs text-muted-foreground">{r.id==="default"?"System register":(r.configuration.fields?.length??0)+" custom fields"}</p><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={()=>setRegisterChoice(r.id)}>Open</Button><Button size="sm" variant="outline" onClick={()=>setRegisterPreview(r.id)}>Preview</Button>{canView("register_builder")&&r.id!=="default"&&<Button size="sm" variant="ghost" asChild><Link to="/builders" search={{type:"register_builder"}}>Edit</Link></Button>}</div></div>)}</div></Card>
-      {canView("register_builder") && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3"><div><p className="text-sm font-medium">Missing columns in your asset register?</p><p className="text-xs text-muted-foreground">Build a named custom register, preview its Excel columns and download its template. Your default register is retained.</p></div><Button asChild size="sm" variant="outline"><Link to="/builders" search={{type:"register_builder"}}>Customize register</Link></Button></div>}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Assets</h1>
-          <p className="text-sm text-muted-foreground">Manage your organization's fixed assets. Assets are retired (with admin approval), never deleted.</p>
+          <p className="text-sm text-muted-foreground">Search, scan or add an asset.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Select value={registerChoice} onValueChange={setRegisterChoice}><SelectTrigger className="w-52"><SelectValue placeholder="Select register"/></SelectTrigger><SelectContent><SelectItem value="default">Default register</SelectItem>{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select>
           <Button variant="outline" onClick={() => { setScanMode("lookup"); setScanOpen(true); }}>
-            <ScanLine className="mr-2 h-4 w-4" /> Scan
+            <ScanLine className="mr-2 h-4 w-4" /> Scan asset
           </Button>
+          <details className="order-last w-full rounded-lg border border-[#dce6eb] bg-white px-3 py-2">
+            <summary className="cursor-pointer select-none text-xs font-semibold text-[#365a6e]">More tools · Import, export, templates & bulk updates</summary>
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+              {canView("register_builder")&&<Button asChild variant="outline" size="sm"><Link to="/builders" search={{type:"register_builder"}}>Manage custom registers</Link></Button>}
+              <Button size="sm" variant="outline" onClick={()=>setRegisterPreview(registerChoice)}>Preview register</Button>
           <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError||!exportAccess.allowed("register")} onClick={()=>runPermittedExport("register",()=>exportAssetsXLSX(registers.find(r=>r.id===registerChoice)?.name??"Default Asset Register", (assets as any[]).filter(a=>registerChoice==="default"?a.register_definition_id==null:a.register_definition_id===registerChoice),registerFields,locationSettings as any))} title="Export assets for selected register"><Download className="mr-2 h-4 w-4"/> Export register</Button>
           <Button variant="outline" disabled={registerCatalogPending||!!registerCatalogError||!exportAccess.allowed("template")} onClick={()=>runPermittedExport("template",()=>downloadTemplate(registers.find(r=>r.id===registerChoice),locationSettings as any))} title="Download Excel import template">
             <Download className="mr-2 h-4 w-4" /> Template
@@ -776,28 +783,30 @@ function AssetsPage() {
             {bulkProgress&&<p>{bulkProgress}</p>}
           </div>}
           {importProgress && <span role="status" aria-live="polite" className="max-w-96 text-xs text-muted-foreground">{importProgress}</span>}
+            </div>
+          </details>
           {canAdd && (
           <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) setWizardStep(0); }}>
-            <Button onClick={openNew} disabled={registerCatalogPending}><Plus className="mr-2 h-4 w-4" /> {registerCatalogPending?"Loading register…":"New asset"}</Button>
+            <Button className="bg-[#c77435] text-white hover:bg-[#aa602e]" onClick={openNew} disabled={registerCatalogPending}><Plus className="mr-2 h-4 w-4" /> {registerCatalogPending?"Loading register…":"New asset"}</Button>
             <DialogContent className="flex max-h-[92vh] max-w-3xl flex-col overflow-hidden p-0">
               <DialogHeader className="border-b px-5 pb-4 pt-5 sm:px-6">
                 {companyLogo && <div className="mb-2 flex justify-start"><img src={companyLogo} alt="Company logo" className="h-14 w-auto max-w-[210px] object-contain sm:h-16" /></div>}
                 <DialogTitle>{form.id ? "Edit asset" : registerChoice!=="default" ? `New ${registers.find(r=>r.id===registerChoice)?.name??"asset"}` : "Register asset"}</DialogTitle>
                 <div className="flex flex-wrap items-center gap-2"><Label className="whitespace-nowrap text-xs">Asset register</Label><Select value={registerChoice} onValueChange={v=>{setRegisterChoice(v);setCustomValues({});setWizardStep(0);if(!form.id)setForm({...empty,branch_id:visibleBranches.length===1?visibleBranches[0].id:null})}}><SelectTrigger className="h-9 flex-1"><SelectValue/></SelectTrigger><SelectContent>{(!catalog?.primaryId||!!form.id)&&<SelectItem value="default">Default register</SelectItem>}{registers.map(r=><SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select></div>
-                <DialogDescription className="sm:hidden">Step {registerChoice==="default"?wizardStep+1:wizardStep===4?2:1} of {displayedSteps.length} · {wizardSteps[wizardStep].title}</DialogDescription>
+                <DialogDescription className="sm:hidden">Step {registerChoice==="default"?wizardStep+1:customStepOrder.indexOf(wizardStep)+1} of {displayedSteps.length} · {wizardSteps[wizardStep].title}</DialogDescription>
 
                 <div className="hidden pt-4 sm:block">
                   <div className="grid grid-cols-5 gap-2">
                     {displayedSteps.map((step, index) => {
-                      const displayStepIndex=registerChoice==="default"?wizardStep:(wizardStep===4?1:0);
+                      const displayStepIndex=registerChoice==="default"?wizardStep:customStepOrder.indexOf(wizardStep);
                       const done = index < displayStepIndex;
                       const active = index === displayStepIndex;
                       return (
                         <button
                           key={step.title}
                           type="button"
-                          onClick={() => index <= (registerChoice==="default"?wizardStep:(wizardStep===4?1:0)) && setWizardStep(registerChoice==="default"?index:index===0?0:4)}
-                          className={`min-w-0 text-left ${index <= (registerChoice==="default"?wizardStep:(wizardStep===4?1:0)) ? "cursor-pointer" : "cursor-default"}`}
+                          onClick={() => index <= (registerChoice==="default"?wizardStep:customStepOrder.indexOf(wizardStep)) && setWizardStep(registerChoice==="default"?index:customStepOrder[index])}
+                          className={`min-w-0 text-left ${index <= (registerChoice==="default"?wizardStep:customStepOrder.indexOf(wizardStep)) ? "cursor-pointer" : "cursor-default"}`}
                         >
                           <div className="flex items-center">
                             <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${
@@ -889,11 +898,11 @@ function AssetsPage() {
                   </div>
                 )}
 
-                {registerChoice==="default" && wizardStep === 2 && (
+                {wizardStep === 2 && (
                   <div className="space-y-5">
                     <div>
                       <h3 className="text-base font-semibold">Set the location</h3>
-                      <p className="text-sm text-muted-foreground">Only the location fields configured by your organisation are shown.</p>
+                      <p className="text-sm text-muted-foreground">Select the geographic area and capture GPS if required by your organisation.</p>
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <AssetLocationFields
@@ -1008,13 +1017,19 @@ function AssetsPage() {
                   </div>
                 )}
 
-                {registerChoice!=="default" && wizardStep===0&&<div className="space-y-3"><div className="grid gap-4 sm:grid-cols-2">{registerFields.map(field=><div key={field.key} className="space-y-2"><Label>{field.label}{field.required?" *":""}</Label>{field.type==="select"&&field.options?.length?<Select value={customValues[field.key]??""} onValueChange={value=>setCustomValues(v=>({...v,[field.key]:value}))}><SelectTrigger><SelectValue placeholder="Choose"/></SelectTrigger><SelectContent>{field.options.map(option=><SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>:field.type==="radio"&&field.options?.length?<div role="radiogroup" aria-label={field.label} className="flex flex-wrap gap-3">{field.options.map(option=><label key={option} className="flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm"><input type="radio" name={`custom-${field.key}`} checked={customValues[field.key]===option} onChange={()=>setCustomValues(v=>({...v,[field.key]:option}))}/>{option}</label>)}</div>:field.type==="attachment"?<label className="block space-y-2">{customValues[field.key]&&<Button type="button" size="sm" variant="outline" onClick={async e=>{e.preventDefault();const {data,error}=await supabase.storage.from("asset-files").createSignedUrl(customValues[field.key],60);if(error||!data?.signedUrl){toast.error(error?.message||"Cannot open attachment");return;}window.open(data.signedUrl,"_blank","noopener,noreferrer")}}>View attachment</Button>}<span className="text-xs text-muted-foreground">{customValues[field.key]?"Attached: "+customValues[field.key].split("/").pop():"PDF or image (max 10 MB)"}</span><Input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx" disabled={uploadingField===field.key} onChange={async e=>{const file=e.target.files?.[0];if(!file||!tenantId)return;if(file.size>10*1024*1024){toast.error("File must be under 10 MB");return;}setUploadingField(field.key);try{const clean=file.name.replace(/[^a-zA-Z0-9._-]/g,"_");const path=`${tenantId}/custom-register/${crypto.randomUUID()}-${clean}`;const result=await supabase.storage.from("asset-files").upload(path,file,{contentType:file.type||"application/octet-stream",upsert:false});if(result.error)throw result.error;setCustomValues(v=>({...v,[field.key]:path}));toast.success("Attachment uploaded")}catch(error:any){toast.error(error.message||"Attachment upload failed")}finally{setUploadingField(null)}}}/></label>:field.type==="boolean"?<label className="flex min-h-11 items-center gap-3 rounded-lg border p-3"><input type="checkbox" checked={customValues[field.key]==="true"} onChange={e=>setCustomValues(v=>({...v,[field.key]:String(e.target.checked)}))}/><span className="text-sm">Yes</span></label>:<Input className="h-11" type={field.type==="date"?"date":field.type==="number"||field.type==="currency"?"number":field.type==="email"?"email":field.type==="url"?"url":field.type==="phone"?"tel":"text"} value={customValues[field.key]??""} onChange={event=>setCustomValues(v=>({...v,[field.key]:event.target.value}))}/>}</div>)}</div></div>}
+                {registerChoice!=="default" && wizardStep===0&&<div className="space-y-4">
+                  <div className="grid gap-3 rounded-lg border bg-[#f7fafc] p-3 sm:grid-cols-2">
+                    <div className="space-y-1.5"><Label htmlFor="custom-asset-tag">Asset tag</Label><div className="flex gap-2"><Input id="custom-asset-tag" value={form.asset_tag} onChange={e=>setForm(f=>({...f,asset_tag:e.target.value}))} placeholder="Scan or enter tag"/><Button type="button" variant="outline" aria-label="Scan asset tag" onClick={()=>{setScanMode("tag");setScanOpen(true)}}><ScanLine className="h-4 w-4"/></Button></div></div>
+                    <div className="space-y-1.5"><Label htmlFor="custom-serial">Serial number</Label><div className="flex gap-2"><Input id="custom-serial" value={form.serial_number} onChange={e=>setForm(f=>({...f,serial_number:e.target.value}))} placeholder="Optional"/><Button type="button" variant="outline" aria-label="Scan serial number" onClick={()=>{setScanMode("serial");setScanOpen(true)}}><ScanLine className="h-4 w-4"/></Button></div></div>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">{registerFields.map(field=><div key={field.key} className="space-y-2"><Label>{field.label}{field.required?" *":""}</Label>{field.type==="select"&&field.options?.length?<Select value={customValues[field.key]??""} onValueChange={value=>setCustomValues(v=>({...v,[field.key]:value}))}><SelectTrigger><SelectValue placeholder="Choose"/></SelectTrigger><SelectContent>{field.options.map(option=><SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>:field.type==="radio"&&field.options?.length?<div role="radiogroup" aria-label={field.label} className="flex flex-wrap gap-3">{field.options.map(option=><label key={option} className="flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm"><input type="radio" name={`custom-${field.key}`} checked={customValues[field.key]===option} onChange={()=>setCustomValues(v=>({...v,[field.key]:option}))}/>{option}</label>)}</div>:field.type==="attachment"?<label className="block space-y-2">{customValues[field.key]&&<Button type="button" size="sm" variant="outline" onClick={async e=>{e.preventDefault();const {data,error}=await supabase.storage.from("asset-files").createSignedUrl(customValues[field.key],60);if(error||!data?.signedUrl){toast.error(error?.message||"Cannot open attachment");return;}window.open(data.signedUrl,"_blank","noopener,noreferrer")}}>View attachment</Button>}<span className="text-xs text-muted-foreground">{customValues[field.key]?"Attached: "+customValues[field.key].split("/").pop():"PDF or image (max 10 MB)"}</span><Input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx" disabled={uploadingField===field.key} onChange={async e=>{const file=e.target.files?.[0];if(!file||!tenantId)return;if(file.size>10*1024*1024){toast.error("File must be under 10 MB");return;}setUploadingField(field.key);try{const clean=file.name.replace(/[^a-zA-Z0-9._-]/g,"_");const path=`${tenantId}/custom-register/${crypto.randomUUID()}-${clean}`;const result=await supabase.storage.from("asset-files").upload(path,file,{contentType:file.type||"application/octet-stream",upsert:false});if(result.error)throw result.error;setCustomValues(v=>({...v,[field.key]:path}));toast.success("Attachment uploaded")}catch(error:any){toast.error(error.message||"Attachment upload failed")}finally{setUploadingField(null)}}}/></label>:field.type==="boolean"?<label className="flex min-h-11 items-center gap-3 rounded-lg border p-3"><input type="checkbox" checked={customValues[field.key]==="true"} onChange={e=>setCustomValues(v=>({...v,[field.key]:String(e.target.checked)}))}/><span className="text-sm">Yes</span></label>:<Input className="h-11" type={field.type==="date"?"date":field.type==="number"||field.type==="currency"?"number":field.type==="email"?"email":field.type==="url"?"url":field.type==="phone"?"tel":"text"} value={customValues[field.key]??""} onChange={event=>setCustomValues(v=>({...v,[field.key]:event.target.value}))}/>}</div>)}</div></div>}
                 {wizardStep === 4 && (
                   <div className="space-y-5">
                     <div>
                       <h3 className="text-base font-semibold">Review & save</h3>
                       <p className="text-sm text-muted-foreground">Confirm the important details before saving.</p>
                     </div>
+                    {registerChoice!=="default"&&<div className="rounded-xl border p-3 text-sm"><p className="font-semibold">Location: {reviewLocation}</p><p className="mt-1 text-xs text-muted-foreground">{form.location_latitude&&form.location_longitude?"GPS captured":"GPS not captured"}</p></div>}
                     {registerChoice!=="default"&&<div className="grid gap-2 rounded-xl border p-3">{registerFields.map(field=><div key={field.key} className="flex justify-between gap-3 text-sm"><span>{field.label}</span><span className="font-semibold">{customValues[field.key]||"—"}</span></div>)}</div>}
                     {registerChoice==="default" && <div className="overflow-hidden rounded-xl border">
                       {[
@@ -1043,7 +1058,7 @@ function AssetsPage() {
                 <div className="flex gap-2">
                   <Button type="button" variant="ghost" onClick={() => { setOpen(false); setWizardStep(0); }}>Cancel</Button>
                   {wizardStep > 0 && (
-                    <Button type="button" variant="outline" onClick={() => setWizardStep((step) => registerChoice==="default"?Math.max(0,step-1):0)}>
+                    <Button type="button" variant="outline" onClick={() => setWizardStep((step) => registerChoice==="default"?Math.max(0,step-1):step===4?2:0)}>
                       <ChevronLeft className="mr-2 h-4 w-4" /> Back
                     </Button>
                   )}
