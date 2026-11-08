@@ -416,7 +416,10 @@
 :root{--af-brand-indigo:#4E51DB;--af-brand-ochre:#C87831;--af-brand-deep:#4E51DB;--af-outer:#fffaf6;--af-line:#e8ded6;}
 .af-illustrated-pages{position:relative;isolation:isolate;background-color:#fffaf6;}
 .af-illustrated-pages::before{content:"";position:fixed;inset:74px 0 0;z-index:-1;background-image:url('/brand/asset-outline-pattern.svg');background-position:center center;background-size:cover;background-repeat:no-repeat;opacity:.32;pointer-events:none;}
-.af-illustrated-pages>.af-site-frame{position:relative;isolation:isolate;background:#fff;}
+.af-illustrated-pages>.af-site-frame:not(.af-public-footer){position:relative;isolation:isolate;background:#fff;}
+/* Footer must not inherit the white frame background used by page content. */
+.af-illustrated-pages>footer.af-public-footer{position:relative;isolation:isolate;background-color:#252a87;color:#fff;}
+.af-illustrated-pages>footer.af-public-footer>.af-public-footer-copyright{background-color:#171d60;color:#e4e6ff;border-top-color:rgba(255,255,255,.16);}
 .af-illustrated-pages>.af-site-frame>.assetflow-homepage{background:#fff;}
 /* Subtle asset-process line art on selected homepage panels. No fake data,
    promotional buttons, animated cursors, or distracting moving backgrounds. */
