@@ -11,6 +11,7 @@ import { supabaseAdmin } from "./integrations/supabase/client.server";
 import {maybeHandleEmailMfa,shouldRequireEmailMfa} from "./lib/platform-security-email-mfa.server";
 import {confirmSaasEmailRecovery} from "./lib/platform-email-recovery.server";
 import { completeMicrosoftOAuth } from "./lib/microsoft365.server";
+import {domainGuard,protectDomainLoginResponse} from "./lib/custom-domain-guard.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -169,8 +170,9 @@ async function maybeProxySupabase(request: Request): Promise<Response | null> {
       }
     }
 
-    return new Response(upstreamResponse.body, {
-      status: upstreamResponse.status,
+    const safeResponse=await protectDomainLoginResponse(request,upstreamResponse);
+    return new Response(safeResponse.body, {
+      status: safeResponse.status,
       statusText: upstreamResponse.statusText,
       headers: responseHeaders,
     });
@@ -453,6 +455,8 @@ function withSecurityHeaders(response: Response, request: Request): Response {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const domainCheck=await domainGuard(request);
+      if(domainCheck)return withSecurityHeaders(domainCheck,request);
       const brandedAsset = await maybeHandlePlatformBrandingAsset(request);
       if (brandedAsset) return withSecurityHeaders(brandedAsset, request);
 

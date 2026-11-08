@@ -149,10 +149,10 @@ function SettingsPage() {
             Manage workspace configuration, document branding, appearance and asset location defaults.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        {activeTab!=="locations"&&<div className="flex items-center gap-2">
           <Button variant="outline" onClick={reset} disabled={!canManage}><RefreshCw className="mr-2 h-4 w-4" />Reset</Button>
-          <Button onClick={save} disabled={!canManage || saving}><Save className="mr-2 h-4 w-4" />{saving ? "Saving…" : "Save changes"}</Button>
-        </div>
+          <Button onClick={save} disabled={!canManage || saving}><Save className="mr-2 h-4 w-4" />{saving ? "Saving…" : "Save document branding"}</Button>
+        </div>}
       </div>
 
       {!canManage && (

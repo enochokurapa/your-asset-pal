@@ -75,16 +75,11 @@ export function LocationSettingsPanel() {
 
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => setForm((current) => ({ ...current, [key]: value }));
 
+  // One country per workspace until separate multi-country plans are enabled.
+  // Choosing Uganda replaces Zambia; merely ticking a second allowed country
+  // must not leave Zambia as the hidden default.
   const toggleCountry = (code: string) => {
-    setForm((current) => {
-      const selected = current.allowed_country_codes.includes(code)
-        ? current.allowed_country_codes.filter((c) => c !== code)
-        : [...current.allowed_country_codes, code];
-      const defaultCountry = current.default_country_code && selected.includes(current.default_country_code)
-        ? current.default_country_code
-        : selected.length===1?selected[0]:null;
-      return { ...current, allowed_country_codes: selected, default_country_code: defaultCountry };
-    });
+    setForm(current=>({...current,allowed_country_codes:[code],default_country_code:code}));
   };
 
   const save = async () => {
@@ -181,7 +176,7 @@ export function LocationSettingsPanel() {
             {usesGeography && (
               <>
                 <div className="space-y-2 md:col-span-2">
-                  <Label>Countries used by this organisation</Label>
+                  <Label>Organisation country (choose one)</Label>
                   <div className="flex flex-wrap gap-2">
                     {(countries as any[]).map((c) => {
                       const active = form.allowed_country_codes.includes(c.code);
@@ -197,11 +192,11 @@ export function LocationSettingsPanel() {
                       );
                     })}
                   </div>
-                  <p className="text-xs text-muted-foreground">These are your organisation's choices, not system defaults. Changing them does not move existing assets. Save changes to update entry forms.</p>
+                  <p className="text-xs text-muted-foreground">Tap the country to make it active, then press Save country settings below. The previous country is replaced for new entries, but existing asset locations remain unchanged.</p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Default country</Label>
+                  <Label>Country used for new assets</Label>
                   <Select
                     value={form.default_country_code || "none"}
                     onValueChange={(v) => set("default_country_code", v === "none" ? null : v)}
@@ -262,7 +257,7 @@ export function LocationSettingsPanel() {
         </details>
 
         <div className="flex justify-end">
-          <Button onClick={save} disabled={saving || !isTenantAdmin}><Save className="mr-2 h-4 w-4" />{saving ? "Saving…" : "Save changes"}</Button>
+          <Button onClick={save} disabled={saving || !isTenantAdmin}><Save className="mr-2 h-4 w-4" />{saving ? "Saving country…" : "Save country settings"}</Button>
         </div>
       </fieldset>
     </div>
