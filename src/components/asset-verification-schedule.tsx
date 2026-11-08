@@ -32,7 +32,7 @@ const descriptions:Record<State,string>={
  current:"Registration-current or physically verified, within the selected period",
 };
 
-export function AssetVerificationSchedule() {
+export function AssetVerificationSchedule({view}:{view:"due"|"settings"}) {
  const {tenantId,isTenantAdmin,branchScope}=useAuth();
  const qc=useQueryClient();
  const [months,setMonths]=useState<number|null>(null);
@@ -107,7 +107,7 @@ export function AssetVerificationSchedule() {
  };
  const currentMonths=months??policy?.intervalMonths??12;
  return <div className="space-y-4">
-   <Card className="space-y-4 p-5">
+   {view==="settings"&&<Card className="space-y-4 p-4 sm:p-5">
     <div className="flex flex-wrap items-start justify-between gap-3">
      <div className="flex items-start gap-2">
       <ShieldCheck className="mt-1 h-5 w-5 text-primary"/>
@@ -137,6 +137,8 @@ export function AssetVerificationSchedule() {
        <Button disabled={savingLegacy||!legacyDate} onClick={updateLegacyDate}>{savingLegacy?"Saving…":"Update historical verification dates"}</Button></div>
       <p className="text-xs text-muted-foreground">This change is audited and restricted to tenant administrators. It updates only owner-attested legacy records for the active business.</p>
      </div>}
+   </Card>}
+   {view==="due"&&<>
     {overviewError && <p className="text-sm text-destructive">Verification status could not be loaded. Contact your administrator if this continues.</p>}
     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
       {categories.map(({key,title})=><div key={key} className="rounded-md border p-3">
@@ -144,7 +146,6 @@ export function AssetVerificationSchedule() {
        <p className="text-2xl font-semibold">{overviewLoading?"…":overview?.counts[key]??0}</p>
       </div>)}
     </div>
-   </Card>
    <Card className="overflow-hidden">
      <div className="border-b p-4">
       <h3 className="font-semibold">Assets requiring verification</h3>
@@ -167,5 +168,6 @@ export function AssetVerificationSchedule() {
        </table>
      </div>
    </Card>
+   </>}
  </div>;
 }

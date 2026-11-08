@@ -75,6 +75,7 @@ function AppLayout() {
   const [settingsOpen,setSettingsOpen]=useState(false);
   const [reportsOpen,setReportsOpen]=useState(false);
   const [billingOpen,setBillingOpen]=useState(false);
+  const [verificationOpen,setVerificationOpen]=useState(false);
   const [branding, setBranding] = useState<DocumentTemplate | null>(null);
   const [mfaChecked,setMfaChecked]=useState(false);
   const [mfaRequired,setMfaRequired]=useState(false);
@@ -96,6 +97,7 @@ function AppLayout() {
     if(["/settings","/users","/integrations","/domains"].some(path=>pathname.startsWith(path)))setSettingsOpen(true);
     if(pathname.startsWith("/reports"))setReportsOpen(true);
     if(pathname.startsWith("/billing"))setBillingOpen(true);
+    if(pathname.startsWith("/verification"))setVerificationOpen(true);
   },[pathname]);
   const exportAccess=useExportAccess();
 
@@ -267,6 +269,19 @@ function AppLayout() {
                     className="block rounded-md px-3 py-2 text-xs font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     activeOptions={{exact:true}}
                   >{label}</Link>)}
+              </div>}
+            </div>
+          ) : item.to === "/verification" && !isSaasAdmin ? (
+            <div key="verification-group">
+              <button type="button" onClick={()=>setVerificationOpen(v=>!v)} aria-expanded={verificationOpen} aria-controls="verification-sidebar-options"
+                className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  pathname.startsWith("/verification")?"bg-sidebar-primary text-sidebar-primary-foreground":"text-sidebar-foreground/80 hover:bg-sidebar-accent")}>
+                <ClipboardCheck className="h-4 w-4"/><span className="flex-1 text-left">Verification</span>
+                <ChevronDown className={cn("h-4 w-4 transition-transform",verificationOpen&&"rotate-180")}/>
+              </button>
+              {verificationOpen&&<div id="verification-sidebar-options" className="ml-4 space-y-0.5 border-l border-sidebar-border pl-2">
+                {([ ["scan","Scan & verify"],["due","Due assets"],["history","Verification history"],["settings","Validity & dates"] ] as const).map(([section,label])=><Link key={section} to="/verification" search={{section}} onClick={()=>setOpen(false)}
+                  className="block rounded-md px-3 py-2 text-xs font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">{label}</Link>)}
               </div>}
             </div>
           ) : item.to === "/billing" && !isSaasAdmin ? (

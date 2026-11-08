@@ -22,7 +22,9 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { loadTemplate, createBrandedPdf, saveBranded, tableHeadFill } from "@/lib/pdf-template";
 
+const VERIFICATION_SECTIONS=["scan","due","history","settings"] as const;
 export const Route = createFileRoute("/_app/verification")({
+  validateSearch:(search:Record<string,unknown>)=>({section:VERIFICATION_SECTIONS.includes(search.section as typeof VERIFICATION_SECTIONS[number])?search.section as typeof VERIFICATION_SECTIONS[number]:"scan"}),
   component: VerificationPage,
 });
 
@@ -38,6 +40,7 @@ const STATUS_TONE: Record<VStatus, string> = {
 };
 
 function VerificationPage() {
+  const {section}=Route.useSearch();
   const { canDo, canSeeBranch, user, branchScope } = useAuth();
   const canPerform = canDo("perform_verification");
   const canExport = canDo("view_verification_reports") || canDo("export_gate_pass_reports") || true; // viewing only
@@ -188,17 +191,12 @@ function VerificationPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><ClipboardCheck className="h-6 w-6" /> Fixed Asset Verification</h1>
-          <p className="text-sm text-muted-foreground">Scan or look up assets, confirm details on the ground, and record verification outcomes.</p>
-        </div>
-      </div>
+      <div><h1 className="flex items-center gap-2 text-xl font-bold tracking-tight sm:text-2xl"><ClipboardCheck className="h-5 w-5"/>{({scan:"Scan & verify",due:"Due assets",history:"Verification history",settings:"Validity & dates"} as const)[section]}</h1></div>
 
-      <AssetVerificationSchedule />
+      {(section==="settings"||section==="due")&&<AssetVerificationSchedule view={section}/>}
 
       {/* Scanner row */}
-      <Card className="p-5">
+      {section==="scan"&&<Card className="p-5">
         <div className="grid gap-3 sm:grid-cols-[260px_1fr_auto_auto]">
           <div className="space-y-1">
             <Label>Branch being verified</Label>
@@ -225,10 +223,10 @@ function VerificationPage() {
           <div className="flex items-end"><Button variant="outline" onClick={() => lookup(tag)} disabled={!branchId || !tag.trim()}><Search className="mr-1 h-4 w-4" />Find</Button></div>
           <div className="flex items-end"><Button onClick={() => setScanOpen(true)} disabled={!branchId}><ScanLine className="mr-1 h-4 w-4" />Scan</Button></div>
         </div>
-      </Card>
+      </Card>}
 
       {/* Filters + exports */}
-      <Card className="p-5">
+      {section==="history"&&<Card className="p-5">
         <div className="grid gap-3 md:grid-cols-6">
           <div className="space-y-1"><Label>From</Label><Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} /></div>
           <div className="space-y-1"><Label>To</Label><Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} /></div>
@@ -261,10 +259,10 @@ function VerificationPage() {
           <Button variant="outline" size="sm" onClick={exportPDF}><FileText className="mr-1 h-4 w-4" />PDF</Button>
           <span className="ml-auto text-xs text-muted-foreground">{filtered.length} record(s)</span>
         </div>
-      </Card>
+      </Card>}
 
       {/* Activity */}
-      <Card className="p-0 overflow-hidden">
+      {section==="history"&&<Card className="p-0 overflow-hidden">
         <div className="border-b px-5 py-3 text-sm font-semibold">Verification activity</div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -303,7 +301,7 @@ function VerificationPage() {
             </tbody>
           </table>
         </div>
-      </Card>
+      </Card>}
 
       <ScannerDialog open={scanOpen} onOpenChange={setScanOpen} onScan={(t) => lookup(t)} />
 
