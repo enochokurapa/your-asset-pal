@@ -63,6 +63,7 @@ const saasAdminNav: NavItem[] = [
   { to: "/saas-admin/contact", label: "Contact Inbox", icon: Mail },
   { to: "/saas-admin/social-links", label: "Social Media & WhatsApp", icon: Globe2 },
   { to: "/saas-admin/organizations", label: "Businesses", icon: Building2 },
+  { to: "/saas-admin/partners", label: "Partners", icon: Building2 },
   { to: "/saas-admin/settings", label: "Settings", icon: Settings },
   { to: "/profile", label: "My profile", icon: UserCircle },
 ];
@@ -85,12 +86,12 @@ function AppLayout() {
     let active=true;
     setMfaChecked(false);
     import("@/integrations/supabase/client").then(async({supabase})=>{
-      const {data,error}=await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if(!active)return;
-      if(error){console.error("[Auth] MFA status unavailable",error);setMfaRequired(true);}
-      else setMfaRequired(data.currentLevel!=="aal2"&&
-        (isSaasAdmin||isTenantAdmin||data.nextLevel==="aal2"));
-      setMfaChecked(true);
+      const {data:{session}}=await supabase.auth.getSession();
+      if(!session?.access_token)throw new Error("Sign-in session unavailable");
+      const response=await fetch("/api/security/email-mfa/status",{method:"POST",headers:{Authorization:"Bearer "+session.access_token},cache:"no-store"});
+      if(!response.ok)throw new Error("Security status unavailable");
+      const status=await response.json() as {verified?:boolean};
+      if(active){setMfaRequired(!status.verified);setMfaChecked(true);}
     }).catch(()=>{if(active){setMfaRequired(true);setMfaChecked(true);}});
     return ()=>{active=false;};
   },[user?.id,loading,isSaasAdmin,isTenantAdmin]);
@@ -218,7 +219,7 @@ function AppLayout() {
   };
 
   return (
-    <div className={cn("flex min-h-screen w-full bg-background", isSaasAdmin && "platform-brand")} onClickCapture={blockRestrictedExport}>
+    <div className={cn("flex min-h-screen w-full bg-[#e2eaf0]", isSaasAdmin && "platform-brand")} onClickCapture={blockRestrictedExport}>
       {open && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setOpen(false)} />}
 
       <aside
@@ -329,7 +330,7 @@ function AppLayout() {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col bg-[#e2eaf0]">
         <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur md:px-8">
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setOpen(true)} aria-label="Open menu"><Menu className="h-5 w-5" /></Button>
           {isSaasAdmin && <div className="hidden text-sm font-medium text-foreground sm:block">AssetFlow 360 · SaaS Control Center</div>}
@@ -344,7 +345,7 @@ function AppLayout() {
           <Button variant="ghost" size="icon" title="Sign out" onClick={signOut} aria-label="Sign out"><LogOut className="h-4 w-4 text-muted-foreground hover:text-foreground" /></Button>
         </header>
 
-        <main className="min-w-0 flex-1 overflow-x-clip px-3 py-4 sm:px-4 sm:py-6 md:px-8 md:py-8">
+        <main className="mx-auto w-full min-w-0 max-w-[1480px] flex-1 overflow-x-clip border-x border-[#d5e0e8] bg-white px-3 py-4 shadow-[0_10px_30px_rgba(25,55,75,.05)] sm:px-5 sm:py-6 md:px-8 md:py-8">
           {!isSaasAdmin && pathname.startsWith("/reports") && !exportAccess.allowed("reports") && subscriptionStatus === "trial" && !lockedPaidFeature && (
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
               <div className="flex items-center gap-2"><LockKeyhole className="h-4 w-4" /><span><strong>Free trial:</strong> reports are view-only. PDF and Excel downloads are locked until upgrade.</span></div>

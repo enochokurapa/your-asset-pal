@@ -8,6 +8,7 @@ import { startPlatformEmailReportScheduler } from "./lib/platform-email-reports.
 import { createHash } from "node:crypto";
 import { maybeHandlePlatformBrandingAsset } from "./lib/platform-branding-assets.server";
 import { supabaseAdmin } from "./integrations/supabase/client.server";
+import {maybeHandleEmailMfa,shouldRequireEmailMfa} from "./lib/platform-security-email-mfa.server";
 import { completeMicrosoftOAuth } from "./lib/microsoft365.server";
 
 type ServerEntry = {
@@ -78,6 +79,24 @@ async function maybeProxySupabase(request: Request): Promise<Response | null> {
   const sourceUrl = new URL(request.url);
   const route = proxyRouteFor(sourceUrl.pathname);
   if (!route) return null;
+
+  if(route.prefix==="/rest/v1"){
+    const authorization=request.headers.get("authorization")||"";
+    if(authorization.startsWith("Bearer ")){
+      const token=authorization.slice(7);
+      const path=sourceUrl.pathname;
+      // Minimal profile/role lookup is needed to render MFA before accessing
+      // protected organisation data. All other admin REST operations require proof.
+      const enrollmentMetadata=request.method==="GET"&&
+        /^\/rest\/v1\/(profiles|user_roles|user_permissions|user_approval_rights|user_action_rights|user_branch_access)$/.test(path);
+      const loginSessionRpc=request.method==="POST"&&
+        /^\/rest\/v1\/rpc\/(current_login_session_valid|other_login_sessions|replace_other_login_sessions)$/.test(path);
+      if(!enrollmentMetadata&&!loginSessionRpc){
+        try{if(await shouldRequireEmailMfa(token))return jsonResponse(403,{error:"mfa_required",message:"Complete sign-in verification before continuing"});}
+        catch{return jsonResponse(503,{error:"security_check_unavailable",message:"Sign-in security check unavailable"});}
+      }
+    }
+  }
 
   const upstreamBase = process.env[route.envName]?.trim();
   if (!upstreamBase) {
@@ -438,6 +457,9 @@ export default {
 
       const microsoftResponse = await maybeHandleMicrosoftOAuth(request);
       if (microsoftResponse) return withSecurityHeaders(microsoftResponse, request);
+
+      const emailMfa=await maybeHandleEmailMfa(request);
+      if(emailMfa)return withSecurityHeaders(emailMfa,request);
 
       const apiResponse = await maybeHandlePublicApi(request);
       if (apiResponse) return withSecurityHeaders(apiResponse, request);

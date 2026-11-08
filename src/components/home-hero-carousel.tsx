@@ -35,13 +35,13 @@ export function HomeHeroCarousel({initialStats}:{initialStats:PublicHomepageStat
   const timer=window.setInterval(()=>setActive(i=>(i+1)%BACKGROUNDS.length),7000);
   return()=>window.clearInterval(timer);
  },[reduced,visible]);
- return <section aria-label="AssetFlow360 asset management solutions" className="af-new-hero relative isolate mx-auto w-full max-w-7xl overflow-hidden bg-[#0c2c42] text-white sm:rounded-b-[32px]">
+ return <section aria-label="AssetFlow360 asset management solutions" className="af-new-hero relative isolate mx-auto w-full max-w-7xl overflow-hidden bg-[#0c2c42] text-white rounded-br-[28px] sm:rounded-br-[52px]">
   <div className="pointer-events-none absolute inset-0" aria-hidden="true">
    {BACKGROUNDS.map((item,i)=><img key={item.key} src={uploaded[i]||item.fallback} alt="" width={1672} height={941} loading={i===0?"eager":"lazy"} fetchPriority={i===0?"high":"low"} decoding="async" className={`af-slide-image absolute inset-0 h-full w-full object-cover object-[60%_center] ${active===i?"af-slide-visible":"af-slide-hidden"}`}/>)}
   </div>
   {/* Single continuous opaque-to-transparent overlay; no separate left panel or hard vertical seam. */}
   <div aria-hidden="true" className="af-mobile-hero-overlay pointer-events-none absolute inset-0" style={{background:"linear-gradient(90deg, rgba(12,44,66,0.99) 0%, rgba(12,44,66,0.97) 28%, rgba(12,44,66,0.86) 42%, rgba(12,44,66,0.52) 57%, rgba(12,44,66,0.16) 72%, rgba(12,44,66,0.02) 90%)"}}/>
-  <div className="relative z-10 mx-auto flex min-h-[420px] w-full max-w-7xl flex-col justify-center px-5 py-9 sm:min-h-[585px] sm:px-9 lg:min-h-[610px] lg:px-12">
+  <div className="relative z-10 mx-auto flex min-h-[365px] w-full max-w-7xl flex-col justify-center px-5 py-5 sm:min-h-[585px] sm:px-9 lg:min-h-[610px] lg:px-12">
    <div className="max-w-[575px]">
     <div className="mb-4 hidden items-center gap-2 rounded-full border border-[#f1a773]/40 bg-[#143d56]/90 px-4 py-2 text-[11px] font-semibold uppercase tracking-[.17em] sm:inline-flex text-[#ffd9bb]"><span className="h-1.5 w-1.5 rounded-full bg-[#ff883f]"/>Asset intelligence for modern teams</div>
     <p className="mb-3 text-[10px] font-bold uppercase tracking-[.12em] sm:mb-4 sm:text-xs sm:tracking-[.18em] text-[#ff9a5f]">Control the complete asset lifecycle</p>
@@ -55,7 +55,12 @@ export function HomeHeroCarousel({initialStats}:{initialStats:PublicHomepageStat
    .af-new-hero .af-slide-image{transition:opacity 1.25s ease-in-out,transform 7s ease;transform:scale(1.035)}
    .af-new-hero .af-slide-visible{opacity:1;transform:scale(1)}
    .af-new-hero .af-slide-hidden{opacity:0}
-   @media(max-width:639px){.af-new-hero .af-mobile-hero-overlay{background:rgba(12,44,66,.98)!important}.af-new-hero .af-slide-image{object-position:center}}
+   @media(max-width:639px){
+     .af-new-hero .af-mobile-hero-overlay{background:rgba(9,37,58,.9)!important}
+     .af-new-hero .af-slide-image{object-position:65% 48%;opacity:.13}
+     .af-new-hero .af-slide-visible{opacity:.18}
+     .af-new-hero .af-slide-hidden{opacity:0}
+   }
    @media(prefers-reduced-motion:reduce){.af-new-hero .af-slide-image{transition:none!important;transform:none!important}}
   `}</style>
  </section>

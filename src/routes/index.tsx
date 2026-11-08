@@ -4,6 +4,7 @@ import {PublicShell} from "@/components/public-site-shell";
 import {HomeHeroCarousel} from "@/components/home-hero-carousel";
 import {getPublicStats} from "@/lib/platform-public-stats.functions";
 import {HomeScrollMotion,HomeLiveStats} from "@/components/home-public-effects";
+import {PublicPartners} from "@/components/public-partners";
 import {ArrowRight,ScanLine,MapPinned,ClipboardCheck,FileSpreadsheet,Route as RouteIcon,Package,ShieldCheck,Building2,FileBarChart2,CheckCircle2,MoveRight,Layers3,CalendarCheck2,ArrowUpRight} from "lucide-react";
 
 export const Route=createFileRoute("/")({component:Home,loader:async()=>({initialStats:await getPublicStats().catch(()=>[])}),head:()=>publicHead("/","AssetFlow 360 | Fixed Asset Management Software","Register, verify, tag, locate and manage fixed assets with AssetFlow 360. Control asset assignments, gate passes, depreciation and reports.")});
@@ -20,6 +21,7 @@ function Home(){const {initialStats}=Route.useLoaderData();return <PublicShell><
  <section aria-label="Platform by the numbers" className="relative z-10 border-b border-[#e2e9ee] bg-white px-4 py-5 sm:px-8 sm:py-8">
   <div className="mx-auto max-w-7xl"><h2 className="mb-3 text-sm font-bold text-[#15364a] sm:mb-5 sm:text-lg">Platform stats</h2><HomeLiveStats initialStats={initialStats}/></div>
  </section>
+ <PublicPartners/>
  <section className="bg-white px-5 py-16 sm:px-8 sm:py-24" aria-labelledby="why-af-title"><div className="mx-auto max-w-7xl">
   <div data-home-reveal className="mb-11 flex flex-col justify-between gap-6 lg:flex-row lg:items-end"><div className="max-w-3xl"><p className="text-xs font-bold uppercase tracking-[.2em] text-[#c16b39]">Why AssetFlow360</p><h2 id="why-af-title" className="mt-4 text-3xl font-bold tracking-[-.035em] text-[#123348] sm:text-5xl">Everything connected.<br/><span className="text-[#c46c3b]">Nothing left to guess.</span></h2></div><p className="max-w-md text-sm leading-7 text-[#546b7b] sm:text-base">Fixed assets move through departments, branches and different teams. Keep the full story connected—without digging through spreadsheets.</p></div>
   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">{capabilities.map(({icon:Icon,index,title,desc})=><article data-home-reveal key={title} className="group rounded-2xl border border-[#dee4e7] bg-white p-6 shadow-[0_12px_28px_rgba(19,51,72,.05)] transition-[transform,box-shadow] duration-300 hover:-translate-y-1.5 hover:shadow-[0_18px_36px_rgba(19,51,72,.12)]"><div className="flex items-start justify-between"><span className="flex h-14 w-14 items-center justify-center rounded-xl bg-[#e8f0f5] text-[#1d5678]"><Icon className="h-7 w-7" aria-hidden="true"/></span><span className="text-sm font-bold text-[#ca7548]">{index}</span></div><h3 className="mt-8 text-lg font-bold text-[#15364b]">{title}</h3><p className="mt-3 text-sm leading-7 text-[#60717c]">{desc}</p></article>)}</div>

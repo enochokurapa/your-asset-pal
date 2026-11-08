@@ -282,3 +282,30 @@ export async function sendPlatformPdfReportEmail(to:string,subject:string,pdf:Bu
   return {accepted:true};
  }finally{c.close()}
 }
+
+/** A transactional security notice. Uses the existing encrypted SMTP connection. */
+export async function sendPlatformSecurityCodeEmail(to:string,code:string){
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)||to.length>250)throw new Error("Invalid security email recipient");
+ if(!/^\d{6}$/.test(code))throw new Error("Invalid security code");
+ const config=await getConfiguredSmtpForApplication("security");
+ const c=await connect(config);
+ try{
+  await c.send("MAIL FROM:<"+config.fromEmail+">");
+  await c.send("RCPT TO:<"+to+">");
+  await c.send("DATA",354);
+  const payload=[
+   "From: "+safe(config.displayName)+" <"+config.fromEmail+">",
+   "To: "+safe(to),
+   "Subject: AssetFlow360 Security | Sign-in verification code",
+   "MIME-Version: 1.0","Content-Type: text/plain; charset=UTF-8",
+   "X-Auto-Response-Suppress: All","Cache-Control: no-store","",
+   "AssetFlow360 Security", "", "Your verification code: "+code,
+   "", "This code expires in 10 minutes.",
+   "If you did not request this code, you can ignore this email.",
+   "Never share your code or password. This is an automated message; please do not reply."
+  ].join("\r\n").replace(/\r\n\./g,"\r\n..");
+  await c.send(payload+"\r\n.",250);
+  try{await c.send("QUIT",221)}catch{/* SMTP DATA 250 accepted */}
+  return {accepted:true};
+ }finally{c.close()}
+}
