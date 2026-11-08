@@ -29,6 +29,7 @@ import {useServerFn} from "@tanstack/react-start";
 import { AssetLocationFields } from "@/components/asset-location-fields";
 import { loadTenantBranding, BRANDING_CHANGED_EVENT } from "@/lib/branding";
 import { GeoHierarchyFilter, type GeoHierarchyPlace } from "@/components/geo-hierarchy-filter";
+import {nativeRegisterKey} from "@/lib/register-core-fields";
 
 export const Route = createFileRoute("/_app/assets")({
   component: AssetsPage,
@@ -139,8 +140,13 @@ function AssetsPage() {
   const [uploadingField,setUploadingField]=useState<string|null>(null);
   const [importBranchId,setImportBranchId]=useState("");
   const [customValues,setCustomValues]=useState<Record<string,string>>({});
-  const registers=(catalog?.definitions??[]) as Array<{id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean,options?:string[],section?:string}>,tag_policy?:string}} >;
+  const registers=(catalog?.definitions??[]) as Array<{id:string,name:string,configuration:{fields?:Array<{key:string,label:string,type:string,required:boolean,options?:string[],section?:string}>,tag_policy?:string,core_fields?:string[]}} >;
   const registerFields=registers.find(r=>r.id===registerChoice)?.configuration?.fields??[];
+  const customEntryFields=registerFields.filter(field=>!nativeRegisterKey(field));
+  const selectedCoreFields=registers.find(r=>r.id===registerChoice)?.configuration?.core_fields;
+  const hasCore=(key:string)=>!Array.isArray(selectedCoreFields)||selectedCoreFields.includes(key);
+  const showTag=hasCore("asset_tag")||registerFields.some(f=>nativeRegisterKey(f)==="asset_tag")||registers.find(r=>r.id===registerChoice)?.configuration?.tag_policy==="required";
+  const showSerial=hasCore("serial_number")||registerFields.some(f=>nativeRegisterKey(f)==="serial_number");
   const sectionForField=(field:{section?:string,label:string,key:string})=>{
     if(field.section==="assignment"||field.section==="assign")return "assignment";
     if(field.section==="identify")return "classify";
@@ -339,7 +345,7 @@ function AssetsPage() {
     setRegisterChoice(a.register_definition_id??"default");
     setCustomValues(Object.fromEntries(Object.entries(a.custom_fields??{}).map(([k,v])=>[k,String(v??"")])));
     setForm({
-      id: a.id, asset_tag: a.asset_tag, serial_number: a.serial_number ?? "",
+      id: a.id, asset_tag: a.asset_tag??"", serial_number: a.serial_number ?? "",
       name: a.name, description: a.description ?? "",
       category_id: a.category_id, location_id: a.location_id, branch_id: a.branch_id,
       geo_place_id: a.geo_place_id ?? null,
@@ -452,10 +458,18 @@ function AssetsPage() {
       };
       if(match[normalized])resolvedCustomValues[field.key]=match[normalized];
     }
+    // Native identifiers win; legacy duplicate custom values remain available
+    // for old assets but may not override an explicitly entered scanner value.
     const enteredTag=tagField?String(resolvedCustomValues[tagField.key]??"").trim():"";
-    const enteredName=nameField?String(resolvedCustomValues[nameField.key]??"").trim():String(Object.values(resolvedCustomValues).find(v=>String(v).trim())??"").trim();
+    const enteredName=nameField?String(resolvedCustomValues[nameField.key]??"").trim():"";
+    for(const field of registerFields){
+      const native=nativeRegisterKey(field);
+      if(native){const current=native==="asset_tag"?form.asset_tag:native==="serial_number"?form.serial_number:native==="name"?form.name:form.description;
+        if(current.trim())resolvedCustomValues[field.key]=current.trim();
+      }
+    }
     const effectiveTag=form.asset_tag.trim()||enteredTag||null;
-    const effectiveName=customRegister?(enteredName||form.name.trim()||enteredTag||"Registered asset"):form.name.trim();
+    const effectiveName=customRegister?(form.name.trim()||enteredName):form.name.trim();
     if(!effectiveName){toast.error("Enter an asset name or item description.");return;}
     if(customRegister&&registers.find(r=>r.id===registerChoice)?.configuration?.tag_policy==="required"&&!effectiveTag){toast.error("This register requires a physical asset tag.");return;}
 
@@ -628,7 +642,7 @@ function AssetsPage() {
   };
 
   const nextWizardStep = () => {
-    if(registerChoice!=="default"&&wizardStep===0){for(const field of registerFields){const value=String(customValues[field.key]??"").trim();const label=(field.label||field.key).toLowerCase().replace(/[^a-z0-9]/g,"");if(field.required&&!value&&!["tagnumber","assettag","tag"].includes(label)){toast.error(`${field.label} is required`);return;}}}
+    if(registerChoice!=="default"&&wizardStep===0){for(const field of registerFields){const value=String(customValues[field.key]??"").trim();const label=(field.label||field.key).toLowerCase().replace(/[^a-z0-9]/g,"");if(field.required&&!value&&!((nativeRegisterKey(field)==="asset_tag"&&form.asset_tag.trim())||(nativeRegisterKey(field)==="serial_number"&&form.serial_number.trim())||(nativeRegisterKey(field)==="name"&&form.name.trim())||(nativeRegisterKey(field)==="description"&&form.description.trim()))){toast.error(`${field.label} is required`);return;}}}
     if((registerChoice==="default"||wizardStep===2)&&!validateWizardStep(wizardStep))return;
     setWizardStep(step=>registerChoice==="default"?Math.min(step+1,wizardSteps.length-1):step===0?2:4);
   };
@@ -1019,18 +1033,23 @@ function AssetsPage() {
 
                 {registerChoice!=="default" && wizardStep===0&&<div className="space-y-4">
                   <div className="grid gap-3 rounded-lg border bg-[#f7fafc] p-3 sm:grid-cols-2">
-                    <div className="space-y-1.5"><Label htmlFor="custom-asset-tag">Asset tag</Label><div className="flex gap-2"><Input id="custom-asset-tag" value={form.asset_tag} onChange={e=>setForm(f=>({...f,asset_tag:e.target.value}))} placeholder="Scan or enter tag"/><Button type="button" variant="outline" aria-label="Scan asset tag" onClick={()=>{setScanMode("tag");setScanOpen(true)}}><ScanLine className="h-4 w-4"/></Button></div></div>
-                    <div className="space-y-1.5"><Label htmlFor="custom-serial">Serial number</Label><div className="flex gap-2"><Input id="custom-serial" value={form.serial_number} onChange={e=>setForm(f=>({...f,serial_number:e.target.value}))} placeholder="Optional"/><Button type="button" variant="outline" aria-label="Scan serial number" onClick={()=>{setScanMode("serial");setScanOpen(true)}}><ScanLine className="h-4 w-4"/></Button></div></div>
+                    {showTag&&<div className="space-y-1.5"><Label htmlFor="custom-asset-tag">Asset tag</Label><div className="flex gap-2"><Input id="custom-asset-tag" value={form.asset_tag} onChange={e=>setForm(f=>({...f,asset_tag:e.target.value}))} placeholder="Scan or enter tag"/><Button type="button" variant="outline" aria-label="Scan asset tag" onClick={()=>{setScanMode("tag");setScanOpen(true)}}><ScanLine className="h-4 w-4"/></Button></div></div>}
+                    {showSerial&&<div className="space-y-1.5"><Label htmlFor="custom-serial">Serial number</Label><div className="flex gap-2"><Input id="custom-serial" value={form.serial_number} onChange={e=>setForm(f=>({...f,serial_number:e.target.value}))} placeholder="Optional"/><Button type="button" variant="outline" aria-label="Scan serial number" onClick={()=>{setScanMode("serial");setScanOpen(true)}}><ScanLine className="h-4 w-4"/></Button></div></div>}
                   </div>
-                  <div className="grid gap-4 sm:grid-cols-2">{registerFields.map(field=><div key={field.key} className="space-y-2"><Label>{field.label}{field.required?" *":""}</Label>{field.type==="select"&&field.options?.length?<Select value={customValues[field.key]??""} onValueChange={value=>setCustomValues(v=>({...v,[field.key]:value}))}><SelectTrigger><SelectValue placeholder="Choose"/></SelectTrigger><SelectContent>{field.options.map(option=><SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>:field.type==="radio"&&field.options?.length?<div role="radiogroup" aria-label={field.label} className="flex flex-wrap gap-3">{field.options.map(option=><label key={option} className="flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm"><input type="radio" name={`custom-${field.key}`} checked={customValues[field.key]===option} onChange={()=>setCustomValues(v=>({...v,[field.key]:option}))}/>{option}</label>)}</div>:field.type==="attachment"?<label className="block space-y-2">{customValues[field.key]&&<Button type="button" size="sm" variant="outline" onClick={async e=>{e.preventDefault();const {data,error}=await supabase.storage.from("asset-files").createSignedUrl(customValues[field.key],60);if(error||!data?.signedUrl){toast.error(error?.message||"Cannot open attachment");return;}window.open(data.signedUrl,"_blank","noopener,noreferrer")}}>View attachment</Button>}<span className="text-xs text-muted-foreground">{customValues[field.key]?"Attached: "+customValues[field.key].split("/").pop():"PDF or image (max 10 MB)"}</span><Input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx" disabled={uploadingField===field.key} onChange={async e=>{const file=e.target.files?.[0];if(!file||!tenantId)return;if(file.size>10*1024*1024){toast.error("File must be under 10 MB");return;}setUploadingField(field.key);try{const clean=file.name.replace(/[^a-zA-Z0-9._-]/g,"_");const path=`${tenantId}/custom-register/${crypto.randomUUID()}-${clean}`;const result=await supabase.storage.from("asset-files").upload(path,file,{contentType:file.type||"application/octet-stream",upsert:false});if(result.error)throw result.error;setCustomValues(v=>({...v,[field.key]:path}));toast.success("Attachment uploaded")}catch(error:any){toast.error(error.message||"Attachment upload failed")}finally{setUploadingField(null)}}}/></label>:field.type==="boolean"?<label className="flex min-h-11 items-center gap-3 rounded-lg border p-3"><input type="checkbox" checked={customValues[field.key]==="true"} onChange={e=>setCustomValues(v=>({...v,[field.key]:String(e.target.checked)}))}/><span className="text-sm">Yes</span></label>:<Input className="h-11" type={field.type==="date"?"date":field.type==="number"||field.type==="currency"?"number":field.type==="email"?"email":field.type==="url"?"url":field.type==="phone"?"tel":"text"} value={customValues[field.key]??""} onChange={event=>setCustomValues(v=>({...v,[field.key]:event.target.value}))}/>}</div>)}</div></div>}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="custom-name">Asset name *</Label><Input id="custom-name" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="e.g. Office laptop"/></div>
+                    {hasCore("description")&&<div className="space-y-1.5 sm:col-span-2"><Label htmlFor="custom-description">Description</Label><Textarea id="custom-description" rows={2} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} placeholder="Optional asset notes"/></div>}
+                  </div>
+                  {registerFields.some(field=>nativeRegisterKey(field))&&<p className="text-xs text-muted-foreground">System identification fields are shown once with their scanning controls. Existing register values remain preserved.</p>}
+                  <div className="grid gap-4 sm:grid-cols-2">{customEntryFields.map(field=><div key={field.key} className="space-y-2"><Label>{field.label}{field.required?" *":""}</Label>{field.type==="select"&&field.options?.length?<Select value={customValues[field.key]??""} onValueChange={value=>setCustomValues(v=>({...v,[field.key]:value}))}><SelectTrigger><SelectValue placeholder="Choose"/></SelectTrigger><SelectContent>{field.options.map(option=><SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>:field.type==="radio"&&field.options?.length?<div role="radiogroup" aria-label={field.label} className="flex flex-wrap gap-3">{field.options.map(option=><label key={option} className="flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm"><input type="radio" name={`custom-${field.key}`} checked={customValues[field.key]===option} onChange={()=>setCustomValues(v=>({...v,[field.key]:option}))}/>{option}</label>)}</div>:field.type==="attachment"?<label className="block space-y-2">{customValues[field.key]&&<Button type="button" size="sm" variant="outline" onClick={async e=>{e.preventDefault();const {data,error}=await supabase.storage.from("asset-files").createSignedUrl(customValues[field.key],60);if(error||!data?.signedUrl){toast.error(error?.message||"Cannot open attachment");return;}window.open(data.signedUrl,"_blank","noopener,noreferrer")}}>View attachment</Button>}<span className="text-xs text-muted-foreground">{customValues[field.key]?"Attached: "+customValues[field.key].split("/").pop():"PDF or image (max 10 MB)"}</span><Input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx" disabled={uploadingField===field.key} onChange={async e=>{const file=e.target.files?.[0];if(!file||!tenantId)return;if(file.size>10*1024*1024){toast.error("File must be under 10 MB");return;}setUploadingField(field.key);try{const clean=file.name.replace(/[^a-zA-Z0-9._-]/g,"_");const path=`${tenantId}/custom-register/${crypto.randomUUID()}-${clean}`;const result=await supabase.storage.from("asset-files").upload(path,file,{contentType:file.type||"application/octet-stream",upsert:false});if(result.error)throw result.error;setCustomValues(v=>({...v,[field.key]:path}));toast.success("Attachment uploaded")}catch(error:any){toast.error(error.message||"Attachment upload failed")}finally{setUploadingField(null)}}}/></label>:field.type==="boolean"?<label className="flex min-h-11 items-center gap-3 rounded-lg border p-3"><input type="checkbox" checked={customValues[field.key]==="true"} onChange={e=>setCustomValues(v=>({...v,[field.key]:String(e.target.checked)}))}/><span className="text-sm">Yes</span></label>:<Input className="h-11" type={field.type==="date"?"date":field.type==="number"||field.type==="currency"?"number":field.type==="email"?"email":field.type==="url"?"url":field.type==="phone"?"tel":"text"} value={customValues[field.key]??""} onChange={event=>setCustomValues(v=>({...v,[field.key]:event.target.value}))}/>}</div>)}</div></div>}
                 {wizardStep === 4 && (
                   <div className="space-y-5">
                     <div>
                       <h3 className="text-base font-semibold">Review & save</h3>
                       <p className="text-sm text-muted-foreground">Confirm the important details before saving.</p>
                     </div>
-                    {registerChoice!=="default"&&<div className="rounded-xl border p-3 text-sm"><p className="font-semibold">Location: {reviewLocation}</p><p className="mt-1 text-xs text-muted-foreground">{form.location_latitude&&form.location_longitude?"GPS captured":"GPS not captured"}</p></div>}
-                    {registerChoice!=="default"&&<div className="grid gap-2 rounded-xl border p-3">{registerFields.map(field=><div key={field.key} className="flex justify-between gap-3 text-sm"><span>{field.label}</span><span className="font-semibold">{customValues[field.key]||"—"}</span></div>)}</div>}
+                    {registerChoice!=="default"&&<div className="rounded-xl border p-3 text-sm"><p className="font-semibold">Asset: {form.name||"—"} · Tag: {form.asset_tag||"—"} · Serial: {form.serial_number||"—"}</p><p className="mt-1">Location: {reviewLocation}</p><p className="mt-1 text-xs text-muted-foreground">{form.location_latitude&&form.location_longitude?"GPS captured":"GPS not captured"}</p></div>}
+                    {registerChoice!=="default"&&<div className="grid gap-2 rounded-xl border p-3">{customEntryFields.map(field=><div key={field.key} className="flex justify-between gap-3 text-sm"><span>{field.label}</span><span className="font-semibold">{customValues[field.key]||"—"}</span></div>)}</div>}
                     {registerChoice==="default" && <div className="overflow-hidden rounded-xl border">
                       {[
                         ["Asset", form.name || "-"],
