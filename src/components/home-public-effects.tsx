@@ -49,13 +49,13 @@ export function HomeLiveStats({initialStats}:{initialStats:PublicHomepageStat[]}
         const Icon=icons[item.metric_key as keyof typeof icons] || BarChart3;
         return <div key={item.metric_key}
           style={{transitionDelay:reduced?"0ms":`${index*100}ms`}}
-          className={`min-w-0 rounded-xl border border-[#e4ddd0] bg-[#fffaf4] p-2.5 shadow-[0_8px_24px_rgba(27,62,78,.10)] transition-[opacity,transform,box-shadow] duration-700 ease-out hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(27,62,78,.15)] motion-reduce:transform-none motion-reduce:transition-none sm:p-4
+          className={`min-w-0 rounded-xl border border-[#e9e0d8] bg-[#fffaf5] p-2.5 shadow-[0_8px_24px_rgba(27,62,78,.10)] transition-[opacity,transform,box-shadow] duration-700 ease-out hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(27,62,78,.15)] motion-reduce:transform-none motion-reduce:transition-none sm:p-4
             ${visible||reduced?"translate-y-0 opacity-100":"translate-y-3 opacity-55"}`}>
           <div className="flex min-w-0 items-center gap-2">
-            <Icon aria-hidden="true" className="h-4 w-4 shrink-0 text-[#b96b3f]"/>
-            <span className="min-w-0 break-words text-[10px] font-medium leading-4 text-[#44616f] sm:text-xs">{item.label}</span>
+            <Icon aria-hidden="true" className="h-4 w-4 shrink-0 text-[#CB7B30]"/>
+            <span className="min-w-0 break-words text-[10px] font-medium leading-4 text-[#344372] sm:text-xs">{item.label}</span>
           </div>
-          <p className="mt-2 break-words text-[clamp(1.25rem,2.2vw,1.85rem)] font-semibold leading-tight tracking-tight text-[#213e4d]">
+          <p className="mt-2 break-words text-[clamp(1.25rem,2.2vw,1.85rem)] font-semibold leading-tight tracking-tight text-[#19285f]">
             <AnimatedNumber value={item.value} visible={visible} reduced={reduced}/>
           </p>
         </div>;

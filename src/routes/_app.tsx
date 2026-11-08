@@ -229,7 +229,7 @@ function AppLayout() {
   };
 
   return (
-    <div className={cn("flex min-h-screen w-full bg-[#e2eaf0]", isSaasAdmin && "platform-brand")} onClickCapture={blockRestrictedExport}>
+    <div className={cn("af-app-outer flex min-h-screen w-full bg-[#f8f5f2]", isSaasAdmin && "platform-brand")} onClickCapture={blockRestrictedExport}>
       {open && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setOpen(false)} />}
 
       <aside
@@ -358,7 +358,7 @@ function AppLayout() {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col bg-[#e2eaf0]">
+      <div className="af-app-workspace flex min-w-0 flex-1 flex-col bg-[#f8f5f2]">
         <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur md:px-8">
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setOpen(true)} aria-label="Open menu"><Menu className="h-5 w-5" /></Button>
           {isSaasAdmin && <div className="hidden text-sm font-medium text-foreground sm:block">AssetFlow 360 · SaaS Control Center</div>}

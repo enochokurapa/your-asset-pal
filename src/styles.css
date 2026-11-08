@@ -379,3 +379,33 @@
     transition: none !important;
   }
 }
+
+/* AssetFlow360 approved web design system — the pale outer canvas and
+   constrained, white central website remain distinct on large monitors. */
+:root{--af-brand-indigo:#3A3EC2;--af-brand-ochre:#CB7B30;--af-brand-deep:#18295f;--af-outer:#fbf7f3;--af-line:#e8dfd7;}
+.af-public-site{background:var(--af-outer);color:#1c2b51;}
+.af-site-frame{width:100%;max-width:1250px;margin-inline:auto;}
+@media(min-width:1280px){.af-site-frame{width:72%;max-width:1250px;}}
+.af-public-header{background:white;border-color:var(--af-line);}
+.af-public-footer{background:#202c70;}
+.af-public-site .assetflow-homepage{border-color:#ebe2d9;box-shadow:0 12px 44px rgba(58,62,194,.075);}
+.af-public-site .assetflow-homepage [data-home-reveal]{transition-duration:450ms!important;}
+.af-public-site .af-hero-button-primary{background:var(--af-brand-ochre);border:1px solid #b66b28;color:white;}
+.af-public-site .af-hero-button-primary:hover{background:#b46927;}
+.af-public-site .af-hero-button-secondary{background:rgba(27,38,94,.24);border:1px solid rgba(255,255,255,.65);color:white;}
+.af-public-site .af-hero-button-secondary:hover{background:rgba(37,47,130,.46);}
+.af-auth-stage{position:relative;min-height:100vh;background:#fcf9f6;color:#182552;isolation:isolate;overflow:hidden;}
+.af-auth-stage:before{content:"";position:absolute;inset:0;z-index:-1;background:url('/brand/asset-outline-pattern.svg') center center / cover no-repeat;pointer-events:none;opacity:.56;}
+.af-auth-stage:after{content:"";position:absolute;left:-3%;right:-3%;bottom:-1px;height:34px;background:#3A3EC2;border-top:6px solid #CB7B30;clip-path:polygon(0 28%,10% 22%,30% 76%,50% 100%,70% 82%,90% 32%,100% 16%,100% 100%,0 100%);pointer-events:none;}
+.af-auth-stage .af-auth-card{background:#fff;border:1px solid #d9dbe3;border-radius:18px;box-shadow:0 16px 45px rgba(31,40,103,.075);}
+.af-auth-stage .af-auth-card input{border-color:#d6d9e4;background:#fff;color:#14234c;}
+.af-auth-stage .af-auth-card input:focus-visible{outline:2px solid #3A3EC2;outline-offset:1px;}
+.af-auth-stage .af-auth-card button[type=submit]{background:#3A3EC2;color:#fff;border-radius:10px;}
+.af-auth-stage .af-auth-card button[type=submit]:hover{background:#3034a8;}
+.af-auth-stage .af-auth-card a:not(.af-auth-link-home){color:#3A3EC2;}
+.af-auth-stage .af-auth-card a:hover{text-decoration:underline;}
+.af-app-outer{background:#f8f5f2!important;}
+.af-app-workspace{background:#f8f5f2!important;}
+.af-app-workspace>main,.af-app-workspace .af-app-main{background:#fff;}
+@media(max-width:767px){.af-auth-stage:before{background-position:58% center;opacity:.28}.af-auth-stage{padding-bottom:22px}.af-auth-stage .af-auth-card{border-radius:16px;}}
+@media(prefers-reduced-motion:reduce){.af-public-site .af-new-hero .af-slide-image{transition:none!important;transform:none!important}}

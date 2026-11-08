@@ -127,7 +127,7 @@ function MfaChallenge(){
   if(error){setError(error.message);return;}
   setEnrollment(null);await saveSuccessfulMethod("app");window.location.replace("/dashboard");
  };
- return <main className="min-h-screen bg-[#e2eaf0] px-4 py-8 sm:py-12"><div className="mx-auto max-w-md space-y-5"><div className="flex justify-center"><PlatformLogo variant="lockup" className="h-14 w-56"/></div><section className="rounded-xl border bg-white p-5 shadow-sm sm:p-7">
+ return <main className="af-auth-stage min-h-screen px-4 py-8 sm:py-12"><div className="mx-auto max-w-md space-y-5"><div className="flex justify-center"><PlatformLogo variant="lockup" className="h-14 w-56"/></div><section className="rounded-xl border bg-white p-5 shadow-sm sm:p-7">
   <h1 className="text-xl font-semibold">Verify your sign-in</h1>
   <p className="mt-2 text-sm text-muted-foreground">{method==="app"?"Enter the code from your authenticator app.":method==="email"?"We send a code to your registered email.":"Choose your preferred verification method."}</p>
   {method==="choose"&&<div className="mt-5 space-y-3">

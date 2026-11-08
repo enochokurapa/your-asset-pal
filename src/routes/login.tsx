@@ -102,24 +102,19 @@ function LoginPage() {
     setTakeoverOpen(false);setExistingDevices([]);
   };
   return (
-    <div className="platform-brand relative min-h-screen overflow-hidden bg-background px-4 py-8">
-      <div className="af-login-orb absolute -right-24 top-[8%] h-64 w-64 rounded-full bg-primary/[0.025]" />
-      <div className="af-login-orb af-delay-2 absolute -left-24 bottom-[8%] h-72 w-72 rounded-full bg-primary/[0.025]" />
-      <div className="pointer-events-none absolute inset-0 opacity-[0.1] [background-image:radial-gradient(circle_at_1px_1px,color-mix(in_oklab,var(--border)_75%,transparent)_1px,transparent_0)] [background-size:26px_26px]" />
+    <div className="platform-brand af-auth-stage px-4 py-8 sm:py-10">
+
 
       {takeoverOpen&&<div role="dialog" aria-modal="true" aria-label="Existing sign-in" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"><div className="w-full max-w-md rounded-2xl bg-card p-7 shadow-xl"><h2 className="text-xl font-bold">Account already signed in</h2><p className="mt-3 text-sm text-muted-foreground">Your account is active on another device. Continue here and sign out the other device?</p><div className="my-4 rounded-xl border p-3 text-sm">{existingDevices.slice(0,3).map(item=><p key={item.session_id} className="truncate">{item.device || "Another browser"}</p>)}</div><p className="text-xs text-muted-foreground">The existing device will be notified when it next checks its session.</p><div className="mt-5 flex justify-end gap-2"><Button variant="outline" onClick={cancelTakeover} disabled={submitting}>Keep other device</Button><Button onClick={replaceSession} disabled={submitting}>Sign out other device</Button></div></div></div>}
-      <main className="relative z-10 mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-[470px] flex-col justify-center">
-        <div className="af-auth-card rounded-[1.6rem] border bg-card p-6 shadow-lg sm:p-8">
-          <div className="mb-6 flex flex-col items-center gap-3">
-            <Link to="/" aria-label="AssetFlow360 homepage"><PlatformLogo variant="lockup" className="h-20 w-[270px] max-w-full" /></Link>
-            <Link to="/" className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted/50"><ArrowLeft className="h-4 w-4"/>Back to homepage</Link>
+      <main className="relative z-10 mx-auto flex min-h-[calc(100vh-6rem)] w-full max-w-[510px] flex-col justify-center">
+        <div className="af-auth-card border bg-white p-6 sm:p-9">
+          <div className="mb-5 flex items-start justify-between gap-3">
+            <span className="inline-flex h-14 w-48 max-w-[60%] items-center"><PlatformLogo variant="lockup" className="h-full w-full" imageClassName="object-left object-contain"/></span>
+            <Link to="/" className="af-auth-link-home inline-flex items-center gap-1 rounded-md px-2 py-2 text-xs font-medium text-[#4d5881] hover:bg-[#f7f5f3]"><ArrowLeft className="h-3.5 w-3.5"/> Home</Link>
           </div>
           <div className="mb-7 text-center">
-            <p className="text-sm font-semibold text-primary">Welcome back</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Sign in to your workspace</h1>
-            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-              Continue to your asset register, locations, reports and operational controls.
-            </p>
+            <h1 className="text-2xl font-bold tracking-tight text-[#18275f] sm:text-3xl">Welcome back</h1>
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[#5d6686]">Sign in to your AssetFlow360 workspace</p>
           </div>
 
           <form onSubmit={onSubmit} className="space-y-5">
@@ -134,7 +129,7 @@ function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@company.com"
-                className="h-12 rounded-xl bg-background"
+                className="h-12 rounded-lg bg-white"
               />
             </div>
 
@@ -148,7 +143,7 @@ function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-12 rounded-xl bg-background pr-11"
+                  className="h-12 rounded-lg bg-white pr-11"
                 />
                 <button
                   type="button"
@@ -163,7 +158,7 @@ function LoginPage() {
             </div>
 
             <div className="flex justify-end"><Link to="/forgot-password" className="text-sm font-medium text-primary hover:underline">Forgot password?</Link></div>
-            <Button type="submit" className="h-12 w-full rounded-xl text-sm font-semibold" disabled={submitting}>
+            <Button type="submit" className="h-12 w-full rounded-lg bg-[#3A3EC2] text-sm font-semibold text-white hover:bg-[#3034a8]" disabled={submitting}>
               {submitting ? (
                 <span className="inline-flex items-center gap-2">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" />
@@ -179,27 +174,17 @@ function LoginPage() {
               Continue with Google
             </Button>
           </>}
-          <div className="mt-5 flex items-center justify-center gap-2 rounded-xl bg-muted/45 px-3 py-2.5 text-xs text-muted-foreground">
-            <ShieldCheck className="h-4 w-4 shrink-0 text-primary" />
-            Secure workspace authentication
+          <div className="mt-5 flex items-center justify-center gap-2 text-xs text-[#707b9b]">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-[#3A3EC2]" /> Secure workspace sign-in
           </div>
 
-          <p className="mt-6 border-t pt-5 text-center text-sm text-muted-foreground">
-            New to AssetFlow 360?{" "}
-            <Link to="/register" className="font-semibold text-primary transition hover:opacity-80">
-              Start free trial
-            </Link>
-          </p>
+          <div className="mt-6 space-y-3 border-t pt-5 text-center">
+            <p className="text-xs text-[#727995]">New to AssetFlow360?</p>
+            <Link to="/register" className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-[#CB7B30] text-sm font-bold text-[#B56B25] hover:bg-[#fff5e9]">Create an account</Link>
+          </div>
         </div>
 
-        <div className="mt-5 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
-          {["Asset control", "Location intelligence", "Official reporting"].map((item) => (
-            <span key={item} className="flex items-center gap-1.5">
-              <Check className="h-3.5 w-3.5 text-primary" />
-              {item}
-            </span>
-          ))}
-        </div>
+        <p className="mt-5 text-center text-xs text-[#777e93]">© {new Date().getFullYear()} AssetFlow360. All rights reserved.</p>
       </main>
     </div>
   );

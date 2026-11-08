@@ -77,28 +77,19 @@ function RegisterPage() {
   };
 
   return (
-    <div className="platform-brand relative min-h-screen overflow-hidden bg-background px-4 py-8">
-      <div className="af-login-orb absolute -right-24 top-[7%] h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
-      <div className="af-login-orb af-delay-2 absolute -left-24 bottom-[7%] h-72 w-72 rounded-full bg-secondary/25 blur-3xl" />
-      <div className="absolute inset-0 opacity-[0.32] [background-image:radial-gradient(circle_at_1px_1px,color-mix(in_oklab,var(--border)_75%,transparent)_1px,transparent_0)] [background-size:26px_26px]" />
+    <div className="platform-brand af-auth-stage px-4 py-8 sm:py-10">
 
-      <Link to="/" className="af-auth-back absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-lg border bg-background/90 px-3 py-2 text-sm font-medium text-muted-foreground shadow-sm backdrop-blur transition hover:text-foreground sm:left-6 sm:top-6">
-        <ArrowLeft className="h-4 w-4" />
-        Back to website
-      </Link>
 
-      <main className="relative z-10 mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-[560px] flex-col justify-center">
-        <Link to="/" className="af-auth-logo mx-auto mb-7 inline-flex">
-          <PlatformLogo variant="lockup" className="h-14 w-[250px] max-w-[78vw]" />
-        </Link>
 
-        <div className="af-auth-card rounded-[1.6rem] border bg-card/95 p-6 shadow-[0_28px_80px_-38px_rgba(0,0,0,.34)] backdrop-blur sm:p-8">
+      <main className="relative z-10 mx-auto flex min-h-[calc(100vh-6rem)] w-full max-w-[570px] flex-col justify-center">
+        <div className="af-auth-card border bg-white p-6 sm:p-9">
+          <div className="mb-5 flex items-start justify-between gap-3">
+            <PlatformLogo variant="lockup" className="h-14 w-48 max-w-[60%]" imageClassName="object-left object-contain"/>
+            <Link to="/login" className="af-auth-link-home inline-flex items-center gap-1 rounded-md px-2 py-2 text-xs text-[#4d5881]"><ArrowLeft className="h-3.5 w-3.5"/> Sign in</Link>
+          </div>
           <div className="mb-7 text-center">
-            <p className="text-sm font-semibold text-primary">Start with AssetFlow 360</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Create your workspace</h1>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-              Set up an isolated asset management workspace for your organisation. No card required.
-            </p>
+            <h1 className="text-2xl font-bold tracking-tight text-[#18275f] sm:text-3xl">Create your workspace</h1>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#5d6686]">Start your AssetFlow360 free trial. No card required.</p>
           </div>
 
           <form onSubmit={submit} className="space-y-4">
@@ -187,7 +178,7 @@ function RegisterPage() {
 
             <p className="text-xs text-muted-foreground">Minimum 8 characters. Your organisation gets its own isolated workspace.</p>
 
-            <Button type="submit" className="h-11 w-full rounded-xl font-semibold" disabled={submitting}>
+            <Button type="submit" className="h-11 w-full rounded-lg bg-[#3A3EC2] font-semibold text-white hover:bg-[#3034a8]" disabled={submitting}>
               {submitting ? (
                 <span className="inline-flex items-center gap-2">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" />

@@ -55,10 +55,10 @@ export function PublicHeader() {
   }, [open]);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-[#e8e2db] bg-white">
-      <div className="mx-auto flex h-[64px] max-w-7xl items-center gap-5 px-5 sm:h-[72px] sm:px-8">
+    <header className="af-public-header sticky top-0 z-50 border-b bg-white">
+      <div className="af-site-frame flex h-[64px] items-center gap-5 px-4 sm:h-[78px] sm:px-6">
         <Link to="/" className="shrink-0" aria-label="AssetFlow 360 home">
-          <span className="inline-flex h-[58px] w-[188px] max-w-[45vw] items-center justify-start overflow-visible sm:h-[64px] sm:w-[210px]">
+          <span className="inline-flex h-[58px] w-[188px] max-w-[45vw] items-center justify-start overflow-visible sm:h-[72px] sm:w-[225px]">
             <PlatformLogo variant="lockup" className="h-full w-full" imageClassName="object-contain object-left p-1" />
           </span>
         </Link>
@@ -69,7 +69,7 @@ export function PublicHeader() {
         </nav>
         <div className="ml-auto hidden items-center gap-3 lg:ml-5 lg:flex">
           <Button variant="ghost" asChild><Link to="/login">Sign in</Link></Button>
-          <Button asChild className="bg-[#c77435] text-white hover:bg-[#a85b2d]">
+          <Button asChild className="bg-[#CB7B30] text-white hover:bg-[#b36720]">
             <Link to="/register">Start free trial <ArrowRight className="ml-2 h-4 w-4" /></Link>
           </Button>
         </div>
@@ -90,11 +90,11 @@ export function PublicHeader() {
         <aside id="assetflow-mobile-drawer" ref={panelRef} role="dialog"
           aria-modal={open} aria-label="Mobile navigation"
           inert={!open}
-          className={`absolute inset-y-0 right-0 flex h-full w-[78vw] max-w-[360px] flex-col overflow-y-auto bg-[#fffaf5] shadow-2xl transition-transform duration-300 ease-out motion-reduce:transition-none ${open ? "translate-x-0" : "translate-x-full"}`}>
+          className={`absolute inset-y-0 right-0 flex h-full w-[78vw] max-w-[360px] flex-col overflow-y-auto bg-[#fffaf6] shadow-2xl transition-transform duration-300 ease-out motion-reduce:transition-none ${open ? "translate-x-0" : "translate-x-full"}`}>
           <div className="flex items-center justify-between gap-3 border-b border-[#eaded2] px-5 py-5">
             <span className="inline-flex h-11 items-center gap-2 overflow-visible">
               <PlatformLogo variant="mark" className="h-10 w-10 shrink-0" />
-              <span className="whitespace-nowrap text-sm font-bold text-[#233c50]">AssetFlow <span className="text-[#ba6c37]">360</span></span>
+              <span className="whitespace-nowrap text-sm font-bold text-[#283278]">AssetFlow <span className="text-[#ba6c37]">360</span></span>
             </span>
             <button ref={closeRef} type="button" aria-label="Close menu"
               onClick={() => setOpen(false)}
@@ -174,7 +174,7 @@ export function PublicFooter(){
  const {data:social=[]}=useQuery({
   queryKey:["public-social-links"],queryFn:()=>getSocial(),staleTime:60_000,retry:1,
  });
- return <footer className="mx-auto w-full max-w-7xl overflow-hidden bg-[#203946] text-white">
+ return <footer className="af-site-frame af-public-footer overflow-hidden text-white">
    <div className="mx-auto flex min-w-0 flex-wrap items-start justify-between gap-8 px-5 pb-8 pt-10 sm:px-8 sm:pb-10 sm:pt-12">
      <div className="max-w-md min-w-0">
        <span className="inline-flex items-center gap-2.5">
@@ -213,4 +213,4 @@ export function PublicFooter(){
    </div>
  </footer>;
 }
-export function PublicShell({children}:{children:React.ReactNode}){return <div className="min-h-screen bg-[#dce8ef] text-[#112c3c]"><style>{`@keyframes af-appear{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}@keyframes af-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}@keyframes af-pulse{0%,100%{opacity:.5}50%{opacity:1}}.af-enter{animation:af-appear .7s both}.af-enter-late{animation:af-appear .85s .2s both}.af-float{animation:af-float 7s ease-in-out infinite}.af-softpulse{animation:af-pulse 5s ease-in-out infinite}@media(prefers-reduced-motion:reduce){.af-enter,.af-enter-late,.af-float,.af-softpulse{animation:none!important}}`}</style><PublicHeader/><div className="mx-auto w-full max-w-7xl bg-white">{children}</div><PublicFooter/><FloatingSocialProfiles/><FloatingWhatsApp/></div>}
+export function PublicShell({children}:{children:React.ReactNode}){return <div className="af-public-site min-h-screen"><style>{`@keyframes af-appear{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}@keyframes af-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}@keyframes af-pulse{0%,100%{opacity:.5}50%{opacity:1}}.af-enter{animation:af-appear .7s both}.af-enter-late{animation:af-appear .85s .2s both}.af-float{animation:af-float 7s ease-in-out infinite}.af-softpulse{animation:af-pulse 5s ease-in-out infinite}@media(prefers-reduced-motion:reduce){.af-enter,.af-enter-late,.af-float,.af-softpulse{animation:none!important}}`}</style><PublicHeader/><div className="af-site-frame min-w-0 bg-white">{children}</div><PublicFooter/><FloatingSocialProfiles/><FloatingWhatsApp/></div>}
