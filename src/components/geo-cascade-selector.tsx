@@ -55,7 +55,7 @@ export function GeoCascadeSelector({
   onChange:(place:GeoPlace|null)=>void;
   required?:boolean;
 }) {
-  const config = CURRENT_ADMIN_CONFIG[countryCode] ?? {level:1,label:"Region"};
+  const config = countryCode==="UG"?{level:1,label:"Region"}:CURRENT_ADMIN_CONFIG[countryCode] ?? {level:1,label:"Region"};
   const [path,setPath]=useState<GeoPlace[]>([]);
 
   const {data:adminAreas=[]}=useQuery({
@@ -66,7 +66,7 @@ export function GeoCascadeSelector({
         .eq("country_code",countryCode)
         .eq("feature_code",`ADM${config.level}`);
       const source=currentAdminSource(countryCode);
-      if(source) q=q.eq("source",source);
+      if(source&&!(countryCode==="UG"&&config.level===1)) q=q.eq("source",source);
       const {data,error}=await q.order("name").limit(1000);
       if(error) throw error;
       return (data??[]) as GeoPlace[];
@@ -92,7 +92,7 @@ export function GeoCascadeSelector({
   useEffect(()=>{
     if(!selectedPlace || !adminAreas.length || path.length) return;
     const primary = (adminAreas as GeoPlace[]).find(a => {
-      if (config.level === 1) return a.admin1_code && a.admin1_code === selectedPlace.admin1_code;
+      if (config.level === 1) return countryCode==="UG"?Boolean(a.name&&selectedPlace.display_path?.includes(a.name)):Boolean(a.admin1_code && a.admin1_code === selectedPlace.admin1_code);
       if (config.level === 2) return a.admin1_code === selectedPlace.admin1_code && a.admin2_code === selectedPlace.admin2_code;
       return false;
     });
@@ -128,7 +128,19 @@ export function GeoCascadeSelector({
     queryFn:()=>fetchChildren(level4Parent!.geoname_id),
   });
 
-  const childSets = [level1Children,level2Children,level3Children,level4Children] as GeoPlace[][];
+  const {data:ugandaDistricts=[]}=useQuery({
+    queryKey:["geo-uganda-districts",primary?.geoname_id],
+    enabled:countryCode==="UG"&&!!primary?.geoname_id,
+    queryFn:async()=>{
+      const {data,error}=await (supabase as any).from("geo_places")
+        .select("geoname_id,name,display_path,feature_class,feature_code,admin_level,admin1_code,admin2_code,admin3_code,admin4_code,latitude,longitude,population,parent_geoname_id")
+        .eq("country_code","UG").eq("feature_code","ADM2")
+        .eq("source","UBOS NPHC 2024").ilike("display_path",`%${primary!.name}%`).order("name").limit(500);
+      if(error)throw error;
+      return data as GeoPlace[];
+    }
+  });
+  const childSets = [countryCode==="UG"?ugandaDistricts:level1Children,level2Children,level3Children,level4Children] as GeoPlace[][];
 
   useEffect(()=>{
     // If GeoNames contains one administrative bridge only (common for cities/counties),
@@ -166,7 +178,7 @@ export function GeoCascadeSelector({
       if(!path[i+1]) break;
     }
     return rows;
-  },[path,level1Children,level2Children,level3Children,level4Children]);
+  },[path,ugandaDistricts,level1Children,level2Children,level3Children,level4Children]);
 
   return <div className="space-y-3">
     <div className="space-y-2">
@@ -183,7 +195,7 @@ export function GeoCascadeSelector({
       const selected=path[depth] ?? null;
       const hasAdminChildren=options.some(o=>o.feature_class==="A");
       return <div key={parent.geoname_id} className="space-y-2">
-        <Label>{nextLabel(parent,hasAdminChildren,depth-1)}</Label>
+        <Label>{countryCode==="UG"&&depth===1?"District":nextLabel(parent,hasAdminChildren,depth-1)}</Label>
         <Select value={selected ? String(selected.geoname_id) : "none"} onValueChange={(v)=>chooseChild(depth,v==="none"?"":v)}>
           <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
           <SelectContent className="max-h-72">

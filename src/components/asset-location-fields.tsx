@@ -26,11 +26,17 @@ export function AssetLocationFields({
   onChange,
   branches,
   locations,
+  showBranchOverride=false,
+  showInternalOverride=false,
+  showGeoOverride=false,
 }: {
   value: AssetLocationValue;
   onChange: (next: AssetLocationValue) => void;
   branches: any[];
   locations: any[];
+  showBranchOverride?:boolean;
+  showInternalOverride?:boolean;
+  showGeoOverride?:boolean;
 }) {
   const { tenantId, user } = useAuth();
   const qc = useQueryClient();
@@ -58,9 +64,9 @@ export function AssetLocationFields({
       .select("code,name").eq("enabled", true).order("name")).data ?? [],
   });
 
-  const showBranch = ["branch", "hybrid"].includes(settings?.location_mode);
-  const showInternal = ["internal", "hybrid"].includes(settings?.location_mode);
-  const showGeo = ["geographic", "hybrid"].includes(settings?.location_mode);
+  const showBranch = showBranchOverride||["branch", "hybrid"].includes(settings?.location_mode);
+  const showInternal = showInternalOverride||["internal", "hybrid"].includes(settings?.location_mode);
+  const showGeo = showGeoOverride||["geographic", "hybrid"].includes(settings?.location_mode);
 
   const eligibleLocations = useMemo(
     () => locations.filter((l: any) => l.is_active !== false && (!value.branch_id || !l.branch_id || l.branch_id === value.branch_id)),
@@ -83,10 +89,9 @@ export function AssetLocationFields({
       return;
     }
     const remembered = settings.remember_last_selection ? localStorage.getItem("assetflow:last-country") : null;
-    const next =
-      (settings.default_country_code && allowed.includes(settings.default_country_code) ? settings.default_country_code : null) ||
-      (remembered && allowed.includes(remembered) ? remembered : null) ||
-      (allowed.length === 1 ? allowed[0] : "");
+    // Never preselect a business default when several countries are allowed.
+    // Existing saved assets retain their true country via the currentGeo hook.
+    const next = allowed.length===1?allowed[0]:"";
     setSelectedCountry((current) => current && allowed.includes(current) ? current : next);
   }, [settings?.tenant_id, settings?.default_country_code, JSON.stringify(settings?.allowed_country_codes)]);
 
@@ -238,7 +243,7 @@ export function AssetLocationFields({
 
         {showGeo && (
           <div className="space-y-3 sm:col-span-2">
-            {allowedCountryCodes.length > 1 && (
+            {allowedCountryCodes.length !== 1 && (
               <div className="space-y-2">
                 <Label>Country {settings?.require_geography ? "*" : ""}</Label>
                 <Select
@@ -255,7 +260,7 @@ export function AssetLocationFields({
                 >
                   <SelectTrigger><SelectValue placeholder="Select country…" /></SelectTrigger>
                   <SelectContent>
-                    {!settings?.require_geography && <SelectItem value="none">Not specified</SelectItem>}
+                    <SelectItem value="none">Select country first</SelectItem>
                     {(countries as any[])
                       .filter((c) => allowedCountryCodes.includes(c.code))
                       .map((c) => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
@@ -264,6 +269,7 @@ export function AssetLocationFields({
               </div>
             )}
 
+            {!selectedCountry&&allowedCountryCodes.length>1&&<p className="rounded-lg border bg-[#f4f8fa] px-3 py-3 text-sm text-muted-foreground">Choose a country above, then select its region and district.</p>}
             {selectedCountry ? (
               <>
                 <GeoCascadeSelector

@@ -92,12 +92,16 @@ function TenantDashboard() {
         canSeeBranch(v.branch_id) && (selectedBranch === "all" || v.branch_id === selectedBranch)
       );
       const verifiedIds = new Set<string>();
+      const registeredIds = new Set<string>();
       const mismatchedIds = new Set<string>();
       for (const v of vList) {
         if (!v.asset_id) continue;
         // A previously verified asset is current only until the configured
         // renewal deadline. Historical owner-attested records remain traceable.
-        if (v.latest_verification_status === "verified" &&
+        if ((v.verification_state === "current" || v.verification_state === "due_soon") &&
+            v.verification_basis === "registration_baseline") {
+          registeredIds.add(v.asset_id);
+        } else if (v.latest_verification_status === "verified" &&
             (v.verification_state === "current" || v.verification_state === "due_soon")) {
           verifiedIds.add(v.asset_id);
         } else if (v.latest_verification_status === "mismatched" || v.latest_verification_status === "not_found") {
@@ -105,8 +109,9 @@ function TenantDashboard() {
         }
       }
       const verifiedCount = Array.from(verifiedIds).filter((id) => visibleAssetIds.has(id)).length;
+      const registeredCount = Array.from(registeredIds).filter(id=>visibleAssetIds.has(id)).length;
       const mismatchedCount = Array.from(mismatchedIds).filter((id) => visibleAssetIds.has(id)).length;
-      const unverifiedCount = Math.max(0, list.length - verifiedCount - mismatchedCount);
+      const unverifiedCount = Math.max(0, list.length - verifiedCount - registeredCount - mismatchedCount);
 
       const locationGroups = new Map<string, any>();
       for (const a of list as any[]) {
@@ -163,6 +168,7 @@ function TenantDashboard() {
         gpPending,
         gpOutside,
         verifiedCount,
+        registeredCount,
         mismatchedCount,
         unverifiedCount,
       };
@@ -186,8 +192,9 @@ function TenantDashboard() {
     { label: "For Repair", value: data?.forRepair ?? 0, icon: Wrench, color: "#BE185D", filter: { kind: "pending_repair" }, subtotal: data?.repairAmount },
     { label: "Out of Premises", value: data?.gpOutside ?? 0, icon: PackageCheck, color: "#0369A1", filter: { kind: "all" }, navigateTo: "/gate-pass" },
     { label: "Gate Pass Pending", value: data?.gpPending ?? 0, icon: DoorOpen, color: "#9333EA", filter: { kind: "all" }, navigateTo: "/gate-pass" },
-    { label: "Verified Assets", value: data?.verifiedCount ?? 0, icon: ClipboardCheck, color: "#15803D", filter: { kind: "all" }, navigateTo: "/verification" },
-    { label: "Unverified / Expired", value: (data?.mismatchedCount ?? 0) + (data?.unverifiedCount ?? 0), icon: ClipboardX, color: "#DC2626", filter: { kind: "all" }, navigateTo: "/verification" },
+    { label: "Registered — Current", value: data?.registeredCount ?? 0, icon: ClipboardCheck, color: "#0E7490", filter: { kind: "all" }, navigateTo: "/verification" },
+    { label: "Inspection Verified", value: data?.verifiedCount ?? 0, icon: ClipboardCheck, color: "#15803D", filter: { kind: "all" }, navigateTo: "/verification" },
+    { label: "Due / Needs Attention", value: (data?.mismatchedCount ?? 0) + (data?.unverifiedCount ?? 0), icon: ClipboardX, color: "#DC2626", filter: { kind: "all" }, navigateTo: "/verification" },
   ];
 
   const [tile, setTile] = useState<{ title: string; filter: TileFilter } | null>(null);
@@ -342,9 +349,10 @@ function TenantDashboard() {
         <div className="h-64 mt-3">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={[
-              { name: "Verified", value: data?.verifiedCount ?? 0, fill: "hsl(142 71% 45%)" },
-              { name: "Mismatched", value: data?.mismatchedCount ?? 0, fill: "hsl(38 92% 50%)" },
-              { name: "Not verified", value: data?.unverifiedCount ?? 0, fill: "hsl(0 84% 60%)" },
+              { name: "Inspected current", value: data?.verifiedCount ?? 0, fill: "hsl(142 71% 45%)" },
+              { name: "Registration current", value: data?.registeredCount ?? 0, fill: "hsl(195 85% 42%)" },
+              { name: "Mismatch", value: data?.mismatchedCount ?? 0, fill: "hsl(38 92% 50%)" },
+              { name: "Due / overdue", value: data?.unverifiedCount ?? 0, fill: "hsl(0 84% 60%)" },
             ]}>
               <XAxis dataKey="name" tick={{ fontSize: 11 }} />
               <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />

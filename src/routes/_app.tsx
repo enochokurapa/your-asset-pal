@@ -79,6 +79,9 @@ function AppLayout() {
   const [reportsOpen,setReportsOpen]=useState(false);
   const [billingOpen,setBillingOpen]=useState(false);
   const [verificationOpen,setVerificationOpen]=useState(false);
+  const [assetSetupOpen,setAssetSetupOpen]=useState(false);
+  const [managementOpen,setManagementOpen]=useState(false);
+  const [addonsOpen,setAddonsOpen]=useState(false);
   const [branding, setBranding] = useState<DocumentTemplate | null>(null);
   const [mfaChecked,setMfaChecked]=useState(false);
   const [mfaRequired,setMfaRequired]=useState(false);
@@ -103,6 +106,9 @@ function AppLayout() {
     if(pathname.startsWith("/reports"))setReportsOpen(true);
     if(pathname.startsWith("/billing"))setBillingOpen(true);
     if(pathname.startsWith("/verification"))setVerificationOpen(true);
+    if(["/categories","/locations","/branches"].some(path=>pathname.startsWith(path)))setAssetSetupOpen(true);
+    if(["/analytics","/diagnostics","/audit","/builders"].some(path=>pathname.startsWith(path)))setManagementOpen(true);
+    if(["/integrations","/live-tracking"].some(path=>pathname.startsWith(path)))setAddonsOpen(true);
   },[pathname]);
   const exportAccess=useExportAccess();
 
@@ -161,7 +167,9 @@ function AppLayout() {
     return true;
   });
 
-  const visibleNav = isSaasAdmin ? saasAdminNav : visibleTenantNav;
+  const groupedNavPaths=new Set(["/categories","/locations","/branches","/analytics","/diagnostics","/audit","/builders","/integrations","/live-tracking"]);
+  const groupItems=(paths:string[])=>visibleTenantNav.filter(n=>paths.includes(n.to));
+  const visibleNav = isSaasAdmin ? saasAdminNav : visibleTenantNav.filter(n=>!groupedNavPaths.has(n.to));
 
   const currentModuleItem = !isSaasAdmin && currentNavItem?.module ? currentNavItem : undefined;
   const lockedPaidFeature = currentModuleItem?.module && (isPaidFeature(currentModuleItem.module) || isAddOnFeature(currentModuleItem.module))
@@ -259,7 +267,23 @@ function AppLayout() {
         )}
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {visibleNav.map(item => item.to === "/reports" && !isSaasAdmin ? (
+          {visibleNav.map(item => item.to === "/assets" && !isSaasAdmin ? (
+            <div key="assets-group" className="space-y-1">
+              {renderNavItem(item)}
+              {([
+                {key:"asset-setup",label:"Asset setup",icon:Tags,items:groupItems(["/categories","/locations","/branches"]),expanded:assetSetupOpen,toggle:()=>setAssetSetupOpen(v=>!v)},
+                {key:"management",label:"Management",icon:SlidersHorizontal,items:groupItems(["/analytics","/diagnostics","/audit","/builders"]),expanded:managementOpen,toggle:()=>setManagementOpen(v=>!v)},
+                {key:"add-ons",label:"Add-ons",icon:PlugZap,items:groupItems(["/integrations","/live-tracking"]),expanded:addonsOpen,toggle:()=>setAddonsOpen(v=>!v)},
+              ]).filter(g=>g.items.length>0).map(g=><div key={g.key}>
+                <button type="button" onClick={g.toggle} aria-expanded={g.expanded} aria-controls={`${g.key}-sidebar-items`}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+                  <g.icon className="h-4 w-4"/><span className="flex-1 text-left">{g.label}</span>
+                  <ChevronDown className={cn("h-4 w-4 transition-transform",g.expanded&&"rotate-180")}/>
+                </button>
+                {g.expanded&&<div id={`${g.key}-sidebar-items`} className="ml-4 space-y-0.5 border-l border-sidebar-border pl-2">{g.items.map(renderNavItem)}</div>}
+              </div>)}
+            </div>
+          ) : item.to === "/reports" && !isSaasAdmin ? (
             <div key="reports-group">
               <button type="button" onClick={()=>setReportsOpen(v=>!v)} aria-expanded={reportsOpen}
                 aria-controls="report-sidebar-options"
