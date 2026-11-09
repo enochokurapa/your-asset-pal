@@ -443,6 +443,17 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 
 function withSecurityHeaders(response: Response, request: Request): Response {
   const headers = new Headers(response.headers);
+  // Never cache application HTML by path. The static asset directory is also
+  // /assets, so the framework may incorrectly mark /assets HTML as immutable.
+  // This caused browsers of ALL tenants to keep stale location-picker JS
+  // after deployment. Only hashed JS/CSS/images may use immutable caching.
+  if ((headers.get("content-type") || "").toLowerCase().includes("text/html")) {
+    headers.set("cache-control", "no-store, no-cache, must-revalidate, max-age=0");
+    headers.set("pragma", "no-cache");
+    headers.set("expires", "0");
+    headers.delete("etag");
+    headers.delete("last-modified");
+  }
   headers.set("x-content-type-options", "nosniff");
   headers.set("referrer-policy", "strict-origin-when-cross-origin");
   headers.set("x-frame-options", "SAMEORIGIN");
