@@ -176,7 +176,7 @@ function GenericGeoCascadeSelector({
       if(!path[i+1]) break;
     }
     return rows;
-  },[path,ugandaDistricts,level1Children,level2Children,level3Children,level4Children]);
+  },[path,level1Children,level2Children,level3Children,level4Children]);
 
   return <div className="space-y-3">
     <div className="space-y-2">
