@@ -89,20 +89,9 @@ function AppLayout() {
       window.location.assign("/saas-admin/organizations");
     }
   };
-  useEffect(()=>{
-    if(!supportMode)return;
-    let active=true;
-    const check=async()=>{
-      const {supabase}=await import("@/integrations/supabase/client");
-      const {data,error}=await supabase.rpc("current_platform_support_context" as any);
-      if(active&&(error||!data)){
-        window.sessionStorage.removeItem("af-platform-tenant-session");
-        window.location.replace("/saas-admin/organizations");
-      }
-    };
-    const timer=window.setInterval(()=>{void check();},15000);
-    return()=>{active=false;window.clearInterval(timer);};
-  },[supportMode]);
+  // The user explicitly exits the business using Exit Business.
+  // Avoid background RPC probes that can fail transiently and cause navigation loops.
+  // Every data request still validates the signed-in SaaS Admin and session in PostgreSQL.
   const [open, setOpen] = useState(false);
   const [settingsOpen,setSettingsOpen]=useState(false);
   const [reportsOpen,setReportsOpen]=useState(false);
