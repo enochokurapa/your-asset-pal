@@ -1,4 +1,5 @@
 import {shouldRequireEmailMfa} from "@/lib/platform-security-email-mfa.server";
+import {getPostgresPool} from "@/lib/postgres.server";
 // Supabase auth middleware for server functions.
 import { createMiddleware } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
@@ -12,7 +13,11 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' })
   .client(async ({ next }) => {
     const { data: { session }, error } = await supabase.auth.getSession();
     if (error || !session?.access_token) throw new Error("Your session has expired. Please sign in again.");
-    return next({ headers: { Authorization: `Bearer ${session.access_token}` } });
+    const supportId=typeof window!=="undefined"?window.sessionStorage.getItem("af-platform-tenant-session"):null;
+    return next({ headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      ...(supportId?{"x-assetflow-support-session":supportId}:{}),
+    } });
   })
   .server(async ({ next }) => {
     
@@ -149,11 +154,29 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' })
       throw new Response("This session was signed out from another device", {status:401});
     }
 
+    // Platform-owned, per-request business context: never trust browser tenant IDs.
+    // The support session must belong to this verified SaaS Administrator and remain active.
+    const supportSessionId=request.headers.get("x-assetflow-support-session");
+    let supportTenantId:string|null=null;
+    if(supportSessionId){
+      if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(supportSessionId))
+        throw new Response("Invalid support session identifier",{status:403});
+      const {rows:[access]}=await getPostgresPool().query<{tenant_id:string}>(
+       `SELECT s.tenant_id FROM public.platform_tenant_access_sessions s
+         JOIN public.profiles p ON p.id=s.administrator_id
+         WHERE s.id=$1 AND s.administrator_id=$2 AND s.ended_at IS NULL
+           AND s.expires_at>NOW() AND p.is_saas_admin=TRUE AND p.is_active=TRUE`,
+       [supportSessionId,verifiedUserId]);
+      if(!access)throw new Response("Business support session expired or revoked",{status:403});
+      supportTenantId=access.tenant_id;
+    }
     return next({
       context: {
         supabase,
         userId: verifiedUserId,
         claims: { sub: verifiedUserId },
+        supportTenantId,
+        supportSessionId: supportTenantId?supportSessionId:null,
       },
     })
   }
