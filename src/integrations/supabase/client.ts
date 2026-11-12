@@ -27,6 +27,23 @@ function createSupabaseClient() {
       storage: typeof window !== 'undefined' ? localStorage : undefined,
       persistSession: true,
       autoRefreshToken: true,
+    },
+    global: {
+      // PostgREST receives a request-scoped support ID in this browser tab.
+      // PostgreSQL verifies the active SaaS Admin and tenant on every request.
+      // This does not replace the real user's JWT or affect other browser tabs.
+      fetch: (input: RequestInfo | URL, init?: RequestInit) => {
+        if (typeof window === "undefined") return fetch(input, init);
+        const raw = window.sessionStorage.getItem("af-platform-tenant-session");
+        if (!raw) return fetch(input, init);
+        const inputUrl = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        const url = new URL(inputUrl, window.location.origin);
+        if (url.origin !== window.location.origin || !url.pathname.startsWith("/rest/v1/"))
+          return fetch(input, init);
+        const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+        headers.set("x-assetflow-support-session", raw);
+        return fetch(input, { ...init, headers });
+      },
     }
   });
 }
