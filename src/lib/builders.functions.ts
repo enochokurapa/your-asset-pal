@@ -7,7 +7,7 @@ import {queryPostgres} from "@/lib/postgres.server";
 const db = supabaseAdmin as any;
 async function supportAudit(context:{userId:string;supportSessionId?:string|null;supportTenantId?:string|null},action:string,details:Record<string,unknown>){
  if(!context.supportSessionId||!context.supportTenantId)return;
- await queryPostgres("INSERT INTO public.platform_tenant_access_audit(session_id,tenant_id,actor_id,action,details) VALUES($1,$2,$3,$4,$5::jsonb)",
+ await queryPostgres("INSERT INTO public.platform_tenant_security_events(session_id,tenant_id,actor_id,action,details) VALUES($1,$2,$3,$4,$5::jsonb)",
   [context.supportSessionId,context.supportTenantId,context.userId,action,JSON.stringify(details)]);
 }
 
