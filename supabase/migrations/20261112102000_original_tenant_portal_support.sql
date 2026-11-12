@@ -99,3 +99,31 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.end_current_platform_support_session() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.end_current_platform_support_session() TO authenticated;
+
+-- Preserve the true SaaS actor on newly created customer records.
+-- The existing tenant reference trigger normally rejects created_by outside the business.
+-- The only exception is the current authenticated platform administrator in a
+-- live, request-scoped support session for precisely this business.
+CREATE OR REPLACE FUNCTION public.enforce_same_tenant_reference()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE
+ reference_id uuid;
+ reference_tenant uuid;
+ reference_table text:=TG_ARGV[0];
+ reference_column text:=TG_ARGV[1];
+BEGIN
+ reference_id:=NULLIF(to_jsonb(NEW)->>reference_column,'')::uuid;
+ IF reference_id IS NULL THEN RETURN NEW; END IF;
+ EXECUTE format('SELECT tenant_id FROM public.%I WHERE id=$1',reference_table)
+   INTO reference_tenant USING reference_id;
+ IF reference_tenant IS NULL OR reference_tenant IS DISTINCT FROM NEW.tenant_id THEN
+  IF reference_table='profiles' AND reference_column IN ('created_by','updated_by','verified_by')
+   AND reference_id=auth.uid()
+   AND public.current_platform_support_session_id() IS NOT NULL
+   AND public.current_platform_support_tenant_id()=NEW.tenant_id THEN
+    RETURN NEW;
+  END IF;
+  RAISE EXCEPTION 'Cross-tenant reference blocked for %.%',TG_TABLE_NAME,reference_column;
+ END IF;
+ RETURN NEW;
+END $$;
