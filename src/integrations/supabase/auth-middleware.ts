@@ -165,9 +165,9 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' })
        `SELECT s.tenant_id FROM public.platform_tenant_access_sessions s
          JOIN public.profiles p ON p.id=s.administrator_id
          WHERE s.id=$1 AND s.administrator_id=$2 AND s.ended_at IS NULL
-           AND s.expires_at>NOW() AND p.is_saas_admin=TRUE AND p.is_active=TRUE`,
+           AND (s.expires_at IS NULL OR s.expires_at>NOW()) AND p.is_saas_admin=TRUE AND p.is_active=TRUE`,
        [supportSessionId,verifiedUserId]);
-      if(!access)throw new Response("Business support session expired or revoked",{status:403});
+      if(!access)throw new Response("Business support session not authorized or closed",{status:403});
       supportTenantId=access.tenant_id;
     }
     return next({
