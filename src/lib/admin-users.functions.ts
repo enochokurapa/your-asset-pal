@@ -9,7 +9,7 @@ async function auditBusinessSupport(context:{userId:string;supportSessionId?:str
  action:string,details:Record<string,unknown>){
  if(!context.supportSessionId||!context.supportTenantId)return;
  await queryPostgres(
-  "INSERT INTO public.platform_tenant_access_audit(session_id,tenant_id,actor_id,action,details) VALUES($1,$2,$3,$4,$5::jsonb)",
+  "INSERT INTO public.platform_tenant_security_events(session_id,tenant_id,actor_id,action,details) VALUES($1,$2,$3,$4,$5::jsonb)",
   [context.supportSessionId,context.supportTenantId,context.userId,action,JSON.stringify(details)]
  );
 }
