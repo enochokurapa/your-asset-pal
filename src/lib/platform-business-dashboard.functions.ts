@@ -12,7 +12,7 @@ const allowedFields:Record<string,string[]>={
 };
 async function validate(client:any,admin:string,sessionId:string,lock=false){
  const {rows:[s]}=await client.query(
-   "SELECT s.id,s.tenant_id,s.expires_at,t.name AS tenant_name,t.subscription_status FROM public.platform_tenant_access_sessions s JOIN public.profiles p ON p.id=$2 AND p.is_saas_admin=TRUE AND p.is_active=TRUE JOIN public.tenants t ON t.id=s.tenant_id WHERE s.id=$1 AND s.administrator_id=$2 AND s.ended_at IS NULL AND s.expires_at>NOW()"+(lock?" FOR SHARE OF s":""),
+   "SELECT s.id,s.tenant_id,s.expires_at,t.name AS tenant_name,t.subscription_status FROM public.platform_tenant_access_sessions s JOIN public.profiles p ON p.id=$2 AND p.is_saas_admin=TRUE AND p.is_active=TRUE JOIN public.tenants t ON t.id=s.tenant_id WHERE s.id=$1 AND s.administrator_id=$2 AND s.ended_at IS NULL AND (s.expires_at IS NULL OR s.expires_at>NOW())"+(lock?" FOR SHARE OF s":""),
    [sessionId,admin]);
  if(!s)throw new Error("SaaS Admin business access has expired. Open the business dashboard again.");
  return s;
@@ -36,7 +36,7 @@ export const openPlatformBusinessDashboard=createServerFn({method:"POST"})
    // Bound to this administrator's authenticated identity, never customer credentials.
    const {rows:[s]}=await c.query("INSERT INTO public.platform_tenant_access_sessions (tenant_id,administrator_id,reason) VALUES ($1,$2,'SaaS Admin direct business intervention') RETURNING id,tenant_id,expires_at",
     [data.tenantId,context.userId]);
-   await audit(c,s,context.userId,"platform_dashboard_opened",{business:t.name});
+   // The created session row records access; a page view is not an asset change.
    await c.query("COMMIT");
    return {sessionId:s.id,tenantId:t.id,expiresAt:s.expires_at};
   }catch(e){await c.query("ROLLBACK");throw e;}finally{c.release();}
@@ -52,7 +52,7 @@ export const resumePlatformBusinessSession=createServerFn({method:"POST"})
    `SELECT s.id,s.tenant_id,s.expires_at,t.name AS tenant_name FROM public.platform_tenant_access_sessions s
       JOIN public.profiles p ON p.id=s.administrator_id
       JOIN public.tenants t ON t.id=s.tenant_id
-      WHERE s.id=$1 AND s.administrator_id=$2 AND s.ended_at IS NULL AND s.expires_at>NOW()
+      WHERE s.id=$1 AND s.administrator_id=$2 AND s.ended_at IS NULL AND (s.expires_at IS NULL OR s.expires_at>NOW())
         AND p.is_saas_admin=TRUE AND p.is_active=TRUE LIMIT 1`,
     [data.sessionId,context.userId]);
   if(!s)throw Error("Business support session expired or not authorized");
@@ -72,7 +72,7 @@ export const getPlatformBusinessDashboard=createServerFn({method:"POST"})
    const {rows:[l]}=await c.query("SELECT COUNT(*)::int AS total FROM public.locations WHERE tenant_id=$1",[s.tenant_id]);
    const {rows:[cat]}=await c.query("SELECT COUNT(*)::int AS total FROM public.categories WHERE tenant_id=$1",[s.tenant_id]);
    const {rows:recent}=await c.query("SELECT id,name,asset_tag,status,created_at FROM public.assets WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 10",[s.tenant_id]);
-   await audit(c,s,context.userId,"platform_dashboard_viewed");
+   // Diagnostic reads are not asset changes.
    await c.query("COMMIT");
    return {business:{id:s.tenant_id,name:s.tenant_name,status:s.subscription_status},expiresAt:s.expires_at,
     metrics:{...m,users:u.total,locations:l.total,categories:cat.total},recent};
@@ -90,7 +90,7 @@ export const listPlatformBusinessRecords=createServerFn({method:"POST"})
      :data.kind==="categories"?"id,name,description":"id,name,address";
    const {rows}=await c.query("SELECT "+columns+" FROM public."+data.kind+
     " WHERE tenant_id=$1 AND ($2='' OR name ILIKE $3) ORDER BY name LIMIT 100",[s.tenant_id,data.search,"%"+data.search+"%"]);
-   await audit(c,s,context.userId,"platform_records_viewed",{kind:data.kind,count:rows.length});
+   // Listing customer records does not create a change audit entry.
    await c.query("COMMIT");
    return rows;
   }catch(e){await c.query("ROLLBACK");throw e;}finally{c.release();}
@@ -119,7 +119,7 @@ export const updatePlatformBusinessRecord=createServerFn({method:"POST"})
    // Field and table are fixed server allowlists, and data remains parameterized.
    const {rows:[updated]}=await c.query("UPDATE public."+data.kind+" SET "+data.field+"=$1 WHERE id=$2 AND tenant_id=$3 RETURNING *",
     [data.value,data.recordId,s.tenant_id]);
-   await audit(c,s,context.userId,"platform_record_changed",{
+   if(data.kind==="assets")await audit(c,s,context.userId,"asset_record_changed",{
     kind:data.kind,recordId:data.recordId,field:data.field,before:old[data.field]??null,after:updated[data.field]??null,reason:data.reason});
    await c.query("COMMIT");
    return {ok:true};
@@ -134,7 +134,7 @@ export const closePlatformBusinessDashboard=createServerFn({method:"POST"})
    await c.query("BEGIN");
    const s=await validate(c,context.userId,data.sessionId,true);
    await c.query("UPDATE public.platform_tenant_access_sessions SET ended_at=NOW() WHERE id=$1",[s.id]);
-   await audit(c,s,context.userId,"platform_dashboard_closed");
+   // The ended_at field records session closure; no change audit entry.
    await c.query("COMMIT");
    return {ok:true};
   }catch(e){await c.query("ROLLBACK");throw e;}finally{c.release();}
