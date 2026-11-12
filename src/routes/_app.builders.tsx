@@ -47,7 +47,8 @@ const protectedKeys=new Set(["id","tenant_id","asset_id","asset_tag","purchase_v
 const slug=(v:string)=>v.toLowerCase().trim().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"").slice(0,50);
 
 function BuildersPage(){
- const {isTenantAdmin,isSaasAdmin,isPaidFeature,isAddOnFeature,canView}=useAuth();
+ const {isTenantAdmin,isSaasAdmin,supportMode,isPaidFeature,isAddOnFeature,canView}=useAuth();
+ const platformControl = isSaasAdmin && !supportMode;
  const search=Route.useSearch();
  const initial=definitions.some(d=>d.key===search.type)?search.type as Kind:"register_builder";
  const [kind,setKind]=useState<Kind>(initial);
@@ -103,14 +104,14 @@ function BuildersPage(){
  useEffect(()=>{
    let valid=true;
    setItems([]);setSelected(null);setName("");setDescription("");setFields([]);setCoreFields(["asset_tag","serial_number","name","description"]);setFieldOrder([]);setError("");setEditing(false);setStep(2);
-   if(!allowed||!isTenantAdmin||isSaasAdmin)return;
+   if(!allowed||!isTenantAdmin||platformControl)return;
    setBusy(true);
    getServerAuthHeaders().then(headers=>list({headers,data:{kind}})).then(async (response)=>{const rows=builderList<Definition>(response);
      if(valid){if(!Array.isArray(rows))throw Error("Unexpected response from server");setItems(rows.filter((row):row is Definition=>Boolean(row&&typeof row==="object"&&typeof row.id==="string"&&typeof row.name==="string")).map(row=>({...row,configuration:{...((row.configuration&&typeof row.configuration==="object"&&!Array.isArray(row.configuration))?row.configuration:{}),fields:Array.isArray(row.configuration?.fields)?row.configuration.fields:[]}})));if(kind==="register_builder")catalog({headers:await getServerAuthHeaders()}).then(c=>{if(valid){setActiveRegister(c.primaryId??null);setIncludeLocation(c.includeLocation??true)}}).catch(e=>{if(valid)toast.error(e?.message||"Unable to load primary register")});}
    }).catch(e=>{if(valid)setError(e?.message||"Unable to load definitions")})
      .finally(()=>{if(valid)setBusy(false)});
    return()=>{valid=false};
- },[kind,allowed,isTenantAdmin,isSaasAdmin,list]);
+ },[kind,allowed,isTenantAdmin,platformControl,list]);
  useEffect(()=>{if(kind!=="register_builder"||!isTenantAdmin)return;getServerAuthHeaders().then(headers=>getTagSettings({headers})).then(x=>{setTagPrefix(x.prefix);setTagSeparator(x.separator);setTagPadding(x.padding)}).catch(()=>{});},[kind,isTenantAdmin,getTagSettings]);
  const saveNumbering=async()=>{setBusy(true);try{const headers=await getServerAuthHeaders();await saveTagSettings({headers,data:{prefix:tagPrefix,separator:tagSeparator as "-"|"/"|"",padding:tagPadding}});toast.success("Tag numbering saved");}catch(e:any){toast.error(e?.message||"Unable to save numbering");}finally{setBusy(false)}};
  const currentTarget=items.find(x=>x.id===targetRegister);
@@ -191,7 +192,7 @@ function BuildersPage(){
    finally{setBusy(false);}
  };
 
- if(isSaasAdmin)return <Card className="p-4">Use SaaS Global Modules to manage builder availability.</Card>;
+ if(platformControl)return <Card className="p-4">Use SaaS Global Modules to manage builder availability.</Card>;
  if(!isTenantAdmin)return <Card className="p-4">Only business administrators can configure builders.</Card>;
  const previewField=(f:Field)=> f.type==="radio" ? (f.options?.map(x=>"◯ "+x).join("   ")||"Add choices") : f.type==="boolean" ? "☐" : f.type==="date" ? "DD/MM/YYYY" : f.type==="currency" ? "UGX 0" : f.type==="number" ? "0" : f.type==="select" ? (f.options?.[0]??"Choose option ▾") : f.type==="attachment" ? "Attach file" : f.type==="textarea" ? "Enter a longer note" : "Enter "+f.label.toLowerCase();
  const active=definitions.find(d=>d.key===kind)!;

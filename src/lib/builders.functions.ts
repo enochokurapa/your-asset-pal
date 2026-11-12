@@ -2,14 +2,24 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {queryPostgres} from "@/lib/postgres.server";
 
 const db = supabaseAdmin as any;
+async function supportAudit(context:{userId:string;supportSessionId?:string|null;supportTenantId?:string|null},action:string,details:Record<string,unknown>){
+ if(!context.supportSessionId||!context.supportTenantId)return;
+ await queryPostgres("INSERT INTO public.platform_tenant_access_audit(session_id,tenant_id,actor_id,action,details) VALUES($1,$2,$3,$4,$5::jsonb)",
+  [context.supportSessionId,context.supportTenantId,context.userId,action,JSON.stringify(details)]);
+}
+
 const kinds = ["register_builder","report_builder","form_builder","dashboard_builder","document_builder"] as const;
 const kindSchema = z.enum(kinds);
 const configSchema = z.record(z.string(), z.unknown());
 const idSchema = z.string().uuid();
 
-async function authorize(userId: string, kind: typeof kinds[number]) {
+async function authorize(userId: string, kind: typeof kinds[number], supportTenantId?:string|null) {
+  // Verified by the server middleware against an unexpired, actor-bound support session.
+  if (supportTenantId) return supportTenantId;
+
   const {data: profile,error} = await db.from("profiles")
     .select("tenant_id,tenant_role,is_saas_admin,is_active").eq("id",userId).single();
   if(error || !profile || profile.is_saas_admin || !profile.is_active || !profile.tenant_id)
@@ -46,7 +56,7 @@ export const listBuilderDefinitions = createServerFn({method:"POST"})
   .middleware([requireSupabaseAuth])
   .inputValidator(input=>z.object({kind:kindSchema}).parse(input))
   .handler(async ({data,context})=>{
-    const tenantId = await authorize(context.userId,data.kind);
+    const tenantId = await authorize(context.userId,data.kind,context.supportTenantId);
     const {data:rows,error}=await db.from("builder_definitions").select("id,name,description,configuration,is_active,updated_at")
       .eq("tenant_id",tenantId).eq("builder_key",data.kind).order("updated_at",{ascending:false});
     if(error) {
@@ -66,7 +76,7 @@ export const saveBuilderDefinition = createServerFn({method:"POST"})
     is_active:z.boolean().default(true),
   }).parse(input))
   .handler(async ({data,context})=>{
-    const tenantId=await authorize(context.userId,data.kind);
+    const tenantId=await authorize(context.userId,data.kind,context.supportTenantId);
     console.info("[BuilderDiag] save authorized", {kind:data.kind, updating:Boolean(data.id)});
     const payload={name:data.name,description:data.description,configuration:data.configuration,is_active:data.is_active,
       updated_at:new Date().toISOString()};
@@ -78,6 +88,7 @@ export const saveBuilderDefinition = createServerFn({method:"POST"})
       const {data:definitions,error:listError}=await db.from("builder_definitions").select("id,name,description,configuration,is_active,updated_at").eq("tenant_id",tenantId).eq("builder_key",data.kind).order("updated_at",{ascending:false});
       if(listError)throw new Error("Unable to verify updated builder catalog: "+listError.message);
       if(!definitions?.some((x:any)=>x.id===updated.id))throw new Error("Updated builder missing from tenant catalog.");
+      await supportAudit(context,"tenant_builder_updated",{kind:data.kind,definitionId:updated.id});
       return {id:updated.id,definitions};
     }
     const {data:created,error}=await db.from("builder_definitions").insert({
@@ -92,6 +103,7 @@ export const saveBuilderDefinition = createServerFn({method:"POST"})
     if(listError)throw new Error("Unable to load saved builder catalog: "+listError.message);
     if(!definitions?.some((x:any)=>x.id===confirmed.id))throw new Error("Created builder missing from tenant catalog.");
     console.info("[BuilderDiag] save catalog verified", {kind:data.kind, count:definitions.length});
+    await supportAudit(context,"tenant_builder_created",{kind:data.kind,definitionId:confirmed.id});
     return {id:confirmed.id,definitions};
   });
 
@@ -99,7 +111,7 @@ export const archiveBuilderDefinition = createServerFn({method:"POST"})
   .middleware([requireSupabaseAuth])
   .inputValidator(input=>z.object({kind:kindSchema,id:idSchema,reason:z.string().trim().min(10).max(1000)}).parse(input))
   .handler(async ({data,context})=>{
-    const tenantId=await authorize(context.userId,data.kind);
+    const tenantId=await authorize(context.userId,data.kind,context.supportTenantId);
     if(data.kind==="register_builder"){
       const {data:current,error:currentError}=await db.from("tenant_primary_registers").select("definition_id").eq("tenant_id",tenantId).maybeSingle();
       if(currentError)throw new Error(currentError.message);
@@ -119,6 +131,7 @@ export const archiveBuilderDefinition = createServerFn({method:"POST"})
     }
     const {error:auditError}=await db.from("builder_archive_audit").insert({tenant_id:tenantId,definition_id:data.id,builder_key:data.kind,reason:data.reason,actor_id:context.userId});
     if(auditError)throw new Error("Configuration archived, but the audit record could not be saved. Contact your administrator: "+auditError.message);
+    await supportAudit(context,"tenant_builder_archived",{kind:data.kind,definitionId:data.id,reason:data.reason});
     return {ok:true};
   });
 
@@ -127,7 +140,7 @@ export const setActiveRegisterDefinition = createServerFn({method:"POST"})
   .middleware([requireSupabaseAuth])
   .inputValidator(input=>z.object({definitionId:idSchema.nullable()}).parse(input))
   .handler(async ({data,context})=>{
-    const tenantId=await authorize(context.userId,"register_builder");
+    const tenantId=await authorize(context.userId,"register_builder",context.supportTenantId);
     if(data.definitionId){
       const {data:definition,error:lookupError}=await db.from("builder_definitions")
         .select("id").eq("id",data.definitionId).eq("tenant_id",tenantId)
@@ -139,6 +152,7 @@ export const setActiveRegisterDefinition = createServerFn({method:"POST"})
       tenant_id:tenantId,definition_id:data.definitionId,updated_at:new Date().toISOString(),
     },{onConflict:"tenant_id"});
     if(error)throw new Error(error.message);
+    await supportAudit(context,"tenant_primary_register_changed",{definitionId:data.definitionId});
     return {ok:true};
   });
 
@@ -146,11 +160,12 @@ export const getRegisterCatalog = createServerFn({method:"POST"})
  .middleware([requireSupabaseAuth])
  .handler(async ({context})=>{
    const {data:p,error:pe}=await db.from("profiles").select("tenant_id,is_active").eq("id",context.userId).single();
-   if(pe||!p?.tenant_id||!p.is_active)throw new Error("Business membership is required.");
+   const effectiveTenantId=context.supportTenantId??p?.tenant_id;
+   if(pe||!effectiveTenantId||!p.is_active)throw new Error("Business membership is required.");
    const [defs,primary,locationSetting]=await Promise.all([
-     db.from("builder_definitions").select("id,name,configuration,is_active").eq("tenant_id",p.tenant_id).eq("builder_key","register_builder").eq("is_active",true).order("name"),
-     db.from("tenant_primary_registers").select("definition_id").eq("tenant_id",p.tenant_id).maybeSingle(),
-     db.from("tenant_location_settings").select("show_in_custom_register").eq("tenant_id",p.tenant_id).maybeSingle()
+     db.from("builder_definitions").select("id,name,configuration,is_active").eq("tenant_id",effectiveTenantId).eq("builder_key","register_builder").eq("is_active",true).order("name"),
+     db.from("tenant_primary_registers").select("definition_id").eq("tenant_id",effectiveTenantId).maybeSingle(),
+     db.from("tenant_location_settings").select("show_in_custom_register").eq("tenant_id",effectiveTenantId).maybeSingle()
    ]);
    if(defs.error)throw new Error(defs.error.message);
    if(primary.error)throw new Error(primary.error.message);
@@ -161,7 +176,7 @@ export const getRegisterCatalog = createServerFn({method:"POST"})
 export const getAssetTagSettings=createServerFn({method:"POST"})
  .middleware([requireSupabaseAuth])
  .handler(async ({context})=>{
-  const tenantId=await authorize(context.userId,"register_builder");
+  const tenantId=await authorize(context.userId,"register_builder",context.supportTenantId);
   const {data,error}=await db.from("tenant_asset_tag_settings").select("prefix,separator,padding,next_number").eq("tenant_id",tenantId).maybeSingle();
   if(error)throw new Error(error.message);
   return data??{prefix:"AST",separator:"-",padding:5,next_number:1};
@@ -170,9 +185,10 @@ export const saveAssetTagSettings=createServerFn({method:"POST"})
  .middleware([requireSupabaseAuth])
  .inputValidator(input=>z.object({prefix:z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,10}$/),separator:z.enum(["","-","/"]),padding:z.number().int().min(2).max(12)}).parse(input))
  .handler(async ({data,context})=>{
-  const tenantId=await authorize(context.userId,"register_builder");
+  const tenantId=await authorize(context.userId,"register_builder",context.supportTenantId);
   const {error}=await db.from("tenant_asset_tag_settings").upsert({tenant_id:tenantId,...data,updated_at:new Date().toISOString()},{onConflict:"tenant_id"});
   if(error)throw new Error(error.message);
+  await supportAudit(context,"tenant_asset_tag_settings_changed",{prefix:data.prefix,separator:data.separator,padding:data.padding});
   return {ok:true};
  });
 
@@ -180,7 +196,7 @@ const migrationInput=z.object({sourceId:idSchema.nullable(),targetId:idSchema,po
 export const previewRegisterMigration=createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
  .inputValidator(input=>migrationInput.parse(input))
  .handler(async ({data,context})=>{
-   const tenantId=await authorize(context.userId,"register_builder");
+   const tenantId=await authorize(context.userId,"register_builder",context.supportTenantId);
    const {data:defs,error:de}=await db.from("builder_definitions").select("id,configuration").eq("tenant_id",tenantId).eq("builder_key","register_builder");
    if(de)throw new Error(de.message);
    const target=(defs??[]).find((x:any)=>x.id===data.targetId),source=data.sourceId?(defs??[]).find((x:any)=>x.id===data.sourceId):null;
@@ -198,7 +214,7 @@ export const previewRegisterMigration=createServerFn({method:"POST"}).middleware
 export const executeRegisterMigration=createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
  .inputValidator(input=>migrationInput.parse(input))
  .handler(async ({data,context})=>{
-   const tenantId=await authorize(context.userId,"register_builder");
+   const tenantId=await authorize(context.userId,"register_builder",context.supportTenantId);
    const {data:rows,error}=await db.rpc("run_asset_register_migration",{p_tenant:tenantId,p_source:data.sourceId,p_target:data.targetId,p_mapping:data.mapping,p_policy:data.policy,p_actor:context.userId});
    if(error)throw Error(error.message);
    return rows?.[0]??{affected_count:0};
@@ -206,14 +222,14 @@ export const executeRegisterMigration=createServerFn({method:"POST"}).middleware
 export const reverseRegisterMigration=createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
  .inputValidator(input=>z.object({migrationId:idSchema}).parse(input))
  .handler(async ({data,context})=>{
-   const tenantId=await authorize(context.userId,"register_builder");
+   const tenantId=await authorize(context.userId,"register_builder",context.supportTenantId);
    const {data:count,error}=await db.rpc("undo_asset_register_migration",{p_tenant:tenantId,p_migration:data.migrationId});
    if(error)throw Error(error.message);
    return {count};
  });
 export const listRegisterMigrations=createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
  .handler(async ({context})=>{
-   const tenantId=await authorize(context.userId,"register_builder");
+   const tenantId=await authorize(context.userId,"register_builder",context.supportTenantId);
    const {data,error}=await db.from("asset_register_migrations").select("id,created_at,affected_count,status").eq("tenant_id",tenantId).order("created_at",{ascending:false}).limit(10);
    if(error)throw Error(error.message);
    return data??[];

@@ -73,9 +73,36 @@ const saasAdminNav: NavItem[] = [
 
 function AppLayout() {
   const {
-    user, loading, signOut, isAdmin, isTenantAdmin, isSaasAdmin, platformStaffRole, roles, canView, isPaidFeature, isAddOnFeature,
+    user, loading, signOut, isAdmin, isTenantAdmin, isSaasAdmin, supportMode, platformStaffRole, roles, canView, isPaidFeature, isAddOnFeature,
     mustChangePassword, canExportReports, subscriptionStatus, trialEndsAt, tenantId, tenantName,
   } = useAuth();
+  // Render the original business navigation whenever a verified support session is active.
+  const platformControl = isSaasAdmin && !supportMode;
+  const exitBusinessSupport=async()=>{
+    try {
+      const {supabase}=await import("@/integrations/supabase/client");
+      const {error}=await supabase.rpc("end_current_platform_support_session" as any);
+      if(error)throw error;
+    }catch(error){console.error("[Support] Exit logging failed",error);}
+    finally{
+      window.sessionStorage.removeItem("af-platform-tenant-session");
+      window.location.assign("/saas-admin/organizations");
+    }
+  };
+  useEffect(()=>{
+    if(!supportMode)return;
+    let active=true;
+    const check=async()=>{
+      const {supabase}=await import("@/integrations/supabase/client");
+      const {data,error}=await supabase.rpc("current_platform_support_context" as any);
+      if(active&&(error||!data)){
+        window.sessionStorage.removeItem("af-platform-tenant-session");
+        window.location.replace("/saas-admin/organizations");
+      }
+    };
+    const timer=window.setInterval(()=>{void check();},15000);
+    return()=>{active=false;window.clearInterval(timer);};
+  },[supportMode]);
   const [open, setOpen] = useState(false);
   const [settingsOpen,setSettingsOpen]=useState(false);
   const [reportsOpen,setReportsOpen]=useState(false);
@@ -100,7 +127,7 @@ function AppLayout() {
       if(active){setMfaRequired(!status.verified);setMfaChecked(true);}
     }).catch(()=>{if(active){setMfaRequired(true);setMfaChecked(true);}});
     return ()=>{active=false;};
-  },[user?.id,loading,isSaasAdmin,isTenantAdmin]);
+  },[user?.id,loading,platformControl,isTenantAdmin]);
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   useEffect(()=>{
@@ -115,7 +142,7 @@ function AppLayout() {
   const exportAccess=useExportAccess();
 
   useEffect(() => {
-    if (isSaasAdmin || !tenantId) return;
+    if (platformControl || !tenantId) return;
     let active = true;
     loadTenantBranding(tenantId).then((value) => {
       if (!active) return;
@@ -129,7 +156,7 @@ function AppLayout() {
     };
     window.addEventListener(BRANDING_CHANGED_EVENT, onChanged);
     return () => { active = false; window.removeEventListener(BRANDING_CHANGED_EVENT, onChanged); };
-  }, [tenantId, isSaasAdmin]);
+  }, [tenantId, platformControl]);
 
   if (loading) {
     return (
@@ -149,17 +176,17 @@ function AppLayout() {
     pathname.startsWith("/saas-admin") ||
     pathname.startsWith("/profile");
 
-  if (isSaasAdmin && !isSaasControlRoute) {
+  if (platformControl && !isSaasControlRoute) {
     return <Navigate to="/dashboard" />;
   }
 
-  const activeNav = isSaasAdmin ? saasAdminNav : tenantNav;
+  const activeNav = platformControl ? saasAdminNav : tenantNav;
   const currentNavItem = activeNav.find((n) =>
     n.exact ? pathname === n.to : pathname.startsWith(n.to),
   );
 
-  if (!isSaasAdmin && currentNavItem?.tenantAdminOnly && !isTenantAdmin) return <Navigate to="/dashboard" />;
-  if (!isSaasAdmin && currentNavItem?.adminOnly && !isAdmin) return <Navigate to="/dashboard" />;
+  if (!platformControl && currentNavItem?.tenantAdminOnly && !isTenantAdmin) return <Navigate to="/dashboard" />;
+  if (!platformControl && currentNavItem?.adminOnly && !isAdmin) return <Navigate to="/dashboard" />;
 
   const builderKeys: ModuleKey[] = ["register_builder", "report_builder", "form_builder", "dashboard_builder", "document_builder"];
   const visibleTenantNav = tenantNav.filter((n) => {
@@ -172,20 +199,20 @@ function AppLayout() {
 
   const groupedNavPaths=new Set(["/categories","/locations","/branches","/analytics","/diagnostics","/audit","/builders","/integrations","/live-tracking"]);
   const groupItems=(paths:string[])=>visibleTenantNav.filter(n=>paths.includes(n.to));
-  const visibleNav = isSaasAdmin ? saasAdminNav : visibleTenantNav.filter(n=>!groupedNavPaths.has(n.to)&&n.to!=="/billing");
+  const visibleNav = platformControl ? saasAdminNav : visibleTenantNav.filter(n=>!groupedNavPaths.has(n.to)&&n.to!=="/billing");
 
-  const currentModuleItem = !isSaasAdmin && currentNavItem?.module ? currentNavItem : undefined;
+  const currentModuleItem = !platformControl && currentNavItem?.module ? currentNavItem : undefined;
   const lockedPaidFeature = currentModuleItem?.module && (isPaidFeature(currentModuleItem.module) || isAddOnFeature(currentModuleItem.module))
     ? {item:currentModuleItem,type:isAddOnFeature(currentModuleItem.module)?"add_on":"paid"}
     : null;
-  const workspaceLocked = !isSaasAdmin && (subscriptionStatus==="expired"||subscriptionStatus==="suspended") && !pathname.startsWith("/billing") && !pathname.startsWith("/profile") && pathname!=="/dashboard" && pathname!=="/integrations" && pathname!=="/live-tracking";
+  const workspaceLocked = !platformControl && !supportMode && (subscriptionStatus==="expired"||subscriptionStatus==="suspended") && !pathname.startsWith("/billing") && !pathname.startsWith("/profile") && pathname!=="/dashboard" && pathname!=="/integrations" && pathname!=="/live-tracking";
 
   const trialDaysLeft = trialEndsAt
     ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000))
     : null;
 
   const blockRestrictedExport = (e: React.MouseEvent<HTMLElement>) => {
-    if (isSaasAdmin || (["register","template","reports","documents","other"] as const).some(cap=>exportAccess.allowed(cap))) return;
+    if (platformControl || (["register","template","reports","documents","other"] as const).some(cap=>exportAccess.allowed(cap))) return;
     const target = e.target as HTMLElement;
     const button = target.closest("button");
     if (!button) return;
@@ -200,8 +227,8 @@ function AppLayout() {
   const renderNavItem = (item: NavItem) => {
     const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
     const Icon = item.icon;
-    const paid = !isSaasAdmin && item.module ? isPaidFeature(item.module) : false;
-    const addOn = !isSaasAdmin && item.module ? isAddOnFeature(item.module) : false;
+    const paid = !platformControl && item.module ? isPaidFeature(item.module) : false;
+    const addOn = !platformControl && item.module ? isAddOnFeature(item.module) : false;
     const expiredLock = workspaceLocked && item.to!=="/billing" && item.to!=="/profile" && item.to!=="/dashboard" && !addOn;
     return (
       <Link
@@ -231,7 +258,7 @@ function AppLayout() {
   };
 
   return (
-    <div className={cn("af-app-outer flex min-h-screen w-full bg-[#f8f5f2]", isSaasAdmin && "platform-brand")} onClickCapture={blockRestrictedExport}>
+    <div className={cn("af-app-outer flex min-h-screen w-full bg-[#f8f5f2]", platformControl && "platform-brand")} onClickCapture={blockRestrictedExport}>
       {open && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setOpen(false)} />}
 
       <aside
@@ -241,7 +268,7 @@ function AppLayout() {
         )}
       >
         <div className="flex min-h-20 items-center justify-between border-b border-sidebar-border px-4 py-2 sm:px-5">
-          {isSaasAdmin ? (
+          {platformControl ? (
             <div className="flex min-w-0 flex-1 flex-col items-start justify-center py-1">
               <PlatformLogo variant="lockup" className="h-[52px] w-[186px] max-w-full" imageClassName="object-contain object-left p-0.5" />
               <p className="ml-1 mt-0.5 text-[10px] uppercase tracking-wider text-sidebar-foreground/70">Platform Control</p>
@@ -263,14 +290,14 @@ function AppLayout() {
           <button className="md:hidden" onClick={() => setOpen(false)} aria-label="Close menu"><X className="h-5 w-5" /></button>
         </div>
 
-        {isSaasAdmin && (
+        {platformControl && (
           <div className="mx-3 mt-3 rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-3 py-2 text-xs text-sidebar-foreground/75">
             Business & platform administration
           </div>
         )}
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {visibleNav.map(item => item.to === "/assets" && !isSaasAdmin ? (
+          {visibleNav.map(item => item.to === "/assets" && !platformControl ? (
             <div key="assets-group" className="space-y-1">
               {renderNavItem(item)}
               {([
@@ -285,7 +312,7 @@ function AppLayout() {
                 {g.expanded&&<div id={`${g.key}-sidebar-items`} className="ml-4 space-y-0.5 border-l border-sidebar-border pl-2">{g.items.map(renderNavItem)}</div>}
               </div>)}
             </div>
-          ) : item.to === "/reports" && !isSaasAdmin ? (
+          ) : item.to === "/reports" && !platformControl ? (
             <div key="reports-group">
               <button type="button" onClick={()=>setReportsOpen(v=>!v)} aria-expanded={reportsOpen}
                 aria-controls="report-sidebar-options"
@@ -302,7 +329,7 @@ function AppLayout() {
                   >{label}</Link>)}
               </div>}
             </div>
-          ) : item.to === "/verification" && !isSaasAdmin ? (
+          ) : item.to === "/verification" && !platformControl ? (
             <div key="verification-group">
               <button type="button" onClick={()=>setVerificationOpen(v=>!v)} aria-expanded={verificationOpen} aria-controls="verification-sidebar-options"
                 className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
@@ -315,7 +342,7 @@ function AppLayout() {
                   className="block rounded-md px-3 py-2 text-xs font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">{label}</Link>)}
               </div>}
             </div>
-          ) : item.to === "/settings" && !isSaasAdmin ? (
+          ) : item.to === "/settings" && !platformControl ? (
             <div key="settings-group">
               <button type="button" onClick={()=>setSettingsOpen(v=>!v)}
                 aria-expanded={settingsOpen} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent">
@@ -338,7 +365,7 @@ function AppLayout() {
               </div>}
             </div>
           ) : renderNavItem(item))}
-          {!isSaasAdmin&&groupItems(["/integrations","/live-tracking"]).length>0&&<div className="mt-3 border-t border-sidebar-border/60 pt-3">
+          {!platformControl&&groupItems(["/integrations","/live-tracking"]).length>0&&<div className="mt-3 border-t border-sidebar-border/60 pt-3">
             <button type="button" onClick={()=>setAddonsOpen(v=>!v)} aria-expanded={addonsOpen} aria-controls="addons-bottom-sidebar" className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent">
               <PlugZap className="h-4 w-4"/><span className="flex-1 text-left">Add-ons</span><ChevronDown className={cn("h-4 w-4 transition-transform",addonsOpen&&"rotate-180")}/>
             </button>
@@ -353,7 +380,7 @@ function AppLayout() {
           <div className="mb-2 rounded-lg bg-sidebar-accent/50 px-3 py-2">
             <p className="truncate text-xs font-medium text-sidebar-accent-foreground">{user.email}</p>
             <p className="mt-0.5 text-[10px] uppercase tracking-wider text-sidebar-foreground/60">
-              {isSaasAdmin ? "SaaS Admin" : isTenantAdmin ? "Admin" : roles.length ? roles.join(" · ") : "member"}
+              {platformControl ? "SaaS Admin" : isTenantAdmin ? "Admin" : roles.length ? roles.join(" · ") : "member"}
             </p>
           </div>
           <button onClick={signOut} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"><LogOut className="h-4 w-4" /> Sign out</button>
@@ -363,26 +390,30 @@ function AppLayout() {
       <div className="af-app-workspace flex min-w-0 flex-1 flex-col bg-[#f8f5f2]">
         <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur md:px-8">
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setOpen(true)} aria-label="Open menu"><Menu className="h-5 w-5" /></Button>
-          {isSaasAdmin && <div className="hidden text-sm font-medium text-foreground sm:block">AssetFlow 360 · SaaS Control Center</div>}
+          {platformControl && <div className="hidden text-sm font-medium text-foreground sm:block">AssetFlow 360 · SaaS Control Center</div>}
           <div className="flex-1" />
-          {!isSaasAdmin && subscriptionStatus === "trial" && isTenantAdmin && (
+          {!platformControl && !supportMode && subscriptionStatus === "trial" && isTenantAdmin && (
             <Button asChild variant="outline" size="sm" className="hidden gap-1.5 border-primary/20 bg-primary/5 text-xs font-semibold text-primary hover:bg-primary/10 sm:inline-flex">
               <Link to="/billing">Trial · {trialDaysLeft ?? "-"} days left</Link>
             </Button>
           )}
           <div className="hidden text-sm text-muted-foreground lg:block">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</div>
-          {!isSaasAdmin && <NotificationBell />}
+          {!platformControl && <NotificationBell />}
           <Button variant="ghost" size="icon" title="Sign out" onClick={signOut} aria-label="Sign out"><LogOut className="h-4 w-4 text-muted-foreground hover:text-foreground" /></Button>
         </header>
 
         <main className="mx-auto w-full min-w-0 max-w-[1480px] flex-1 overflow-x-clip border-x border-[#d5e0e8] bg-white px-3 py-4 shadow-[0_10px_30px_rgba(25,55,75,.05)] sm:px-5 sm:py-6 md:px-8 md:py-8">
-          {!isSaasAdmin && pathname.startsWith("/reports") && !exportAccess.allowed("reports") && subscriptionStatus === "trial" && !lockedPaidFeature && (
+          {supportMode&&<div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-300 bg-orange-50 px-4 py-3 text-sm text-orange-950" role="status">
+            <div><strong>SaaS Admin · Business Support Mode</strong><p className="mt-1 text-xs">You are viewing the existing {tenantName||"business"} portal. All actions remain attributable to your SaaS Admin account. This access is temporary.</p></div>
+            <Button variant="outline" size="sm" onClick={()=>{void exitBusinessSupport();}}>Exit Business</Button>
+          </div>}
+          {!platformControl && pathname.startsWith("/reports") && !exportAccess.allowed("reports") && subscriptionStatus === "trial" && !lockedPaidFeature && (
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
               <div className="flex items-center gap-2"><LockKeyhole className="h-4 w-4" /><span><strong>Free trial:</strong> reports are view-only. PDF and Excel downloads are locked until upgrade.</span></div>
               {isTenantAdmin && <Button asChild size="sm"><Link to="/billing">Upgrade</Link></Button>}
             </div>
           )}
-          {!isSaasAdmin && (subscriptionStatus === "expired" || subscriptionStatus === "suspended") && !pathname.startsWith("/billing") && (
+          {!platformControl && !supportMode && (subscriptionStatus === "expired" || subscriptionStatus === "suspended") && !pathname.startsWith("/billing") && (
             <div className="mb-5 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
               <strong>{subscriptionStatus === "expired" ? "Trial/subscription expired." : "Workspace suspended."}</strong> Features remain visible but are locked until the workspace is reactivated.{isTenantAdmin && <> <Link to="/billing" className="font-semibold text-primary underline">Open billing</Link>.</>}
             </div>
