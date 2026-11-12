@@ -8,7 +8,7 @@ import { getPostgresPool } from "@/lib/postgres.server";
 const uuid = z.string().uuid();
 const recordType = z.enum(["assets", "categories", "locations"]);
 const editableFields = {
-  assets: ["name", "description", "serial_number", "asset_tag", "status", "department", "purchase_date", "purchase_value", "category_id", "location_id"],
+  assets: ["name", "description", "serial_number", "asset_tag", "status",  "purchase_date", "purchase_value", "category_id", "location_id"],
   categories: ["name", "description"],
   locations: ["name", "address"],
 } as const;
@@ -38,7 +38,7 @@ export const listSupportRecords = createServerFn({ method: "POST" })
       if(!session)throw new Error("An active approved support session is required");
       // SQL identifier comes strictly from this server-side enum.
       const columns=data.recordType==="assets"
-        ?"id,name,asset_tag,serial_number,status,description,department,category_id,location_id,purchase_value,purchase_date,updated_at"
+        ?"id,name,asset_tag,serial_number,status,description,category_id,location_id,purchase_value,purchase_date,updated_at"
         : data.recordType==="categories"?"id,name,description":"id,name,address";
       const {rows}=await client.query(`SELECT ${columns} FROM public.${data.recordType}
         WHERE tenant_id=$1 ORDER BY name ASC LIMIT 150`,[session.tenant_id]);
@@ -60,7 +60,7 @@ export const updateSupportRecord = createServerFn({method:"POST"})
     let value:string|null=data.value;
     if(["name"].includes(data.field)&&(!value||!value.trim()||value.length>200))
       throw new Error("A record name is required (maximum 200 characters)");
-    if(data.field==="status" && !["in_use","in_storage","under_repair","retired","missing","disposed"].includes(value||""))
+    if(data.field==="status" && !["in_use","in_storage","under_repair","retired","missing","disposed","checked_out"].includes(value||""))
       throw new Error("Invalid asset status");
     if(["category_id","location_id"].includes(data.field)&&value!==null&&!uuid.safeParse(value).success)
       throw new Error("Invalid related record identifier");
