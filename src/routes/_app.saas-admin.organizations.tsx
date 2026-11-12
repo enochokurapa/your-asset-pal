@@ -193,7 +193,8 @@ function SaasAdminOrganizationsPage() {
     setEnteringBusiness(true);
     try{
       const session=await authCall(openBusinessDashboard,{data:{tenantId:selectedTenantId}});
-      await navigate({to:"/saas-admin/business-dashboard",search:{session:session.sessionId}});
+      window.sessionStorage.setItem("af-platform-tenant-session",session.sessionId);
+      window.location.assign("/dashboard");
     }catch(error:any){toast.error(error?.message||"Unable to open business dashboard");}
     finally{setEnteringBusiness(false);}
   };
