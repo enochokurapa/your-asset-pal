@@ -66,9 +66,6 @@ const saasAdminNav: NavItem[] = [
   { to: "/saas-admin/social-links", label: "Social Media & WhatsApp", icon: Globe2 },
   { to: "/saas-admin/organizations", label: "Businesses", icon: Building2 },
   { to: "/saas-admin/user-activity", label: "User Accounts", icon: Users },
-  { to: "/saas-admin/support-access", label: "Support Access", icon: ShieldCheck },
-  { to: "/saas-admin/support-records", label: "Support Record Changes", icon: Wrench },
-  { to: "/saas-admin/administrators", label: "SaaS Administrators", icon: LockKeyhole },
   { to: "/saas-admin/partners", label: "Partners", icon: Building2 },
   { to: "/saas-admin/settings", label: "Settings", icon: Settings },
   { to: "/profile", label: "My profile", icon: UserCircle },
@@ -76,7 +73,7 @@ const saasAdminNav: NavItem[] = [
 
 function AppLayout() {
   const {
-    user, loading, signOut, isAdmin, isTenantAdmin, isSaasAdmin, roles, canView, isPaidFeature, isAddOnFeature,
+    user, loading, signOut, isAdmin, isTenantAdmin, isSaasAdmin, platformStaffRole, roles, canView, isPaidFeature, isAddOnFeature,
     mustChangePassword, canExportReports, subscriptionStatus, trialEndsAt, tenantId, tenantName,
   } = useAuth();
   const [open, setOpen] = useState(false);
@@ -145,6 +142,7 @@ function AppLayout() {
   if (!mfaChecked) return <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"/></div>;
   if (mfaRequired) return <Navigate to="/mfa" />;
   if (mustChangePassword) return <Navigate to="/welcome" />;
+  if (platformStaffRole && !isSaasAdmin) return <Navigate to="/platform-workspace" />;
 
   const isSaasControlRoute =
     pathname === "/dashboard" ||

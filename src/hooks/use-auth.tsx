@@ -61,6 +61,7 @@ interface AuthCtx {
   isAdmin: boolean;
   isTenantAdmin: boolean;
   isSaasAdmin: boolean;
+  platformStaffRole: string | null;
   isManager: boolean;
   tenantId: string | null;
   tenantName: string | null;
@@ -94,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [isActive, setIsActive] = useState(true);
   const [isSaasAdmin, setIsSaasAdmin] = useState(false);
+  const [platformStaffRole,setPlatformStaffRole]=useState<string|null>(null);
   const [tenantRole, setTenantRole] = useState<"tenant_admin" | "member">("member");
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [tenantName, setTenantName] = useState<string | null>(null);
@@ -124,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const resetMetadata = () => {
     setRoles([]); setPermissions(new Set()); setApprovalRights(new Set());
     setActionRights(new Set()); setBranchScope(null); setMustChangePassword(false);
-    setIsActive(true); setIsSaasAdmin(false); setTenantRole("member");
+    setIsActive(true); setIsSaasAdmin(false); setPlatformStaffRole(null); setTenantRole("member");
     setTenantId(null); setTenantName(null); setSubscriptionStatus("unknown");
     setTrialEndsAt(null); setSubscriptionEndsAt(null); setEnabledModules(new Set(ALL_MODULES));
     setPaidOnlyModules(new Set()); setAddOnModules(new Set());
@@ -158,6 +160,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMustChangePassword(Boolean(prof?.must_change_password));
       setIsActive(prof?.is_active !== false);
       setIsSaasAdmin(Boolean(prof?.is_saas_admin));
+      const {data:staffRole,error:staffError}=await supabase.rpc("my_platform_staff_role" as any);
+      setPlatformStaffRole(staffError?null:(typeof staffRole==="string"?staffRole:null));
       setTenantRole(prof?.tenant_role === "tenant_admin" ? "tenant_admin" : "member");
       setTenantId(prof?.tenant_id ?? null);
 
@@ -247,7 +251,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value: AuthCtx = {
     user: session?.user ?? null, session, roles, permissions, approvalRights, actionRights, branchScope,
-    loading, mustChangePassword, isActive, isAdmin, isTenantAdmin, isSaasAdmin, isManager,
+    loading, mustChangePassword, isActive, isAdmin, isTenantAdmin, isSaasAdmin, platformStaffRole, isManager,
     tenantId, tenantName, subscriptionStatus, trialEndsAt, subscriptionEndsAt, enabledModules, paidOnlyModules, addOnModules,
     canExportReports: subscriptionStatus === "active",
     canUseCustomDomain: subscriptionStatus === "active",

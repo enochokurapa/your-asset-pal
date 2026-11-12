@@ -34,7 +34,7 @@ function authErrorMessage(error: unknown): string {
 }
 
 function LoginPage() {
-  const { user, loading, tenantId } = useAuth();
+  const { user, loading, tenantId, isSaasAdmin, platformStaffRole } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
@@ -66,7 +66,7 @@ function LoginPage() {
     if(displaced){sessionStorage.removeItem("assetflow-session-replaced");toast.warning("Your account was signed in on another device. This device has been signed out.");}
   },[]);
 
-  if (!loading && user && !submitting && !takeoverOpen) return <Navigate to={tenantId ? "/dashboard" : "/register"} />;
+  if (!loading && user && !submitting && !takeoverOpen) return <Navigate to={isSaasAdmin||tenantId ? "/dashboard" : platformStaffRole ? "/platform-workspace" : "/register"} />;
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();

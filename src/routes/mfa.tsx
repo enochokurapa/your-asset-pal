@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 
 export const Route=createFileRoute("/mfa")({component:MfaChallenge});
 function MfaChallenge(){
- const {user,loading,isSaasAdmin,isTenantAdmin}=useAuth();
+ const {user,loading,isSaasAdmin,isTenantAdmin,platformStaffRole}=useAuth();
  const [factor,setFactor]=useState<string|null>(null);
  const [code,setCode]=useState("");
  const [busy,setBusy]=useState(false);
@@ -41,7 +41,7 @@ function MfaChallenge(){
    const status=await statusResponse.json() as {verified?:boolean;registeredEmail?:string;preferredMethod?:"email"|"app"|null;hasAuthenticator?:boolean;pendingCode?:boolean;retryAfterSeconds?:number};
    if(!active)return;
    if(status.verified){setReady(true);return;}
-   if(levels.nextLevel!=="aal2"&&!isSaasAdmin&&!isTenantAdmin){setReady(true);return;}
+   if(levels.nextLevel!=="aal2"&&!isSaasAdmin&&!isTenantAdmin&&!platformStaffRole){setReady(true);return;}
    setRegisteredEmail(status.registeredEmail||user.email||"");
    if(status.pendingCode){setEmailSent(true);setRetrySeconds(status.retryAfterSeconds||0);didAutoSend.current=true;}
    const {data,error}=await supabase.auth.mfa.listFactors();
@@ -55,9 +55,9 @@ function MfaChallenge(){
    setResolved(true);
   })();
   return ()=>{active=false;};
- },[user?.id,isSaasAdmin,isTenantAdmin]);
+ },[user?.id,isSaasAdmin,isTenantAdmin,platformStaffRole]);
  if(!loading&&!user)return <Navigate to="/login"/>;
- if(ready)return <Navigate to="/dashboard"/>;
+ if(ready)return <Navigate to={platformStaffRole&&!isSaasAdmin?"/platform-workspace":"/dashboard"}/>;
  const enroll=async()=>{
   if(enrolling||factor)return;
   setEnrolling(true);setError("");
@@ -114,7 +114,7 @@ function MfaChallenge(){
   setBusy(true);setError("");
   const ok=await emailAction("verify");
   setBusy(false);
-  if(ok){await saveSuccessfulMethod("email");window.location.replace("/dashboard");}
+  if(ok){await saveSuccessfulMethod("email");window.location.replace(platformStaffRole&&!isSaasAdmin?"/platform-workspace":"/dashboard");}
  };
  const submit=async(e:FormEvent)=>{
   e.preventDefault();const id=factor||enrollment?.factorId;
@@ -125,7 +125,7 @@ function MfaChallenge(){
   const {error}=await supabase.auth.mfa.verify({factorId:id,challengeId:data.id,code});
   setBusy(false);
   if(error){setError(error.message);return;}
-  setEnrollment(null);await saveSuccessfulMethod("app");window.location.replace("/dashboard");
+  setEnrollment(null);await saveSuccessfulMethod("app");window.location.replace(platformStaffRole&&!isSaasAdmin?"/platform-workspace":"/dashboard");
  };
  return <main className="af-auth-stage min-h-screen px-4 py-8 sm:py-12"><div className="mx-auto max-w-md space-y-5"><div className="flex justify-center"><PlatformLogo variant="lockup" className="h-14 w-56"/></div><section className="rounded-xl border bg-white p-5 shadow-sm sm:p-7">
   <h1 className="text-xl font-semibold">Verify your sign-in</h1>

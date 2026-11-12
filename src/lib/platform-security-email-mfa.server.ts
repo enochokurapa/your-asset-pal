@@ -12,7 +12,8 @@ function jwtPayload(token:string):JwtPayload{
 async function adminIdentity(id:string){
  const rows=await queryPostgres<{email:string;is_active:boolean;is_saas_admin:boolean;tenant_role:string;admin_role:boolean}>(
  `SELECT p.email,p.is_active,p.is_saas_admin,p.tenant_role,
-  EXISTS(SELECT 1 FROM public.user_roles r WHERE r.user_id=p.id AND r.role='admin') AS admin_role
+  (EXISTS(SELECT 1 FROM public.user_roles r WHERE r.user_id=p.id AND r.role='admin')
+  OR EXISTS(SELECT 1 FROM public.platform_staff_memberships s WHERE s.user_id=p.id)) AS admin_role
   FROM public.profiles p WHERE p.id=$1`,[id]);
  const p=rows[0];
  return {admin:Boolean(p?.is_saas_admin||p?.tenant_role==="tenant_admin"||p?.admin_role),active:p?.is_active===true,email:p?.email||""};
