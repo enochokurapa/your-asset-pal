@@ -1,9 +1,19 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import {queryPostgres} from "@/lib/postgres.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const admin = supabaseAdmin as any;
+async function auditBusinessSupport(context:{userId:string;supportSessionId?:string|null;supportTenantId?:string|null},
+ action:string,details:Record<string,unknown>){
+ if(!context.supportSessionId||!context.supportTenantId)return;
+ await queryPostgres(
+  "INSERT INTO public.platform_tenant_access_audit(session_id,tenant_id,actor_id,action,details) VALUES($1,$2,$3,$4,$5::jsonb)",
+  [context.supportSessionId,context.supportTenantId,context.userId,action,JSON.stringify(details)]
+ );
+}
+
 
 async function sendNewUserWelcomeEmail(email:string,fullName:string):Promise<boolean>{
   const key=process.env.RESEND_API_KEY;
@@ -43,7 +53,7 @@ const actionSchema = z.enum([
   "perform_verification", "view_verification_reports", "approve_own_request", "manage_audit_log",
 ]);
 
-async function getTenantAdminProfile(userId: string) {
+async function getTenantAdminProfile(userId: string,supportTenantId?:string|null) {
   if (!userId) throw new Error("Administrator privileges required: Not authenticated");
   const [{ data: role, error: roleError }, { data: profile, error: profileError }] = await Promise.all([
     admin.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle(),
@@ -53,7 +63,8 @@ async function getTenantAdminProfile(userId: string) {
   if (profileError || !profile) throw new Error("Administrator profile is not configured");
 
   if (profile.is_saas_admin) {
-    throw new Error("SaaS Admin manages platform policy, not workspace users");
+    if(!supportTenantId)throw new Error("Open a business support session before managing customer users");
+    return {...profile,tenant_id:supportTenantId,tenant_role:"tenant_admin"};
   }
   if (!role && profile.tenant_role !== "tenant_admin") {
     throw new Error("Administrator privileges required");
@@ -62,8 +73,8 @@ async function getTenantAdminProfile(userId: string) {
   return profile;
 }
 
-async function assertSameTenant(adminUserId: string, targetUserId: string) {
-  const p = await getTenantAdminProfile(adminUserId);
+async function assertSameTenant(adminUserId: string, targetUserId: string,supportTenantId?:string|null) {
+  const p = await getTenantAdminProfile(adminUserId,supportTenantId);
   const { data: target, error } = await admin.from("profiles")
     .select("tenant_id,is_saas_admin")
     .eq("id", targetUserId)
@@ -134,7 +145,7 @@ export const createUserAccount = createServerFn({ method: "POST" })
     role: roleSchema,
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const p = await getTenantAdminProfile(context.userId);
+    const p = await getTenantAdminProfile(context.userId,context.supportTenantId);
     await enforceSeatLimit(p.tenant_id);
 
     const { data: created, error } = await supabaseAdmin.auth.admin.createUser({
@@ -166,6 +177,7 @@ export const createUserAccount = createServerFn({ method: "POST" })
       throw new Error(roleError.message);
     }
     const welcomeEmailAccepted=await sendNewUserWelcomeEmail(data.email.trim().toLowerCase(),data.full_name);
+    await auditBusinessSupport(context,"tenant_user_created",{targetUserId:uid,role:data.role});
     return { id: uid, welcomeEmailAccepted };
   });
 
@@ -176,13 +188,14 @@ export const adminResetPassword = createServerFn({ method: "POST" })
     new_password: z.string().min(6).max(72),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertSameTenant(context.userId, data.user_id);
+    await assertSameTenant(context.userId, data.user_id,context.supportTenantId);
     const { error } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, {
       password: data.new_password,
       user_metadata: { must_change_password: true },
     });
     if (error) throw new Error(error.message);
     await admin.from("profiles").update({ must_change_password: true }).eq("id", data.user_id);
+    await auditBusinessSupport(context,"tenant_user_password_reset",{targetUserId:data.user_id});
     return { ok: true };
   });
 
@@ -193,7 +206,7 @@ export const setUserActive = createServerFn({ method: "POST" })
     active: z.boolean(),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    const p = await assertSameTenant(context.userId, data.user_id);
+    const p = await assertSameTenant(context.userId, data.user_id,context.supportTenantId);
     if (data.user_id === context.userId && !data.active) throw new Error("You cannot deactivate your own account");
     if (data.active) await enforceSeatLimit(p.tenant_id);
     const { error } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, {
@@ -201,6 +214,7 @@ export const setUserActive = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message);
     await admin.from("profiles").update({ is_active: data.active }).eq("id", data.user_id);
+    await auditBusinessSupport(context,"tenant_user_status_changed",{targetUserId:data.user_id,active:data.active});
     return { ok: true };
   });
 
@@ -208,10 +222,11 @@ export const deleteUserAccount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ user_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertSameTenant(context.userId, data.user_id);
+    await assertSameTenant(context.userId, data.user_id,context.supportTenantId);
     if (data.user_id === context.userId) throw new Error("You cannot delete your own account");
     const { error } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
     if (error) throw new Error(error.message);
+    await auditBusinessSupport(context,"tenant_user_deleted",{targetUserId:data.user_id});
     return { ok: true };
   });
 
@@ -221,7 +236,7 @@ export const setUserRole = createServerFn({ method: "POST" })
     user_id: z.string().uuid(), role: roleSchema, enabled: z.boolean(),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertSameTenant(context.userId, data.user_id);
+    await assertSameTenant(context.userId, data.user_id,context.supportTenantId);
     if (data.user_id === context.userId && data.role === "admin" && !data.enabled) {
       throw new Error("You cannot remove your own admin role");
     }
@@ -238,6 +253,7 @@ export const setUserRole = createServerFn({ method: "POST" })
     if (data.role === "admin") {
       await admin.from("profiles").update({ tenant_role: data.enabled ? "tenant_admin" : "member" }).eq("id", data.user_id);
     }
+    await auditBusinessSupport(context,"tenant_user_role_changed",{targetUserId:data.user_id,role:data.role,enabled:data.enabled});
     return { ok: true };
   });
 
@@ -247,7 +263,7 @@ export const setUserModulePermission = createServerFn({ method: "POST" })
     user_id: z.string().uuid(), module: moduleSchema, enabled: z.boolean(),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertSameTenant(context.userId, data.user_id);
+    await assertSameTenant(context.userId, data.user_id,context.supportTenantId);
     if (data.enabled) {
       const { error } = await admin.from("user_permissions").upsert(
         { user_id: data.user_id, module: data.module, can_view: true },
@@ -258,6 +274,7 @@ export const setUserModulePermission = createServerFn({ method: "POST" })
       const { error } = await admin.from("user_permissions").delete().eq("user_id", data.user_id).eq("module", data.module);
       if (error) throw new Error(error.message);
     }
+    await auditBusinessSupport(context,"tenant_user_module_changed",{targetUserId:data.user_id,module:data.module,enabled:data.enabled});
     return { ok: true };
   });
 
@@ -267,7 +284,7 @@ export const setUserApprovalRight = createServerFn({ method: "POST" })
     user_id: z.string().uuid(), approval_kind: approvalSchema, enabled: z.boolean(),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertSameTenant(context.userId, data.user_id);
+    await assertSameTenant(context.userId, data.user_id,context.supportTenantId);
     if (data.enabled) {
       const { error } = await admin.from("user_approval_rights").upsert(
         { user_id: data.user_id, approval_kind: data.approval_kind },
@@ -278,6 +295,7 @@ export const setUserApprovalRight = createServerFn({ method: "POST" })
       const { error } = await admin.from("user_approval_rights").delete().eq("user_id", data.user_id).eq("approval_kind", data.approval_kind);
       if (error) throw new Error(error.message);
     }
+    await auditBusinessSupport(context,"tenant_user_approval_changed",{targetUserId:data.user_id,kind:data.approval_kind,enabled:data.enabled});
     return { ok: true };
   });
 
@@ -287,7 +305,7 @@ export const setUserActionRight = createServerFn({ method: "POST" })
     user_id: z.string().uuid(), action_kind: actionSchema, enabled: z.boolean(),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertSameTenant(context.userId, data.user_id);
+    await assertSameTenant(context.userId, data.user_id,context.supportTenantId);
     if (data.enabled) {
       const { error } = await admin.from("user_action_rights").upsert(
         { user_id: data.user_id, action_kind: data.action_kind },
@@ -298,6 +316,7 @@ export const setUserActionRight = createServerFn({ method: "POST" })
       const { error } = await admin.from("user_action_rights").delete().eq("user_id", data.user_id).eq("action_kind", data.action_kind);
       if (error) throw new Error(error.message);
     }
+    await auditBusinessSupport(context,"tenant_user_action_changed",{targetUserId:data.user_id,kind:data.action_kind,enabled:data.enabled});
     return { ok: true };
   });
 
@@ -307,7 +326,7 @@ export const setUserBranchAccess = createServerFn({ method: "POST" })
     user_id: z.string().uuid(), branch_id: z.string().uuid(), enabled: z.boolean(),
   }).parse(input))
   .handler(async ({ data, context }) => {
-    await assertSameTenant(context.userId, data.user_id);
+    await assertSameTenant(context.userId, data.user_id,context.supportTenantId);
     if (data.enabled) {
       const { error } = await admin.from("user_branch_access").upsert(
         { user_id: data.user_id, branch_id: data.branch_id },
@@ -318,5 +337,6 @@ export const setUserBranchAccess = createServerFn({ method: "POST" })
       const { error } = await admin.from("user_branch_access").delete().eq("user_id", data.user_id).eq("branch_id", data.branch_id);
       if (error) throw new Error(error.message);
     }
+    await auditBusinessSupport(context,"tenant_user_branch_changed",{targetUserId:data.user_id,branchId:data.branch_id,enabled:data.enabled});
     return { ok: true };
   });
