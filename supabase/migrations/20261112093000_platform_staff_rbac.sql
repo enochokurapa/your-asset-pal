@@ -31,3 +31,13 @@ END $$;
 DROP TRIGGER IF EXISTS platform_staff_role_audit_immutable ON public.platform_staff_role_audit;
 CREATE TRIGGER platform_staff_role_audit_immutable BEFORE UPDATE OR DELETE
  ON public.platform_staff_role_audit FOR EACH ROW EXECUTE FUNCTION public.platform_tenant_access_audit_immutable();
+
+-- Read-only, caller-bound role lookup for the login experience.
+CREATE OR REPLACE FUNCTION public.my_platform_staff_role()
+RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$
+ SELECT CASE WHEN p.is_saas_admin THEN 'saas_admin' ELSE m.role END
+ FROM public.profiles p LEFT JOIN public.platform_staff_memberships m ON m.user_id=p.id
+ WHERE p.id=auth.uid() AND p.is_active=TRUE
+$$;
+REVOKE ALL ON FUNCTION public.my_platform_staff_role() FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.my_platform_staff_role() TO authenticated;
