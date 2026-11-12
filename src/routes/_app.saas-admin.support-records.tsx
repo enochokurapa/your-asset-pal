@@ -13,7 +13,7 @@ import { toast } from "sonner";
 
 type RecordKind="assets"|"categories"|"locations";
 const fields:Record<RecordKind,string[]>={
-  assets:["name","description","serial_number","asset_tag","status","department","purchase_value","purchase_date","category_id","location_id"],
+  assets:["name","description","serial_number","asset_tag","status","purchase_value","purchase_date","category_id","location_id"],
   categories:["name","description"],
   locations:["name","address"],
 };
@@ -78,7 +78,7 @@ function SupportRecordEditor(){
       <div className="space-y-2"><Label htmlFor="support-value">New value</Label>
         {field==="status"?
           <select id="support-value" className="w-full rounded-md border bg-background p-2" value={value} onChange={e=>setValue(e.target.value)}>
-            {["in_use","in_storage","under_repair","retired","missing","disposed"].map(s=><option value={s} key={s}>{s}</option>)}
+            {["in_use","in_storage","under_repair","retired","missing","disposed","checked_out"].map(s=><option value={s} key={s}>{s}</option>)}
           </select>:
           <Input id="support-value" value={value} onChange={e=>setValue(e.target.value)} maxLength={2000}/>}
       </div>
