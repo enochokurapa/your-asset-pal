@@ -29,8 +29,8 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 function Dashboard() {
-  const { isSaasAdmin } = useAuth();
-  return isSaasAdmin ? <SaasAdminOverview /> : <TenantDashboard />;
+  const { isSaasAdmin, supportMode } = useAuth();
+  return isSaasAdmin && !supportMode ? <SaasAdminOverview /> : <TenantDashboard />;
 }
 
 function TenantDashboard() {
