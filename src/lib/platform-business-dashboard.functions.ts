@@ -41,6 +41,23 @@ export const openPlatformBusinessDashboard=createServerFn({method:"POST"})
    return {sessionId:s.id,tenantId:t.id,expiresAt:s.expires_at};
   }catch(e){await c.query("ROLLBACK");throw e;}finally{c.release();}
  });
+// Bootstrap uses the authenticated server, not a browser PostgREST RPC header.
+// This prevents the original tenant UI from briefly falling back to SaaS Control Center.
+export const resumePlatformBusinessSession=createServerFn({method:"POST"})
+ .middleware([requireSupabaseAuth])
+ .inputValidator(input=>z.object({sessionId:uuid}).parse(input))
+ .handler(async({context,data})=>{
+  const pool=getPostgresPool();
+  const {rows:[s]}=await pool.query(
+   `SELECT s.id,s.tenant_id,s.expires_at,t.name AS tenant_name FROM public.platform_tenant_access_sessions s
+      JOIN public.profiles p ON p.id=s.administrator_id
+      JOIN public.tenants t ON t.id=s.tenant_id
+      WHERE s.id=$1 AND s.administrator_id=$2 AND s.ended_at IS NULL AND s.expires_at>NOW()
+        AND p.is_saas_admin=TRUE AND p.is_active=TRUE LIMIT 1`,
+    [data.sessionId,context.userId]);
+  if(!s)throw Error("Business support session expired or not authorized");
+  return {sessionId:s.id,tenantId:s.tenant_id,tenantName:s.tenant_name,expiresAt:s.expires_at};
+ });
 export const getPlatformBusinessDashboard=createServerFn({method:"POST"})
  .middleware([requireSupabaseAuth])
  .inputValidator(input=>z.object({sessionId:uuid}).parse(input))
