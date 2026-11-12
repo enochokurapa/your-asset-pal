@@ -32,7 +32,8 @@ export const Route = createFileRoute("/_app/users")({ component: UsersPage });
 const ROLES: AppRole[] = ["admin", "manager", "staff", "security"];
 
 function UsersPage() {
-  const { isTenantAdmin, isSaasAdmin, loading, user: me } = useAuth();
+  const { isTenantAdmin, isSaasAdmin, supportMode, loading, user: me } = useAuth();
+  const platformControl = isSaasAdmin && !supportMode;
   const getAuthHeaders = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) return {};
@@ -51,7 +52,7 @@ function UsersPage() {
   const [roleActions,setRoleActions]=useState<string[]>([]);
   const [roleApprovals,setRoleApprovals]=useState<string[]>([]);
   const [roleSaving,setRoleSaving]=useState(false);
-  const roleList=useQuery({queryKey:["tenant-role-templates"],enabled:isTenantAdmin&&!isSaasAdmin,
+  const roleList=useQuery({queryKey:["tenant-role-templates"],enabled:isTenantAdmin&&!platformControl,
     queryFn:async()=>roleListFn({headers:await getAuthHeaders()})});
   const editRole=(role?:any)=>{setRoleId(role?.id??null);setRoleName(role?.name??"");setRoleDescription(role?.description??"");
     setRoleBase(role?.base_role??"staff");setRoleModules(role?.modules??["dashboard","assets"]);
@@ -105,13 +106,13 @@ function UsersPage() {
 
   const { data: branchesAll = [] } = useQuery({
     queryKey: ["branches-all-for-perms"],
-    enabled: isTenantAdmin && !isSaasAdmin,
+    enabled: isTenantAdmin && !platformControl,
     queryFn: async () => (await supabase.from("branches").select("id,name,code").order("name")).data ?? [],
   });
 
   const { data = [], isLoading } = useQuery({
     queryKey: ["users-with-roles"],
-    enabled: isTenantAdmin && !isSaasAdmin,
+    enabled: isTenantAdmin && !platformControl,
     queryFn: async () => {
       const [{ data: profiles }, { data: roles }, { data: perms }, { data: rights }, { data: acts }, { data: brs }] = await Promise.all([
         supabase.from("profiles").select("*").eq("is_saas_admin", false).order("created_at", { ascending: false }),
@@ -133,7 +134,7 @@ function UsersPage() {
   });
 
   if (loading) return <div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>;
-  if (isSaasAdmin) return <Navigate to="/saas-admin" />;
+  if (platformControl) return <Navigate to="/saas-admin" />;
   if (!isTenantAdmin) return <Navigate to="/dashboard" />;
 
   const create = async () => {
