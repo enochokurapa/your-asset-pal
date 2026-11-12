@@ -73,6 +73,10 @@ export const changePlatformAdministrator=createServerFn({method:"POST"})
      await client.query("UPDATE public.profiles SET is_saas_admin=$1 WHERE id=$2",
        [data.makeAdmin,data.targetUserId]);
    }
+   if(data.makeAdmin){
+     // A SaaS Admin never retains a lower-privilege platform staff assignment.
+     await client.query("DELETE FROM public.platform_staff_memberships WHERE user_id=$1",[data.targetUserId]);
+   }
    await client.query(
      "INSERT INTO public.platform_admin_membership_audit (actor_id,target_user_id,action,previous_state,new_state,reason) VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,$6)",[
       context.userId,data.targetUserId,data.makeAdmin?"promote":"demote",
