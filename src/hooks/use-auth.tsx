@@ -251,7 +251,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // SaaS administration is an additional platform privilege. It must not remove
   // the user's normal tenant role or RBAC permissions.
   const isTenantAdmin = tenantRole === "tenant_admin" || isAdmin;
-  const subscriptionUsable = subscriptionStatus === "active" || subscriptionStatus === "trial" || subscriptionStatus === "unknown";
+  const subscriptionUsable = supportMode || subscriptionStatus === "active" || subscriptionStatus === "trial" || subscriptionStatus === "unknown";
   const hasUserModuleAccess = (m: ModuleKey) => isAdmin || permissions.has(m);
 
   const canView = (m: ModuleKey) => enabledModules.has(m) && hasUserModuleAccess(m);
