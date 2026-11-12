@@ -73,7 +73,7 @@ const saasAdminNav: NavItem[] = [
 
 function AppLayout() {
   const {
-    user, loading, signOut, isAdmin, isTenantAdmin, isSaasAdmin, supportMode, platformStaffRole, roles, canView, isPaidFeature, isAddOnFeature,
+    user, loading, signOut, isAdmin, isTenantAdmin, isSaasAdmin, supportMode, supportRestoreError, platformStaffRole, roles, canView, isPaidFeature, isAddOnFeature,
     mustChangePassword, canExportReports, subscriptionStatus, trialEndsAt, tenantId, tenantName,
   } = useAuth();
   // Render the original business navigation whenever a verified support session is active.
@@ -89,20 +89,9 @@ function AppLayout() {
       window.location.assign("/saas-admin/organizations");
     }
   };
-  useEffect(()=>{
-    if(!supportMode)return;
-    let active=true;
-    const check=async()=>{
-      const {supabase}=await import("@/integrations/supabase/client");
-      const {data,error}=await supabase.rpc("current_platform_support_context" as any);
-      if(active&&(error||!data)){
-        window.sessionStorage.removeItem("af-platform-tenant-session");
-        window.location.replace("/saas-admin/organizations");
-      }
-    };
-    const timer=window.setInterval(()=>{void check();},15000);
-    return()=>{active=false;window.clearInterval(timer);};
-  },[supportMode]);
+  // The user explicitly exits the business using Exit Business.
+  // Avoid background RPC probes that can fail transiently and cause navigation loops.
+  // Every data request still validates the signed-in SaaS Admin and session in PostgreSQL.
   const [open, setOpen] = useState(false);
   const [settingsOpen,setSettingsOpen]=useState(false);
   const [reportsOpen,setReportsOpen]=useState(false);
@@ -166,6 +155,20 @@ function AppLayout() {
     );
   }
   if (!user) return <Navigate to="/login" />;
+  if (supportRestoreError && typeof window!=="undefined" &&
+      window.sessionStorage.getItem("af-platform-tenant-session")) {
+    return <div className="flex min-h-screen items-center justify-center bg-background p-5">
+      <div className="w-full max-w-lg space-y-4 rounded-xl border bg-card p-6 shadow-sm">
+        <h1 className="text-xl font-semibold">Business connection interrupted</h1>
+        <p className="text-sm text-muted-foreground">Your business support session has not been closed. Retry the connection or choose Exit Business. You will not be redirected automatically.</p>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={()=>window.location.reload()}>Retry connection</Button>
+          <Button variant="outline" onClick={()=>{void exitBusinessSupport();}}>Exit Business</Button>
+        </div>
+      </div>
+    </div>;
+  }
+
   if (!mfaChecked) return <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"/></div>;
   if (mfaRequired) return <Navigate to="/mfa" />;
   if (mustChangePassword) return <Navigate to="/welcome" />;

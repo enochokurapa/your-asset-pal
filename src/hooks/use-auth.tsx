@@ -63,6 +63,7 @@ interface AuthCtx {
   isTenantAdmin: boolean;
   isSaasAdmin: boolean;
   supportMode: boolean;
+  supportRestoreError: boolean;
   platformStaffRole: string | null;
   isManager: boolean;
   tenantId: string | null;
@@ -98,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isActive, setIsActive] = useState(true);
   const [isSaasAdmin, setIsSaasAdmin] = useState(false);
   const [supportMode,setSupportMode]=useState(false);
+  const [supportRestoreError,setSupportRestoreError]=useState(false);
   const [platformStaffRole,setPlatformStaffRole]=useState<string|null>(null);
   const [tenantRole, setTenantRole] = useState<"tenant_admin" | "member">("member");
   const [tenantId, setTenantId] = useState<string | null>(null);
@@ -129,7 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const resetMetadata = () => {
     setRoles([]); setPermissions(new Set()); setApprovalRights(new Set());
     setActionRights(new Set()); setBranchScope(null); setMustChangePassword(false);
-    setIsActive(true); setIsSaasAdmin(false); setSupportMode(false); setPlatformStaffRole(null); setTenantRole("member");
+    setIsActive(true); setIsSaasAdmin(false); setSupportMode(false); setSupportRestoreError(false); setPlatformStaffRole(null); setTenantRole("member");
     setTenantId(null); setTenantName(null); setSubscriptionStatus("unknown");
     setTrialEndsAt(null); setSubscriptionEndsAt(null); setEnabledModules(new Set(ALL_MODULES));
     setPaidOnlyModules(new Set()); setAddOnModules(new Set());
@@ -155,7 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const rs = (Array.isArray(r)?r:[]).map((x: any) => x.role as AppRole);
       const isPlatformAdmin=prof?.is_saas_admin===true;
       let support: {tenantId?:string;tenantName?:string;expiresAt?:string}|null=null;
-      if (isPlatformAdmin && typeof window!=="undefined") {
+      if (typeof window!=="undefined") {
         const sessionId=window.sessionStorage.getItem("af-platform-tenant-session");
         if(sessionId){
           try {
@@ -166,15 +168,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 "x-assetflow-support-session":sessionId},
               data:{sessionId},
             });
+            setSupportRestoreError(false);
           } catch(error) {
-            console.warn("[Support] Unable to load business session",error);
-            window.sessionStorage.removeItem("af-platform-tenant-session");
+            // Do not treat a temporary API/network failure as an Exit Business action.
+            // The recovery UI prevents accidentally rendering SaaS Control Center.
+            console.warn("[Support] Business context temporarily unavailable",error);
+            setSupportRestoreError(true);
           }
         }
       }
       const supporting=!!support?.tenantId;
       const effectiveTenant= support?.tenantId ?? prof?.tenant_id ?? null;
-      setSupportMode(supporting);
+      if(supporting) setSupportMode(true);
+      else if(typeof window==="undefined" || !window.sessionStorage.getItem("af-platform-tenant-session")) setSupportMode(false);
 
       setRoles(supporting?["admin"]:rs);
       setPermissions(new Set((Array.isArray(p)?p:[]).filter((x: any) => x.can_view).map((x: any) => x.module as ModuleKey)));
@@ -184,7 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setBranchScope(supporting || rs.includes("admin") || brList.length === 0 ? null : new Set(brList));
       setMustChangePassword(Boolean(prof?.must_change_password));
       setIsActive(prof?.is_active !== false);
-      setIsSaasAdmin(Boolean(prof?.is_saas_admin));
+      setIsSaasAdmin(isPlatformAdmin || supporting);
       const {data:staffRole,error:staffError}=await supabase.rpc("my_platform_staff_role" as any);
       setPlatformStaffRole(staffError?null:(typeof staffRole==="string"?staffRole:null));
       setTenantRole(supporting || prof?.tenant_role === "tenant_admin" ? "tenant_admin" : "member");
@@ -276,7 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value: AuthCtx = {
     user: session?.user ?? null, session, roles, permissions, approvalRights, actionRights, branchScope,
-    loading, mustChangePassword, isActive, isAdmin, isTenantAdmin, isSaasAdmin, supportMode, platformStaffRole, isManager,
+    loading, mustChangePassword, isActive, isAdmin, isTenantAdmin, isSaasAdmin, supportMode, supportRestoreError, platformStaffRole, isManager,
     tenantId, tenantName, subscriptionStatus, trialEndsAt, subscriptionEndsAt, enabledModules, paidOnlyModules, addOnModules,
     canExportReports: subscriptionStatus === "active",
     canUseCustomDomain: subscriptionStatus === "active",
