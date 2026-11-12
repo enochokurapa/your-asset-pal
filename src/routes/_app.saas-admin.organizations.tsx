@@ -271,7 +271,7 @@ function SaasAdminOrganizationsPage() {
             Select one organization to inspect its usage and control its plan, modules and users.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2"><Button asChild variant="outline"><Link to="/saas-admin/administrators">Manage SaaS Admins</Link></Button><Button variant="outline" onClick={refreshAll}>
+        <div className="flex flex-wrap gap-2"><Button asChild variant="outline"><Link to="/saas-admin/users">Users & Roles</Link></Button><Button variant="outline" onClick={refreshAll}>
           <RefreshCw className="mr-2 h-4 w-4" /> Refresh
         </Button></div>
       </div>
