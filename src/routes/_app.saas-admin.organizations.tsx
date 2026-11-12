@@ -1,7 +1,7 @@
 import type { ExportCapability } from "@/lib/export-permissions";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -16,6 +16,7 @@ import {
   updateSaasTenantTagSettings,
 } from "@/lib/saas.functions";
 import { getServerAuthHeaders } from "@/lib/auth-headers";
+import { openPlatformBusinessDashboard } from "@/lib/platform-business-dashboard.functions";
 import { useAuth } from "@/hooks/use-auth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,9 @@ function SmallMetric({ label, value, icon: Icon }: { label: string; value: strin
 
 function SaasAdminOrganizationsPage() {
   const { isSaasAdmin } = useAuth();
+  const navigate = useNavigate();
+  const openBusinessDashboard = useServerFn(openPlatformBusinessDashboard);
+  const [enteringBusiness,setEnteringBusiness] = useState(false);
   const qc = useQueryClient();
   const getDashboard = useServerFn(getSaasAdminDashboard);
   const getDetail = useServerFn(getSaasTenantDetail);
@@ -184,6 +188,15 @@ function SaasAdminOrganizationsPage() {
     try{await authCall(assignPlan,{data:{tenant_id:selectedTenantId,plan_code:plan}});await refreshAll();toast.success("Assigned "+plan+" package");}
     catch(error:any){toast.error(error.message||"Cannot assign package")}
   };
+  const accessBusinessDashboard = async () => {
+    if(!selectedTenantId||enteringBusiness)return;
+    setEnteringBusiness(true);
+    try{
+      const session=await authCall(openBusinessDashboard,{data:{tenantId:selectedTenantId}});
+      await navigate({to:"/saas-admin/business-dashboard",search:{session:session.sessionId}});
+    }catch(error:any){toast.error(error?.message||"Unable to open business dashboard");}
+    finally{setEnteringBusiness(false);}
+  };
   const saveName = async () => {
     if (!selectedTenantId || !nameDraft.trim()) return;
     setSavingName(true);
@@ -258,9 +271,9 @@ function SaasAdminOrganizationsPage() {
             Select one organization to inspect its usage and control its plan, modules and users.
           </p>
         </div>
-        <Button variant="outline" onClick={refreshAll}>
+        <div className="flex flex-wrap gap-2"><Button asChild variant="outline"><Link to="/saas-admin/administrators">Manage SaaS Admins</Link></Button><Button variant="outline" onClick={refreshAll}>
           <RefreshCw className="mr-2 h-4 w-4" /> Refresh
-        </Button>
+        </Button></div>
       </div>
 
       {dashboardQuery.error && <Card className="border-destructive/40 p-4 text-sm text-destructive" role="alert">Businesses could not be loaded: {(dashboardQuery.error as Error).message} <Button variant="outline" size="sm" className="ml-3" onClick={() => dashboardQuery.refetch()}>Retry</Button></Card>}
@@ -319,6 +332,7 @@ function SaasAdminOrganizationsPage() {
                     <Badge variant="secondary">{tenant.plan_code}</Badge>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">{tenant.slug} · Created {new Date(tenant.created_at).toLocaleDateString()}</p>
+                  <Button className="mt-3" disabled={enteringBusiness} onClick={accessBusinessDashboard}><ShieldCheck className="mr-2 h-4 w-4"/>{enteringBusiness?"Opening…":"Access Dashboard"}</Button>
                 </div>
                 <div className="w-full sm:w-52 space-y-2"><label className="block text-xs font-medium">Assigned paid package</label><Select value={["starter","business","enterprise"].includes(tenant.plan_code)?tenant.plan_code:"legacy"} disabled={tenant.effective_status!=="active"} onValueChange={v=>setNamedPlan(v==="legacy"?"paid":v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="legacy">Legacy paid plan</SelectItem><SelectItem value="starter">Starter</SelectItem><SelectItem value="business">Business</SelectItem><SelectItem value="enterprise">Enterprise</SelectItem></SelectContent></Select><p className="text-xs text-muted-foreground">SaaS Admin sets the package without changing the subscription expiry.</p></div><div className="w-full sm:w-52">
                   <Select value={tenant.effective_status} onValueChange={(value) => changeTenantStatus(value as any)}>
