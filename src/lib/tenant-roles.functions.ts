@@ -2,7 +2,13 @@ import {createServerFn} from "@tanstack/react-start";
 import {z} from "zod";
 import {supabaseAdmin} from "@/integrations/supabase/client.server";
 import {requireSupabaseAuth} from "@/integrations/supabase/auth-middleware";
+import {queryPostgres} from "@/lib/postgres.server";
 const db=supabaseAdmin as any;
+async function supportAudit(context:{userId:string;supportSessionId?:string|null;supportTenantId?:string|null},action:string,details:Record<string,unknown>){
+ if(!context.supportSessionId||!context.supportTenantId)return;
+ await queryPostgres("INSERT INTO public.platform_tenant_access_audit(session_id,tenant_id,actor_id,action,details) VALUES ($1,$2,$3,$4,$5::jsonb)",
+  [context.supportSessionId,context.supportTenantId,context.userId,action,JSON.stringify(details)]);
+}
 const roleInput=z.object({
   id:z.string().uuid().optional(),
   name:z.string().trim().min(2).max(70),
@@ -12,7 +18,8 @@ const roleInput=z.object({
   actions:z.array(z.string()).max(60).default([]),
   approvals:z.array(z.string()).max(30).default([]),
 });
-async function tenant(userId:string) {
+async function tenant(userId:string,supportTenantId?:string|null) {
+ if(supportTenantId)return supportTenantId;
  const {data:p,error}=await db.from("profiles").select("tenant_id,tenant_role,is_active,is_saas_admin").eq("id",userId).single();
  if(error||!p?.tenant_id||!p.is_active||p.is_saas_admin||p.tenant_role!=="tenant_admin")throw Error("Business administrator required");
  return p.tenant_id as string;
@@ -41,7 +48,7 @@ async function apply(tenantId:string,userId:string,t:any){
  }
 }
 export const listTenantRoleTemplates=createServerFn({method:"GET"}).middleware([requireSupabaseAuth]).handler(async({context})=>{
- const t=await tenant(context.userId);
+ const t=await tenant(context.userId,context.supportTenantId);
  const [roles,assignments]=await Promise.all([
  db.from("tenant_role_templates").select("*").eq("tenant_id",t).order("name"),
  db.from("tenant_role_assignments").select("user_id,template_id").eq("tenant_id",t),
@@ -51,23 +58,25 @@ export const listTenantRoleTemplates=createServerFn({method:"GET"}).middleware([
 });
 export const saveTenantRoleTemplate=createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
  .inputValidator(roleInput).handler(async({data,context})=>{
- const t=await tenant(context.userId);
+ const t=await tenant(context.userId,context.supportTenantId);
  const payload={tenant_id:t,name:data.name,description:data.description,base_role:data.base_role,modules:data.modules,actions:data.actions,approvals:data.approvals};
  const op=data.id?db.from("tenant_role_templates").update(payload).eq("id",data.id).eq("tenant_id",t):
  db.from("tenant_role_templates").insert(payload);
  const {data:row,error}=await op.select("id").single();
  if(error||!row)throw Error(error?.message||"Role not saved");
+ await supportAudit(context,"tenant_role_template_saved",{templateId:row.id,name:data.name,baseRole:data.base_role});
  return row;
 });
 export const assignTenantRoleTemplate=createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
  .inputValidator(z.object({userId:z.string().uuid(),templateId:z.string().uuid()}))
  .handler(async({context,data})=>{
- const t=await tenant(context.userId);
+ const t=await tenant(context.userId,context.supportTenantId);
  if(data.userId===context.userId)throw Error("You cannot change your own administrator rights");
  const {data:r,error}=await db.from("tenant_role_templates").select("*").eq("id",data.templateId).eq("tenant_id",t).single();
  if(error||!r)throw Error("Role not found in this business");
  await apply(t,data.userId,r);
  const saved=await db.from("tenant_role_assignments").upsert({tenant_id:t,user_id:data.userId,template_id:r.id},{onConflict:"tenant_id,user_id"});
  if(saved.error)throw Error(saved.error.message);
+ await supportAudit(context,"tenant_role_template_assigned",{targetUserId:data.userId,templateId:r.id});
  return {ok:true};
 });
