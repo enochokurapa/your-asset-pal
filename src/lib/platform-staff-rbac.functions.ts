@@ -55,7 +55,7 @@ export const createPlatformStaffUser=createServerFn({method:"POST"})
    const {rows:[profile]}=await db.query(
     "SELECT id,tenant_id,is_saas_admin FROM public.profiles WHERE id=$1 FOR UPDATE",[userId]);
    if(!profile||profile.tenant_id||profile.is_saas_admin)throw Error("Cannot assign platform role to a business account");
-   await db.query("UPDATE public.profiles SET full_name=$1,is_active=TRUE,is_saas_admin=FALSE WHERE id=$2",[data.name,userId]);
+   await db.query("UPDATE public.profiles SET full_name=$1,is_active=TRUE,is_saas_admin=FALSE,must_change_password=TRUE WHERE id=$2",[data.name,userId]);
    await db.query("INSERT INTO public.platform_staff_memberships(user_id,role,assigned_by) VALUES($1,$2,$3)",[userId,data.role,context.userId]);
    await db.query("INSERT INTO public.platform_staff_role_audit(actor_id,target_id,event,new_role,reason) VALUES($1,$2,'staff_created',$3,$4)",
     [context.userId,userId,data.role,data.reason]);
