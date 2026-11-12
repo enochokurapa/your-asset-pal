@@ -21,6 +21,7 @@ function PlatformAdminManagement(){
  const [target,setTarget]=useState<any>(null);
  const [reason,setReason]=useState("");
  const [confirmEmail,setConfirmEmail]=useState("");
+ const [transferFromBusiness,setTransferFromBusiness]=useState(false);
  const [working,setWorking]=useState(false);
  const call=async(fn:any,data?:any)=>fn({headers:await getServerAuthHeaders(),...(data?{data}:{})});
  const admins=useQuery({queryKey:["platform-admins"],queryFn:()=>call(list)});
@@ -30,9 +31,9 @@ function PlatformAdminManagement(){
   if(!target)return;
   setWorking(true);
   try{
-   await call(changeFn,{targetUserId:target.id,makeAdmin:!target.is_saas_admin,reason,confirmEmail});
+   await call(changeFn,{targetUserId:target.id,makeAdmin:!target.is_saas_admin,reason,confirmEmail,transferFromBusiness});
    toast.success("SaaS Admin membership updated and audited");
-   setTarget(null);setReason("");setConfirmEmail("");setMatches([]);
+   setTarget(null);setReason("");setConfirmEmail("");setTransferFromBusiness(false);setMatches([]);
    await Promise.all([qc.invalidateQueries({queryKey:["platform-admins"]}),qc.invalidateQueries({queryKey:["platform-admin-role-audit"]})]);
   }catch(e:any){toast.error(e.message||"Role change blocked")}finally{setWorking(false)}
  }
@@ -49,14 +50,14 @@ function PlatformAdminManagement(){
     <Button variant="outline" disabled={working||search.length<3} onClick={lookup}>Search</Button></div>
    {matches.map(u=><div key={u.id} className="flex flex-wrap justify-between gap-2 border-b py-2 text-sm">
       <div><p>{u.full_name||"Account"}</p><p className="text-xs text-muted-foreground">{u.email} {u.tenant_id?"· Business account":""} {u.is_saas_admin?"· SaaS Admin":""}</p></div>
-      <Button size="sm" variant="outline" onClick={()=>{setTarget(u);setConfirmEmail("");setReason("");}}>{u.is_saas_admin?"Choose to remove":"Choose to promote"}</Button>
+      <Button size="sm" variant="outline" onClick={()=>{setTarget(u);setConfirmEmail("");setReason("");setTransferFromBusiness(false);}}>{u.is_saas_admin?"Choose to remove":"Choose to promote"}</Button>
     </div>)}
    {target&&<div className="space-y-3 rounded-md border p-4">
     <p className="font-medium">{target.is_saas_admin?"Remove SaaS Admin access":"Grant SaaS Admin access"}: {target.email}</p>
-    {target.tenant_id&&<p className="text-sm text-destructive">This is a business account and cannot be promoted directly. Use a platform-only account instead.</p>}
+    {target.tenant_id&&!target.is_saas_admin&&<div className="space-y-2 rounded-md border p-3 text-sm"><p className="text-destructive">This account belongs to a customer business. Promotion will remove its business membership and tenant roles. The business must have another active business administrator.</p><label className="flex items-center gap-2"><input type="checkbox" checked={transferFromBusiness} onChange={e=>setTransferFromBusiness(e.target.checked)}/> I authorize transferring this account away from its business.</label></div>}
     <div className="space-y-1"><Label htmlFor="role-confirm">Enter exact email to confirm</Label><Input id="role-confirm" value={confirmEmail} onChange={e=>setConfirmEmail(e.target.value)} autoComplete="off"/></div>
     <div className="space-y-1"><Label htmlFor="role-reason">Reason (at least 15 characters)</Label><Input id="role-reason" value={reason} onChange={e=>setReason(e.target.value)} maxLength={1000}/></div>
-    <Button disabled={working||(!target.is_saas_admin&&!!target.tenant_id)||confirmEmail.trim().toLowerCase()!==target.email?.toLowerCase()||reason.trim().length<15} onClick={save}>Confirm and audit change</Button>
+    <Button disabled={working||(!target.is_saas_admin&&!!target.tenant_id&&!transferFromBusiness)||confirmEmail.trim().toLowerCase()!==target.email?.toLowerCase()||reason.trim().length<15} onClick={save}>Confirm and audit change</Button>
    </div>}
   </Card>
   <Card className="space-y-2 p-5"><h2 className="font-semibold">Role change history</h2>
