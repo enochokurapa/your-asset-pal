@@ -81,3 +81,21 @@ END $$;
 DROP TRIGGER IF EXISTS audit_platform_support_changes ON public.audit_log;
 CREATE TRIGGER audit_platform_support_changes AFTER INSERT ON public.audit_log
  FOR EACH ROW EXECUTE FUNCTION public.audit_platform_support_change();
+
+-- Called only by the SaaS Admin while support mode is active.
+CREATE OR REPLACE FUNCTION public.end_current_platform_support_session()
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE sid uuid; tid uuid;
+BEGIN
+ sid:=public.current_platform_support_session_id();
+ IF sid IS NULL THEN RETURN FALSE; END IF;
+ UPDATE public.platform_tenant_access_sessions SET ended_at=now()
+ WHERE id=sid AND administrator_id=auth.uid() AND ended_at IS NULL
+ RETURNING tenant_id INTO tid;
+ IF tid IS NULL THEN RETURN FALSE; END IF;
+ INSERT INTO public.platform_tenant_access_audit(session_id,tenant_id,actor_id,action)
+ VALUES(sid,tid,auth.uid(),'original_tenant_portal_exited');
+ RETURN TRUE;
+END $$;
+REVOKE ALL ON FUNCTION public.end_current_platform_support_session() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.end_current_platform_support_session() TO authenticated;
