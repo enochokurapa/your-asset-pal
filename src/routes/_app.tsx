@@ -73,7 +73,7 @@ const saasAdminNav: NavItem[] = [
 
 function AppLayout() {
   const {
-    user, loading, signOut, isAdmin, isTenantAdmin, isSaasAdmin, roles, canView, isPaidFeature, isAddOnFeature,
+    user, loading, signOut, isAdmin, isTenantAdmin, isSaasAdmin, platformStaffRole, roles, canView, isPaidFeature, isAddOnFeature,
     mustChangePassword, canExportReports, subscriptionStatus, trialEndsAt, tenantId, tenantName,
   } = useAuth();
   const [open, setOpen] = useState(false);
@@ -142,6 +142,7 @@ function AppLayout() {
   if (!mfaChecked) return <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"/></div>;
   if (mfaRequired) return <Navigate to="/mfa" />;
   if (mustChangePassword) return <Navigate to="/welcome" />;
+  if (platformStaffRole && !isSaasAdmin) return <Navigate to="/platform-workspace" />;
 
   const isSaasControlRoute =
     pathname === "/dashboard" ||
