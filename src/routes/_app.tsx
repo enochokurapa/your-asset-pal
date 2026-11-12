@@ -45,6 +45,7 @@ const tenantNav: NavItem[] = [
   { to: "/audit", label: "Audit Trail", icon: History, module: "audit" },
   { to: "/builders", label: "Builders", icon: SlidersHorizontal, tenantAdminOnly: true },
   { to: "/settings", label: "Settings", icon: Settings, module: "settings", tenantAdminOnly: true },
+  { to: "/support-requests", label: "Platform Support Requests", icon: ShieldCheck, tenantAdminOnly: true },
   { to: "/billing", label: "Plan & Billing", icon: CreditCard, tenantAdminOnly: true },
   { to: "/profile", label: "My profile", icon: UserCircle },
 ];
@@ -65,6 +66,9 @@ const saasAdminNav: NavItem[] = [
   { to: "/saas-admin/social-links", label: "Social Media & WhatsApp", icon: Globe2 },
   { to: "/saas-admin/organizations", label: "Businesses", icon: Building2 },
   { to: "/saas-admin/user-activity", label: "User Accounts", icon: Users },
+  { to: "/saas-admin/support-access", label: "Support Access", icon: ShieldCheck },
+  { to: "/saas-admin/support-records", label: "Support Record Changes", icon: Wrench },
+  { to: "/saas-admin/administrators", label: "SaaS Administrators", icon: LockKeyhole },
   { to: "/saas-admin/partners", label: "Partners", icon: Building2 },
   { to: "/saas-admin/settings", label: "Settings", icon: Settings },
   { to: "/profile", label: "My profile", icon: UserCircle },
