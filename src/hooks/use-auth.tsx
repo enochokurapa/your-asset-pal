@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import {resumePlatformBusinessSession} from "@/lib/platform-business-dashboard.functions";
 import type { Session, User } from "@supabase/supabase-js";
 
 export type AppRole = "admin" | "manager" | "staff" | "security";
@@ -154,13 +155,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const rs = (Array.isArray(r)?r:[]).map((x: any) => x.role as AppRole);
       const isPlatformAdmin=prof?.is_saas_admin===true;
       let support: {tenantId?:string;tenantName?:string;expiresAt?:string}|null=null;
-      if (isPlatformAdmin && typeof window!=="undefined" &&
-          window.sessionStorage.getItem("af-platform-tenant-session")) {
-        const {data,error}=await supabase.rpc("current_platform_support_context" as any);
-        if (!error && data && typeof data==="object" && (data as any).tenantId) {
-          support=data as typeof support;
-        } else {
-          window.sessionStorage.removeItem("af-platform-tenant-session");
+      if (isPlatformAdmin && typeof window!=="undefined") {
+        const sessionId=window.sessionStorage.getItem("af-platform-tenant-session");
+        if(sessionId){
+          try {
+            const auth=(await supabase.auth.getSession()).data.session;
+            if(!auth?.access_token)throw Error("No active login session");
+            support=await resumePlatformBusinessSession({
+              headers:{Authorization:`Bearer ${auth.access_token}`,
+                "x-assetflow-support-session":sessionId},
+              data:{sessionId},
+            });
+          } catch(error) {
+            console.warn("[Support] Unable to load business session",error);
+            window.sessionStorage.removeItem("af-platform-tenant-session");
+          }
         }
       }
       const supporting=!!support?.tenantId;
