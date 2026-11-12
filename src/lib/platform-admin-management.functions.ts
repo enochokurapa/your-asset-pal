@@ -34,7 +34,7 @@ export const changePlatformAdministrator=createServerFn({method:"POST"})
  .middleware([requireSupabaseAuth])
  .inputValidator(input=>z.object({
    targetUserId:uuid,makeAdmin:z.boolean(),reason,
-   confirmEmail:z.string().email().max(254),
+   confirmEmail:z.string().email().max(254), transferFromBusiness:z.boolean().default(false),
  }).parse(input))
  .handler(async({context,data})=>{
   if(context.userId===data.targetUserId)throw Error("You cannot change your own SaaS Admin privileges");
@@ -56,15 +56,28 @@ export const changePlatformAdministrator=createServerFn({method:"POST"})
      "SELECT COUNT(*)::int active_count FROM public.profiles WHERE is_active=TRUE AND is_saas_admin=TRUE");
    if(data.makeAdmin && counts.active_count>=3)throw Error("Maximum of three active SaaS Administrators");
    if(!data.makeAdmin && counts.active_count<=1)throw Error("The last SaaS Administrator cannot be removed");
-   if(data.makeAdmin && target.tenant_id)
-     throw Error("This user belongs to a business. Use a separate platform-only account to avoid changing business ownership or membership.");
-   await client.query("UPDATE public.profiles SET is_saas_admin=$1 WHERE id=$2",
-      [data.makeAdmin,data.targetUserId]);
+   if(data.makeAdmin && target.tenant_id){
+     if(!data.transferFromBusiness)throw Error("Confirm explicitly that this user must leave their existing business");
+     if(target.tenant_role==="tenant_admin"){
+       const {rows:[other]}=await client.query(
+         "SELECT COUNT(*)::int AS total FROM public.profiles WHERE tenant_id=$1 AND tenant_role='tenant_admin' AND is_active=TRUE AND id<>$2",
+         [target.tenant_id,data.targetUserId]);
+       if(!other?.total)throw Error("A business must retain at least one other active administrator before transferring this account");
+     }
+     // Strip legacy tenant-scoped roles before transferring to platform-only identity.
+     await client.query("DELETE FROM public.user_roles WHERE user_id=$1",[data.targetUserId]);
+     await client.query(
+       "UPDATE public.profiles SET tenant_id=NULL,tenant_role='member',is_saas_admin=TRUE WHERE id=$1",
+       [data.targetUserId]);
+   }else{
+     await client.query("UPDATE public.profiles SET is_saas_admin=$1 WHERE id=$2",
+       [data.makeAdmin,data.targetUserId]);
+   }
    await client.query(
      "INSERT INTO public.platform_admin_membership_audit (actor_id,target_user_id,action,previous_state,new_state,reason) VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,$6)",[
       context.userId,data.targetUserId,data.makeAdmin?"promote":"demote",
-      JSON.stringify({is_saas_admin:target.is_saas_admin}),
-      JSON.stringify({is_saas_admin:data.makeAdmin}),data.reason,
+      JSON.stringify({is_saas_admin:target.is_saas_admin,tenant_id:target.tenant_id,tenant_role:target.tenant_role}),
+      JSON.stringify({is_saas_admin:data.makeAdmin,tenant_id:data.makeAdmin&&data.transferFromBusiness?null:target.tenant_id,tenant_role:data.makeAdmin&&data.transferFromBusiness?"member":target.tenant_role}),data.reason,
      ]);
    await client.query("COMMIT");
    return {ok:true,userId:data.targetUserId,isSaasAdmin:data.makeAdmin};
