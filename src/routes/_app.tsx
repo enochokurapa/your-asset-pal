@@ -169,7 +169,7 @@ function AppLayout() {
   if (!mfaChecked) return <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"/></div>;
   if (mfaRequired) return <Navigate to="/mfa" />;
   if (mustChangePassword) return <Navigate to="/welcome" />;
-  if (platformStaffRole && !platformControl) return <Navigate to="/platform-workspace" />;
+  if (platformStaffRole && !isSaasAdmin) return <Navigate to="/platform-workspace" />;
 
   const isSaasControlRoute =
     pathname === "/dashboard" ||
@@ -205,7 +205,7 @@ function AppLayout() {
   const lockedPaidFeature = currentModuleItem?.module && (isPaidFeature(currentModuleItem.module) || isAddOnFeature(currentModuleItem.module))
     ? {item:currentModuleItem,type:isAddOnFeature(currentModuleItem.module)?"add_on":"paid"}
     : null;
-  const workspaceLocked = !platformControl && (subscriptionStatus==="expired"||subscriptionStatus==="suspended") && !pathname.startsWith("/billing") && !pathname.startsWith("/profile") && pathname!=="/dashboard" && pathname!=="/integrations" && pathname!=="/live-tracking";
+  const workspaceLocked = !platformControl && !supportMode && (subscriptionStatus==="expired"||subscriptionStatus==="suspended") && !pathname.startsWith("/billing") && !pathname.startsWith("/profile") && pathname!=="/dashboard" && pathname!=="/integrations" && pathname!=="/live-tracking";
 
   const trialDaysLeft = trialEndsAt
     ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000))
@@ -392,7 +392,7 @@ function AppLayout() {
           <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setOpen(true)} aria-label="Open menu"><Menu className="h-5 w-5" /></Button>
           {platformControl && <div className="hidden text-sm font-medium text-foreground sm:block">AssetFlow 360 · SaaS Control Center</div>}
           <div className="flex-1" />
-          {!platformControl && subscriptionStatus === "trial" && isTenantAdmin && (
+          {!platformControl && !supportMode && subscriptionStatus === "trial" && isTenantAdmin && (
             <Button asChild variant="outline" size="sm" className="hidden gap-1.5 border-primary/20 bg-primary/5 text-xs font-semibold text-primary hover:bg-primary/10 sm:inline-flex">
               <Link to="/billing">Trial · {trialDaysLeft ?? "-"} days left</Link>
             </Button>
@@ -413,7 +413,7 @@ function AppLayout() {
               {isTenantAdmin && <Button asChild size="sm"><Link to="/billing">Upgrade</Link></Button>}
             </div>
           )}
-          {!platformControl && (subscriptionStatus === "expired" || subscriptionStatus === "suspended") && !pathname.startsWith("/billing") && (
+          {!platformControl && !supportMode && (subscriptionStatus === "expired" || subscriptionStatus === "suspended") && !pathname.startsWith("/billing") && (
             <div className="mb-5 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
               <strong>{subscriptionStatus === "expired" ? "Trial/subscription expired." : "Workspace suspended."}</strong> Features remain visible but are locked until the workspace is reactivated.{isTenantAdmin && <> <Link to="/billing" className="font-semibold text-primary underline">Open billing</Link>.</>}
             </div>
