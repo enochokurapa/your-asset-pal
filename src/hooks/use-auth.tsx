@@ -61,6 +61,7 @@ interface AuthCtx {
   isAdmin: boolean;
   isTenantAdmin: boolean;
   isSaasAdmin: boolean;
+  supportMode: boolean;
   platformStaffRole: string | null;
   isManager: boolean;
   tenantId: string | null;
@@ -95,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [isActive, setIsActive] = useState(true);
   const [isSaasAdmin, setIsSaasAdmin] = useState(false);
+  const [supportMode,setSupportMode]=useState(false);
   const [platformStaffRole,setPlatformStaffRole]=useState<string|null>(null);
   const [tenantRole, setTenantRole] = useState<"tenant_admin" | "member">("member");
   const [tenantId, setTenantId] = useState<string | null>(null);
@@ -126,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const resetMetadata = () => {
     setRoles([]); setPermissions(new Set()); setApprovalRights(new Set());
     setActionRights(new Set()); setBranchScope(null); setMustChangePassword(false);
-    setIsActive(true); setIsSaasAdmin(false); setPlatformStaffRole(null); setTenantRole("member");
+    setIsActive(true); setIsSaasAdmin(false); setSupportMode(false); setPlatformStaffRole(null); setTenantRole("member");
     setTenantId(null); setTenantName(null); setSubscriptionStatus("unknown");
     setTrialEndsAt(null); setSubscriptionEndsAt(null); setEnabledModules(new Set(ALL_MODULES));
     setPaidOnlyModules(new Set()); setAddOnModules(new Set());
@@ -150,26 +152,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const br = brRes.status === "fulfilled" ? brRes.value.data : null;
       const prof: any = profRes.status === "fulfilled" ? profRes.value.data : null;
       const rs = (Array.isArray(r)?r:[]).map((x: any) => x.role as AppRole);
+      const isPlatformAdmin=prof?.is_saas_admin===true;
+      let support: {tenantId?:string;tenantName?:string;expiresAt?:string}|null=null;
+      if (isPlatformAdmin && typeof window!=="undefined" &&
+          window.sessionStorage.getItem("af-platform-tenant-session")) {
+        const {data,error}=await supabase.rpc("current_platform_support_context" as any);
+        if (!error && data && typeof data==="object" && (data as any).tenantId) {
+          support=data as typeof support;
+        } else {
+          window.sessionStorage.removeItem("af-platform-tenant-session");
+        }
+      }
+      const supporting=!!support?.tenantId;
+      const effectiveTenant= support?.tenantId ?? prof?.tenant_id ?? null;
+      setSupportMode(supporting);
 
-      setRoles(rs);
+      setRoles(supporting?["admin"]:rs);
       setPermissions(new Set((Array.isArray(p)?p:[]).filter((x: any) => x.can_view).map((x: any) => x.module as ModuleKey)));
       setApprovalRights(new Set((Array.isArray(a)?a:[]).map((x: any) => x.approval_kind as ApprovalKind)));
       setActionRights(new Set((Array.isArray(act)?act:[]).map((x: any) => x.action_kind as ActionKind)));
       const brList = (Array.isArray(br)?br:[]).map((x: any) => x.branch_id as string);
-      setBranchScope(rs.includes("admin") || brList.length === 0 ? null : new Set(brList));
+      setBranchScope(supporting || rs.includes("admin") || brList.length === 0 ? null : new Set(brList));
       setMustChangePassword(Boolean(prof?.must_change_password));
       setIsActive(prof?.is_active !== false);
       setIsSaasAdmin(Boolean(prof?.is_saas_admin));
       const {data:staffRole,error:staffError}=await supabase.rpc("my_platform_staff_role" as any);
       setPlatformStaffRole(staffError?null:(typeof staffRole==="string"?staffRole:null));
-      setTenantRole(prof?.tenant_role === "tenant_admin" ? "tenant_admin" : "member");
-      setTenantId(prof?.tenant_id ?? null);
+      setTenantRole(supporting || prof?.tenant_role === "tenant_admin" ? "tenant_admin" : "member");
+      setTenantId(effectiveTenant);
 
-      if (prof?.tenant_id) {
+      if (effectiveTenant) {
         const [{ data: tenant }, { data: modules }, { data: overrides },{data: pricingPlans}] = await Promise.all([
-          (supabase as any).from("tenants").select("name,subscription_status,trial_ends_at,subscription_ends_at,plan_code").eq("id", prof.tenant_id).maybeSingle(),
+          (supabase as any).from("tenants").select("name,subscription_status,trial_ends_at,subscription_ends_at,plan_code").eq("id", effectiveTenant).maybeSingle(),
           (supabase as any).from("saas_modules").select("module_key,globally_enabled,trial_enabled,paid_enabled,billing_model").order("sort_order"),
-          (supabase as any).from("tenant_module_overrides").select("module_key,enabled").eq("tenant_id", prof.tenant_id),
+          (supabase as any).from("tenant_module_overrides").select("module_key,enabled").eq("tenant_id", effectiveTenant),
           (supabase as any).from("saas_pricing_plans").select("id,enabled_modules").eq("is_published",true),
         ]);
         if (tenant) {
@@ -251,7 +267,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value: AuthCtx = {
     user: session?.user ?? null, session, roles, permissions, approvalRights, actionRights, branchScope,
-    loading, mustChangePassword, isActive, isAdmin, isTenantAdmin, isSaasAdmin, platformStaffRole, isManager,
+    loading, mustChangePassword, isActive, isAdmin, isTenantAdmin, isSaasAdmin, supportMode, platformStaffRole, isManager,
     tenantId, tenantName, subscriptionStatus, trialEndsAt, subscriptionEndsAt, enabledModules, paidOnlyModules, addOnModules,
     canExportReports: subscriptionStatus === "active",
     canUseCustomDomain: subscriptionStatus === "active",
