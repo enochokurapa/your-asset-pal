@@ -32,7 +32,7 @@ export const Route = createFileRoute("/_app/users")({ component: UsersPage });
 const ROLES: AppRole[] = ["admin", "manager", "staff", "security"];
 
 function UsersPage() {
-  const { isTenantAdmin, isSaasAdmin, supportMode, loading, user: me } = useAuth();
+  const { isTenantAdmin, isSaasAdmin, supportMode, tenantId, loading, user: me } = useAuth();
   const platformControl = isSaasAdmin && !supportMode;
   const getAuthHeaders = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -52,7 +52,7 @@ function UsersPage() {
   const [roleActions,setRoleActions]=useState<string[]>([]);
   const [roleApprovals,setRoleApprovals]=useState<string[]>([]);
   const [roleSaving,setRoleSaving]=useState(false);
-  const roleList=useQuery({queryKey:["tenant-role-templates"],enabled:isTenantAdmin&&!platformControl,
+  const roleList=useQuery({queryKey:["tenant-role-templates",tenantId],enabled:isTenantAdmin&&!platformControl,
     queryFn:async()=>roleListFn({headers:await getAuthHeaders()})});
   const editRole=(role?:any)=>{setRoleId(role?.id??null);setRoleName(role?.name??"");setRoleDescription(role?.description??"");
     setRoleBase(role?.base_role??"staff");setRoleModules(role?.modules??["dashboard","assets"]);
@@ -87,7 +87,7 @@ function UsersPage() {
     catch(e:any){toast.error(e?.message||"Could not assign role");}
   };
   const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["users-with-roles"] });
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["users-with-roles",tenantId] });
   const [userSearch,setUserSearch]=useState("");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ email: "", password: "", full_name: "", role: "staff" as AppRole });
@@ -105,7 +105,7 @@ function UsersPage() {
 
 
   const { data: branchesAll = [] } = useQuery({
-    queryKey: ["branches-all-for-perms"],
+    queryKey: ["branches-all-for-perms",tenantId],
     enabled: isTenantAdmin && !platformControl,
     queryFn: async () => (await supabase.from("branches").select("id,name,code").order("name")).data ?? [],
   });
@@ -114,13 +114,21 @@ function UsersPage() {
     queryKey: ["users-with-roles"],
     enabled: isTenantAdmin && !platformControl,
     queryFn: async () => {
-      const [{ data: profiles }, { data: roles }, { data: perms }, { data: rights }, { data: acts }, { data: brs }] = await Promise.all([
-        supabase.from("profiles").select("*").eq("is_saas_admin", false).order("created_at", { ascending: false }),
-        supabase.from("user_roles").select("user_id, role"),
-        supabase.from("user_permissions" as any).select("user_id, module, can_view"),
-        supabase.from("user_approval_rights" as any).select("user_id, approval_kind"),
-        supabase.from("user_action_rights" as any).select("user_id, action_kind"),
-        supabase.from("user_branch_access" as any).select("user_id, branch_id"),
+      if(!tenantId) return [];
+      // This view must always query exactly one business. A SaaS Admin may have
+      // platform-wide profile read rights, so RLS alone cannot scope this page.
+      const {data:profiles,error:profileError}=await supabase.from("profiles")
+        .select("*").eq("is_saas_admin",false).eq("tenant_id",tenantId)
+        .order("created_at",{ascending:false});
+      if(profileError)throw new Error(profileError.message);
+      const userIds=(profiles??[]).map(p=>p.id);
+      if(!userIds.length)return [];
+      const [{data:roles},{data:perms},{data:rights},{data:acts},{data:brs}]=await Promise.all([
+        supabase.from("user_roles").select("user_id, role").in("user_id",userIds),
+        supabase.from("user_permissions" as any).select("user_id, module, can_view").in("user_id",userIds),
+        supabase.from("user_approval_rights" as any).select("user_id, approval_kind").in("user_id",userIds),
+        supabase.from("user_action_rights" as any).select("user_id, action_kind").in("user_id",userIds),
+        supabase.from("user_branch_access" as any).select("user_id, branch_id").in("user_id",userIds),
       ]);
       return (profiles ?? []).map((p) => ({
         ...p,
