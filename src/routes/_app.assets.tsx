@@ -373,7 +373,9 @@ function AssetsPage() {
     nav({ to: "/assets", search: {} as any, replace: true });
   };
 
-  const openNew = async () => { setAssetPhoto(null);setInspectedOnEntry(false);setInspectionCondition("");setInspectionNotes("");const result=await refreshRegisterCatalog();if(result.error||!result.data){toast.error("Cannot load your company register. Try again.");return;}const preferred=result.data.primaryId??"default";if(preferred!=="default"&&!result.data.definitions.some((d:any)=>d.id===preferred)){toast.error("Your active register is unavailable. Please contact your administrator.");return;}setRegisterChoice(preferred);setCustomValues({});setForm({...empty,branch_id:visibleBranches.length===1?visibleBranches[0].id:null});setWizardStep(0);setFinancialOpen(false);setOpen(true); };
+  const openNew = async () => { setAssetPhoto(null);
+    const canVerifyNow=canDo("perform_verification")&&Boolean(user?.id);
+    setInspectedOnEntry(canVerifyNow);setInspectionCondition(canVerifyNow?"good":"");setInspectionNotes("");const result=await refreshRegisterCatalog();if(result.error||!result.data){toast.error("Cannot load your company register. Try again.");return;}const preferred=result.data.primaryId??"default";if(preferred!=="default"&&!result.data.definitions.some((d:any)=>d.id===preferred)){toast.error("Your active register is unavailable. Please contact your administrator.");return;}setRegisterChoice(preferred);setCustomValues({});setForm({...empty,branch_id:visibleBranches.length===1?visibleBranches[0].id:null});setWizardStep(0);setFinancialOpen(false);setOpen(true); };
   const openEdit = (a: any) => {
     setAssetPhoto(null);
     setRegisterChoice(a.register_definition_id??"default");
@@ -640,7 +642,8 @@ function AssetsPage() {
       }
       if (!form.id && saveAndNext) {
         setAssetPhoto(null);
-        setInspectedOnEntry(false);setInspectionCondition("");setInspectionNotes("");
+        const canVerifyNext=canDo("perform_verification")&&Boolean(user?.id);
+        setInspectedOnEntry(canVerifyNext);setInspectionCondition(canVerifyNext?"good":"");setInspectionNotes("");
         setCustomValues({});
         setForm((previous) => ({
           ...empty,
@@ -873,10 +876,15 @@ function AssetsPage() {
           <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) setWizardStep(0); }}>
             {canDo("perform_verification")&&<Button asChild variant="outline"><Link to="/verification" search={{section:"scan"}}><Check className="mr-2 h-4 w-4"/>Verify asset</Link></Button>}
             <Button className="bg-[#c77435] text-white hover:bg-[#aa602e]" onClick={openNew} disabled={registerCatalogPending}><Plus className="mr-2 h-4 w-4" /> {registerCatalogPending?"Loading register…":"New asset"}</Button>
-            <DialogContent className="flex max-h-[92vh] max-w-3xl flex-col overflow-hidden p-0">
-              <DialogHeader className="border-b px-5 pb-4 pt-5 sm:px-6">
-                {companyLogo && <div className="mb-2 flex justify-start"><img src={companyLogo} alt="Company logo" className="h-14 w-auto max-w-[210px] object-contain sm:h-16" /></div>}
-                <DialogTitle>{form.id ? "Edit asset" : "New asset"}</DialogTitle>
+            <DialogContent className="flex max-h-[96dvh] w-[calc(100vw-1rem)] max-w-3xl flex-col overflow-hidden rounded-xl p-0 sm:max-h-[92vh] sm:w-full sm:rounded-2xl">
+              <DialogHeader className="border-b px-3 pb-2 pt-3 sm:px-5 sm:pb-3 sm:pt-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  {companyLogo && <img src={companyLogo} alt="Organisation logo" className="h-9 w-14 shrink-0 object-contain sm:h-11 sm:w-20" />}
+                  <div className="min-w-0 flex-1 text-left">
+                    <DialogTitle className="text-base font-semibold sm:text-lg">{form.id ? "Edit asset" : "New asset"}</DialogTitle>
+                    <p className="truncate text-xs text-muted-foreground">Register: {registerChoice==="default"?"System Asset Register":registers.find(r=>r.id===registerChoice)?.name||"Custom register"}</p>
+                  </div>
+                </div>
                 <p className="text-xs text-muted-foreground">Register: <strong className="text-foreground">{displayedRegisterName}</strong> {form.id?"· Existing asset": "· Active for new entries"}</p>
                 <DialogDescription className="sm:hidden">Step {registerChoice==="default"?wizardStep+1:customStepOrder.indexOf(wizardStep)+1} of {displayedSteps.length} · {wizardSteps[wizardStep].title}</DialogDescription>
 
@@ -1155,7 +1163,7 @@ function AssetsPage() {
                     {!form.id&&<div className="space-y-2 rounded-xl border border-[#dce7e9] bg-[#f7fafb] p-3">
                       <label className="flex items-start gap-3 text-sm">
                         <input type="checkbox" className="mt-1 h-4 w-4" checked={inspectedOnEntry} disabled={!canDo("perform_verification")||!user?.id} onChange={e=>{setInspectedOnEntry(e.target.checked);setInspectionCondition("");setInspectionNotes("");}}/>
-                        <span><strong>Physically inspected this asset now</strong><span className="mt-1 block text-xs text-muted-foreground">Optional. Check only after seeing the actual asset and confirming its tag, serial, condition, and location. This creates a dated verification under your account.</span></span>
+                        <span><strong>Verified during capture</strong><span className="mt-1 block text-xs text-muted-foreground">Checked by default for authorized field staff. Uncheck if the physical asset has not been inspected. Confirm its tag, serial and condition, and location. This creates a dated verification under your account.</span></span>
                       </label>
                       {inspectedOnEntry&&<div className="grid gap-2 sm:grid-cols-2">
                         <div className="space-y-1"><Label>Observed condition *</Label>

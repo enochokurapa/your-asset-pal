@@ -30,6 +30,21 @@ jobs:
         run: bun run scripts/test-activation-receipt.ts
       - name: Verify A3 and A4 reports keep all columns together
         run: bun run scripts/test-report-paper.ts
+      - name: Stamp PWA service worker with the release revision
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          python3 - <<'PYCODE'
+          from pathlib import Path
+          import os
+          p=Path("public/sw.js")
+          s=p.read_text()
+          s=s.replace('const CACHE_NAME = "assetflow-pwa-v4";',
+                      'const CACHE_NAME = "assetflow-pwa-"+'+repr(os.environ["RELEASE_SHA"][:12])+';')
+          p.write_text(s)
+          PYCODE
+      - name: Test asset lifecycle verification status
+        run: bun run scripts/test-verification-group.ts
       - name: Build application
         run: bun run build
       - name: Upload compiled production bundle

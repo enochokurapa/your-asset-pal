@@ -18,15 +18,35 @@ export function InstallPwaPrompt() {
   const [showIOSModal, setShowIOSModal] = useState<boolean>(false);
   const [isStandalone, setIsStandalone] = useState<boolean>(false);
   const [installed, setInstalled] = useState<boolean>(false);
+  const [updateReady,setUpdateReady]=useState(false);
 
   useEffect(() => {
     if (!user) return;
 
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("/sw.js", { updateViaCache: "none" })
-        .then((reg) => reg.update().catch(() => undefined))
-        .catch((err) => console.warn("[PWA] Service Worker registration failed:", err));
+      let originalController=Boolean(navigator.serviceWorker.controller);
+      const changed=()=>{
+        if(originalController)setUpdateReady(true);
+        originalController=true;
+      };
+      navigator.serviceWorker.addEventListener("controllerchange",changed);
+      navigator.serviceWorker.register("/sw.js",{updateViaCache:"none"})
+        .then(reg=>{
+          const listen=(worker:ServiceWorker|null)=>{
+            if(!worker)return;
+            worker.addEventListener("statechange",()=>{
+              if(worker.state==="installed"&&navigator.serviceWorker.controller)
+                setUpdateReady(true);
+            });
+          };
+          if(reg.waiting&&navigator.serviceWorker.controller)setUpdateReady(true);
+          reg.addEventListener("updatefound",()=>listen(reg.installing));
+          void reg.update().catch(()=>undefined);
+          const onVisible=()=>{if(document.visibilityState==="visible")void reg.update().catch(()=>undefined)};
+          document.addEventListener("visibilitychange",onVisible);
+          return ()=>document.removeEventListener("visibilitychange",onVisible);
+        })
+        .catch(err=>console.warn("[PWA] Service Worker registration failed:",err));
     }
 
     const standalone =
@@ -100,17 +120,22 @@ export function InstallPwaPrompt() {
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    // Dismiss for 7 days
-    const next7Days = Date.now() + 7 * 24 * 60 * 60 * 1000;
-    localStorage.setItem("af_pwa_dismissed_until", String(next7Days));
+    // Respect the choice for 24 hours, then offer installation again when eligible.
+    const nextDay = Date.now() + 24 * 60 * 60 * 1000;
+    localStorage.setItem("af_pwa_dismissed_until", String(nextDay));
   };
-
-  if (isStandalone || installed) return null;
 
   return (
     <>
-      {/* Floating Install Prompt Banner / Bottom Sheet */}
-      {showPrompt && (deferredPrompt || isIOS) && (
+      {updateReady&&<div role="status" className="fixed bottom-4 left-4 right-4 z-[60] mx-auto max-w-md rounded-xl border border-indigo-200 bg-white p-4 shadow-xl">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0"><p className="text-sm font-semibold text-slate-900">AssetFlow360 update available</p>
+          <p className="text-xs text-slate-600">Load the latest improvements without losing saved records.</p></div>
+          <Button size="sm" onClick={()=>window.location.reload()}>Update</Button>
+        </div>
+      </div>}
+      {/* Offer installation only where the browser provides a supported install flow. */}
+      {!updateReady&&!isStandalone&&!installed&&showPrompt && (deferredPrompt || isIOS) && (
         <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md animate-in fade-in slide-in-from-bottom-6 duration-300 md:bottom-6 md:left-auto md:right-6">
           <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-background/95 p-4 shadow-2xl backdrop-blur-md dark:border-border/50">
             {/* Header accent gradient bar */}

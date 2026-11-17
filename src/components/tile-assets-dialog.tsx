@@ -91,7 +91,7 @@ export function TileAssetsDialog({
         _pending_retirement: pendingRet.has(row.id),
         _pending_repair: pendingRep.has(row.id),
         _parked: row.set_for_disposal || pendingRet.has(row.id) || pendingRep.has(row.id),
-        verification_group:verificationGroup(bySchedule.get(row.id)),
+        verification_group:verificationGroup(bySchedule.get(row.id),latestHistory.get(row.id)),
         ...assetReportAudit(row,latestHistory.get(row.id),label),
         _gate_pending:pendingGate.has(row.id),
         _gate_outside:outsideGate.has(row.id),

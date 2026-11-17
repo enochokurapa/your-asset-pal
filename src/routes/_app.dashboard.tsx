@@ -42,7 +42,7 @@ function TenantDashboard() {
     queryKey: ["dashboard-stats", scopeKey, selectedBranch],
 
     queryFn: async () => {
-      const [assets, cats, locs, branches, pending, gatePasses, verifs] = await Promise.all([
+      const [assets, cats, locs, branches, pending, gatePasses, verifs, history] = await Promise.all([
         supabase.from("assets").select("id,status,name,asset_tag,branch_id,location_id,geo_place_id,location_latitude,location_longitude,set_for_disposal,purchase_value,created_at, locations(name), geo_places!assets_geo_place_id_fkey(name,display_path)").order("created_at", { ascending: false }),
         supabase.from("categories").select("id", { count: "exact", head: true }),
         supabase.from("locations").select("id", { count: "exact", head: true }),
@@ -50,6 +50,7 @@ function TenantDashboard() {
         supabase.from("approval_requests").select("id,kind,asset_id,status,payload").eq("status", "pending"),
         (supabase as any).from("gate_passes").select("id,status,branch_id,asset_id").in("status", ["pending", "approved", "checked_out"]),
         (supabase as any).from("asset_verification_schedule").select("asset_id,branch_id,latest_verification_status,verification_state,verification_basis"),
+        (supabase as any).from("asset_verifications").select("asset_id,status,verified_at").order("verified_at",{ascending:false}).limit(1000),
       ]);
       const list = (assets.data ?? [])
         .filter((a: any) => canSeeBranch(a.branch_id))
@@ -93,9 +94,12 @@ function TenantDashboard() {
         canSeeBranch(v.branch_id) && (selectedBranch === "all" || v.branch_id === selectedBranch)
       );
       const scheduleById=new Map(vList.map((v:any)=>[v.asset_id,v]));
-      const verifiedCount=list.filter((a:any)=>verificationGroup(scheduleById.get(a.id))==="inspected").length;
-      const registeredCount=list.filter((a:any)=>verificationGroup(scheduleById.get(a.id))==="registered").length;
-      const attentionCount=list.filter((a:any)=>verificationGroup(scheduleById.get(a.id))==="attention").length;
+      const historyById=new Map<string,any>();
+      for(const item of history.data??[]){if(!historyById.has(item.asset_id))historyById.set(item.asset_id,item);}
+      const groupFor=(a:any)=>verificationGroup(scheduleById.get(a.id),historyById.get(a.id));
+      const verifiedCount=list.filter((a:any)=>groupFor(a)==="inspected").length;
+      const registeredCount=list.filter((a:any)=>groupFor(a)==="registered").length;
+      const attentionCount=list.filter((a:any)=>groupFor(a)==="attention").length;
       const mismatchedCount=list.filter((a:any)=>["mismatched","not_found"].includes(scheduleById.get(a.id)?.latest_verification_status)).length;
       const unverifiedCount=attentionCount-mismatchedCount;
 
