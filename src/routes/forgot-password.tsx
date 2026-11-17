@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { MailCheck, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { PlatformLogo } from "@/components/platform-logo";
+import { AuthPageFrame } from "@/components/auth-page-frame";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,5 +27,24 @@ function ForgotPassword() {
       setSent(true);
     }finally{setBusy(false);}
   };
-  return <main className="platform-brand af-auth-stage px-4 py-12"><div className="mx-auto max-w-md space-y-7"><section className="af-auth-card rounded-xl border bg-white p-7 shadow-sm"><div className="mb-5 flex flex-col items-center gap-3"><PlatformLogo variant="lockup" className="h-20 w-64"/><Link to="/login" className="inline-flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft className="h-4 w-4"/>Back to sign in</Link></div><div className="mb-5 flex justify-center text-primary"><MailCheck className="h-9 w-9"/></div><h1 className="text-center text-2xl font-semibold">{sent?"Check your email":"Reset your password"}</h1><p className="mt-2 text-center text-sm text-muted-foreground">{sent?"If an account exists for that address, a password reset link has been sent. Check spam too. Links expire.":"Enter your account email and we'll send a secure, time-limited reset link. Your existing password will never be emailed."}</p>{!sent&&<form onSubmit={submit} className="mt-7 space-y-4"><div className="space-y-2"><Label htmlFor="reset-email">Account email</Label><Input id="reset-email" autoComplete="email" type="email" value={email} onChange={e=>setEmail(e.target.value)} required placeholder="you@company.com"/></div>{error&&<p className="text-sm text-destructive">{error}</p>}<Button className="w-full" disabled={busy}>{busy?"Sending…":"Send reset link"}</Button></form>}{sent&&<Button variant="outline" className="mt-6 w-full" onClick={()=>setSent(false)}>Try another address</Button>}</section><p className="text-center text-sm text-muted-foreground">Forgot which email you registered with? Ask your organization's administrator to verify your account using your registered identity. For privacy, we do not reveal email addresses publicly.</p></div></main>;
+  return <AuthPageFrame backTo="/login" backLabel="Sign in">
+    <div className="mb-6">
+      <h1 className="text-2xl font-bold tracking-tight text-[#172554]">{sent?"Check your inbox":"Forgot password?"}</h1>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{sent?"If your email is registered, you will receive a secure reset link.":"Enter your account email to receive a reset link."}</p>
+    </div>
+    {!sent?<form onSubmit={submit} className="space-y-5">
+      <div className="space-y-2"><Label htmlFor="reset-email">Email address</Label>
+       <Input id="reset-email" className="h-11" autoComplete="email" type="email" value={email}
+        onChange={e=>setEmail(e.target.value)} required placeholder="you@company.com"/></div>
+      {error&&<p role="alert" className="text-sm text-red-700">{error}</p>}
+      <Button type="submit" className="h-11 w-full" disabled={busy}>{busy?"Sending…":"Send reset link"}</Button>
+    </form>:<div className="space-y-4">
+      <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-sm text-indigo-900">
+       <MailCheck className="mb-2 h-5 w-5"/>Check your inbox and spam folder.</div>
+      <Button type="button" variant="outline" className="h-11 w-full" onClick={()=>setSent(false)}>Use another email</Button>
+    </div>}
+    <p className="mt-6 border-t pt-5 text-center text-sm text-slate-600">
+      Remember your password? <Link to="/login" className="font-semibold text-indigo-700">Sign in</Link>
+    </p>
+  </AuthPageFrame>;
 }

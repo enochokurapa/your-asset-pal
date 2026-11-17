@@ -528,6 +528,21 @@ function AssetsPage() {
       )
     );
     if (dup) { setDupAsset(dup); setDupOpen(true); return; }
+    // Check the whole tenant, not only the currently loaded asset page.
+    // The database's unique constraint remains the final authority for races.
+    if(effectiveTag){
+      const {data:match,error:tagCheckError}=await supabase.from("assets")
+        .select("id,asset_tag,name").eq("tenant_id",tenantId!)
+        .ilike("asset_tag",effectiveTag).limit(5);
+      if(tagCheckError){toast.error("Could not check the asset tag. Please try again.");return;}
+      const already=(match||[]).find(item=>item.id!==form.id);
+      if(already){
+        toast.error("This asset tag is already registered.",{
+          description:"Use a different tag, or open the existing asset to update its details."
+        });
+        return;
+      }
+    }
 
     const payload: any = {
       register_definition_id:registerChoice==="default"?null:registerChoice,
@@ -587,7 +602,11 @@ function AssetsPage() {
       if (form.id) {
         const previous: any = (assets as any[]).find((a) => a.id === form.id);
         const { error } = await supabase.from("assets").update(payload).eq("id", form.id);
-        if (error) { toast.error(error.message); return; }
+        if (error) {
+          toast.error(error.code==="23505"?"This asset tag is already registered.":"Unable to update this asset.",{
+            description:error.code==="23505"?"Open the existing asset or choose a unique tag.":"Please check the details and try again."
+          });return;
+        }
         await saveAssetPhoto(form.id);
         const locationChanged =
           previous?.location_id !== form.location_id ||
@@ -599,7 +618,11 @@ function AssetsPage() {
       } else {
         const { data: created, error } = await supabase
           .from("assets").insert({ ...payload, created_by: user?.id ?? null }).select().single();
-        if (error || !created) { toast.error(error?.message ?? "Failed"); return; }
+        if (error || !created) {
+          toast.error(error?.code==="23505"?"This asset tag is already registered.":"Unable to save the asset.",{
+            description:error?.code==="23505"?"Choose a different tag, or open the existing asset to edit it.":"Please check the details and try again."
+          });return;
+        }
         await saveAssetPhoto(created.id);
         if (form.location_id || form.geo_place_id || (form.location_latitude && form.location_longitude)) {
           await recordLocationEvent(created.id, "registered", "Initial asset location recorded during registration.");
@@ -616,7 +639,7 @@ function AssetsPage() {
           });
           if(verificationError){
             toast.warning("Asset registered, but inspection was not recorded",{
-              description:"Use Verification → Scan & verify to finish the inspection. " + verificationError.message,
+              description:"Use Verification → Scan & verify to finish the inspection.",
             });
           }else toast.success("Asset registered and physically verified");
         }

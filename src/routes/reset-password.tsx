@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { KeyRound, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { PlatformLogo } from "@/components/platform-logo";
+import { AuthPageFrame } from "@/components/auth-page-frame";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,5 +38,33 @@ function ResetPassword(){
   await supabase.auth.signOut();
   setDone(true);setBusy(false);
  };
- return <main className="platform-brand af-auth-stage px-4 py-12"><div className="mx-auto max-w-md space-y-7"><section className="af-auth-card rounded-xl border bg-white p-7 shadow-sm"><div className="mb-5 flex flex-col items-center gap-3"><PlatformLogo variant="lockup" className="h-20 w-64"/><Link to="/" className="text-sm text-muted-foreground">Back to homepage</Link></div><div className="mb-5 flex justify-center text-primary">{done?<ShieldCheck className="h-9 w-9"/>:<KeyRound className="h-9 w-9"/>}</div><h1 className="text-center text-2xl font-semibold">{done?"Password updated":"Create a new password"}</h1><p className="mt-2 text-center text-sm text-muted-foreground">{done?"Your password was changed. Sign in using your new credentials.":"Your new password must have at least 12 characters."}</p>{ready&&!done&&<form className="mt-6 space-y-4" onSubmit={submit}><div><Label htmlFor="new-password">New password</Label><Input id="new-password" type="password" autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} required/></div><div><Label htmlFor="confirm-password">Confirm new password</Label><Input id="confirm-password" type="password" autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)} required/></div>{error&&<p role="alert" className="text-sm text-destructive">{error}</p>}<Button disabled={busy} className="w-full">{busy?"Updating…":"Set new password"}</Button></form>}{!ready&&!done&&<p className="mt-5 text-center text-sm text-muted-foreground">{error||"Checking your secure reset link…"}</p>}<Link to={done?"/login":"/forgot-password"} className="mt-6 block text-center text-sm font-medium text-primary">{done?"Return to sign in":"Request another reset link"}</Link></section></div></main>;
+ return <AuthPageFrame backTo="/login" backLabel="Sign in">
+   <div className="mb-6">
+     <h1 className="text-2xl font-bold tracking-tight text-[#172554]">{done?"Password updated":"Set a new password"}</h1>
+     <p className="mt-2 text-sm leading-6 text-slate-600">
+      {done?"Your new password is ready. You can sign in.":"Use at least 12 characters."}
+     </p>
+   </div>
+   {ready&&!done&&<form onSubmit={submit} className="space-y-4">
+      <div className="space-y-2"><Label htmlFor="new-password">New password</Label>
+       <Input id="new-password" className="h-11" type="password" autoComplete="new-password" minLength={12}
+        value={password} onChange={e=>setPassword(e.target.value)} required/></div>
+      <div className="space-y-2"><Label htmlFor="confirm-password">Confirm password</Label>
+       <Input id="confirm-password" className="h-11" type="password" autoComplete="new-password" minLength={12}
+        value={confirm} onChange={e=>setConfirm(e.target.value)} required/></div>
+      {error&&<p role="alert" className="text-sm text-red-700">{error}</p>}
+      <Button type="submit" className="h-11 w-full" disabled={busy}>{busy?"Updating…":"Save new password"}</Button>
+   </form>}
+   {!ready&&!done&&<div role="status" className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
+     {error||"Checking your secure reset link…"}
+   </div>}
+   {done&&<div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+     <ShieldCheck className="mb-2 h-5 w-5"/>Your password was changed successfully.
+   </div>}
+   <p className="mt-6 border-t pt-5 text-center text-sm">
+     <Link to={done?"/login":"/forgot-password"} className="font-semibold text-indigo-700">
+       {done?"Return to sign in":"Request a new reset link"}
+     </Link>
+   </p>
+ </AuthPageFrame>;
 }

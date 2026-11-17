@@ -361,18 +361,49 @@ export const getTenantPaymentHistory=createServerFn({method:"GET"})
  .middleware([requireSupabaseAuth])
  .handler(async({context})=>{
   const p=await assertTenantAdmin(context.userId);
-  const [plans,seats,capacity]=await Promise.all([
+  const [plans,seats,capacity,receipts]=await Promise.all([
    admin.from("billing_transactions").select("id,amount,currency,status,created_at,provider_reference,module_key").eq("tenant_id",p.tenant_id).order("created_at",{ascending:false}).limit(200),
    admin.from("seat_purchase_transactions").select("id,amount,currency,status,created_at,provider_reference").eq("tenant_id",p.tenant_id).order("created_at",{ascending:false}).limit(200),
    admin.from("asset_capacity_purchases").select("id,amount,currency,status,created_at,provider_reference").eq("tenant_id",p.tenant_id).order("created_at",{ascending:false}).limit(200),
+   admin.from("platform_operations_campaigns")
+    .select("id,event_key,created_at,attachment_name,attachment_mime").eq("tenant_id",p.tenant_id)
+    .eq("scope","activation").eq("attachment_mime","application/pdf")
+    .order("created_at",{ascending:false}).limit(200),
   ]);
-  for(const result of [plans,seats,capacity])if(result.error)throw Error("Payment history unavailable");
+  for(const result of [plans,seats,capacity,receipts])if(result.error)throw Error("Payment history unavailable");
   const rows=[
    ...(plans.data||[]).map((tx:any)=>({...tx,type:tx.module_key?"Add-on · "+tx.module_key:"Subscription"})),
    ...(seats.data||[]).map((tx:any)=>({...tx,type:"Additional user seats"})),
    ...(capacity.data||[]).map((tx:any)=>({...tx,type:"Additional asset capacity"})),
+   ...(receipts.data||[]).map((tx:any)=>({
+     id:tx.id,created_at:tx.created_at,
+     type:tx.attachment_name?.includes("Receipt")?"Administrator-confirmed payment":"Workspace activation",
+     status:"confirmed",currency:null,amount:null,
+     provider_reference:tx.event_key?.split(":").slice(1).join(":")||tx.id,
+     receipt_id:tx.id,receipt_name:tx.attachment_name,
+   })),
   ];
   return rows.sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,300);
+ });
+
+/** Retrieve only the signed-in organisation's immutable activation PDF. */
+export const getTenantActivationReceipt=createServerFn({method:"POST"})
+ .middleware([requireSupabaseAuth])
+ .inputValidator((raw)=>z.object({receiptId:z.string().uuid()}).parse(raw))
+ .handler(async({data,context})=>{
+   const profile=await assertTenantAdmin(context.userId);
+   const {data:document,error}=await admin.from("platform_operations_campaigns")
+     .select("attachment_name,attachment_mime,attachment_data")
+     .eq("tenant_id",profile.tenant_id).eq("id",data.receiptId).eq("scope","activation")
+     .eq("attachment_mime","application/pdf").single();
+   if(error||!document||!document.attachment_data)throw new Error("Receipt unavailable");
+   const raw=document.attachment_data;
+   const buffer=typeof raw==="string"?
+     Buffer.from(raw.startsWith("\\x")?raw.slice(2):raw,"hex"):Buffer.from(raw);
+   if(buffer.subarray(0,4).toString()!=="%PDF"||buffer.length>2_000_000)
+     throw new Error("Receipt unavailable");
+   return {name:String(document.attachment_name||"AssetFlow360-receipt.pdf").replace(/[^a-zA-Z0-9._-]/g,"_"),
+      base64:buffer.toString("base64")};
  });
 
 export const updateSaasSettings = createServerFn({ method: "POST" })

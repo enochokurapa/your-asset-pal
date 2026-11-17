@@ -112,15 +112,19 @@ function RegisterPage() {
 
 
 
-      <main className="relative z-10 mx-auto flex min-h-[calc(100vh-6rem)] w-full max-w-[570px] flex-col justify-center">
-        <div className="af-auth-card border bg-white p-6 sm:p-9">
-          <div className="mb-5 flex items-start justify-between gap-3">
-            <PlatformLogo variant="lockup" className="h-14 w-48 max-w-[60%]" imageClassName="object-left object-contain"/>
+      <main className="relative z-10 mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-[530px] flex-col justify-center">
+        <div className="af-auth-card border bg-white px-5 py-6 sm:px-8 sm:py-8">
+          <div className="mb-6 flex items-center justify-between gap-2 border-b border-slate-100 pb-5">
+            <span className="flex min-w-0 items-center gap-2">
+             <PlatformLogo variant="mark" className="h-11 w-12 shrink-0"/>
+             <span><span className="block text-[15px] font-bold tracking-tight text-[#172554]">AssetFlow360</span>
+             <span className="block text-[11px] text-slate-500">Secure workspace access</span></span>
+           </span>
             <Link to="/login" className="af-auth-link-home inline-flex items-center gap-1 rounded-md px-2 py-2 text-xs text-[#4d5881]"><ArrowLeft className="h-3.5 w-3.5"/> Sign in</Link>
           </div>
-          <div className="mb-7 text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-[#18275f] sm:text-3xl">{user&&!tenantId?"Complete your workspace":"Create your workspace"}</h1>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#5d6686]">Start your AssetFlow360 free trial. No card required.</p>
+          <div className="mb-6 text-left">
+            <h1 className="text-2xl font-bold tracking-tight text-[#18275f]">{user&&!tenantId?"Complete your workspace":"Create your workspace"}</h1>
+            <p className="mt-2 text-sm leading-6 text-[#5d6686]">Start your AssetFlow360 free trial. No card required.</p>
           </div>
 
           {verificationPending ? (
@@ -134,7 +138,7 @@ function RegisterPage() {
               <p><Link className="font-semibold text-indigo-700 underline" to="/login">Already verified? Sign in</Link></p>
             </div>
           ) : <form onSubmit={submit} className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="organization">Organization</Label>
                 <Input
@@ -144,7 +148,7 @@ function RegisterPage() {
                   value={form.organization_name}
                   onChange={(e) => setForm({ ...form, organization_name: e.target.value })}
                   placeholder="Company name"
-                  className="h-11 rounded-xl bg-background"
+                  className="h-11 rounded-lg bg-background"
                 />
               </div>
               <div className="space-y-2">
@@ -156,7 +160,7 @@ function RegisterPage() {
                   value={form.full_name}
                   onChange={(e) => setForm({ ...form, full_name: e.target.value })}
                   placeholder="Your name"
-                  className="h-11 rounded-xl bg-background"
+                  className="h-11 rounded-lg bg-background"
                 />
               </div>
             </div>
@@ -172,12 +176,12 @@ function RegisterPage() {
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 placeholder="you@company.com"
                 disabled={Boolean(user)}
-                className="h-11 rounded-xl bg-background"
+                className="h-11 rounded-lg bg-background"
               />
             </div>
 
             {!user && (
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
                   <div className="relative">
@@ -189,7 +193,7 @@ function RegisterPage() {
                       autoComplete="new-password"
                       value={form.password}
                       onChange={(e) => setForm({ ...form, password: e.target.value })}
-                      className="h-11 rounded-xl bg-background pr-10"
+                      className="h-11 rounded-lg bg-background pr-10"
                     />
                     <button
                       type="button"
@@ -211,7 +215,7 @@ function RegisterPage() {
                     autoComplete="new-password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="h-11 rounded-xl bg-background"
+                    className="h-11 rounded-lg bg-background"
                   />
                 </div>
               </div>

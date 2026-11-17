@@ -8,7 +8,7 @@ import {
   startYoUpgrade,getPricingPlans,
   checkYoUpgrade,
   startYoAddonPurchase,
-  checkYoAddonPurchase,getTenantPaymentHistory,
+  checkYoAddonPurchase,getTenantPaymentHistory,getTenantActivationReceipt,
   startYoSeatPurchase,checkYoSeatPurchase,startYoAssetCapacityPurchase,checkYoAssetCapacityPurchase,
 } from "@/lib/saas.functions";
 import { getServerAuthHeaders } from "@/lib/auth-headers";
@@ -40,6 +40,21 @@ function BillingPage() {
   const qc = useQueryClient();
   const getCtx = useServerFn(getSaasContext);
   const getHistory=useServerFn(getTenantPaymentHistory);
+  const getReceipt=useServerFn(getTenantActivationReceipt);
+  const [receiptBusy,setReceiptBusy]=useState<string|null>(null);
+  const downloadReceipt=async(id:string)=>{
+    if(receiptBusy)return;
+    setReceiptBusy(id);
+    try{
+      const data=await getReceipt({data:{receiptId:id},headers:await getServerAuthHeaders()});
+      const bytes=Uint8Array.from(atob(data.base64),c=>c.charCodeAt(0));
+      const url=URL.createObjectURL(new Blob([bytes],{type:"application/pdf"}));
+      const link=document.createElement("a");link.href=url;link.download=data.name;
+      document.body.appendChild(link);link.click();link.remove();
+      window.setTimeout(()=>URL.revokeObjectURL(url),60000);
+    }catch{toast.error("Could not download this receipt. Please try again.");}
+    finally{setReceiptBusy(null);}
+  };
   const getPlans=useServerFn(getPricingPlans);
   const {data:publicPlans}=useQuery({queryKey:["pricing-plans"],queryFn:()=>getPlans()});
   const [selectedPlan,setSelectedPlan]=useState("business"),[period,setPeriod]=useState<"monthly"|"annual">("monthly");
@@ -63,6 +78,7 @@ function BillingPage() {
   const {data:paymentHistory=[],isLoading:historyLoading}=useQuery({
     queryKey:["tenant-payment-history"],queryFn:async()=>getHistory({headers:await getServerAuthHeaders()}),
     enabled:section==="history"&&isTenantAdmin,
+    staleTime:10000,
   });
   const { data: ctx, refetch } = useQuery({
     queryKey: ["saas-context"],
@@ -131,10 +147,16 @@ function BillingPage() {
        <p className="mt-1 text-xs text-muted-foreground">{tenantName || "Workspace"}</p></div>
 
 
-      {section==="history"&&<Card className="space-y-3 p-4"><div><h2 className="font-semibold">Payment history</h2><p className="text-xs text-muted-foreground">Recorded transactions from your workspace. A payment record is not a tax invoice.</p></div>
+      {section==="history"&&<Card className="space-y-3 p-4"><div><h2 className="font-semibold">Payment history</h2><p className="text-xs text-muted-foreground">Confirmed payments, activation receipts and other billing transactions recorded for your workspace.</p></div>
        {historyLoading?<p className="text-sm">Loading payments…</p>:!paymentHistory.length?<p className="text-sm text-muted-foreground">No payments recorded yet.</p>:
-       <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b bg-muted/30"><tr><th className="px-3 py-2">Date</th><th className="px-3 py-2">Purchase</th><th className="px-3 py-2">Amount</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Reference</th></tr></thead><tbody>
-       {paymentHistory.map((tx:any)=><tr key={tx.id} className="border-b"><td className="whitespace-nowrap px-3 py-3">{new Date(tx.created_at).toLocaleDateString()}</td><td className="px-3 py-3">{tx.type}</td><td className="whitespace-nowrap px-3 py-3">{money(Number(tx.amount),tx.currency||"UGX")}</td><td className="px-3 py-3 capitalize">{tx.status}</td><td className="px-3 py-3 font-mono text-xs">{tx.provider_reference||"—"}</td></tr>)}
+       <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b bg-muted/30"><tr><th className="px-3 py-2">Date</th><th className="px-3 py-2">Purchase</th><th className="px-3 py-2">Amount</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Reference</th><th className="px-3 py-2">Receipt</th></tr></thead><tbody>
+       {paymentHistory.map((tx:any)=><tr key={tx.id} className="border-b"><td className="whitespace-nowrap px-3 py-3">{new Date(tx.created_at).toLocaleDateString()}</td><td className="px-3 py-3">{tx.type}</td><td className="whitespace-nowrap px-3 py-3">{tx.amount===null?"See receipt":money(Number(tx.amount),tx.currency||"UGX")}</td><td className="px-3 py-3 capitalize">{tx.status}</td><td className="px-3 py-3 font-mono text-xs">{tx.provider_reference||"—"}</td>
+          <td className="px-3 py-3">{tx.receipt_id?
+            <Button type="button" size="sm" variant="outline" disabled={Boolean(receiptBusy)}
+              onClick={()=>void downloadReceipt(tx.receipt_id)}>
+              {receiptBusy===tx.receipt_id?"Opening…":"Download PDF"}
+            </Button>:"—"}</td>
+          </tr>)}
        </tbody></table></div>}
        <p className="text-xs text-muted-foreground">Formal invoices, where issued, should use the business's approved invoicing process. This page does not manufacture invoice numbers or tax documents.</p>
       </Card>}

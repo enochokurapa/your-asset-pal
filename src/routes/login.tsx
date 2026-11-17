@@ -129,18 +129,22 @@ function LoginPage() {
 
 
       {takeoverOpen&&<div role="dialog" aria-modal="true" aria-label="Existing sign-in" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"><div className="w-full max-w-md rounded-2xl bg-card p-7 shadow-xl"><h2 className="text-xl font-bold">Account already signed in</h2><p className="mt-3 text-sm text-muted-foreground">Your account is active on another device. Continue here and sign out the other device?</p><div className="my-4 rounded-xl border p-3 text-sm">{existingDevices.slice(0,3).map(item=><p key={item.session_id} className="truncate">{item.device || "Another browser"}</p>)}</div><p className="text-xs text-muted-foreground">The existing device will be notified when it next checks its session.</p><div className="mt-5 flex justify-end gap-2"><Button variant="outline" onClick={cancelTakeover} disabled={submitting}>Keep other device</Button><Button onClick={replaceSession} disabled={submitting}>Sign out other device</Button></div></div></div>}
-      <main className="relative z-10 mx-auto flex min-h-[calc(100vh-6rem)] w-full max-w-[510px] flex-col justify-center">
-        <div className="af-auth-card border bg-white p-6 sm:p-9">
-          <div className="mb-5 flex items-start justify-between gap-3">
-            <span className="inline-flex h-14 w-48 max-w-[60%] items-center"><PlatformLogo variant="lockup" className="h-full w-full" imageClassName="object-left object-contain"/></span>
+      <main className="relative z-10 mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-[465px] flex-col justify-center">
+        <div className="af-auth-card border bg-white px-5 py-6 sm:px-8 sm:py-8">
+          <div className="mb-6 flex items-center justify-between gap-2 border-b border-slate-100 pb-5">
+            <span className="flex min-w-0 items-center gap-2">
+             <PlatformLogo variant="mark" className="h-11 w-12 shrink-0"/>
+             <span><span className="block text-[15px] font-bold tracking-tight text-[#172554]">AssetFlow360</span>
+             <span className="block text-[11px] text-slate-500">Secure workspace access</span></span>
+           </span>
             <Link to="/" className="af-auth-link-home inline-flex items-center gap-1 rounded-md px-2 py-2 text-xs font-medium text-[#4d5881] hover:bg-[#f7f5f3]"><ArrowLeft className="h-3.5 w-3.5"/> Home</Link>
           </div>
-          <div className="mb-7 text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-[#18275f] sm:text-3xl">Welcome back</h1>
-            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[#5d6686]">Sign in to your AssetFlow360 workspace</p>
+          <div className="mb-6 text-left">
+            <h1 className="text-2xl font-bold tracking-tight text-[#18275f]">Welcome back</h1>
+            <p className="mt-2 text-sm leading-6 text-[#5d6686]">Sign in to your AssetFlow360 workspace</p>
           </div>
 
-          <form onSubmit={onSubmit} className="space-y-5">
+          <form onSubmit={onSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email address</Label>
               <Input
