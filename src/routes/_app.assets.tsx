@@ -765,7 +765,7 @@ function AssetsPage() {
     setImportProgress("Preparing import…");
     try {
       if(registerCatalogPending||registerCatalogError||!catalog)throw new Error("The company register has not finished loading.");
-      
+
       const r = await importAssetsFromFile(f, user?.id ?? null,registers.find(r=>r.id===registerChoice),importBranchId||undefined,locationSettings as any,
         (done,total,saved,skipped,failed)=>setImportProgress(`${done}/${total} processed · ${saved} saved · ${skipped} already present · ${failed} failed`),
         importVerified?{confirmed:true,inspectionDate:importInspectionDate}:undefined);
@@ -957,7 +957,7 @@ function AssetsPage() {
                   <div className="space-y-5">
                     <div>
                       <h3 className="text-base font-semibold">Set the location</h3>
-                      <p className="text-sm text-muted-foreground">Select the geographic area and capture GPS if required by your organisation.</p>
+
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <AssetLocationFields
@@ -1139,9 +1139,9 @@ function AssetsPage() {
 
               <DialogFooter className="border-t bg-background px-5 py-4 sm:justify-between sm:px-6">
                 <div className="flex gap-2">
-                  <Button type="button" variant="ghost" onClick={() => { setOpen(false); setWizardStep(0); }}>Cancel</Button>
+                  <Button type="button" variant="outline" className="border-slate-300 text-slate-800 hover:bg-slate-100" onClick={() => { setOpen(false); setWizardStep(0); }}>Cancel</Button>
                   {wizardStep > 0 && (
-                    <Button type="button" variant="outline" onClick={() => setWizardStep((step) => registerChoice==="default"?Math.max(0,step-1):step===4?2:0)}>
+                    <Button type="button" variant="outline" className="border-slate-300 bg-white font-semibold text-slate-900 hover:bg-slate-100" onClick={() => setWizardStep((step) => registerChoice==="default"?Math.max(0,step-1):step===4?2:0)}>
                       <ChevronLeft className="mr-2 h-4 w-4" /> Back
                     </Button>
                   )}
@@ -1149,7 +1149,7 @@ function AssetsPage() {
 
                 <div className="flex flex-1 justify-end gap-2">
                   {wizardStep < wizardSteps.length - 1 ? (
-                    <Button type="button" onClick={nextWizardStep}>
+                    <Button type="button" className="bg-[#3438B9] font-semibold text-white hover:bg-[#292D9F]" onClick={nextWizardStep}>
                       Next <ChevronRight className="ml-2 h-4 w-4" />
                     </Button>
                   ) : (

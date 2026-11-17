@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { DepreciationPanel } from "@/components/depreciation-panel";
 import { fmtDateTimeEAT } from "@/lib/time";
+import {compressAssetPhoto} from "@/lib/compress-asset-photo";
 
 function DecideDialog({
   open, status, onCancel, onConfirm,
@@ -421,12 +422,21 @@ function AttachmentsPanel({ assetId }: { assetId: string }) {
   const upload = async (file: File) => {
     setUploading(true);
     if (!tenantId) { toast.error("Workspace is not configured"); setUploading(false); return; }
-    const path = `${tenantId}/${assetId}/${Date.now()}-${file.name}`;
-    const { error: upErr } = await supabase.storage.from("asset-files").upload(path, file);
+    let uploadFile=file;
+    try{
+      if(kind==="image"){
+        uploadFile=await compressAssetPhoto(file);
+      }else if(file.size>5*1024*1024){
+        throw Error("Attachments must be smaller than 5 MB.");
+      }
+    }catch(error:any){toast.error(error?.message||"Photo compression failed");setUploading(false);return;}
+    const safeName=uploadFile.name.replace(/[^a-zA-Z0-9._-]/g,"_");
+    const path = `${tenantId}/${assetId}/${Date.now()}-${safeName}`;
+    const { error: upErr } = await supabase.storage.from("asset-files").upload(path, uploadFile,{contentType:uploadFile.type,upsert:false});
     if (upErr) { toast.error(upErr.message); setUploading(false); return; }
     const { error } = await supabase.from("asset_attachments").insert({
-      asset_id: assetId, kind, file_name: file.name, storage_path: path,
-      mime_type: file.type, uploaded_by: user?.id ?? null,
+      asset_id: assetId, kind, file_name: kind==="image"?"Asset photo.webp":file.name, storage_path: path,
+      mime_type: uploadFile.type, uploaded_by: user?.id ?? null,
     });
     setUploading(false);
     if (error) { toast.error(error.message); return; }

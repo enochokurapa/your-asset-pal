@@ -206,10 +206,10 @@ function GenericGeoCascadeSelector({
 
     {primary && (
       <p className="text-xs text-muted-foreground">
-        Stop at any administrative level that is sufficient. Use a custom organisation place for the exact site, building, office, room or locally known place.
+        Selected location: {path.map(p=>p.name).join(" / ")}
       </p>
     )}
-    <p className="text-[11px] text-muted-foreground">Geographic reference: <a className="underline hover:text-primary" href="https://www.geonames.org/" target="_blank" rel="noopener noreferrer">GeoNames</a>. Coverage varies by country.</p>
+
   </div>;
 }
 
@@ -276,8 +276,8 @@ function UgandaGeoCascadeSelector({value,onChange,required=false}:{value:number|
  }).sort((a,b)=>a.name.localeCompare(b.name)),[available,districts,search]);
  const selectedDistrict=districts.find(d=>Number(d.geoname_id)===Number(value));
  return <div className="space-y-3 rounded-xl border bg-white p-3 sm:p-4">
-  <p className="flex items-center gap-2 text-sm font-semibold"><MapPin className="h-4 w-4 text-primary"/> Uganda · Geographic location</p>
-  <div className="space-y-1.5"><Label>1. Region (optional filter)</Label>
+  <p className="flex items-center gap-2 text-sm font-semibold"><MapPin className="h-4 w-4 text-primary"/> Select district</p>
+  <div className="space-y-1.5"><Label>Region (optional)</Label>
    <Select value={regionId||"none"} onValueChange={id=>{setRegionId(id==="none"?"":id);setSearch("");onChange(null);}}>
     <SelectTrigger className="h-11 w-full"><SelectValue placeholder="Choose region"/></SelectTrigger>
     <SelectContent><SelectItem value="none">All regions (entire country)</SelectItem>{regions.map(r=><SelectItem key={r.geoname_id} value={String(r.geoname_id)}>{r.name}</SelectItem>)}</SelectContent>
@@ -286,13 +286,13 @@ function UgandaGeoCascadeSelector({value,onChange,required=false}:{value:number|
   {loadingRegions&&<p className="text-xs text-muted-foreground">Loading regions…</p>}
   {regionsError&&<button type="button" className="text-sm text-destructive underline" onClick={()=>void retryRegions()}>Could not load regions · Retry</button>}
   <div className="space-y-2">
-   <Label>2. District {required?"*":""} · {districts.length} available nationwide</Label>
+   <Label>District {required?"*":""}</Label>
    <div className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground"/>
-    <Input className="h-11 w-full pl-9" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search all districts in Uganda" aria-label="Search districts nationwide"/>
+    <Input className="h-11 w-full pl-9" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Type district name to search" aria-label="Search districts by name"/>
    </div>
    <Select value={selectedDistrict?String(selectedDistrict.geoname_id):"none"} onValueChange={id=>{const place=districts.find(d=>String(d.geoname_id)===id)??null;onChange(place);if(place)setRegionId(inferRegion(place));setSearch("");}}>
-    <SelectTrigger className="h-11 w-full"><SelectValue placeholder="Choose district"/></SelectTrigger>
-    <SelectContent className="max-h-64"><SelectItem value="none">Choose district</SelectItem>
+    <SelectTrigger className="h-11 w-full"><SelectValue placeholder="Select your district"/></SelectTrigger>
+    <SelectContent className="max-h-64"><SelectItem value="none">Select district</SelectItem>
      {matches.map(d=><SelectItem key={d.geoname_id} value={String(d.geoname_id)}>{d.name}{d.name.toLowerCase().endsWith("district")?"":" District"}</SelectItem>)}
     </SelectContent>
    </Select>
