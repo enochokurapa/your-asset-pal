@@ -1,4 +1,6 @@
 import {createHmac,timingSafeEqual} from "node:crypto";
+import {mkdir,readFile,writeFile} from "node:fs/promises";
+import {join} from "node:path";
 import {supabaseAdmin} from "@/integrations/supabase/client.server";
 import {createR2PresignedUrl} from "./backup-core.server";
 
@@ -35,6 +37,52 @@ async function userTenant(request:Request){
  if(!profile||!profile.is_active)return null;
  return profile as {tenant_id:string,is_active:boolean,is_saas_admin:boolean};
 }
+const localRoot=process.env.PRIVATE_ASSET_STORAGE_ROOT||"/app/private-files";
+function localFilePath(storagePath:string){
+ const parsed=parseStoragePath(storagePath);
+ if(!parsed)throw Error("Invalid private file path");
+ return join(localRoot,"asset-files",...parsed.name.split("/"));
+}
+async function storePrivateFile(storagePath:string,body:ArrayBuffer|Uint8Array,contentType:string){
+ const key="asset-files/"+storagePath;
+ if(process.env.ASSET_FILE_BACKEND!=="local")try{
+   const response=await fetch(createR2PresignedUrl("PUT",key,180),{
+     method:"PUT",headers:{"content-type":contentType},body,
+     signal:AbortSignal.timeout(20000)
+   });
+   if(response.ok)return "r2";
+   console.warn("[Asset Storage] Remote write unavailable",response.status);
+ }catch(e){console.warn("[Asset Storage] Remote write failed",e instanceof Error?e.message:"unavailable");}
+ if(!process.env.PRIVATE_ASSET_STORAGE_ROOT)throw Error("Persistent local storage is not configured");
+ const local=localFilePath(storagePath);
+ await mkdir(localFilePath(storagePath).slice(0,-storagePath.split("/").at(-1)!.length-1),{recursive:true,mode:0o700});
+ await writeFile(local,body,{flag:"wx",mode:0o600});
+ return "local";
+}
+async function readPrivateFile(storagePath:string){
+ const local=async()=>{
+  if(!process.env.PRIVATE_ASSET_STORAGE_ROOT)return null;
+  try{
+   const bytes=await readFile(localFilePath(storagePath));
+   const type=/\.webp$/i.test(storagePath)?"image/webp":/\.png$/i.test(storagePath)?"image/png":
+    /\.jpe?g$/i.test(storagePath)?"image/jpeg":/\.pdf$/i.test(storagePath)?"application/pdf":"application/octet-stream";
+   return new Response(bytes,{status:200,headers:{"content-type":type}});
+  }catch{return null;}
+ };
+ // Prefer persistent local files for low latency; older R2 files remain accessible.
+ const cached=await local();
+ if(cached)return cached;
+ try{
+   const response=await fetch(createR2PresignedUrl("GET","asset-files/"+storagePath,60),
+      {signal:AbortSignal.timeout(12000)});
+   if(response.ok)return new Response(response.body,{status:200,
+      headers:{"content-type":response.headers.get("content-type")||"application/octet-stream"}});
+ }catch{}
+ return null;
+}
+export async function storeAssetApiFile(storagePath:string,bytes:Uint8Array,contentType:string){
+ return storePrivateFile(storagePath,bytes,contentType);
+}
 const storagePrefix="/storage/v1/object/";
 export async function handleAssetStorage(request:Request):Promise<Response|null>{
  const url=new URL(request.url);
@@ -56,8 +104,8 @@ export async function handleAssetStorage(request:Request):Promise<Response|null>
    return json(403,{message:"Invalid or expired file link"});
   const expected=Buffer.from(signed(r2key,expiry),"hex"),actual=Buffer.from(token,"hex");
   if(!timingSafeEqual(expected,actual))return json(403,{message:"Invalid file link"});
-  const response=await fetch(createR2PresignedUrl("GET",r2key,60),{signal:AbortSignal.timeout(15000)});
-  if(!response.ok)return json(response.status===404?404:502,{message:"Stored file unavailable"});
+  const response=await readPrivateFile(parsed.name);
+  if(!response)return json(404,{message:"Stored file unavailable"});
   return new Response(response.body,{status:200,headers:{
     "content-type":response.headers.get("content-type")||"application/octet-stream",
     "cache-control":"private, no-store","x-content-type-options":"nosniff",
@@ -100,11 +148,13 @@ export async function handleAssetStorage(request:Request):Promise<Response|null>
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"];
   if(!allowed.includes(contentType))return json(415,{message:"File type not permitted"});
   if(!body.byteLength||body.byteLength>maxBytes)return json(413,{message:"File size must be between 1 byte and 10 MB"});
-  const upload=await fetch(createR2PresignedUrl("PUT",r2key,180),{
-    method:"PUT",headers:{"content-type":contentType},body,signal:AbortSignal.timeout(25000),
-  });
-  if(!upload.ok)return json(502,{message:"Could not store file"});
-  return json(200,{Key:"asset-files/"+parsed.name,Id:parsed.name});
+  try{
+    const backend=await storePrivateFile(parsed.name,body,contentType);
+    return json(200,{Key:"asset-files/"+parsed.name,Id:parsed.name,storageBackend:backend});
+  }catch(error){
+    console.error("[Asset Storage] Upload failed",error instanceof Error?error.message:"unknown");
+    return json(503,{message:"Private file storage unavailable"});
+  }
  }
  return json(405,{message:"Unsupported storage method"});
 }

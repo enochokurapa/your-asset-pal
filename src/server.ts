@@ -9,7 +9,7 @@ import {createR2PresignedUrl} from "./lib/backup-core.server";
 import { startTenantAutomationScheduler } from "./lib/automation-core.server";
 import { startPlatformEmailReportScheduler } from "./lib/platform-email-reports.server";
 import { createHash } from "node:crypto";
-import {handleAssetStorage,signedAssetFileUrl} from "./lib/asset-r2-storage.server";
+import {handleAssetStorage,signedAssetFileUrl,storeAssetApiFile} from "./lib/asset-r2-storage.server";
 import { maybeHandlePlatformBrandingAsset } from "./lib/platform-branding-assets.server";
 import { supabaseAdmin } from "./integrations/supabase/client.server";
 import {maybeHandleEmailMfa,shouldRequireEmailMfa} from "./lib/platform-security-email-mfa.server";
@@ -403,9 +403,8 @@ async function maybeHandlePublicApi(request: Request): Promise<Response | null> 
       const bytes=Buffer.from(b64,"base64");
       if(!bytes.length||bytes.length>2_000_000)return jsonResponse(413,{error:"file_too_large"});
       const path=key.tenant_id+"/"+assetId+"/"+Date.now()+"-"+crypto.randomUUID()+"-"+name;
-      const dest=createR2PresignedUrl("PUT","asset-files/"+path,120);
-      const response=await fetch(dest,{method:"PUT",body:bytes,headers:{"content-type":mime},signal:AbortSignal.timeout(25000)});
-      if(!response.ok)return jsonResponse(502,{error:"file_storage_failed"});
+      try{await storeAssetApiFile(path,bytes,mime);}
+      catch{return jsonResponse(503,{error:"file_storage_unavailable"});}
       const {data:record,error}=await apiAdmin.from("asset_attachments").insert({
         tenant_id:key.tenant_id,asset_id:assetId,kind:body.kind,file_name:name,storage_path:path,
         mime_type:mime,uploaded_by:key.created_by??null
