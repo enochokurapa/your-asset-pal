@@ -9,7 +9,7 @@ export type LogoPosition = "left" | "center" | "right" | "none";
 export type WatermarkPosition = "center" | "diagonal" | "repeated" | "none";
 export type FontFamily = "helvetica" | "times" | "courier";
 export type Orientation = "portrait" | "landscape";
-export type PaperSize = "a4" | "letter" | "legal";
+export type PaperSize = "a3" | "a4" | "letter" | "legal";
 
 export interface DocumentTemplate {
   id: string;

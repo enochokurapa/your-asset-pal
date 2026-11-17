@@ -28,6 +28,8 @@ jobs:
         run: bun test
       - name: Verify payment receipt PDF generation
         run: bun run scripts/test-activation-receipt.ts
+      - name: Verify A3 and A4 reports keep all columns together
+        run: bun run scripts/test-report-paper.ts
       - name: Build application
         run: bun run build
       - name: Upload compiled production bundle

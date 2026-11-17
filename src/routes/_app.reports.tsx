@@ -56,7 +56,7 @@ type ReportExportMeta = {
   generatedBy: string;
 };
 
-async function exportPDF(r: Report, meta: ReportExportMeta, options?: {orientation:"portrait"|"landscape";paper:"a4"|"letter"|"legal";signature?:string}) {
+async function exportPDF(r: Report, meta: ReportExportMeta, options?: {orientation:"portrait"|"landscape";paper:"a3"|"a4"|"letter"|"legal";signature?:string}) {
   const loadedTemplate = await loadTemplate();
   const template = {
     ...loadedTemplate,
@@ -1215,7 +1215,7 @@ function ReportTable({ r, exportMeta,stage }: { r: Report; exportMeta: ReportExp
   const exportAccess=useExportAccess();
   const [columns,setColumns]=useState<string[]|null>(null);
   const [orientation,setOrientation]=useState<"portrait"|"landscape">("landscape");
-  const [paper,setPaper]=useState<"a4"|"letter"|"legal">("a4");
+  const [paper,setPaper]=useState<"a3"|"a4"|"letter"|"legal">("a3");
   const [signature,setSignature]=useState<string>();
 
   const automaticColumns=r.columns.filter(c=>r.rows.length===0||r.rows.some(row=>{
@@ -1236,7 +1236,7 @@ function ReportTable({ r, exportMeta,stage }: { r: Report; exportMeta: ReportExp
        <p className="text-xs text-muted-foreground">Only fields containing data are selected by default. Optional fields may be included manually.</p>
        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{r.columns.map(c=><label key={c.key} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={selectedColumns.some(v=>v.key===c.key)} onChange={e=>setColumns(previous=>{const all=previous??automaticColumns.map(v=>v.key);return e.target.checked?[...all,c.key]:all.filter(v=>v!==c.key)})}/>{c.header}</label>)}</div>
        <div className="flex gap-2"><Button size="sm" variant="outline" onClick={()=>setColumns(null)}>Use recommended fields</Button><Button size="sm" variant="outline" onClick={()=>setColumns(r.columns.map(c=>c.key))}>Select all</Button></div>
-       <div className="grid gap-3 sm:grid-cols-2"><div className="space-y-1"><Label htmlFor="report-paper">Paper size</Label><select id="report-paper" className="h-10 w-full rounded-md border bg-background px-2" value={paper} onChange={e=>setPaper(e.target.value as typeof paper)}><option value="a4">A4</option><option value="letter">Letter</option><option value="legal">Legal</option></select></div><div className="space-y-1"><Label htmlFor="report-orientation">Orientation</Label><select id="report-orientation" className="h-10 w-full rounded-md border bg-background px-2" value={orientation} onChange={e=>setOrientation(e.target.value as typeof orientation)}><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></div></div>
+       <div className="grid gap-3 sm:grid-cols-2"><div className="space-y-1"><Label htmlFor="report-paper">Paper size</Label><select id="report-paper" className="h-10 w-full rounded-md border bg-background px-2" value={paper} onChange={e=>setPaper(e.target.value as typeof paper)}><option value="a3">A3 (recommended for wide reports)</option><option value="a4">A4</option><option value="letter">Letter</option><option value="legal">Legal</option></select></div><div className="space-y-1"><Label htmlFor="report-orientation">Orientation</Label><select id="report-orientation" className="h-10 w-full rounded-md border bg-background px-2" value={orientation} onChange={e=>setOrientation(e.target.value as typeof orientation)}><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></div></div>
        <div className="space-y-1"><Label htmlFor="report-signature">Optional prepared-by signature (PNG or JPEG)</Label><Input id="report-signature" type="file" accept="image/png,image/jpeg" onChange={e=>readSignature(e.target.files?.[0])}/></div>
       </section>:<>
       <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={!selectedColumns.length||!exportAccess.allowed("reports")} onClick={()=>runPermittedExport("reports",()=>exportPDF(report,exportMeta,{orientation,paper,signature}))}><FileDown className="mr-1 h-4 w-4"/>Export PDF</Button>
