@@ -47,7 +47,6 @@ const tenantNav: NavItem[] = [
   { to: "/audit", label: "Audit Trail", icon: History, module: "audit" },
   { to: "/builders", label: "Builders", icon: SlidersHorizontal, tenantAdminOnly: true },
   { to: "/settings", label: "Settings", icon: Settings, module: "settings", tenantAdminOnly: true },
-  { to: "/support-requests", label: "Platform Support Requests", icon: ShieldCheck, tenantAdminOnly: true },
   { to: "/billing", label: "Plan & Billing", icon: CreditCard, tenantAdminOnly: true },
   { to: "/profile", label: "My profile", icon: UserCircle },
 ];
