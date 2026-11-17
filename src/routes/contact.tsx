@@ -25,7 +25,7 @@ function ContactPage(){
   catch(err:any){setError(err?.message||"Could not submit your message. Please try again.");}
   finally{setBusy(false);}
  };
- return <PublicShell><main className="mx-auto w-full max-w-7xl min-w-0 overflow-hidden bg-[#edf3f4] px-5 py-9 sm:px-8 sm:py-14">
+ return <PublicShell><main className="mx-auto w-full af-content-fluid min-w-0 overflow-hidden bg-[#edf3f4] px-5 py-9 sm:px-8 sm:py-14">
   <div className="grid min-w-0 gap-8 lg:grid-cols-[.85fr_1.15fr] lg:gap-14">
    <div className="min-w-0">
     <p className="text-xs font-semibold uppercase tracking-[.18em] text-[#bb693a]">Get in touch</p>

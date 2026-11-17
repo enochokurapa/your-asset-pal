@@ -474,11 +474,11 @@
 .af-app-workspace > main.af-app-main { width:100%; max-width:none; min-width:0; margin-inline:auto; border:0; box-shadow:none; }
 @media (min-width: 768px) and (max-width: 1279px) {
   .af-public-site .af-site-frame,
-  .af-app-workspace > main.af-app-main { width:94%; }
+  .af-app-workspace > main.af-app-main { width:85%; }
 }
 @media (min-width: 1280px) {
   .af-public-site .af-site-frame,
-  .af-app-workspace > main.af-app-main { width:85%; }
+  .af-app-workspace > main.af-app-main { width:80%; }
 }
 @media (max-width: 767px) {
   .af-public-site .af-site-frame,
@@ -538,4 +538,17 @@
 .af-app-workspace :is(.bg-primary, .hover\:bg-primary:hover){background-color:var(--primary)!important}
 @media (max-width:767px) {
  .af-app-workspace :is(input,select,textarea){font-size:16px}
+}
+
+
+/* Consistent content widths for public pages: hero and sections share the same frame. */
+.af-public-site main > section > .af-content-fluid,
+.af-public-site main > section.af-content-fluid,
+.af-public-site .af-partners-content.af-content-fluid {
+  width:100%;
+  max-width:none;
+  min-width:0;
+}
+.af-public-site main > section > .af-content-fluid {
+  margin-inline:auto;
 }

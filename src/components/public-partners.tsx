@@ -13,7 +13,7 @@ export function PublicPartners(){
   </div>)}
  </div>;
  return <section aria-label="Our partners" className="overflow-hidden border-t border-[#e1e9ee] bg-[#fbfcfd] px-5 py-9 sm:px-8 sm:py-12">
-  <div className="mx-auto max-w-7xl">
+  <div className="mx-auto af-content-fluid">
    <div className="mb-7 text-center"><p className="text-[10px] font-semibold uppercase tracking-[.2em] text-[#b66e45]">Trusted partnerships</p><h2 className="mt-2 text-xl font-bold tracking-tight text-[#18394c] sm:text-2xl">Our partners</h2></div>
    {moving?<div className="af-partners-window mx-auto max-w-5xl overflow-hidden" aria-label="Partner logo carousel">
      <div className="af-partners-marquee flex w-max items-center">{group(false)}{group(true)}</div>

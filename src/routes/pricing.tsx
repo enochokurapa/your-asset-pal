@@ -43,7 +43,7 @@ function PricingPage(){
    return rank(a.id)-rank(b.id);
  });
  return <PublicShell><main><PublicPageHero page="pricing" />
- <section className="bg-[#f4f6f6] px-4 py-10 sm:px-8 sm:py-14"><div className="mx-auto max-w-7xl">
+ <section className="bg-[#f4f6f6] px-4 py-10 sm:px-8 sm:py-14"><div className="mx-auto af-content-fluid">
    <div className="mb-7 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
      <div className="min-w-0"><h2 className="text-xl font-semibold tracking-tight text-[#263a44] sm:text-2xl">Choose your plan</h2><p className="mt-1 text-sm text-[#62737d]">Clear pricing, with capabilities that grow with your team.</p></div>
      <div className="flex w-fit max-w-full flex-wrap items-center gap-2">

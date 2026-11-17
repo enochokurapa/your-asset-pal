@@ -16,7 +16,7 @@ function Page(){
  const {data=[],isLoading,error}=useQuery({queryKey:["public-feature-catalog"],queryFn:()=>getter(),staleTime:60_000});
  return <PublicShell><main className="min-w-0 overflow-x-clip">
   <PublicPageHero page="features"/>
-  <section className="mx-auto w-full max-w-7xl overflow-hidden bg-[#f2f6f7] px-5 py-12 sm:px-8 sm:py-16">
+  <section className="mx-auto w-full af-content-fluid overflow-hidden bg-[#f2f6f7] px-5 py-12 sm:px-8 sm:py-16">
    <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
     <div className="max-w-2xl">
      <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#bd673a]">AssetFlow capabilities</p>
@@ -38,7 +38,7 @@ function Page(){
     </article>)}
    </div>
   </section>
-  <section className="mx-auto flex w-full max-w-7xl flex-col gap-4 overflow-hidden bg-[#e9eef2] px-5 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+  <section className="mx-auto flex w-full af-content-fluid flex-col gap-4 overflow-hidden bg-[#e9eef2] px-5 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-8">
    <div><h2 className="text-xl font-semibold text-[#203e4d] sm:text-2xl">Choose the features your team needs.</h2>
     <p className="mt-2 text-sm text-[#607582]">Compare plans, request a demonstration or get in touch about integrations.</p></div>
    <div className="flex flex-wrap gap-2">
