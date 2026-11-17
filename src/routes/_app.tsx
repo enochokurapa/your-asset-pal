@@ -108,13 +108,15 @@ function AppLayout() {
   // Avoid background RPC probes that can fail transiently and cause navigation loops.
   // Every data request still validates the signed-in SaaS Admin and session in PostgreSQL.
   const [open, setOpen] = useState(false);
-  const [settingsOpen,setSettingsOpen]=useState(false);
-  const [reportsOpen,setReportsOpen]=useState(false);
-  const [billingOpen,setBillingOpen]=useState(false);
-  const [verificationOpen,setVerificationOpen]=useState(false);
-  const [assetSetupOpen,setAssetSetupOpen]=useState(false);
-  const [managementOpen,setManagementOpen]=useState(false);
-  const [addonsOpen,setAddonsOpen]=useState(false);
+  // One open navigation section at a time; no network requests or polling.
+  const [openNavGroup,setOpenNavGroup]=useState<string|null>(null);
+  const settingsOpen=openNavGroup==="settings";
+  const reportsOpen=openNavGroup==="reports";
+  const verificationOpen=openNavGroup==="verification";
+  const assetSetupOpen=openNavGroup==="asset-setup";
+  const managementOpen=openNavGroup==="management";
+  const addonsOpen=openNavGroup==="addons";
+  const toggleNavGroup=(group:string)=>setOpenNavGroup(previous=>previous===group?null:group);
   const [branding, setBranding] = useState<DocumentTemplate | null>(null);
   const [mfaChecked,setMfaChecked]=useState(false);
   const [mfaRequired,setMfaRequired]=useState(false);
@@ -135,13 +137,15 @@ function AppLayout() {
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   useEffect(()=>{
-    if(["/settings","/users","/domains","/billing"].some(path=>pathname.startsWith(path)))setSettingsOpen(true);
-    if(pathname.startsWith("/reports"))setReportsOpen(true);
-    if(pathname.startsWith("/billing"))setBillingOpen(true);
-    if(pathname.startsWith("/verification"))setVerificationOpen(true);
-    if(["/categories","/locations","/branches"].some(path=>pathname.startsWith(path)))setAssetSetupOpen(true);
-    if(["/analytics","/diagnostics","/audit","/builders"].some(path=>pathname.startsWith(path)))setManagementOpen(true);
-    if(["/integrations","/live-tracking"].some(path=>pathname.startsWith(path)))setAddonsOpen(true);
+    // Keep the current page's section visible while closing all others.
+    const group=
+      ["/settings","/users","/domains","/billing"].some(path=>pathname.startsWith(path))?"settings":
+      pathname.startsWith("/reports")?"reports":
+      pathname.startsWith("/verification")?"verification":
+      ["/categories","/locations","/branches"].some(path=>pathname.startsWith(path))?"asset-setup":
+      ["/analytics","/diagnostics","/audit","/builders"].some(path=>pathname.startsWith(path))?"management":
+      ["/integrations","/live-tracking"].some(path=>pathname.startsWith(path))?"addons":null;
+    setOpenNavGroup(group);
   },[pathname]);
   const exportAccess=useExportAccess();
 
@@ -319,8 +323,8 @@ function AppLayout() {
             <div key="assets-group" className="space-y-1">
               {renderNavItem(item)}
               {([
-                {key:"asset-setup",label:"Asset setup",icon:Tags,items:groupItems(["/categories","/locations","/branches"]),expanded:assetSetupOpen,toggle:()=>setAssetSetupOpen(v=>!v)},
-                {key:"management",label:"Management",icon:SlidersHorizontal,items:groupItems(["/analytics","/diagnostics","/audit","/builders"]),expanded:managementOpen,toggle:()=>setManagementOpen(v=>!v)},
+                {key:"asset-setup",label:"Asset setup",icon:Tags,items:groupItems(["/categories","/locations","/branches"]),expanded:assetSetupOpen,toggle:()=>toggleNavGroup("asset-setup")},
+                {key:"management",label:"Management",icon:SlidersHorizontal,items:groupItems(["/analytics","/diagnostics","/audit","/builders"]),expanded:managementOpen,toggle:()=>toggleNavGroup("management")},
               ]).filter(g=>g.items.length>0).map(g=><div key={g.key}>
                 <button type="button" onClick={g.toggle} aria-expanded={g.expanded} aria-controls={`${g.key}-sidebar-items`}
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
@@ -332,7 +336,7 @@ function AppLayout() {
             </div>
           ) : item.to === "/reports" && !platformControl ? (
             <div key="reports-group">
-              <button type="button" onClick={()=>setReportsOpen(v=>!v)} aria-expanded={reportsOpen}
+              <button type="button" onClick={()=>toggleNavGroup("reports")} aria-expanded={reportsOpen}
                 aria-controls="report-sidebar-options"
                 className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                   pathname.startsWith("/reports")?"bg-sidebar-primary text-sidebar-primary-foreground":"text-sidebar-foreground/80 hover:bg-sidebar-accent")}>
@@ -349,7 +353,7 @@ function AppLayout() {
             </div>
           ) : item.to === "/verification" && !platformControl ? (
             <div key="verification-group">
-              <button type="button" onClick={()=>setVerificationOpen(v=>!v)} aria-expanded={verificationOpen} aria-controls="verification-sidebar-options"
+              <button type="button" onClick={()=>toggleNavGroup("verification")} aria-expanded={verificationOpen} aria-controls="verification-sidebar-options"
                 className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                   pathname.startsWith("/verification")?"bg-sidebar-primary text-sidebar-primary-foreground":"text-sidebar-foreground/80 hover:bg-sidebar-accent")}>
                 <ClipboardCheck className="h-4 w-4"/><span className="flex-1 text-left">Verification</span>
@@ -362,7 +366,7 @@ function AppLayout() {
             </div>
           ) : item.to === "/settings" && !platformControl ? (
             <div key="settings-group">
-              <button type="button" onClick={()=>setSettingsOpen(v=>!v)}
+              <button type="button" onClick={()=>toggleNavGroup("settings")}
                 aria-expanded={settingsOpen} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent">
                 <Settings className="h-4 w-4"/><span className="flex-1 text-left">Settings</span>
                 <ChevronDown className={cn("h-4 w-4 transition-transform",settingsOpen&&"rotate-180")}/>
@@ -384,7 +388,7 @@ function AppLayout() {
             </div>
           ) : renderNavItem(item))}
           {!platformControl&&groupItems(["/integrations","/live-tracking"]).length>0&&<div className="mt-3 border-t border-sidebar-border/60 pt-3">
-            <button type="button" onClick={()=>setAddonsOpen(v=>!v)} aria-expanded={addonsOpen} aria-controls="addons-bottom-sidebar" className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent">
+            <button type="button" onClick={()=>toggleNavGroup("addons")} aria-expanded={addonsOpen} aria-controls="addons-bottom-sidebar" className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/80 hover:bg-sidebar-accent">
               <PlugZap className="h-4 w-4"/><span className="flex-1 text-left">Add-ons</span><ChevronDown className={cn("h-4 w-4 transition-transform",addonsOpen&&"rotate-180")}/>
             </button>
             {addonsOpen&&<div id="addons-bottom-sidebar" className="ml-4 space-y-0.5 border-l border-sidebar-border pl-2">

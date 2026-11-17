@@ -11,7 +11,7 @@ export interface ThemePreset {
 }
 
 export const THEME_PRESETS: ThemePreset[] = [
-  { id: "ocean",   name: "Ocean (default)", primary: "#1e6fbf", accent: "#7fd3e8", sidebar: "#1f3550", sidebarPrimary: "#3aa0e0" },
+  { id: "ocean",   name: "AssetFlow Brand (default)", primary: "#3A3EC2", accent: "#e9e9fa", sidebar: "#202f70", sidebarPrimary: "#5155d8" },
   { id: "forest",  name: "Forest",          primary: "#2f8f4e", accent: "#a8e3b8", sidebar: "#1e3a2b", sidebarPrimary: "#4dbd6c" },
   { id: "sunset",  name: "Sunset",          primary: "#d9534f", accent: "#ffd6a5", sidebar: "#3a1f2b", sidebarPrimary: "#ff7a59" },
   { id: "violet",  name: "Violet",          primary: "#7c3aed", accent: "#ddc7ff", sidebar: "#2a1f44", sidebarPrimary: "#a78bfa" },

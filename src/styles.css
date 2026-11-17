@@ -519,27 +519,28 @@
 }
 
 
-/* Tenant-selected theme must control navigation, not fixed brand colors. */
+/* Restore the approved AssetFlow indigo navigation as the default.
+   Custom business themes still provide their own sidebar variables.
+   Do not globally recolor cards, action buttons, or dashboard widgets. */
 .af-premium-sidebar {
-  --sidebar:var(--af-selected-sidebar,#1f3550)!important;
-  --sidebar-primary:var(--af-selected-sidebar-primary,#3aa0e0)!important;
-  --sidebar-accent:color-mix(in srgb,var(--af-selected-sidebar,#1f3550) 80%,white)!important;
-  --sidebar-border:color-mix(in srgb,var(--af-selected-sidebar,#1f3550) 70%,white)!important;
-  background-color:var(--af-selected-sidebar,#1f3550)!important;
+  --sidebar:var(--af-selected-sidebar,#202f70)!important;
+  --sidebar-primary:var(--af-selected-sidebar-primary,#5155d8)!important;
+  --sidebar-accent:color-mix(in srgb,var(--af-selected-sidebar,#202f70) 84%,white)!important;
+  --sidebar-border:color-mix(in srgb,var(--af-selected-sidebar,#202f70) 82%,white)!important;
+  background-color:var(--af-selected-sidebar,#202f70)!important;
   border-right-color:var(--sidebar-border)!important;
 }
 .af-premium-sidebar .bg-sidebar-primary {
-  background-color:var(--af-selected-sidebar-primary,#3aa0e0)!important;
-  box-shadow:none!important;
+  background-color:var(--af-selected-sidebar-primary,#5155d8)!important;
+  color:white!important;
+  box-shadow:inset 3px 0 #c87831,0 2px 6px rgba(12,20,60,.12);
 }
 .af-premium-sidebar .bg-sidebar-accent {
   background-color:var(--sidebar-accent)!important;
 }
-.af-app-workspace :is(.bg-primary, .hover\:bg-primary:hover){background-color:var(--primary)!important}
 @media (max-width:767px) {
  .af-app-workspace :is(input,select,textarea){font-size:16px}
 }
-
 
 /* Consistent content widths for public pages: hero and sections share the same frame. */
 .af-public-site main > section > .af-content-fluid,
