@@ -35,3 +35,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Production-only deployment configuration (contains credentials)
+standalone.compose.yml
+
+.runtime.env
+backups/
+*.dump
+*.pre-ui-*
+*.pre-audit-*

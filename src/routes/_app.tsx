@@ -15,6 +15,9 @@ import { DEFAULT_TEMPLATE, type DocumentTemplate } from "@/lib/pdf-template";
 import { applyBrowserBranding, BRANDING_CHANGED_EVENT, loadTenantBranding } from "@/lib/branding";
 import { PlatformLogo, PlatformName } from "@/components/platform-logo";
 import {AddOnInlineCheckout} from "@/components/addon-inline-checkout";
+import {getWorkspaceTheme} from "@/lib/tenant-theme.functions";
+import {getServerAuthHeaders} from "@/lib/auth-headers";
+import {saveStoredTheme} from "@/lib/theme";
 
 export const Route = createFileRoute("/_app")({ component: AppLayout, head:()=>({meta:[{name:"robots",content:"noindex,nofollow,noarchive"}]}) });
 
@@ -76,6 +79,18 @@ function AppLayout() {
     user, loading, signOut, isAdmin, isTenantAdmin, isSaasAdmin, supportMode, supportRestoreError, platformStaffRole, roles, canView, isPaidFeature, isAddOnFeature,
     mustChangePassword, canExportReports, subscriptionStatus, trialEndsAt, tenantId, tenantName,
   } = useAuth();
+  // Share business-selected theme across all workspace users, not just the local browser.
+  useEffect(()=>{
+    if(!tenantId)return;
+    let cancelled=false;
+    void (async()=>{
+      try{
+        const theme=await getWorkspaceTheme({headers:await getServerAuthHeaders()});
+        if(!cancelled)saveStoredTheme(theme);
+      }catch(error){console.warn("[Theme] Could not load workspace preference",error)}
+    })();
+    return ()=>{cancelled=true};
+  },[tenantId]);
   // Render the original business navigation whenever a verified support session is active.
   const platformControl = isSaasAdmin && !supportMode;
   const exitBusinessSupport=async()=>{
@@ -405,7 +420,7 @@ function AppLayout() {
           <Button variant="ghost" size="icon" title="Sign out" onClick={signOut} aria-label="Sign out"><LogOut className="h-4 w-4 text-muted-foreground hover:text-foreground" /></Button>
         </header>
 
-        <main className="mx-auto w-full min-w-0 max-w-[1480px] flex-1 overflow-x-clip border-x border-[#d5e0e8] bg-white px-3 py-4 shadow-[0_10px_30px_rgba(25,55,75,.05)] sm:px-5 sm:py-6 md:px-8 md:py-8">
+        <main className="af-app-main mx-auto min-w-0 flex-1 overflow-x-clip bg-white px-3 py-4 sm:px-5 sm:py-6 md:px-7 md:py-7">
           {supportMode&&<div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-300 bg-orange-50 px-4 py-3 text-sm text-orange-950" role="status">
             <div><strong>SaaS Admin · Business Support Mode</strong><p className="mt-1 text-xs">You are viewing the existing {tenantName||"business"} portal. All actions remain attributable to your SaaS Admin account. This access is temporary.</p></div>
             <Button variant="outline" size="sm" onClick={()=>{void exitBusinessSupport();}}>Exit Business</Button>

@@ -26,6 +26,8 @@ import {
 import { announceBrandingChanged } from "@/lib/branding";
 import { LocationSettingsPanel } from "@/components/location-settings-panel";
 import { AutomationSettingsPanel } from "@/components/automation-settings-panel";
+import {getWorkspaceTheme,saveWorkspaceTheme} from "@/lib/tenant-theme.functions";
+import {getServerAuthHeaders} from "@/lib/auth-headers";
 
 export const Route = createFileRoute("/_app/settings")({
   component: SettingsPage,
@@ -41,7 +43,7 @@ function SettingsPage() {
   const previewTimer = useRef<any>(null);
 
   useEffect(() => {
-    loadTemplate(true).then(setTpl).catch((error) => {
+    loadTemplate().then(setTpl).catch((error) => {
       console.error("Unable to load company branding", error);
       toast.error(error?.message || "Unable to load company branding. Refresh and try again.");
     });
@@ -49,11 +51,11 @@ function SettingsPage() {
 
   // Debounced live preview
   useEffect(() => {
-    if (!tpl) return;
+    if (!tpl || activeTab!=="brand") return;
     clearTimeout(previewTimer.current);
     previewTimer.current = setTimeout(() => generatePreview(tpl).then(setPreviewUrl), 250);
     return () => clearTimeout(previewTimer.current);
-  }, [tpl]);
+  }, [tpl,activeTab]);
 
   if (loading) return null;
   if (!canView("settings")) return <Navigate to="/dashboard" />;
@@ -432,7 +434,27 @@ async function generatePreview(tpl: DocumentTemplate): Promise<string> {
 
 function AppearancePanel() {
   const [theme, setTheme] = useState<StoredTheme>(() => loadStoredTheme());
-  const apply = (next: StoredTheme) => { setTheme(next); saveStoredTheme(next); };
+  const timer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  useEffect(()=>{
+    let cancelled=false;
+    void (async()=>{
+      try{
+        const loaded=await getWorkspaceTheme({headers:await getServerAuthHeaders()});
+        if(!cancelled){setTheme(loaded);saveStoredTheme(loaded)}
+      }catch(error){console.warn("Workspace theme unavailable",error)}
+    })();
+    return ()=>{cancelled=true;if(timer.current)clearTimeout(timer.current)};
+  },[]);
+  const apply=(next:StoredTheme)=>{
+    setTheme(next);saveStoredTheme(next);
+    if(timer.current)clearTimeout(timer.current);
+    timer.current=setTimeout(()=>{
+      void (async()=>{
+        try{await saveWorkspaceTheme({headers:await getServerAuthHeaders(),data:next})}
+        catch(error:any){toast.error(error?.message||"Unable to save organisation theme")}
+      })();
+    },650);
+  };
   const current = THEME_PRESETS.find((p) => p.id === theme.presetId) ?? THEME_PRESETS[0];
   return (
     <div className="space-y-5">
@@ -502,7 +524,7 @@ function AppearancePanel() {
         </div>
       </div>
       <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
-        Your theme is saved to this browser. PDF document branding is controlled separately on the other tabs.
+        The selected theme is shared across this organisation's dashboards. Document/PDF branding is managed separately.
       </div>
     </div>
   );

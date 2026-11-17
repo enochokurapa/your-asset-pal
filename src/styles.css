@@ -466,3 +466,76 @@
 .af-premium-sidebar .bg-sidebar-primary{background-color:#5155d8;color:#fff;box-shadow:inset 3px 0 #c87831,0 2px 6px rgba(12,20,60,.12);}
 .af-premium-sidebar .bg-sidebar-accent{background-color:#334486;}
 @media(prefers-reduced-motion:reduce){.af-premium-sidebar a,.af-premium-sidebar button{transition:none;}}
+
+
+/* AssetFlow360 responsive UI refresh — 2026-11-17 */
+/* Website and data-entry workspace: comfortable widths, no fixed desktop ceiling. */
+.af-public-site .af-site-frame { width:100%; max-width:none; margin-inline:auto; }
+.af-app-workspace > main.af-app-main { width:100%; max-width:none; min-width:0; margin-inline:auto; border:0; box-shadow:none; }
+@media (min-width: 768px) and (max-width: 1279px) {
+  .af-public-site .af-site-frame,
+  .af-app-workspace > main.af-app-main { width:94%; }
+}
+@media (min-width: 1280px) {
+  .af-public-site .af-site-frame,
+  .af-app-workspace > main.af-app-main { width:85%; }
+}
+@media (max-width: 767px) {
+  .af-public-site .af-site-frame,
+  .af-app-workspace > main.af-app-main { width:100%; padding-left:14px; padding-right:14px; }
+}
+/* Forms should feel quiet, readable, and reliable on mobile and desktop. */
+.af-auth-stage { background:#f7f8fb; overflow-x:hidden; }
+.af-auth-stage::before, .af-auth-stage::after { display:none!important; content:none!important; }
+.af-auth-stage .af-auth-card {
+  border-color:#e2e6ee;
+  border-radius:16px;
+  box-shadow:0 12px 34px rgba(21,33,71,.065);
+}
+.af-auth-stage .af-auth-card input {
+  min-height:44px;
+  font-size:16px;
+  transition:border-color .16s ease,box-shadow .16s ease;
+}
+.af-auth-stage .af-auth-card input:focus-visible {
+  outline:none;
+  border-color:#4e51db;
+  box-shadow:0 0 0 3px rgba(78,81,219,.14);
+}
+.af-auth-stage .af-auth-card button[type=submit] { min-height:44px; transition:background-color .16s ease; }
+.af-auth-stage .af-auth-card,
+.af-auth-stage .af-auth-card form>*,
+.af-auth-stage .af-auth-card>div,
+.af-auth-stage .af-auth-card>p { animation:none!important; }
+.af-app-workspace { background:#f4f6fa!important; }
+.af-app-workspace > main.af-app-main { background:#fff; }
+.af-app-workspace :is(input,textarea,select):focus-visible {
+  outline-offset:2px;
+}
+.af-app-workspace :is(input,textarea,select) { min-width:0; }
+@media (prefers-reduced-motion: reduce) {
+  .af-auth-stage .af-auth-card input,
+  .af-auth-stage .af-auth-card button[type=submit] { transition:none!important; }
+}
+
+
+/* Tenant-selected theme must control navigation, not fixed brand colors. */
+.af-premium-sidebar {
+  --sidebar:var(--af-selected-sidebar,#1f3550)!important;
+  --sidebar-primary:var(--af-selected-sidebar-primary,#3aa0e0)!important;
+  --sidebar-accent:color-mix(in srgb,var(--af-selected-sidebar,#1f3550) 80%,white)!important;
+  --sidebar-border:color-mix(in srgb,var(--af-selected-sidebar,#1f3550) 70%,white)!important;
+  background-color:var(--af-selected-sidebar,#1f3550)!important;
+  border-right-color:var(--sidebar-border)!important;
+}
+.af-premium-sidebar .bg-sidebar-primary {
+  background-color:var(--af-selected-sidebar-primary,#3aa0e0)!important;
+  box-shadow:none!important;
+}
+.af-premium-sidebar .bg-sidebar-accent {
+  background-color:var(--sidebar-accent)!important;
+}
+.af-app-workspace :is(.bg-primary, .hover\:bg-primary:hover){background-color:var(--primary)!important}
+@media (max-width:767px) {
+ .af-app-workspace :is(input,select,textarea){font-size:16px}
+}

@@ -338,3 +338,60 @@ export async function sendPlatformEmailRecoveryLink(to:string,url:string){
   return {accepted:true};
  }finally{smtp.close()}
 }
+
+
+/** Branded operations mail. Subject and message are plain-text inputs, not HTML. */
+export async function sendPlatformOperationsNotice(
+ to:string,subject:string,message:string,attachment?:{name:string;mime:string;data:Buffer}
+){
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)||to.length>250)throw Error("Invalid notification recipient");
+ if(attachment&&attachment.data.length>512*1024)throw Error("Attachment exceeds 512 KB");
+ const cfg=await getConfiguredSmtpForApplication("operations");
+ const encode=(x:string)=>x.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+ const esc=encode(message).replace(/\n/g,"<br/>");
+ const html=`<!doctype html><html><body style="margin:0;padding:36px 12px;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;color:#172554">
+ <div style="max-width:640px;margin:auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0">
+ <div style="padding:24px 30px;background:#333bc1;color:#fff;font-size:21px;font-weight:700">AssetFlow360 <span style="font-size:13px;font-weight:400">Operations</span></div>
+ <div style="padding:30px"><h1 style="font-size:22px;line-height:1.3;margin:0 0 18px">${encode(subject)}</h1>
+ <div style="font-size:15px;line-height:1.75;color:#334155">${esc}</div>
+ <p style="margin-top:28px"><a href="https://assetflow360.com/login" style="display:inline-block;padding:13px 22px;border-radius:9px;background:#333bc1;color:#fff;text-decoration:none;font-weight:bold">Open your workspace</a></p></div>
+ <div style="padding:20px 30px;background:#f8fafc;border-top:1px solid #e2e8f0;color:#64748b;font-size:12px;line-height:1.7">
+ AssetFlow360 Operations · Automated platform notification<br/>Please do not reply to this email.</div></div></body></html>`;
+ const boundary="assetflow-"+randomBytes(15).toString("hex");
+ const lines=[
+  "From: AssetFlow Operations <"+cfg.fromEmail+">",
+  "To: "+safe(to),
+  "Subject: "+safe(subject).slice(0,170),
+  "MIME-Version: 1.0",
+  "X-Auto-Response-Suppress: All",
+  "Content-Type: multipart/mixed; boundary=\""+boundary+"\"",
+  "",
+  "--"+boundary,
+  "Content-Type: text/html; charset=UTF-8",
+  "Content-Transfer-Encoding: base64",
+  "",
+  Buffer.from(html,"utf8").toString("base64").match(/.{1,76}/g)?.join("\r\n")||"",
+ ];
+ if(attachment){
+  if(!/^[a-zA-Z0-9._ -]{1,100}$/.test(attachment.name))throw Error("Unsafe attachment name");
+  if(!["application/pdf","image/jpeg","image/png","application/vnd.openxmlformats-officedocument.wordprocessingml.document"].includes(attachment.mime))throw Error("Unsupported attachment");
+  lines.push(
+   "--"+boundary,
+   "Content-Type: "+attachment.mime,
+   "Content-Transfer-Encoding: base64",
+   "Content-Disposition: attachment; filename=\""+attachment.name+"\"",
+   "",
+   attachment.data.toString("base64").match(/.{1,76}/g)?.join("\r\n")||"",
+  );
+ }
+ lines.push("--"+boundary+"--");
+ const session=await connect(cfg);
+ try{
+  await session.send("MAIL FROM:<"+cfg.fromEmail+">");
+  await session.send("RCPT TO:<"+to+">");
+  await session.send("DATA",354);
+  await session.send(lines.join("\r\n").replace(/\r\n\./g,"\r\n..")+"\r\n.",250);
+  try{await session.send("QUIT",221)}catch{/* accepted after DATA */}
+  return {accepted:true};
+ }finally{session.close();}
+}

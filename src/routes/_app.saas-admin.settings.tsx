@@ -11,6 +11,7 @@ function SettingsPage(){
  {[
  {to:"/saas-admin/payment-gateways",title:"Payment Gateways",description:"Yo Uganda and ioTec credentials"},
  {to:"/saas-admin/email",title:"Email & SMTP",description:"Sender credentials and email tests"},
+ {to:"/saas-admin/communications",title:"Business Communications",description:"Send branded notices with attachments to all users, one business, or a specific recipient"},
  {to:"/saas-admin/email-reports",title:"Automated Reports",description:"Monthly or daily emailed asset summaries"},
  {to:"/saas-admin/modules",title:"Modules & Add-ons",description:"Explicit activation of integrations and GPS"},
  {to:"/saas-admin/organizations",title:"Organizations & Billing",description:"Manage subscriptions and tenant permissions"},

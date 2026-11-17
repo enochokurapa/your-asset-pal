@@ -6,3 +6,14 @@ node_modules
 .env.*
 dist
 *.log
+# Security: never embed local production backups or deployment credentials in images.
+backups/
+**/backups/
+*.dump
+*.sql.gz
+standalone.compose.yml
+.runtime.env
+ui-build-*.log
+*.pre-ui-*
+*.pre-audit-*
+.github/

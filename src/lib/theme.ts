@@ -88,6 +88,8 @@ export function applyStoredTheme(t: StoredTheme = loadStoredTheme()) {
   root.setProperty("--accent", preset.accent);
   root.setProperty("--sidebar", preset.sidebar);
   root.setProperty("--sidebar-primary", preset.sidebarPrimary);
+  root.setProperty("--af-selected-sidebar", preset.sidebar);
+  root.setProperty("--af-selected-sidebar-primary", preset.sidebarPrimary);
   root.setProperty("--sidebar-ring", preset.sidebarPrimary);
   const font = FONT_OPTIONS.find((f) => f.id === t.fontId) ?? FONT_OPTIONS[0];
   root.setProperty("--font-sans", font.stack);

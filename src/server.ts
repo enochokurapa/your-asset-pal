@@ -1,3 +1,5 @@
+import {queryPostgres} from "./lib/postgres.server";
+import {startOperationsNoticeScheduler} from "./lib/platform-operations-notices.server";
 import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
@@ -44,6 +46,7 @@ let serverEntryPromise: Promise<ServerEntry> | undefined;
 startBackupScheduler();
 startTenantAutomationScheduler();
 startPlatformEmailReportScheduler();
+startOperationsNoticeScheduler();
 
 async function getServerEntry(): Promise<ServerEntry> {
   if (!serverEntryPromise) {
@@ -466,6 +469,14 @@ function withSecurityHeaders(response: Response, request: Request): Response {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      if(new URL(request.url).pathname==="/api/health"){
+        try{
+          await queryPostgres("SELECT 1");
+          return withSecurityHeaders(jsonResponse(200,{status:"ok",database:"ok"}),request);
+        }catch{
+          return withSecurityHeaders(jsonResponse(503,{status:"degraded",database:"unavailable"}),request);
+        }
+      }
       const domainCheck=await domainGuard(request);
       if(domainCheck)return withSecurityHeaders(domainCheck,request);
       const brandedAsset = await maybeHandlePlatformBrandingAsset(request);

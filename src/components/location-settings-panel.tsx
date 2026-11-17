@@ -10,6 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
+import {getServerAuthHeaders} from "@/lib/auth-headers";
+import {getTenantCountryAddons,getCountryExpansionQuote,startYoCountryExpansionPurchase,checkYoCountryExpansionPurchase} from "@/lib/saas.functions";
 
 type Settings = {
   location_mode: "internal" | "branch" | "geographic" | "hybrid";
@@ -49,20 +51,36 @@ export function LocationSettingsPanel() {
   const [form, setForm] = useState<Settings>(DEFAULTS);
   const [saving, setSaving] = useState(false);
   const [countrySearch,setCountrySearch]=useState("");
+  const [purchaseCountry,setPurchaseCountry]=useState("");
+  const [purchasePhone,setPurchasePhone]=useState("");
+  const [purchaseTransaction,setPurchaseTransaction]=useState("");
+  const [purchaseQuote,setPurchaseQuote]=useState<{countryName:string;countryCode:string;priceUgx:number;discountPercent:number;renewalDate:string}|null>(null);
+  const [purchaseBusy,setPurchaseBusy]=useState(false);
+  const countryAddons=useQuery({
+    queryKey:["tenant-country-addons",tenantId],
+    enabled:!!tenantId&&isTenantAdmin,
+    staleTime:60000,
+    queryFn:async()=>getTenantCountryAddons({headers:await getServerAuthHeaders()}),
+  });
+
 
   const { data: countries = [] } = useQuery({
     queryKey: ["geo-countries"],
+    staleTime:3600000,
+    refetchOnWindowFocus:false,
     queryFn: async () => (await (supabase as any).from("geo_countries").select("code,name").eq("enabled", true).order("name")).data ?? [],
   });
   const { data: branches = [] } = useQuery({
     queryKey: ["location-settings-branches"],
+    staleTime:300000,
+    refetchOnWindowFocus:false,
     queryFn: async () => (await supabase.from("branches").select("id,name,code,is_active").eq("is_active", true).order("name")).data ?? [],
   });
   const { data: saved } = useQuery({
     queryKey: ["tenant-location-settings", tenantId],
-    staleTime:0,
-    refetchOnMount:"always",
-    refetchOnWindowFocus:"always",
+    staleTime:120000,
+    refetchOnMount:false,
+    refetchOnWindowFocus:false,
     enabled: !!tenantId,
     queryFn: async () => {
       const { data, error } = await (supabase as any).from("tenant_location_settings").select("*").eq("tenant_id", tenantId).maybeSingle();
@@ -77,11 +95,50 @@ export function LocationSettingsPanel() {
 
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => setForm((current) => ({ ...current, [key]: value }));
 
-  // One country per workspace until separate multi-country plans are enabled.
-  // Choosing Uganda replaces Zambia; merely ticking a second allowed country
-  // must not leave Zambia as the hidden default.
-  const toggleCountry = (code: string) => {
-    setForm(current=>({...current,allowed_country_codes:[code],default_country_code:code}));
+  const toggleCountry = (code:string)=>{
+    if(!form.default_country_code){
+      setForm(current=>({...current,default_country_code:code,allowed_country_codes:[code]}));
+      return;
+    }
+    const paid=(countryAddons.data||[]).some(x=>x.country_code===code);
+    if(paid){
+      setForm(current=>({...current,allowed_country_codes:Array.from(new Set([...current.allowed_country_codes,code]))}));
+      toast.success("Paid country selected; save settings to apply");
+      return;
+    }
+    if(form.default_country_code===code)return;
+    setPurchaseCountry(code);setPurchaseQuote(null);setPurchaseTransaction("");
+    void (async()=>{
+      try{
+        const quote=await getCountryExpansionQuote({headers:await getServerAuthHeaders(),data:{country_code:code}});
+        setPurchaseQuote(quote);
+      }catch(error:any){toast.error(error?.message||"Country payment quote unavailable")}
+    })();
+  };
+  const buyCountry=async()=>{
+    if(!purchaseCountry||!purchasePhone)return;
+    setPurchaseBusy(true);
+    try{
+      const result=await startYoCountryExpansionPurchase({
+       headers:await getServerAuthHeaders(),data:{country_code:purchaseCountry,phone:purchasePhone}});
+      setPurchaseTransaction(result.transactionId);
+      toast.success("Mobile money payment request sent. Approve it on your phone, then verify.");
+    }catch(error:any){toast.error(error?.message||"Payment request failed")}
+    finally{setPurchaseBusy(false)}
+  };
+  const verifyCountry=async()=>{
+    if(!purchaseTransaction)return;
+    setPurchaseBusy(true);
+    try{
+      const result=await checkYoCountryExpansionPurchase({
+       headers:await getServerAuthHeaders(),data:{transactionId:purchaseTransaction}});
+      if(!result.successful){toast.info("Payment is still pending");return}
+      await Promise.all([countryAddons.refetch(),qc.invalidateQueries({queryKey:["tenant-location-settings",tenantId]})]);
+      setForm(current=>({...current,allowed_country_codes:Array.from(new Set([...current.allowed_country_codes,purchaseCountry]))}));
+      setPurchaseTransaction("");setPurchaseCountry("");setPurchaseQuote(null);
+      toast.success("Country successfully activated until your subscription renewal date");
+    }catch(error:any){toast.error(error?.message||"Could not verify payment")}
+    finally{setPurchaseBusy(false)}
   };
 
   const save = async () => {
@@ -178,7 +235,7 @@ export function LocationSettingsPanel() {
             {usesGeography && (
               <>
                 <div className="space-y-2 md:col-span-2">
-                  <Label>Organisation country (choose one)</Label>
+                  <Label>Countries for this workspace</Label>
                   <Input className="h-11" placeholder="Search any country worldwide…" aria-label="Search available countries"
                     value={countrySearch} onChange={e=>setCountrySearch(e.target.value)}/>
                   <div className="max-h-52 overflow-y-auto rounded-lg border bg-background p-2">
@@ -193,10 +250,26 @@ export function LocationSettingsPanel() {
                       })}
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">{(countries as any[]).length} available countries · Your organisation selects one active country at a time.</p>
-                  <p className="text-xs text-muted-foreground">Tap the country to make it active, then press Save country settings below. The previous country is replaced for new entries, but existing asset locations remain unchanged.</p>
+                  <p className="text-xs text-muted-foreground">{(countries as any[]).length} countries available. One country is included; additional countries require a verified payment.</p>
+                  <p className="text-xs text-muted-foreground">Click an additional country to see its payment quote. Paid countries remain enabled until the business subscription expiry. Unpaid countries are blocked by server rules.</p>
                 </div>
 
+                {purchaseCountry&&<div className="space-y-3 rounded-lg border p-4 md:col-span-2">
+                  <h4 className="font-semibold">Add a country to your subscription</h4>
+                  {purchaseQuote?<><p className="text-sm">{purchaseQuote.countryName}: <strong>UGX {purchaseQuote.priceUgx.toLocaleString()}</strong>
+                    {" "}({purchaseQuote.discountPercent}% discount from verified base-country payment).</p>
+                    <p className="text-xs text-muted-foreground">Entitlement expires on {new Date(purchaseQuote.renewalDate).toLocaleDateString()}.</p>
+                    <Label>Uganda mobile money number</Label>
+                    <Input value={purchasePhone} placeholder="e.g. 0771234567" onChange={e=>setPurchasePhone(e.target.value)}
+                      disabled={!!purchaseTransaction}/>
+                    {!purchaseTransaction?
+                    <Button disabled={purchaseBusy||!purchasePhone} onClick={()=>void buyCountry()}>
+                      {purchaseBusy?"Requesting…":"Pay and add country"}</Button>:
+                    <Button disabled={purchaseBusy} onClick={()=>void verifyCountry()}>
+                      {purchaseBusy?"Checking…":"I've approved payment — verify"}</Button>}
+                  </>:<p className="text-sm text-muted-foreground">A verified base subscription amount is required for a country quote.</p>}
+                  <Button variant="outline" onClick={()=>{setPurchaseCountry("");setPurchaseQuote(null);setPurchaseTransaction("")}}>Cancel</Button>
+                </div>}
                 <div className="space-y-2">
                   <Label>Country used for new assets</Label>
                   <Select

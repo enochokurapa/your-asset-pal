@@ -105,6 +105,14 @@ function SaasAdminOrganizationsPage() {
   const [seatLimit,setSeatLimit] = useState("");
   const [priceOverride,setPriceOverride] = useState("");
   const [savingControls,setSavingControls] = useState(false);
+  const [activationPeriod,setActivationPeriod]=useState<"monthly"|"six_months"|"annual"|"365_days"|"custom_days">("annual");
+  const [activationDays,setActivationDays]=useState("365");
+  const [activationUsers,setActivationUsers]=useState("4");
+  const [activationAssets,setActivationAssets]=useState("-1");
+  const [activationMethod,setActivationMethod]=useState<"cash"|"bank_transfer"|"external_mobile_money"|"admin_grant">("admin_grant");
+  const [activationAmount,setActivationAmount]=useState("");
+
+  const [activationReason,setActivationReason]=useState("Administrator-approved subscription activation");
 
   const [search, setSearch] = useState("");
   const [nameDraft, setNameDraft] = useState("");
@@ -167,12 +175,24 @@ function SaasAdminOrganizationsPage() {
 
   const changeTenantStatus = async (status: "trial" | "active" | "expired" | "suspended") => {
     if (!selectedTenantId) return;
+    if(status==="active"&&!window.confirm("Activate this business for the chosen duration and quotas? Users beyond the seat allowance will be deactivated."))return;
     try {
+      const users=Number(activationUsers),assets=Number(activationAssets),days=Number(activationDays);
+      if(status==="active"&&(!Number.isInteger(users)||users<1||!Number.isInteger(assets)||assets< -1||
+       (activationPeriod==="custom_days"&&(!Number.isInteger(days)||days<1||days>3650))))
+        throw Error("Enter valid limits; use -1 for unlimited assets and users.");
       await authCall(saveTenant, {
         data: {
           tenant_id: selectedTenantId,
           status,
-          plan_code: status === "active" ? (["starter","business","enterprise"].includes(tenant?.plan_code)?tenant.plan_code:"paid") : "trial",
+          plan_code: status === "active" ? (["starter","business","enterprise"].includes(tenant?.plan_code)?tenant.plan_code:"paid") : "paid",
+          period:status==="active"?activationPeriod:undefined,
+          duration_days:status==="active"&&activationPeriod==="custom_days"?Number(activationDays):undefined,
+          paid_user_limit:status==="active"?Number(activationUsers):undefined,
+          paid_asset_limit:status==="active"?Number(activationAssets):undefined,
+          payment_method:status==="active"?activationMethod:undefined,
+          amount_received_ugx:status==="active"&&activationAmount.trim()?Number(activationAmount):undefined,
+          reason:status==="active"?activationReason:undefined,
         },
       });
       await qc.invalidateQueries({ queryKey: ["saas-admin-dashboard"] });
@@ -335,7 +355,34 @@ function SaasAdminOrganizationsPage() {
                   <p className="mt-1 text-xs text-muted-foreground">{tenant.slug} · Created {new Date(tenant.created_at).toLocaleDateString()}</p>
                   <Button className="mt-3" disabled={enteringBusiness} onClick={accessBusinessDashboard}><ShieldCheck className="mr-2 h-4 w-4"/>{enteringBusiness?"Opening…":"Access Dashboard"}</Button>
                 </div>
-                <div className="w-full sm:w-52 space-y-2"><label className="block text-xs font-medium">Assigned paid package</label><Select value={["starter","business","enterprise"].includes(tenant.plan_code)?tenant.plan_code:"legacy"} disabled={tenant.effective_status!=="active"} onValueChange={v=>setNamedPlan(v==="legacy"?"paid":v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="legacy">Legacy paid plan</SelectItem><SelectItem value="starter">Starter</SelectItem><SelectItem value="business">Business</SelectItem><SelectItem value="enterprise">Enterprise</SelectItem></SelectContent></Select><p className="text-xs text-muted-foreground">SaaS Admin sets the package without changing the subscription expiry.</p></div><div className="w-full sm:w-52">
+                <div className="w-full sm:w-52 space-y-2"><label className="block text-xs font-medium">Assigned paid package</label><Select value={["starter","business","enterprise"].includes(tenant.plan_code)?tenant.plan_code:"legacy"} disabled={tenant.effective_status!=="active"} onValueChange={v=>setNamedPlan(v==="legacy"?"paid":v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="legacy">Legacy paid plan</SelectItem><SelectItem value="starter">Starter</SelectItem><SelectItem value="business">Business</SelectItem><SelectItem value="enterprise">Enterprise</SelectItem></SelectContent></Select><p className="text-xs text-muted-foreground">SaaS Admin sets the package without changing the subscription expiry.</p></div><div className="w-full sm:w-52 space-y-2">
+                  <label className="block text-xs font-medium">Activation duration</label>
+                  <select aria-label="Activation duration" className="h-10 w-full rounded-md border bg-background px-2" value={activationPeriod}
+                    onChange={e=>setActivationPeriod(e.target.value as typeof activationPeriod)}>
+                    <option value="monthly">1 month</option><option value="six_months">6 months</option>
+                    <option value="annual">12 months</option><option value="365_days">365 days</option>
+                    <option value="custom_days">Custom number of days</option>
+                  </select>
+                  {activationPeriod==="custom_days"&&<><label className="block text-xs font-medium">Number of days</label>
+                    <Input type="number" min={1} max={3650} value={activationDays} onChange={e=>setActivationDays(e.target.value)}/></>}
+                  <label className="block text-xs font-medium">Maximum active users (enter -1 for unlimited)</label>
+                  <Input type="number" min={-1} value={activationUsers} onChange={e=>setActivationUsers(e.target.value)}/>
+                  <label className="block text-xs font-medium">Maximum assets (enter -1 for unlimited)</label>
+                  <Input type="number" min={-1} value={activationAssets} onChange={e=>setActivationAssets(e.target.value)}/>
+                  <label className="block text-xs font-medium">Payment method</label>
+                  <select className="h-10 w-full rounded-md border bg-background px-2" value={activationMethod}
+                    onChange={e=>setActivationMethod(e.target.value as typeof activationMethod)}>
+                    <option value="cash">Cash received</option><option value="bank_transfer">Bank transfer</option>
+                    <option value="external_mobile_money">Mobile money outside platform</option>
+                    <option value="admin_grant">Administrator-approved (no payment)</option>
+                  </select>
+                  <label className="block text-xs font-medium">Amount collected outside AssetFlow (UGX)</label>
+                  <Input type="number" min={0} value={activationAmount} placeholder="Optional verified amount"
+                    onChange={e=>setActivationAmount(e.target.value)}/>
+                  <label className="block text-xs font-medium">Reason for manual activation</label>
+                  <Input aria-label="Manual activation reason" value={activationReason} maxLength={500}
+                    onChange={e=>setActivationReason(e.target.value)} placeholder="Reason for administrator activation"/>
+                  <label className="block text-xs font-medium">Subscription status</label>
                   <Select value={tenant.effective_status} onValueChange={(value) => changeTenantStatus(value as any)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>

@@ -1,3 +1,6 @@
+import {queueTenantActivationNotice} from "@/lib/platform-operations-notices.server";
+import {getPostgresPool} from "@/lib/postgres.server";
+import {randomUUID} from "node:crypto";
 import { getYoCheckoutConfig, isYoCheckoutConfigured } from "@/lib/payment-gateway.server";
 import { ugandanMobileMoneyPhoneSchema } from "@/lib/uganda-mobile-money";
 import { currentUsdUgxQuote, usdToUgx } from "@/lib/pricing-fx.server";
@@ -456,40 +459,102 @@ export const assignTenantPricingPlan=createServerFn({method:"POST"}).middleware(
   return {ok:true};
  });
 export const updateTenantSubscription = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({
-    tenant_id: z.string().uuid(),
-    status: z.enum(["trial", "active", "expired", "suspended"]),
-    plan_code: z.string().min(1).max(60).default("paid"),
-  }).parse(input))
-  .handler(async ({ data, context }) => {
-    await assertSaasAdmin(context.userId);
-    const patch: any = {
-      subscription_status: data.status,
-      plan_code: data.status === "trial" ? "trial" : data.plan_code,
-      updated_at: new Date().toISOString(),
-    };
-    if (data.status === "active") {
-      patch.subscription_started_at = new Date().toISOString();
-      patch.subscription_ends_at = new Date(Date.now() + 30 * 86400000).toISOString();
-    } else if (data.status === "trial") {
-      const { data: settings, error: settingsError } = await admin.from("saas_settings")
-        .select("trial_days").eq("id", true).single();
-      if (settingsError || !settings) throw new Error(settingsError?.message || "Trial policy is not configured");
-      const { data: tenantOverrides, error: overrideError } = await admin.from("tenants").select("trial_days_override").eq("id", data.tenant_id).single();
-      if (overrideError) throw new Error(overrideError.message);
-      const trialDays = Number(tenantOverrides?.trial_days_override ?? settings.trial_days);
-      if (!Number.isInteger(trialDays) || trialDays < 1) throw new Error("Trial policy is not configured");
-      const startedAt = new Date();
-      patch.trial_started_at = startedAt.toISOString();
-      patch.trial_ends_at = new Date(startedAt.getTime() + trialDays * 86400000).toISOString();
-      patch.subscription_started_at = null;
-      patch.subscription_ends_at = null;
+ .middleware([requireSupabaseAuth])
+ .inputValidator(input=>z.object({
+  tenant_id:z.string().uuid(),
+  status:z.enum(["trial","active","expired","suspended"]),
+  plan_code:z.enum(["starter","business","enterprise","paid"]).default("paid"),
+  period:z.enum(["monthly","six_months","annual","365_days","custom_days"]).optional(),
+  duration_days:z.number().int().min(1).max(3650).optional(),
+  paid_user_limit:z.number().int().min(-1).max(100000).optional(),
+  paid_asset_limit:z.number().int().min(-1).max(100000000).optional(),
+  amount_received_ugx:z.number().min(0).max(100000000000).optional(),
+  payment_method:z.enum(["cash","bank_transfer","external_mobile_money","admin_grant"]).optional(),
+  reason:z.string().trim().min(8).max(500).optional(),
+ }).parse(input))
+ .handler(async({data,context})=>{
+  await assertSaasAdmin(context.userId);
+  if(data.status==="active"&&(!data.period||!data.reason||data.paid_user_limit===undefined||data.paid_asset_limit===undefined||!data.payment_method))
+   throw Error("Select duration, user/asset limits, payment method, and audit reason before activation");
+  if(data.period==="custom_days"&&!data.duration_days)throw Error("Number of days is required");
+  const client=await getPostgresPool().connect();
+  const eventId=randomUUID();
+  const usersToBan:string[]=[];
+  try{
+   await client.query("BEGIN");
+   const current=(await client.query<{subscription_status:string;subscription_ends_at:string|null;plan_code:string}>(
+    "SELECT subscription_status,subscription_ends_at,plan_code FROM public.tenants WHERE id=$1 FOR UPDATE",[data.tenant_id])).rows[0];
+   if(!current)throw Error("Business not found");
+   const now=new Date().toISOString();
+   if(data.status==="active"){
+    const base=current.subscription_status==="active"&&current.subscription_ends_at&&new Date(current.subscription_ends_at)>new Date()
+     ?current.subscription_ends_at:now;
+    const months=data.period==="monthly"?1:data.period==="six_months"?6:data.period==="annual"?12:0;
+    const days=data.period==="365_days"?365:data.period==="custom_days"?data.duration_days||0:0;
+    await client.query(`UPDATE public.tenants SET subscription_status='active',
+     subscription_started_at=CASE WHEN subscription_status='active' AND subscription_ends_at>now()
+        THEN subscription_started_at ELSE $2::timestamptz END,
+     subscription_ends_at=$3::timestamptz+make_interval(months=>$4::integer,days=>$5::integer),
+     plan_code=$6,paid_user_limit_override=CASE WHEN $7::integer=-1 THEN NULL ELSE $7::integer END,
+     paid_users_unlimited=($7::integer=-1),paid_asset_limit_override=$8,
+     last_manual_activation_amount_ugx=$9::numeric,
+     last_manual_activation_method=$10,last_manual_activation_at=now(),updated_at=now()
+     WHERE id=$1`,
+     [data.tenant_id,now,base,months,days,data.plan_code,data.paid_user_limit,data.paid_asset_limit,
+      data.amount_received_ugx??null,data.payment_method]);
+    if(data.paid_user_limit!==-1){
+     const active=(await client.query<{id:string}>(`SELECT p.id FROM public.profiles p
+      WHERE p.tenant_id=$1 AND p.is_active=true AND p.is_saas_admin=false
+      ORDER BY CASE WHEN p.tenant_role='tenant_admin'
+         OR EXISTS (SELECT 1 FROM public.user_roles r WHERE r.user_id=p.id AND r.role='admin')
+           THEN 0 ELSE 1 END,p.created_at,p.id FOR UPDATE OF p`,[data.tenant_id])).rows;
+     const surplus=active.slice(data.paid_user_limit).map(x=>x.id);
+     if(surplus.length){
+      usersToBan.push(...surplus);
+      await client.query("UPDATE public.profiles SET is_active=false WHERE id=ANY($1::uuid[])",[surplus]);
+      for(const id of surplus){
+       await client.query(`INSERT INTO public.audit_log(entity_type,entity_id,action,actor_user_id,tenant_id,details)
+        VALUES('profile',$1,'user_deactivated_subscription_limit',$2,$3,$4::jsonb)`,
+        [id,context.userId,data.tenant_id,JSON.stringify({reason:"Subscription active user allowance",limit:data.paid_user_limit,eventId})]);
+      }
+     }
     }
-    const { error } = await admin.from("tenants").update(patch).eq("id", data.tenant_id);
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
+   }else if(data.status==="trial"){
+    const q=(await client.query<{days:number}>(`SELECT COALESCE(t.trial_days_override,s.trial_days)::int days
+     FROM public.tenants t CROSS JOIN public.saas_settings s
+     WHERE t.id=$1 AND s.id=true`,[data.tenant_id])).rows[0];
+    if(!q||!Number.isInteger(q.days)||q.days<1)throw Error("Trial duration is not configured");
+    await client.query(`UPDATE public.tenants SET subscription_status='trial',plan_code='trial',
+     trial_started_at=now(),trial_ends_at=now()+($2::integer*interval '1 day'),
+     subscription_started_at=NULL,subscription_ends_at=NULL,updated_at=now() WHERE id=$1`,[data.tenant_id,q.days]);
+   }else{
+    await client.query("UPDATE public.tenants SET subscription_status=$2,updated_at=now() WHERE id=$1",[data.tenant_id,data.status]);
+   }
+   await client.query(`INSERT INTO public.audit_log
+    (id,entity_type,entity_id,action,actor_user_id,tenant_id,details)
+    VALUES($1,'tenant',$2,'subscription_status_changed',$3,$2,$4::jsonb)`,
+    [eventId,data.tenant_id,context.userId,JSON.stringify({
+     previousStatus:current.subscription_status,newStatus:data.status,previousPlan:current.plan_code,
+     plan:data.plan_code,period:data.period||null,durationDays:data.duration_days||null,
+     userLimit:data.paid_user_limit??null,assetLimit:data.paid_asset_limit??null,
+     amountReceivedUgx:data.amount_received_ugx??null,paymentMethod:data.payment_method||null,
+     reason:data.reason||null,deactivatedUsers:usersToBan.length
+    })]);
+   await client.query("COMMIT");
+  }catch(error){await client.query("ROLLBACK");throw error}
+  finally{client.release()}
+  for(const userId of usersToBan){
+   try{
+    const {error}=await supabaseAdmin.auth.admin.updateUserById(userId,{ban_duration:"876000h"});
+    if(error)console.error("[Subscription] User ban sync failed",userId,error.message);
+   }catch(error){console.error("[Subscription] User ban sync retry needed",userId,String(error).slice(0,180))}
+  }
+  if(data.status==="active"){
+   try{await queueTenantActivationNotice(data.tenant_id,{type:"admin",eventId})}
+   catch(error){console.error("[Subscription] Activation saved; email queue failed",error)}
+  }
+  return {ok:true,deactivatedUsers:usersToBan.length};
+ });
 
 export const updateTenantControls = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -1158,6 +1223,8 @@ export const checkYoUpgrade = createServerFn({ method: "POST" })
     if(successful){
       const {error:activationError}=await admin.rpc("activate_paid_plan_transaction",{p_id:tx.id,p_tenant:p.tenant_id});
       if(activationError)throw Error(activationError.message);
+      try{await queueTenantActivationNotice(p.tenant_id,{type:"payment",transactionId:tx.id})}
+      catch(noticeError){console.error("[Billing] Payment activated; activation notice failed",noticeError)}
     }else{
       const {error:updateError}=await admin.from("billing_transactions").update({
         status:failed?"failed":"pending",raw_response:response,updated_at:new Date().toISOString()
@@ -1334,3 +1401,151 @@ export const checkYoAssetCapacityPurchase=createServerFn({method:"POST"})
   return {successful:status==="SUCCEEDED",status};
  });
 
+
+/** Country add-ons cost 80% of the verified base-country subscription amount
+ * for countries 2-6, then 50% from country 7 onward.
+ * Every additional country must be paid before gaining access.
+ */
+export const getCountryExpansionQuote=createServerFn({method:"POST"})
+ .middleware([requireSupabaseAuth])
+ .inputValidator(input=>z.object({country_code:z.string().length(2)}).parse(input))
+ .handler(async({data,context})=>{
+  const p=await assertTenantAdmin(context.userId);
+  const code=data.country_code.toUpperCase();
+  const {data:country}=await admin.from("geo_countries").select("code,name").eq("code",code).eq("enabled",true).maybeSingle();
+  if(!country)throw Error("Unsupported country");
+  const {data:t,error}=await admin.from("tenants").select("id,subscription_status,subscription_ends_at,last_manual_activation_amount_ugx,plan_code")
+    .eq("id",p.tenant_id).single();
+  if(error||!t||t.subscription_status!=="active"||!t.subscription_ends_at||new Date(t.subscription_ends_at)<=new Date())
+   throw Error("An active base-country subscription is required");
+  const {data:settings}=await admin.from("tenant_location_settings")
+    .select("default_country_code").eq("tenant_id",p.tenant_id).maybeSingle();
+  if(code===settings?.default_country_code)throw Error("This is already your included country");
+  const {data:extras,error:ee}=await admin.from("tenant_country_entitlements")
+   .select("country_code,ends_at").eq("tenant_id",p.tenant_id).gt("ends_at",new Date().toISOString());
+  if(ee)throw Error(ee.message);
+  if((extras||[]).some((e:any)=>e.country_code===code))throw Error("Country already paid and enabled");
+  const {data:verified,error:ve}=await admin.from("billing_transactions")
+    .select("amount,currency").eq("tenant_id",p.tenant_id)
+    .eq("status","successful").not("plan_code","is",null)
+    .order("updated_at",{ascending:false}).limit(1).maybeSingle();
+  if(ve)throw Error(ve.message);
+  let base=Number(verified?.currency==="UGX"?verified.amount:t.last_manual_activation_amount_ugx);
+  if(!Number.isFinite(base)||base<=0)
+   throw Error("Verified base-country payment amount unavailable. Contact AssetFlow Operations before adding countries.");
+  const additionalIndex=(extras?.length??0)+1;
+  const quoted=Math.round(base*(additionalIndex<=5?0.8:0.5));
+  return {countryCode:code,countryName:country.name,baseAmountUgx:base,
+    additionalIndex,discountPercent:additionalIndex<=5?20:50,
+    priceUgx:quoted,renewalDate:t.subscription_ends_at};
+ });
+
+export const startYoCountryExpansionPurchase=createServerFn({method:"POST"})
+ .middleware([requireSupabaseAuth])
+ .inputValidator(input=>z.object({country_code:z.string().length(2),phone:ugandanMobileMoneyPhoneSchema}).parse(input))
+ .handler(async({data,context})=>{
+  const p=await assertTenantAdmin(context.userId);
+  const quote=await (async()=>{
+   const headers={};
+   // Recalculate on the server using the same authoritative records, never the UI price.
+   const code=data.country_code.toUpperCase();
+   const t=(await queryPostgres<{
+    subscription_ends_at:string;last_manual_activation_amount_ugx:string|null
+   }>(`SELECT subscription_ends_at,last_manual_activation_amount_ugx FROM public.tenants
+       WHERE id=$1 AND subscription_status='active' AND subscription_ends_at>now()`,[p.tenant_id]))[0];
+   if(!t)throw Error("Base subscription is not currently active");
+   const country=(await queryPostgres<{name:string}>(`SELECT name FROM public.geo_countries WHERE code=$1 AND enabled=true`,[code]))[0];
+   if(!country)throw Error("Invalid country");
+   const loc=(await queryPostgres<{default_country_code:string}>(`SELECT default_country_code FROM public.tenant_location_settings WHERE tenant_id=$1`,[p.tenant_id]))[0];
+   if(!loc?.default_country_code)throw Error("Select your included country first");
+   if(loc.default_country_code===code)throw Error("Included country cannot be purchased");
+   const extras=await queryPostgres<{country_code:string}>(`SELECT country_code FROM public.tenant_country_entitlements WHERE tenant_id=$1 AND ends_at>now()`,[p.tenant_id]);
+   if(extras.some(e=>e.country_code===code))throw Error("Country is already active");
+   const paid=(await queryPostgres<{amount:string}>(`SELECT amount FROM public.billing_transactions
+     WHERE tenant_id=$1 AND status='successful' AND plan_code IS NOT NULL AND currency='UGX'
+     ORDER BY updated_at DESC LIMIT 1`,[p.tenant_id]))[0];
+   const base=Number(paid?.amount??t.last_manual_activation_amount_ugx);
+   if(!Number.isFinite(base)||base<=0)throw Error("Base-country payment needs verification before an expansion charge");
+   const index=extras.length+1;
+   return {name:country.name,code,base,index,amount:Math.round(base*(index<=5?.8:.5))};
+  })();
+  const {username,password,mode}=await getYoCheckoutConfig();
+  if(!username||!password)throw Error("Yo Uganda payments are not configured");
+  const client=await getPostgresPool().connect();
+  let quoteId:string;
+  try{
+   await client.query("BEGIN");
+   await client.query("SELECT id FROM public.tenants WHERE id=$1 FOR UPDATE",[p.tenant_id]);
+   const duplicate=(await client.query<{id:string}>(`SELECT id FROM public.tenant_country_quotes
+     WHERE tenant_id=$1 AND country_code=$2 AND status='pending' AND expires_at>now()
+     LIMIT 1 FOR UPDATE`,[p.tenant_id,quote.code])).rows[0];
+   if(duplicate)throw Error("An active checkout already exists for this country");
+   const order=(await client.query<{id:string}>(`INSERT INTO public.tenant_country_quotes
+     (tenant_id,country_code,base_country_price,quoted_price,currency,country_index,user_id,phone)
+     VALUES($1,$2,$3,$4,'UGX',$5,$6,$7) RETURNING id`,
+     [p.tenant_id,quote.code,quote.base,quote.amount,quote.index,context.userId,data.phone])).rows[0];
+   quoteId=order.id;
+   await client.query("COMMIT");
+  }catch(e){await client.query("ROLLBACK");throw e}finally{client.release()}
+  const xml='<?xml version="1.0" encoding="UTF-8"?><AutoCreate><Request>'+
+   '<APIUsername>'+xmlEscape(username)+'</APIUsername><APIPassword>'+xmlEscape(password)+'</APIPassword>'+
+   '<Method>acdepositfunds</Method><NonBlocking>TRUE</NonBlocking><Account>'+xmlEscape(data.phone)+'</Account>'+
+   '<Amount>'+xmlEscape(quote.amount)+'</Amount>'+
+   '<Narrative>'+xmlEscape("AssetFlow country expansion: "+quote.name)+'</Narrative>'+
+   '<ExternalReference>'+xmlEscape(quoteId)+'</ExternalReference></Request></AutoCreate>';
+  try{
+   const raw=await yoRequest(xml,mode);
+   const reference=xmlTag(raw,"TransactionReference"),status=xmlTag(raw,"Status");
+   await queryPostgres(`UPDATE public.tenant_country_quotes SET provider_reference=$2,
+    status=CASE WHEN $3='OK' THEN 'pending' ELSE 'cancelled' END WHERE id=$1`,
+    [quoteId,reference||null,status]);
+   if(status!=="OK"||!reference)throw Error(xmlTag(raw,"ErrorMessage")||"Payment request was rejected");
+   return {transactionId:quoteId,status:"PENDING",amountUgx:quote.amount};
+  }catch(error){
+   await queryPostgres("UPDATE public.tenant_country_quotes SET status='cancelled' WHERE id=$1",[quoteId]);
+   throw error;
+  }
+ });
+
+export const checkYoCountryExpansionPurchase=createServerFn({method:"POST"})
+ .middleware([requireSupabaseAuth])
+ .inputValidator(input=>z.object({transactionId:z.string().uuid()}).parse(input))
+ .handler(async({data,context})=>{
+  const p=await assertTenantAdmin(context.userId);
+  const order=(await queryPostgres<{id:string;tenant_id:string;status:string;provider_reference:string;quoted_price:string}>(
+   "SELECT id,tenant_id,status,provider_reference,quoted_price FROM public.tenant_country_quotes WHERE id=$1 AND tenant_id=$2",
+   [data.transactionId,p.tenant_id]))[0];
+  if(!order)throw Error("Country checkout not found");
+  if(order.status==="paid")return {successful:true,status:"SUCCEEDED"};
+  if(order.status!=="pending"||!order.provider_reference)throw Error("Country payment is not pending");
+  const {username,password,mode}=await getYoCheckoutConfig();
+  if(!username||!password)throw Error("Payment gateway is unavailable");
+  const xml='<?xml version="1.0" encoding="UTF-8"?><AutoCreate><Request>'+
+   '<APIUsername>'+xmlEscape(username)+'</APIUsername><APIPassword>'+xmlEscape(password)+'</APIPassword>'+
+   '<Method>actransactioncheckstatus</Method><TransactionReference>'+xmlEscape(order.provider_reference)+'</TransactionReference>'+
+   '<PrivateTransactionReference>'+xmlEscape(order.id)+'</PrivateTransactionReference><DepositTransactionType>PULL</DepositTransactionType>'+
+   '</Request></AutoCreate>';
+  const raw=await yoRequest(xml,mode);
+  const status=xmlTag(raw,"TransactionStatus").toUpperCase();
+  if(status==="SUCCEEDED"){
+   const amount=xmlTag(raw,"Amount"),currency=xmlTag(raw,"CurrencyCode");
+   const responseRef=xmlTag(raw,"TransactionReference");
+   if(responseRef&&responseRef!==order.provider_reference)throw Error("Gateway transaction reference mismatch");
+   if(amount&&Math.abs(Number(amount)-Number(order.quoted_price))>1)throw Error("Gateway payment amount mismatch");
+   if(currency&&currency.toUpperCase()!=="UGX")throw Error("Gateway payment currency mismatch");
+   await queryPostgres("SELECT public.activate_verified_country_purchase($1,$2)",[order.id,p.tenant_id]);
+  }else if(status==="FAILED"){
+   await queryPostgres("UPDATE public.tenant_country_quotes SET status='cancelled' WHERE id=$1",[order.id]);
+  }
+  return {successful:status==="SUCCEEDED",status};
+ });
+
+export const getTenantCountryAddons=createServerFn({method:"GET"})
+ .middleware([requireSupabaseAuth])
+ .handler(async({context})=>{
+  const p=await assertTenantAdmin(context.userId);
+  const countries=await queryPostgres<{country_code:string;ends_at:string;price_paid:string}>(
+   `SELECT country_code,ends_at,price_paid FROM public.tenant_country_entitlements
+      WHERE tenant_id=$1 AND ends_at>now() ORDER BY country_code`,[p.tenant_id]);
+  return countries;
+ });

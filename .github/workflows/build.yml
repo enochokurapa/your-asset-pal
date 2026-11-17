@@ -28,6 +28,14 @@ jobs:
         run: bun test
       - name: Build application
         run: bun run build
+      - name: Upload compiled production bundle
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: assetflow-bundle-${{ github.sha }}
+          path: .output/
+          include-hidden-files: true
+          retention-days: 3
 
   deploy:
     needs: build
