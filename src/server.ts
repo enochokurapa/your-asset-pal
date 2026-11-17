@@ -247,6 +247,22 @@ async function maybeHandlePublicApi(request: Request): Promise<Response | null> 
     return jsonResponse(401, { error: "unauthorized", message: "API key is invalid, expired or revoked." });
   }
 
+  // Enforce the commercial entitlement for EVERY request, not only when
+  // issuing a key. Revocation, expiry and plan suspension must block old keys.
+  const [{data: tenant, error: tenantError}, {data: apiModule, error: moduleError},
+         {data: apiOverride, error: overrideError}] = await Promise.all([
+    apiAdmin.from("tenants").select("subscription_status,subscription_ends_at").eq("id",key.tenant_id).single(),
+    apiAdmin.from("saas_modules").select("globally_enabled,billing_model").eq("module_key","api_access").single(),
+    apiAdmin.from("tenant_module_overrides").select("enabled").eq("tenant_id",key.tenant_id).eq("module_key","api_access").maybeSingle(),
+  ]);
+  if(tenantError||moduleError||overrideError)
+    return jsonResponse(503,{error:"entitlement_unavailable",message:"Unable to verify subscription entitlement."});
+  if(!tenant || tenant.subscription_status!=="active" ||
+     (tenant.subscription_ends_at && new Date(tenant.subscription_ends_at).getTime()<=Date.now()))
+    return jsonResponse(403,{error:"subscription_inactive",message:"An active subscription is required."});
+  if(!apiModule?.globally_enabled || apiModule.billing_model!=="add_on" || apiOverride?.enabled!==true)
+    return jsonResponse(403,{error:"api_add_on_inactive",message:"API access is not enabled for this workspace."});
+
   const resource = url.pathname.slice("/api/v1/".length).replace(/\/+$/, "");
   const scopes = Array.isArray(key.scopes) ? key.scopes : [];
 
