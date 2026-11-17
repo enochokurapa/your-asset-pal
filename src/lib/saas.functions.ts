@@ -556,6 +556,22 @@ export const updateTenantSubscription = createServerFn({ method: "POST" })
   return {ok:true,deactivatedUsers:usersToBan.length};
  });
 
+/** Reissue the latest activation document without changing subscription or charging. */
+export const resendTenantActivationDocument = createServerFn({method:"POST"})
+ .middleware([requireSupabaseAuth])
+ .inputValidator(input=>z.object({tenant_id:z.string().uuid()}).parse(input))
+ .handler(async({data,context})=>{
+   await assertSaasAdmin(context.userId);
+   const business=(await queryPostgres<{subscription_status:string;subscription_ends_at:string|null}>(
+    "SELECT subscription_status,subscription_ends_at FROM public.tenants WHERE id=$1",[data.tenant_id]))[0];
+   if(!business||business.subscription_status!=="active"||!business.subscription_ends_at||
+      new Date(business.subscription_ends_at)<=new Date())throw Error("Only active subscriptions can be reissued");
+   const eventId=randomUUID();
+   await queryPostgres("INSERT INTO public.audit_log(tenant_id,entity_type,entity_id,action,actor_user_id,details) VALUES($1,'tenant',$1,'activation_document_reissued',$2,$3::jsonb)",
+     [data.tenant_id,context.userId,JSON.stringify({eventId})]);
+   await queueTenantActivationNotice(data.tenant_id,{type:"admin",eventId});
+   return {queued:true};
+ });
 export const updateTenantControls = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(input => z.object({

@@ -9,7 +9,7 @@ import {
   getSaasTenantDetail,
   updateSaasTenantName,
   updateTenantModule,
-  updateTenantSubscription,assignTenantPricingPlan,
+  updateTenantSubscription,assignTenantPricingPlan,resendTenantActivationDocument,
   updateTenantControls,
   updateSaasTenantUserStatus,
   getSaasTenantTagSettings,
@@ -116,6 +116,16 @@ function SaasAdminOrganizationsPage() {
 
   const [search, setSearch] = useState("");
   const [nameDraft, setNameDraft] = useState("");
+  const [reissuingDocument,setReissuingDocument]=useState(false);
+  const reissueDocument=async()=>{
+    if(!selectedTenantId||!window.confirm("Email the current activation document and PDF receipt to this business?"))return;
+    setReissuingDocument(true);
+    try{
+      await authCall(resendTenantActivationDocument,{data:{tenant_id:selectedTenantId}});
+      toast.success("Activation document queued for email delivery");
+    }catch(error:any){toast.error(error?.message||"Could not queue activation email")}
+    finally{setReissuingDocument(false)}
+  };
   const [savingName, setSavingName] = useState(false);
 
   const authCall = async <T,>(fn: (arg: any) => Promise<T>, arg: any = {}) => {
@@ -354,6 +364,11 @@ function SaasAdminOrganizationsPage() {
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">{tenant.slug} · Created {new Date(tenant.created_at).toLocaleDateString()}</p>
                   <Button className="mt-3" disabled={enteringBusiness} onClick={accessBusinessDashboard}><ShieldCheck className="mr-2 h-4 w-4"/>{enteringBusiness?"Opening…":"Access Dashboard"}</Button>
+                  {tenant.effective_status==="active"&&
+                    <Button type="button" className="ml-2 mt-3" variant="outline" disabled={reissuingDocument}
+                      onClick={()=>void reissueDocument()}>
+                      {reissuingDocument?"Queueing…":"Resend activation receipt"}
+                    </Button>}
                 </div>
                 <div className="w-full sm:w-52 space-y-2"><label className="block text-xs font-medium">Assigned paid package</label><Select value={["starter","business","enterprise"].includes(tenant.plan_code)?tenant.plan_code:"legacy"} disabled={tenant.effective_status!=="active"} onValueChange={v=>setNamedPlan(v==="legacy"?"paid":v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="legacy">Legacy paid plan</SelectItem><SelectItem value="starter">Starter</SelectItem><SelectItem value="business">Business</SelectItem><SelectItem value="enterprise">Enterprise</SelectItem></SelectContent></Select><p className="text-xs text-muted-foreground">SaaS Admin sets the package without changing the subscription expiry.</p></div><div className="w-full sm:w-52 space-y-2">
                   <label className="block text-xs font-medium">Activation duration</label>
