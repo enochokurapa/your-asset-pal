@@ -42,7 +42,7 @@ function APIDocumentation(){
  <section className="space-y-3"><h2 className="text-xl font-bold">Tracking devices</h2>
  <p>Tracking is a separate paid add-on. Register and enable the device first; then send GPS telemetry with provider, external_device_id, latitude, longitude, and optional accuracy, speed, heading, recorded_at, metadata. Location reporting does not imply the system can remotely control hardware.</p></section>
  <section className="space-y-2"><h2 className="text-xl font-bold">Responses and limits</h2>
- <p>JSON responses contain <code>data</code> and optional <code>meta</code>. HTTP 401 indicates missing or invalid credentials, 403 indicates missing permission or subscription, 404 means a record is not found, and 409 indicates a validation or lifecycle conflict. GET list requests default to 100 records, up to 500.</p>
+ <p>JSON responses contain <code>data</code> and optional <code>meta</code>. HTTP 401 indicates missing or invalid credentials, 403 indicates missing permission or subscription, 404 means a record is not found, and 409 indicates a validation or lifecycle conflict. GET list requests default to 100 records, up to 500. API keys have a basic per-instance limit of 120 requests per minute; HTTP 429 indicates rate limiting.</p>
  <p className="text-sm text-slate-600">Use a separate test workspace and read-only key first. This API is version 1; additional workflow endpoints require separate releases and documentation.</p></section>
  </div></main>;
 }

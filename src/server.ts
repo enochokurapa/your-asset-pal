@@ -228,6 +228,17 @@ async function maybeHandleMicrosoftOAuth(request: Request): Promise<Response | n
   }
 }
 
+const apiRateBuckets=new Map<string,{start:number,count:number}>();
+function checkApiRateLimit(hash:string){
+ const now=Date.now();
+ if(apiRateBuckets.size>5000){
+  for(const [id,value] of apiRateBuckets){if(now-value.start>60_000)apiRateBuckets.delete(id);}
+ }
+ const existing=apiRateBuckets.get(hash);
+ if(!existing||now-existing.start>60_000){apiRateBuckets.set(hash,{start:now,count:1});return true;}
+ existing.count+=1;
+ return existing.count<=120;
+}
 async function maybeHandlePublicApi(request: Request): Promise<Response | null> {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/v1/")) return null;
@@ -239,6 +250,9 @@ async function maybeHandlePublicApi(request: Request): Promise<Response | null> 
   }
 
   const keyHash = createHash("sha256").update(token).digest("hex");
+  if(!checkApiRateLimit(keyHash))return new Response(JSON.stringify({
+     error:"rate_limited",message:"Please retry in one minute."
+   }),{status:429,headers:{"content-type":"application/json","retry-after":"60","cache-control":"no-store"}});
   const { data: key, error: keyError } = await apiAdmin
     .from("api_keys")
     .select("id,tenant_id,scopes,is_active,expires_at,created_by")
@@ -500,6 +514,8 @@ async function maybeHandlePublicApi(request: Request): Promise<Response | null> 
           "INSERT INTO public.assets ("+cols.map(k=>'"'+k+'"').join(",")+") VALUES ("+
           cols.map((_,i)=>"$"+(i+1)).join(",")+") RETURNING id,asset_tag,asset_number,name,status",
           [key.tenant_id,Number(numbers[0].next_no),...vals]);
+        await client.query("INSERT INTO public.audit_log(tenant_id,entity_type,entity_id,action,actor_user_id,details) VALUES($1,'asset',$2,'api_created',$3,$4::jsonb)",
+         [key.tenant_id,result.rows[0].id,key.created_by??null,JSON.stringify({api_key_id:key.id})]);
         await client.query("COMMIT");
         return jsonResponse(201,{data:result.rows[0],meta:{api_version:"v1"}});
       }catch(e){
@@ -513,6 +529,8 @@ async function maybeHandlePublicApi(request: Request): Promise<Response | null> 
       .eq("id",assetId).select("id,asset_tag,name,status,updated_at").maybeSingle();
     if(error)return jsonResponse(409,{error:"asset_update_rejected",message:"Check field values and organisation references."});
     if(!data)return jsonResponse(404,{error:"asset_not_found"});
+    await queryPostgres("INSERT INTO public.audit_log(tenant_id,entity_type,entity_id,action,actor_user_id,details) VALUES($1,'asset',$2,'api_updated',$3,$4::jsonb)",
+      [key.tenant_id,assetId,key.created_by??null,JSON.stringify({api_key_id:key.id,fields:Object.keys(cleaned)})]).catch(console.error);
     return jsonResponse(200,{data,meta:{api_version:"v1"}});
   }
   if(request.method!=="GET"){
