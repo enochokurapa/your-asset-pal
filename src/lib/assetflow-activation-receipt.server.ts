@@ -31,10 +31,10 @@ export function createAssetFlowActivationReceipt(data:ActivationReceipt):Buffer{
  p.setDrawColor(...border);p.setLineWidth(.35);p.rect(8,8,132,194,"S");
  p.setFillColor(...blue);p.rect(8,8,132,2.1,"F");
  const logo=approvedAssetFlowLogoPng();
- p.addImage(new Uint8Array(logo),"PNG",13,14,28,17,undefined,"FAST");
- txt("ASSETFLOW360",45,19.5,12,true,blue);
- txt("ASSETFLOW OPERATIONS",45,25,7.3,true,muted);
- txt("assetflow360.com  |  assetflow360.com/contact",45,30,6.4,false,muted);
+ p.addImage(new Uint8Array(logo),"PNG",13,13.5,18,18,undefined,"FAST");
+ txt("ASSETFLOW360",36,19.5,12,true,blue);
+ txt("ASSETFLOW OPERATIONS",36,25,7.3,true,muted);
+ txt("assetflow360.com  |  assetflow360.com/contact",36,30,6.4,false,muted);
  line(36);
  txt(data.paid?"OFFICIAL PAYMENT RECEIPT":"WORKSPACE ACTIVATION CONFIRMATION",X,44,12,true,dark);
  label("Receipt / document no.",X,50);
