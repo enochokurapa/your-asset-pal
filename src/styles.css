@@ -632,3 +632,67 @@
 .af-auth-stage .af-auth-card button[type=submit]:hover{background:#ac6228!important;}
 .af-auth-stage .af-auth-card a{color:var(--af-brand-indigo,#4E51DB)!important;}
 .af-auth-stage .af-auth-card input:focus-visible{border-color:var(--af-brand-indigo,#4E51DB);box-shadow:0 0 0 3px rgba(78,81,219,.16);}
+
+
+/* Auth layout: one continuous branded composition, not two disconnected cards. */
+@media (min-width: 1024px) {
+  .af-auth-stage.af-auth-split {
+    display:flex;
+    align-items:stretch;
+    justify-content:center;
+    padding:clamp(24px,4vh,56px) clamp(24px,4vw,64px)!important;
+    gap:0!important;
+    min-height:100dvh;
+  }
+  .af-auth-stage.af-auth-split > .af-auth-visual {
+    flex:0 1 560px;
+    max-width:560px;
+    min-height:660px;
+    margin:0!important;
+    border-radius:24px 0 0 24px;
+    box-shadow:0 16px 45px rgba(23,37,84,.10);
+    padding:34px 36px;
+  }
+  .af-auth-stage.af-auth-split > .af-auth-form-side {
+    flex:0 1 530px;
+    width:auto;
+    max-width:530px;
+    min-height:660px;
+    height:auto;
+    margin:0!important;
+    padding:34px clamp(28px,3vw,44px);
+    border-radius:0 24px 24px 0;
+    box-shadow:12px 16px 45px rgba(23,37,84,.07);
+    background:#fff;
+  }
+  .af-auth-stage.af-auth-split .af-auth-card {
+    width:100%;
+    padding:0!important;
+  }
+  .af-auth-stage .af-auth-building {
+    width:67%;height:43%;bottom:88px;right:-45px;opacity:.28;
+  }
+}
+@media(max-width:1023px) {
+  .af-auth-stage.af-auth-split .af-auth-visual {display:none!important;}
+  .af-auth-stage.af-auth-split > .af-auth-form-side {
+    width:100%;max-width:540px;
+    margin-inline:auto!important;
+    min-height:100dvh;
+    border-radius:0;
+  }
+}
+@media(max-width:640px) {
+  .af-auth-stage.af-auth-split {
+    width:100%;margin:0;min-width:0;
+    padding:0!important;background:#fff;
+  }
+  .af-auth-stage.af-auth-split > .af-auth-form-side {
+    max-width:none;
+    width:100%;
+    min-height:100dvh;
+    padding:18px 16px 22px!important;
+  }
+  .af-auth-stage.af-auth-split .af-auth-card {padding:0!important;}
+  .af-auth-stage.af-auth-split h1 {font-size:clamp(21px,5.3vw,27px);line-height:1.25;}
+}

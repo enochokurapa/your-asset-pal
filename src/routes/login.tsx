@@ -35,7 +35,7 @@ function authErrorMessage(error: unknown): string {
 }
 
 function LoginPage() {
-  const { user, loading, tenantId, isSaasAdmin, platformStaffRole } = useAuth();
+  const { user, loading, tenantId, isSaasAdmin, platformStaffRole, metadataStatus } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
@@ -82,11 +82,15 @@ function LoginPage() {
     if(displaced){sessionStorage.removeItem("assetflow-session-replaced");toast.warning("Your account was signed in on another device. This device has been signed out.");}
   },[]);
 
-  if (!loading && user && !submitting && !takeoverOpen) return <Navigate to={isSaasAdmin||tenantId ? "/dashboard" : platformStaffRole ? "/platform-workspace" : "/register"} />;
+  if (!loading && user && !submitting && !takeoverOpen) {
+    if(isSaasAdmin || tenantId) return <Navigate to="/dashboard" />;
+    if(platformStaffRole) return <Navigate to="/platform-workspace" />;
+    if(metadataStatus==="ready") return <Navigate to="/register" />;
+  }
 
   const withTimeout=<T,>(promise:Promise<T>,timeoutMs:number):Promise<T>=>Promise.race([
     promise,
-    new Promise<T>((_,reject)=>setTimeout(()=>reject(new Error("The sign-in request took too long. Please check your connection and retry.")),timeoutMs))
+    new Promise<T>((_,reject)=>setTimeout(()=>reject(new Error("Sign-in verification has not finished. Please retry in a moment; do not create another account.")),timeoutMs))
   ]);
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -95,7 +99,7 @@ function LoginPage() {
     setUnconfirmedEmail("");
     try {
       const { error } = await withTimeout(
-        supabase.auth.signInWithPassword({ email: email.trim(), password }),20000);
+        supabase.auth.signInWithPassword({ email: email.trim(), password }),25000);
       if (error) {
         if(/email not confirmed/i.test(error.message))setUnconfirmedEmail(email.trim());
         toast.error(authErrorMessage(error));
@@ -103,7 +107,10 @@ function LoginPage() {
       }
       const {data:other,error:deviceError}=await withTimeout(
         supabase.rpc("other_login_sessions" as any),15000);
-      if(deviceError){await supabase.auth.signOut({scope:"local"});toast.error("Unable to verify active sessions. Please try again.");return;}
+      if(deviceError){
+        toast.error("Session check is temporarily unavailable. Please retry signing in.");
+        return;
+      }
       const devices=Array.isArray(other)?other as Array<{session_id:string,device:string,last_seen:string}>:[];
       if(devices.length){setExistingDevices(devices);setTakeoverOpen(true);return;}
       window.location.assign("/dashboard");
@@ -146,7 +153,12 @@ function LoginPage() {
 
           </div>
 
-          <form onSubmit={onSubmit} className="space-y-4">
+          {user && metadataStatus==="loading" && <p role="status" className="mb-4 rounded-lg bg-indigo-50 p-3 text-sm text-indigo-900">Opening your existing workspace…</p>}
+           {user && metadataStatus==="error" && <div role="alert" className="mb-4 rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm">
+             <p>We couldn't load your existing workspace details.</p>
+             <Button type="button" variant="outline" className="mt-2" onClick={()=>window.location.reload()}>Retry loading workspace</Button>
+           </div>}
+           <form onSubmit={onSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email address</Label>
               <Input

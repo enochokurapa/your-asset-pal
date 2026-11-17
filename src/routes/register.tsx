@@ -24,7 +24,7 @@ export const Route = createFileRoute("/register")({
 });
 
 function RegisterPage() {
-  const { user, tenantId, loading } = useAuth();
+  const { user, tenantId, loading, metadataStatus } = useAuth();
   const provision = useServerFn(provisionFreeTrialWorkspace);
   const [form, setForm] = useState({ organization_name: "", full_name: "", email: "", password: "" });
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -56,6 +56,17 @@ function RegisterPage() {
   };
 
   if (!loading && user && tenantId) return <Navigate to="/dashboard" />;
+  if (user && metadataStatus!=="ready") return (
+    <div className="platform-brand af-auth-stage flex min-h-[100dvh] items-center justify-center px-4">
+      <div role={metadataStatus==="error"?"alert":"status"} className="w-full max-w-md rounded-xl bg-white p-6 text-center">
+        <h1 className="text-xl font-bold text-[#18275f]">{metadataStatus==="error"?"Workspace unavailable":"Opening your workspace"}</h1>
+        <p className="mt-3 text-sm text-slate-600">
+          {metadataStatus==="error"?"Your account is signed in. We could not retrieve your workspace details.":"Checking your existing account…"}
+        </p>
+        {metadataStatus==="error" && <Button className="mt-5" onClick={()=>window.location.reload()}>Retry</Button>}
+      </div>
+    </div>
+  );
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();

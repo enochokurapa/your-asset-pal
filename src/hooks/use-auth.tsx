@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {resumePlatformBusinessSession} from "@/lib/platform-business-dashboard.functions";
 import type { Session, User } from "@supabase/supabase-js";
@@ -57,6 +57,7 @@ interface AuthCtx {
   actionRights: Set<ActionKind>;
   branchScope: Set<string> | null;
   loading: boolean;
+  metadataStatus: "loading" | "ready" | "error" | "idle";
   mustChangePassword: boolean;
   isActive: boolean;
   isAdmin: boolean;
@@ -111,6 +112,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [paidOnlyModules, setPaidOnlyModules] = useState<Set<ModuleKey>>(new Set());
   const [addOnModules, setAddOnModules] = useState<Set<ModuleKey>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [metadataStatus,setMetadataStatus]=useState<"loading"|"ready"|"error"|"idle">("loading");
+  const pendingMetadataUid=useRef<string|null>(null);
 
   // A replaced device sees a notification instead of silently retaining the UI.
   useEffect(()=>{
@@ -129,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   },[session?.user?.id,session?.access_token]);
 
   const resetMetadata = () => {
+    setMetadataStatus("idle");
     setRoles([]); setPermissions(new Set()); setApprovalRights(new Set());
     setActionRights(new Set()); setBranchScope(null); setMustChangePassword(false);
     setIsActive(true); setIsSaasAdmin(false); setSupportMode(false); setSupportRestoreError(false); setPlatformStaffRole(null); setTenantRole("member");
@@ -138,14 +142,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const loadFor = async (uid: string) => {
+    if(pendingMetadataUid.current===uid)return;
+    pendingMetadataUid.current=uid;
+    setMetadataStatus("loading");
+    let timer:ReturnType<typeof setTimeout>|undefined;
     try {
-      const [rRes, pRes, aRes, actRes, brRes, profRes] = await Promise.allSettled([
+      const [rRes, pRes, aRes, actRes, brRes, profRes] = await Promise.race([
+        Promise.allSettled([
         supabase.from("user_roles").select("role").eq("user_id", uid),
         supabase.from("user_permissions" as any).select("module,can_view").eq("user_id", uid),
         supabase.from("user_approval_rights" as any).select("approval_kind").eq("user_id", uid),
         supabase.from("user_action_rights" as any).select("action_kind").eq("user_id", uid),
         supabase.from("user_branch_access" as any).select("branch_id").eq("user_id", uid),
         (supabase as any).from("profiles").select("must_change_password,is_active,tenant_id,tenant_role,is_saas_admin").eq("id", uid).maybeSingle(),
+        ]),
+        new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(new Error("Workspace lookup timeout")),18000);}),
       ]);
 
       const r = rRes.status === "fulfilled" ? rRes.value.data : null;
@@ -153,7 +164,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const a = aRes.status === "fulfilled" ? aRes.value.data : null;
       const act = actRes.status === "fulfilled" ? actRes.value.data : null;
       const br = brRes.status === "fulfilled" ? brRes.value.data : null;
-      const prof: any = profRes.status === "fulfilled" ? profRes.value.data : null;
+      if(profRes.status==="rejected" || profRes.value.error) throw new Error("Workspace profile lookup unavailable");
+      const prof: any = profRes.value.data;
       const rs = (Array.isArray(r)?r:[]).map((x: any) => x.role as AppRole);
       const isPlatformAdmin=prof?.is_saas_admin===true;
       let support: {tenantId?:string;tenantName?:string;expiresAt?:string}|null=null;
@@ -196,6 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setPlatformStaffRole(null);
       setTenantRole(supporting || prof?.tenant_role === "tenant_admin" ? "tenant_admin" : "member");
       setTenantId(effectiveTenant);
+      setMetadataStatus("ready");
 
       if (effectiveTenant) {
         const [{ data: tenant }, { data: modules }, { data: overrides },{data: pricingPlans}] = await Promise.all([
@@ -244,15 +257,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch (err) {
+      setMetadataStatus("error");
       console.error("[AuthProvider] Failed to load user auth metadata:", err);
+    } finally {
+      if(timer)clearTimeout(timer);
+      if(pendingMetadataUid.current===uid)pendingMetadataUid.current=null;
     }
   };
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
-      if (s?.user) setTimeout(() => loadFor(s.user.id), 0);
-      else resetMetadata();
+      // Refreshing a token does not require reloading ten permission queries.
+      if (!s?.user) resetMetadata();
+      else if(event!=="TOKEN_REFRESHED") setTimeout(() => loadFor(s.user.id), 0);
     });
     let finished=false;
     const finish=()=>{if(!finished){finished=true;setLoading(false)}};
@@ -289,7 +307,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value: AuthCtx = {
     user: session?.user ?? null, session, roles, permissions, approvalRights, actionRights, branchScope,
-    loading, mustChangePassword, isActive, isAdmin, isTenantAdmin, isSaasAdmin, supportMode, supportRestoreError, platformStaffRole, isManager,
+    loading, metadataStatus, mustChangePassword, isActive, isAdmin, isTenantAdmin, isSaasAdmin, supportMode, supportRestoreError, platformStaffRole, isManager,
     tenantId, tenantName, subscriptionStatus, trialEndsAt, subscriptionEndsAt, enabledModules, paidOnlyModules, addOnModules,
     canExportReports: subscriptionStatus === "active",
     canUseCustomDomain: subscriptionStatus === "active",
