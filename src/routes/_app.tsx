@@ -34,7 +34,6 @@ type NavItem = {
 const tenantNav: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
   { to: "/analytics", label: "Analytics", icon: Activity, tenantAdminOnly: true },
-  { to: "/diagnostics", label: "Diagnostics", icon: Wrench, tenantAdminOnly: true },
   { to: "/assets", label: "Assets", icon: Package, module: "assets" },
   { to: "/categories", label: "Categories", icon: Tags, module: "categories" },
   { to: "/locations", label: "Locations", icon: MapPin, module: "locations" },
@@ -143,7 +142,7 @@ function AppLayout() {
       pathname.startsWith("/reports")?"reports":
       pathname.startsWith("/verification")?"verification":
       ["/categories","/locations","/branches"].some(path=>pathname.startsWith(path))?"asset-setup":
-      ["/analytics","/diagnostics","/audit","/builders"].some(path=>pathname.startsWith(path))?"management":
+      ["/analytics","/audit","/builders"].some(path=>pathname.startsWith(path))?"management":
       ["/integrations","/live-tracking"].some(path=>pathname.startsWith(path))?"addons":null;
     setOpenNavGroup(group);
   },[pathname]);
@@ -219,7 +218,7 @@ function AppLayout() {
     return true;
   });
 
-  const groupedNavPaths=new Set(["/categories","/locations","/branches","/analytics","/diagnostics","/audit","/builders","/integrations","/live-tracking"]);
+  const groupedNavPaths=new Set(["/categories","/locations","/branches","/analytics","/audit","/builders","/integrations","/live-tracking"]);
   const groupItems=(paths:string[])=>visibleTenantNav.filter(n=>paths.includes(n.to));
   const visibleNav = platformControl ? saasAdminNav : visibleTenantNav.filter(n=>!groupedNavPaths.has(n.to)&&n.to!=="/billing");
 
@@ -324,7 +323,7 @@ function AppLayout() {
               {renderNavItem(item)}
               {([
                 {key:"asset-setup",label:"Asset setup",icon:Tags,items:groupItems(["/categories","/locations","/branches"]),expanded:assetSetupOpen,toggle:()=>toggleNavGroup("asset-setup")},
-                {key:"management",label:"Management",icon:SlidersHorizontal,items:groupItems(["/analytics","/diagnostics","/audit","/builders"]),expanded:managementOpen,toggle:()=>toggleNavGroup("management")},
+                {key:"management",label:"Management",icon:SlidersHorizontal,items:groupItems(["/analytics","/audit","/builders"]),expanded:managementOpen,toggle:()=>toggleNavGroup("management")},
               ]).filter(g=>g.items.length>0).map(g=><div key={g.key}>
                 <button type="button" onClick={g.toggle} aria-expanded={g.expanded} aria-controls={`${g.key}-sidebar-items`}
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">

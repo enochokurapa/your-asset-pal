@@ -1,6 +1,7 @@
 import {getPostgresPool,queryPostgres} from "@/lib/postgres.server";
 import {sendPlatformOperationsNotice} from "@/lib/platform-smtp.server";
 import {randomUUID} from "node:crypto";
+import {createAssetFlowActivationReceipt} from "@/lib/assetflow-activation-receipt.server";
 type Recipient={id:string,email:string,tenant_id:string};
 type NewCampaign={scope:"all"|"business"|"user";tenantId?:string;userId?:string;subject:string;body:string;attachment?:{name:string;mime:string;base64:string}};
 let processing=false;
@@ -90,25 +91,48 @@ export async function queueTenantActivationNotice(
     (t.paid_user_limit_override??plan?.included_users??0)+(t.paid_user_limit_override===null?Number(t.purchased_extra_users??0):0));
  const assets=t.paid_asset_limit_override===-1?"Unlimited":String(
     (t.paid_asset_limit_override??plan?.included_assets??0)+(t.paid_asset_limit_override===null?Number(t.purchased_extra_assets??0):0));
- let paymentText=t.last_manual_activation_method==="admin_grant"?
-   "Activation type: Administrator-approved grant. No payment receipt was generated.":
-   `Activation type: Administrator-confirmed external payment.
-Payment method: ${t.last_manual_activation_method||"Not specified"}
-Amount recorded as received: ${t.last_manual_activation_amount_ugx?"UGX "+t.last_manual_activation_amount_ugx:"Not recorded"}
-This is an activation confirmation, not proof of a platform-collected payment.`;
+ const reference=source.type==="payment"?source.transactionId:source.eventId;
+ let method=t.last_manual_activation_method==="admin_grant"?"Administrator grant":
+   t.last_manual_activation_method==="cash"?"Cash":
+   t.last_manual_activation_method==="bank_transfer"?"Bank transfer":
+   t.last_manual_activation_method==="external_mobile_money"?"Mobile money":"Administrator approval";
+ let amount:number|null=t.last_manual_activation_amount_ugx===null?null:Number(t.last_manual_activation_amount_ugx);
+ let currency="UGX";
+ let paymentReference:string|null=null;
+ let paid=t.last_manual_activation_method!=="admin_grant"&&amount!==null&&Number.isFinite(amount)&&amount>=0;
  if(source.type==="payment"){
   const tx=(await queryPostgres<{amount:string;currency:string;provider:string;provider_reference:string;status:string}>(
    `SELECT amount,currency,provider,provider_reference,status FROM public.billing_transactions WHERE id=$1 AND tenant_id=$2`,
    [source.transactionId,tenantId]))[0];
   if(!tx||tx.status!=="successful")return;
-  paymentText=`Payment confirmed: ${tx.currency} ${tx.amount}\nPayment provider: ${tx.provider||"Yo Uganda"}\nTransaction reference: ${tx.provider_reference||source.transactionId}\nReceipt / transaction ID: ${source.transactionId}`;
+  amount=Number(tx.amount);currency=tx.currency||"UGX";
+  method=tx.provider||"Online payment";paymentReference=tx.provider_reference||source.transactionId;
+  paid=Number.isFinite(amount)&&amount>=0;
  }
- const subject="Your AssetFlow360 workspace is activated and live";
- const body=`Your workspace is activated and live!\n\nWorkspace: ${t.name}\nPlan: ${t.plan_code}\nActive user allowance: ${users}\nAsset allowance: ${assets}\nActivated: ${new Date(t.subscription_started_at).toLocaleDateString("en-GB",{timeZone:"Africa/Kampala"})}\nExpiry / next renewal due: ${new Date(t.subscription_ends_at).toLocaleDateString("en-GB",{timeZone:"Africa/Kampala"})}\n\n${paymentText}\n\nYour team can now sign in and continue registering, verifying and managing assets.\n\nVisit https://assetflow360.com/login\n\nAssetFlow Operations`;
+ const subject="Your AssetFlow360 workspace is active";
+ const body=`Your ${t.name} workspace has been activated successfully.
+
+You can now sign in and manage your organisation's assets.
+
+Plan: ${t.plan_code}
+Renewal date: ${new Date(t.subscription_ends_at).toLocaleDateString("en-GB",{timeZone:"Africa/Kampala"})}
+
+${paid?"Your payment receipt is attached as a PDF for printing and filing.":"Your activation confirmation is attached as a PDF."}
+
+AssetFlow Operations`;
+ const pdf=createAssetFlowActivationReceipt({
+  receiptNo:reference,workspace:t.name,plan:t.plan_code,
+  activatedAt:new Date(t.subscription_started_at||Date.now()),
+  expiresAt:new Date(t.subscription_ends_at),
+  users,assets,method,amount,currency,paymentReference,paid
+ });
  const eventKey=source.type==="payment"?"payment-activation:"+source.transactionId:"admin-activation:"+source.eventId;
  const rows=await queryPostgres<{id:string}>(`INSERT INTO public.platform_operations_campaigns
- (event_key,scope,tenant_id,subject,body) VALUES($1,'activation',$2,$3,$4) ON CONFLICT(event_key) DO NOTHING RETURNING id`,
- [eventKey,tenantId,subject,body]);
+ (event_key,scope,tenant_id,subject,body,attachment_name,attachment_mime,attachment_data)
+ VALUES($1,'activation',$2,$3,$4,$5,'application/pdf',$6)
+ ON CONFLICT(event_key) DO NOTHING RETURNING id`,
+ [eventKey,tenantId,subject,body,
+  (paid?"AssetFlow360-Receipt-":"AssetFlow360-Activation-")+reference.slice(0,18)+".pdf",pdf]);
  if(!rows.length)return;
  await queryPostgres(`INSERT INTO public.platform_operations_deliveries(campaign_id,user_id,to_email)
  VALUES($1,$2,$3) ON CONFLICT DO NOTHING`,[rows[0].id,r.id,r.email]);

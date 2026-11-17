@@ -30,6 +30,7 @@ import { AssetLocationFields } from "@/components/asset-location-fields";
 import { loadTenantBranding, BRANDING_CHANGED_EVENT } from "@/lib/branding";
 import { GeoHierarchyFilter, type GeoHierarchyPlace } from "@/components/geo-hierarchy-filter";
 import {nativeRegisterKey} from "@/lib/register-core-fields";
+import {compressAssetPhoto} from "@/lib/compress-asset-photo";
 
 export const Route = createFileRoute("/_app/assets")({
   component: AssetsPage,
@@ -165,6 +166,30 @@ function AssetsPage() {
   const [inspectedOnEntry,setInspectedOnEntry]=useState(false);
   const [inspectionCondition,setInspectionCondition]=useState("");
   const [inspectionNotes,setInspectionNotes]=useState("");
+  const [assetPhoto,setAssetPhoto]=useState<File|null>(null);
+  const [photoWorking,setPhotoWorking]=useState(false);
+  const captureAssetPhoto=async(file?:File)=>{
+    if(!file)return;
+    setPhotoWorking(true);
+    try{
+      const compressed=await compressAssetPhoto(file);
+      setAssetPhoto(compressed);
+      toast.success("Photo ready ("+Math.ceil(compressed.size/1024)+" KB)");
+    }catch(error:any){toast.error(error?.message||"Could not prepare asset photo")}
+    finally{setPhotoWorking(false)}
+  };
+  const saveAssetPhoto=async(assetId:string)=>{
+    if(!assetPhoto||!tenantId)return;
+    const path=`${tenantId}/${assetId}/${Date.now()}-asset-photo.webp`;
+    const {error:uploadError}=await supabase.storage.from("asset-files").upload(path,assetPhoto,{contentType:"image/webp",upsert:false});
+    if(uploadError){toast.warning("Asset saved, but the photo could not be uploaded");return;}
+    const {error:linkError}=await supabase.from("asset_attachments").insert({
+      asset_id:assetId,kind:"image",file_name:"Asset photo.webp",storage_path:path,
+      mime_type:"image/webp",uploaded_by:user?.id??null,
+    });
+    if(linkError)toast.warning("Asset saved, but the photo could not be linked");
+    else toast.success("Asset photo saved");
+  };
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<AssetForm>(empty);
   const [wizardStep, setWizardStep] = useState(0);
@@ -348,8 +373,9 @@ function AssetsPage() {
     nav({ to: "/assets", search: {} as any, replace: true });
   };
 
-  const openNew = async () => { setInspectedOnEntry(false);setInspectionCondition("");setInspectionNotes("");const result=await refreshRegisterCatalog();if(result.error||!result.data){toast.error("Cannot load your company register. Try again.");return;}const preferred=result.data.primaryId??"default";if(preferred!=="default"&&!result.data.definitions.some((d:any)=>d.id===preferred)){toast.error("Your active register is unavailable. Please contact your administrator.");return;}setRegisterChoice(preferred);setCustomValues({});setForm({...empty,branch_id:visibleBranches.length===1?visibleBranches[0].id:null});setWizardStep(0);setFinancialOpen(false);setOpen(true); };
+  const openNew = async () => { setAssetPhoto(null);setInspectedOnEntry(false);setInspectionCondition("");setInspectionNotes("");const result=await refreshRegisterCatalog();if(result.error||!result.data){toast.error("Cannot load your company register. Try again.");return;}const preferred=result.data.primaryId??"default";if(preferred!=="default"&&!result.data.definitions.some((d:any)=>d.id===preferred)){toast.error("Your active register is unavailable. Please contact your administrator.");return;}setRegisterChoice(preferred);setCustomValues({});setForm({...empty,branch_id:visibleBranches.length===1?visibleBranches[0].id:null});setWizardStep(0);setFinancialOpen(false);setOpen(true); };
   const openEdit = (a: any) => {
+    setAssetPhoto(null);
     setRegisterChoice(a.register_definition_id??"default");
     setCustomValues(Object.fromEntries(Object.entries(a.custom_fields??{}).map(([k,v])=>[k,String(v??"")])));
     setForm({
@@ -560,6 +586,7 @@ function AssetsPage() {
         const previous: any = (assets as any[]).find((a) => a.id === form.id);
         const { error } = await supabase.from("assets").update(payload).eq("id", form.id);
         if (error) { toast.error(error.message); return; }
+        await saveAssetPhoto(form.id);
         const locationChanged =
           previous?.location_id !== form.location_id ||
           previous?.geo_place_id !== form.geo_place_id ||
@@ -571,6 +598,7 @@ function AssetsPage() {
         const { data: created, error } = await supabase
           .from("assets").insert({ ...payload, created_by: user?.id ?? null }).select().single();
         if (error || !created) { toast.error(error?.message ?? "Failed"); return; }
+        await saveAssetPhoto(created.id);
         if (form.location_id || form.geo_place_id || (form.location_latitude && form.location_longitude)) {
           await recordLocationEvent(created.id, "registered", "Initial asset location recorded during registration.");
         }
@@ -611,6 +639,7 @@ function AssetsPage() {
         }
       }
       if (!form.id && saveAndNext) {
+        setAssetPhoto(null);
         setInspectedOnEntry(false);setInspectionCondition("");setInspectionNotes("");
         setCustomValues({});
         setForm((previous) => ({
@@ -626,6 +655,7 @@ function AssetsPage() {
         setFinancialOpen(false);
         toast.message("Ready for the next asset");
       } else {
+        setAssetPhoto(null);
         setInspectedOnEntry(false);setInspectionCondition("");setInspectionNotes("");
         setOpen(false);
         setWizardStep(0);
@@ -1092,7 +1122,7 @@ function AssetsPage() {
                     </Select>
                   </div>}
                   {registerFields.some(field=>nativeRegisterKey(field))&&<p style={{order:9999}} className="col-span-full text-xs text-muted-foreground">Built-in fields appear only once. Existing register data remains preserved.</p>}
-                  <div className="contents">{customEntryFields.map(field=><div key={field.key} style={{order:entryOrder(`custom:${field.id??field.key}`)}} className="space-y-2"><Label>{field.label}{field.required?" *":""}</Label>{field.type==="select"&&field.options?.length?<Select value={customValues[field.key]??""} onValueChange={value=>setCustomValues(v=>({...v,[field.key]:value}))}><SelectTrigger><SelectValue placeholder="Choose"/></SelectTrigger><SelectContent>{field.options.map(option=><SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>:field.type==="radio"&&field.options?.length?<div role="radiogroup" aria-label={field.label} className="flex flex-wrap gap-3">{field.options.map(option=><label key={option} className="flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm"><input type="radio" name={`custom-${field.key}`} checked={customValues[field.key]===option} onChange={()=>setCustomValues(v=>({...v,[field.key]:option}))}/>{option}</label>)}</div>:field.type==="attachment"?<label className="block space-y-2">{customValues[field.key]&&<Button type="button" size="sm" variant="outline" onClick={async e=>{e.preventDefault();const {data,error}=await supabase.storage.from("asset-files").createSignedUrl(customValues[field.key],60);if(error||!data?.signedUrl){toast.error(error?.message||"Cannot open attachment");return;}window.open(data.signedUrl,"_blank","noopener,noreferrer")}}>View attachment</Button>}<span className="text-xs text-muted-foreground">{customValues[field.key]?"Attached: "+customValues[field.key].split("/").pop():"PDF or image (max 10 MB)"}</span><Input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx" disabled={uploadingField===field.key} onChange={async e=>{const file=e.target.files?.[0];if(!file||!tenantId)return;if(file.size>10*1024*1024){toast.error("File must be under 10 MB");return;}setUploadingField(field.key);try{const clean=file.name.replace(/[^a-zA-Z0-9._-]/g,"_");const path=`${tenantId}/custom-register/${crypto.randomUUID()}-${clean}`;const result=await supabase.storage.from("asset-files").upload(path,file,{contentType:file.type||"application/octet-stream",upsert:false});if(result.error)throw result.error;setCustomValues(v=>({...v,[field.key]:path}));toast.success("Attachment uploaded")}catch(error:any){toast.error(error.message||"Attachment upload failed")}finally{setUploadingField(null)}}}/></label>:field.type==="boolean"?<label className="flex min-h-11 items-center gap-3 rounded-lg border p-3"><input type="checkbox" checked={customValues[field.key]==="true"} onChange={e=>setCustomValues(v=>({...v,[field.key]:String(e.target.checked)}))}/><span className="text-sm">Yes</span></label>:<Input className="h-11" type={field.type==="date"?"date":field.type==="number"||field.type==="currency"?"number":field.type==="email"?"email":field.type==="url"?"url":field.type==="phone"?"tel":"text"} value={customValues[field.key]??""} onChange={event=>setCustomValues(v=>({...v,[field.key]:event.target.value}))}/>}</div>)}</div></div>}
+                  <div className="contents">{customEntryFields.map(field=><div key={field.key} style={{order:entryOrder(`custom:${field.id??field.key}`)}} className="space-y-2"><Label>{field.label}{field.required?" *":""}</Label>{field.type==="select"&&field.options?.length?<Select value={customValues[field.key]??""} onValueChange={value=>setCustomValues(v=>({...v,[field.key]:value}))}><SelectTrigger><SelectValue placeholder="Choose"/></SelectTrigger><SelectContent>{field.options.map(option=><SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>:field.type==="radio"&&field.options?.length?<div role="radiogroup" aria-label={field.label} className="flex flex-wrap gap-3">{field.options.map(option=><label key={option} className="flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-sm"><input type="radio" name={`custom-${field.key}`} checked={customValues[field.key]===option} onChange={()=>setCustomValues(v=>({...v,[field.key]:option}))}/>{option}</label>)}</div>:["attachment","image"].includes(field.type)?<label className="block space-y-2">{customValues[field.key]&&<Button type="button" size="sm" variant="outline" onClick={async e=>{e.preventDefault();const {data,error}=await supabase.storage.from("asset-files").createSignedUrl(customValues[field.key],60);if(error||!data?.signedUrl){toast.error(error?.message||"Cannot open attachment");return;}window.open(data.signedUrl,"_blank","noopener,noreferrer")}}>View attachment</Button>}<span className="text-xs text-muted-foreground">{customValues[field.key]?"Attached: "+customValues[field.key].split("/").pop():field.type==="image"?"Asset photo (compressed)":"PDF or image (max 10 MB)"}</span><Input type="file" accept={field.type==="image"?"image/jpeg,image/png,image/webp":".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx"} disabled={uploadingField===field.key} onChange={async e=>{const file=e.target.files?.[0];if(!file||!tenantId)return;if(file.size>10*1024*1024){toast.error("File must be under 10 MB");return;}setUploadingField(field.key);try{const prepared=field.type==="image"?await compressAssetPhoto(file):file;const clean=prepared.name.replace(/[^a-zA-Z0-9._-]/g,"_");const path=`${tenantId}/custom-register/${crypto.randomUUID()}-${clean}`;const result=await supabase.storage.from("asset-files").upload(path,prepared,{contentType:prepared.type||"application/octet-stream",upsert:false});if(result.error)throw result.error;setCustomValues(v=>({...v,[field.key]:path}));toast.success("Attachment uploaded")}catch(error:any){toast.error(error.message||"Attachment upload failed")}finally{setUploadingField(null)}}}/></label>:field.type==="boolean"?<label className="flex min-h-11 items-center gap-3 rounded-lg border p-3"><input type="checkbox" checked={customValues[field.key]==="true"} onChange={e=>setCustomValues(v=>({...v,[field.key]:String(e.target.checked)}))}/><span className="text-sm">Yes</span></label>:<Input className="h-11" type={field.type==="date"?"date":field.type==="number"||field.type==="currency"?"number":field.type==="email"?"email":field.type==="url"?"url":field.type==="phone"?"tel":"text"} value={customValues[field.key]??""} onChange={event=>setCustomValues(v=>({...v,[field.key]:event.target.value}))}/>}</div>)}</div></div>}
                 {wizardStep === 4 && (
                   <div className="space-y-5">
                     <div>
@@ -1101,6 +1131,27 @@ function AssetsPage() {
                     </div>
                     {registerChoice!=="default"&&<div className="rounded-xl border p-3 text-sm"><p className="font-semibold">Asset: {form.name||"—"} · Tag: {form.asset_tag||"—"} · Serial: {form.serial_number||"—"}</p><p className="mt-1">Location: {reviewLocation}</p><p className="mt-1 text-xs text-muted-foreground">{form.location_latitude&&form.location_longitude?"GPS captured":"GPS not captured"}</p></div>}
                     {registerChoice!=="default"&&<div className="grid gap-2 rounded-xl border p-3">{customEntryFields.map(field=><div key={field.key} className="flex justify-between gap-3 text-sm"><span>{field.label}</span><span className="font-semibold">{customValues[field.key]||"—"}</span></div>)}</div>}
+                    <div className="rounded-xl border bg-background p-4 space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div><p className="font-semibold text-sm">Asset photo <span className="font-normal text-muted-foreground">(optional)</span></p>
+                        <p className="text-xs text-muted-foreground">Capture or select a photo. It is compressed on your device before upload.</p></div>
+                        {assetPhoto&&<Button type="button" size="sm" variant="outline" onClick={()=>setAssetPhoto(null)}>Remove photo</Button>}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <label className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[#cbd5e1] bg-white px-4 py-2 text-sm font-semibold text-[#172554] hover:bg-slate-50">
+                          Take photo
+                          <input aria-label="Take asset photo with camera" type="file" accept="image/*" capture="environment" className="sr-only" disabled={photoWorking||saving}
+                            onChange={e=>{void captureAssetPhoto(e.target.files?.[0]);e.target.value=""}}/>
+                        </label>
+                        <label className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[#cbd5e1] bg-white px-4 py-2 text-sm font-semibold text-[#172554] hover:bg-slate-50">
+                          Choose photo
+                          <input aria-label="Choose an existing asset photo" type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={photoWorking||saving}
+                            onChange={e=>{void captureAssetPhoto(e.target.files?.[0]);e.target.value=""}}/>
+                        </label>
+                        {photoWorking&&<span className="text-sm">Preparing photo…</span>}
+                        {assetPhoto&&<span className="text-sm text-emerald-700">Ready · {Math.ceil(assetPhoto.size/1024)} KB</span>}
+                      </div>
+                    </div>
                     {!form.id&&<div className="space-y-2 rounded-xl border border-[#dce7e9] bg-[#f7fafb] p-3">
                       <label className="flex items-start gap-3 text-sm">
                         <input type="checkbox" className="mt-1 h-4 w-4" checked={inspectedOnEntry} disabled={!canDo("perform_verification")||!user?.id} onChange={e=>{setInspectedOnEntry(e.target.checked);setInspectionCondition("");setInspectionNotes("");}}/>
@@ -1155,11 +1206,11 @@ function AssetsPage() {
                   ) : (
                     <>
                       {!form.id && (
-                        <Button type="button" variant="outline" onClick={() => save(true)} disabled={saving}>
+                        <Button type="button" variant="outline" onClick={() => save(true)} disabled={saving||photoWorking}>
                           {saving ? "Saving…" : "Save & add next"}
                         </Button>
                       )}
-                      <Button type="button" onClick={() => save(false)} disabled={saving}>
+                      <Button type="button" onClick={() => save(false)} disabled={saving||photoWorking}>
                         {saving ? "Saving…" : form.id ? "Save changes" : "Save asset"}
                       </Button>
                     </>
@@ -1399,6 +1450,11 @@ function AssetsPage() {
               Full history & audit trail{viewAsset?.status ? ` · Status: ${STATUS_LABEL[viewAsset.status as Status]}` : ""}
             </DialogDescription>
           </DialogHeader>
+          {viewAsset && <div className="flex justify-end">
+            {canEdit&&<Button type="button" onClick={()=>{const selected=viewAsset;setViewOpen(false);openEdit(selected)}}>
+              <Pencil className="mr-2 h-4 w-4"/> Edit details
+            </Button>}
+          </div>}
           {viewAsset && <AssetDetailTabs assetId={viewAsset.id} defaultTab={viewTab} />}
         </DialogContent>
       </Dialog>

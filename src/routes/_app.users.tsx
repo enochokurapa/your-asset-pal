@@ -118,7 +118,7 @@ function UsersPage() {
       // This view must always query exactly one business. A SaaS Admin may have
       // platform-wide profile read rights, so RLS alone cannot scope this page.
       const {data:profiles,error:profileError}=await supabase.from("profiles")
-        .select("*").eq("is_saas_admin",false).eq("tenant_id",tenantId)
+        .select("*").eq("is_saas_admin",false).eq("tenant_id",tenantId).is("archived_at",null)
         .order("created_at",{ascending:false});
       if(profileError)throw new Error(profileError.message);
       const userIds=(profiles??[]).map(p=>p.id);
@@ -201,7 +201,7 @@ function UsersPage() {
   };
 
   const onDelete = async (userId: string) => {
-    await call(deleteFn, { user_id: userId }, "User deleted");
+    await call(deleteFn, { user_id: userId }, "User access removed");
   };
 
   return (
@@ -352,10 +352,10 @@ function UserRow({ u, self, branchesAll, onRole, onModule, onApproval, onAction,
         <div className="flex items-center gap-2 text-sm"><Switch checked={u.is_active !== false} disabled={self} onCheckedChange={(v) => onActive(u.id, v)} /><span className="text-muted-foreground">{u.is_active !== false ? "Active" : "Inactive"}</span></div>
         {!self && (
           <AlertDialog>
-            <AlertDialogTrigger asChild><Button variant="destructive" size="sm" className="ml-auto"><Trash2 className="mr-2 h-4 w-4" /> Delete</Button></AlertDialogTrigger>
+            <AlertDialogTrigger asChild><Button variant="destructive" size="sm" className="ml-auto"><Trash2 className="mr-2 h-4 w-4" /> Remove access</Button></AlertDialogTrigger>
             <AlertDialogContent>
-              <AlertDialogHeader><AlertDialogTitle>Delete this user?</AlertDialogTitle><AlertDialogDescription>This permanently removes <strong>{u.email}</strong>. Their roles and permissions are revoked. Records they created remain.</AlertDialogDescription></AlertDialogHeader>
-              <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => onDelete(u.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+              <AlertDialogHeader><AlertDialogTitle>Remove this user's access?</AlertDialogTitle><AlertDialogDescription>This will block <strong>{u.email}</strong> from signing in and archive their profile from active user management. Their asset and audit history will remain.</AlertDialogDescription></AlertDialogHeader>
+              <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => onDelete(u.id)}>Remove access</AlertDialogAction></AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
         )}

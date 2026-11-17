@@ -76,13 +76,14 @@ async function getTenantAdminProfile(userId: string,supportTenantId?:string|null
 async function assertSameTenant(adminUserId: string, targetUserId: string,supportTenantId?:string|null) {
   const p = await getTenantAdminProfile(adminUserId,supportTenantId);
   const { data: target, error } = await admin.from("profiles")
-    .select("tenant_id,is_saas_admin")
+    .select("tenant_id,is_saas_admin,archived_at")
     .eq("id", targetUserId)
     .single();
   if (error || !target || target.tenant_id !== p.tenant_id) {
     throw new Error("You cannot manage a user from another workspace");
   }
   if (target.is_saas_admin) throw new Error("Admins cannot manage the SaaS Admin account");
+  if (target.archived_at) throw new Error("This user has already been removed from the workspace");
   return p;
 }
 
@@ -224,9 +225,18 @@ export const deleteUserAccount = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertSameTenant(context.userId, data.user_id,context.supportTenantId);
     if (data.user_id === context.userId) throw new Error("You cannot delete your own account");
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.user_id);
-    if (error) throw new Error(error.message);
-    await auditBusinessSupport(context,"tenant_user_deleted",{targetUserId:data.user_id});
+    // Preserve historical assets, assignments and audit records. Ban the account
+    // first and archive its profile rather than cascading auth.users deletion.
+    const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, {
+      ban_duration:"876000h"
+    });
+    if (banError) throw new Error("Unable to revoke account login: "+banError.message);
+    const { error: archiveError } = await admin.from("profiles")
+      .update({is_active:false,archived_at:new Date().toISOString()}).eq("id",data.user_id);
+    if (archiveError) throw new Error("Login blocked, but profile archiving failed: "+archiveError.message);
+    await auditBusinessSupport(context,"tenant_user_access_removed",{
+      targetUserId:data.user_id,retainedHistory:true
+    });
     return { ok: true };
   });
 
