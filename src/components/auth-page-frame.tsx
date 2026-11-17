@@ -2,12 +2,14 @@ import type {ReactNode} from "react";
 import {Link} from "@tanstack/react-router";
 import {ArrowLeft,ShieldCheck} from "lucide-react";
 import {PlatformLogo} from "@/components/platform-logo";
+import {AuthVisualPanel} from "@/components/auth-visual-panel";
 
 export function AuthPageFrame({children,backTo="/",backLabel="Home",wide=false}:{
  children:ReactNode;backTo:"/"|"/login";backLabel?:string;wide?:boolean
 }){
- return <div className="af-auth-stage platform-brand min-h-[100dvh] px-3 py-5 sm:px-5 sm:py-10">
-   <main className={`af-auth-container mx-auto flex min-h-[calc(100dvh-4rem)] w-full flex-col justify-center ${wide?"max-w-[550px]":"max-w-[465px]"}`}>
+ return <div className="af-auth-stage af-auth-split platform-brand min-h-[100dvh] px-0 py-0 lg:px-5 lg:py-8">
+   <AuthVisualPanel/>
+   <main className="af-auth-form-side={`af-auth-container mx-auto flex min-h-[100dvh] w-full flex-col justify-center ${wide?"max-w-[550px]":"max-w-[465px]"}`}>
     <section className="af-auth-card bg-white px-5 py-6 sm:px-8 sm:py-8">
      <header className="mb-6 flex items-center justify-between gap-2 border-b border-slate-100 pb-5">
       <PlatformLogo variant="mark" className="h-11 w-12 shrink-0" imageClassName="object-contain"/>

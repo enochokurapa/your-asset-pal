@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { PlatformLogo } from "@/components/platform-logo";
+import {AuthVisualPanel} from "@/components/auth-visual-panel";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -125,11 +126,12 @@ function LoginPage() {
     setTakeoverOpen(false);setExistingDevices([]);
   };
   return (
-    <div className="platform-brand af-auth-stage px-4 py-8 sm:py-10">
+    <div className="platform-brand af-auth-stage af-auth-split px-0 py-0 lg:px-5 lg:py-8">
 
 
       {takeoverOpen&&<div role="dialog" aria-modal="true" aria-label="Existing sign-in" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"><div className="w-full max-w-md rounded-2xl bg-card p-7 shadow-xl"><h2 className="text-xl font-bold">Account already signed in</h2><p className="mt-3 text-sm text-muted-foreground">Your account is active on another device. Continue here and sign out the other device?</p><div className="my-4 rounded-xl border p-3 text-sm">{existingDevices.slice(0,3).map(item=><p key={item.session_id} className="truncate">{item.device || "Another browser"}</p>)}</div><p className="text-xs text-muted-foreground">The existing device will be notified when it next checks its session.</p><div className="mt-5 flex justify-end gap-2"><Button variant="outline" onClick={cancelTakeover} disabled={submitting}>Keep other device</Button><Button onClick={replaceSession} disabled={submitting}>Sign out other device</Button></div></div></div>}
-      <main className="relative z-10 mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-[465px] flex-col justify-center">
+      <AuthVisualPanel/>
+      <main className="af-auth-form-side relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-[465px] flex-col justify-center">
         <div className="af-auth-card border bg-white px-5 py-6 sm:px-8 sm:py-8">
           <div className="mb-6 flex items-center justify-between gap-2 border-b border-slate-100 pb-5">
             <span className="flex min-w-0 items-center gap-2">
@@ -141,7 +143,7 @@ function LoginPage() {
           </div>
           <div className="mb-6 text-left">
             <h1 className="text-2xl font-bold tracking-tight text-[#18275f]">Welcome back</h1>
-            <p className="mt-2 text-sm leading-6 text-[#5d6686]">Sign in to your AssetFlow360 workspace</p>
+
           </div>
 
           <form onSubmit={onSubmit} className="space-y-4">
@@ -207,12 +209,10 @@ function LoginPage() {
               Continue with Google
             </Button>
           </>}
-          <div className="mt-5 flex items-center justify-center gap-2 text-xs text-[#707b9b]">
-            <ShieldCheck className="h-4 w-4 shrink-0 text-[#3A3EC2]" /> Secure workspace sign-in
-          </div>
+
 
           <div className="mt-6 space-y-3 border-t pt-5 text-center">
-            <p className="text-xs text-[#727995]">New to AssetFlow360?</p>
+
             <Link to="/register" className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-[#CB7B30] text-sm font-bold text-[#B56B25] hover:bg-[#fff5e9]">Create an account</Link>
           </div>
         </div>

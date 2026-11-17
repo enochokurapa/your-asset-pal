@@ -8,6 +8,7 @@ import { getServerAuthHeaders } from "@/lib/auth-headers";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { PlatformLogo } from "@/components/platform-logo";
+import {AuthVisualPanel} from "@/components/auth-visual-panel";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -108,11 +109,12 @@ function RegisterPage() {
   };
 
   return (
-    <div className="platform-brand af-auth-stage px-4 py-8 sm:py-10">
+    <div className="platform-brand af-auth-stage af-auth-split px-0 py-0 lg:px-5 lg:py-8">
 
 
 
-      <main className="relative z-10 mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-[530px] flex-col justify-center">
+      <AuthVisualPanel/>
+      <main className="af-auth-form-side relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-[530px] flex-col justify-center">
         <div className="af-auth-card border bg-white px-5 py-6 sm:px-8 sm:py-8">
           <div className="mb-6 flex items-center justify-between gap-2 border-b border-slate-100 pb-5">
             <span className="flex min-w-0 items-center gap-2">
@@ -233,10 +235,7 @@ function RegisterPage() {
             </Button>
           </form>}
 
-          <div className="mt-5 flex items-center justify-center gap-2 rounded-xl bg-muted/45 px-3 py-2.5 text-xs text-muted-foreground">
-            <ShieldCheck className="h-4 w-4 shrink-0 text-primary" />
-            Secure, isolated organisation workspace
-          </div>
+
 
           <p className="mt-6 border-t pt-5 text-center text-sm text-muted-foreground">
             Already registered?{" "}
@@ -246,14 +245,7 @@ function RegisterPage() {
           </p>
         </div>
 
-        <div className="mt-5 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
-          {["No card required", "Multi-branch ready", "Secure workspace"].map((item) => (
-            <span key={item} className="flex items-center gap-1.5">
-              <Check className="h-3.5 w-3.5 text-primary" />
-              {item}
-            </span>
-          ))}
-        </div>
+
       </main>
     </div>
   );

@@ -9,6 +9,12 @@ const submitSchema=z.object({
   name:z.string().trim().min(2).max(120),
   email,
   subject:z.string().trim().min(5).max(180),
+  reason:z.enum(["support","sales","small_business","enterprise","custom_workspace","integrations","billing","other"]),
+  organisation:z.string().trim().max(160).default(""),
+  phone:z.string().trim().max(40).default(""),
+  size:z.enum(["not_sure","1_100","101_1000","1001_10000","10001_plus"]).default("not_sure"),
+  assets:z.number().int().min(0).max(100000000).nullable().default(null),
+  requirements:z.string().trim().max(1200).default(""),
   message:z.string().trim().min(10).max(6000),
   website:z.string().max(200).optional().default(""),
 });
@@ -37,8 +43,25 @@ export const submitContactRequest=createServerFn({method:"POST"})
      WHERE email=$1 AND created_at>NOW()-INTERVAL '1 hour'
    `,[data.email]);
    if(recent.total>=3)throw Error("Too many recent requests. Please try again later.");
+   const categoryNames:Record<typeof data.reason,string>={
+     support:"Support",sales:"Sales",small_business:"Small business package",
+     enterprise:"Enterprise solution",custom_workspace:"Custom workspace",
+     integrations:"API & integrations",billing:"Billing",other:"General enquiry"
+   };
+   const subject="["+categoryNames[data.reason]+"] "+data.subject;
+   const details=[
+     "Reason: "+categoryNames[data.reason],
+     data.organisation?"Organisation: "+data.organisation:null,
+     data.phone?"Phone: "+data.phone:null,
+     "Business size: "+({not_sure:"Not sure", "1_100":"1–100 assets",
+       "101_1000":"101–1,000 assets","1001_10000":"1,001–10,000 assets",
+       "10001_plus":"Over 10,000 assets"} as Record<typeof data.size,string>)[data.size],
+     data.assets!==null?"Estimated assets: "+data.assets.toLocaleString("en-UG"):null,
+     data.requirements?"Requested features: "+data.requirements:null,
+   ].filter(Boolean).join("\n");
    await queryPostgres(`INSERT INTO public.platform_contact_requests(name,email,subject,message)
-       VALUES($1,$2,$3,$4)`,[data.name,data.email,data.subject,data.message]);
+       VALUES($1,$2,$3,$4)`,[data.name,data.email,subject,
+         details+"\n\nMessage:\n"+data.message]);
    return {received:true};
  });
 export const getAdminContactRequests=createServerFn({method:"GET"})

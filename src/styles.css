@@ -553,3 +553,30 @@
 .af-public-site main > section > .af-content-fluid {
   margin-inline:auto;
 }
+
+/* Premium split-layout authentication. Keep the form full-width on phones. */
+.af-auth-split{display:flex;align-items:center;justify-content:center;gap:0;background:#eef3fb;min-height:100dvh;}
+.af-auth-form-side{position:relative;flex:1;max-width:520px;min-width:0;padding:22px 20px;}
+.af-auth-form-side .af-auth-card{border:0!important;box-shadow:none!important;background:white!important;border-radius:0!important;}
+.af-auth-visual{display:none;position:relative;isolation:isolate;overflow:hidden;background:linear-gradient(150deg,#071b4e 0%,#153e91 61%,#317dd0 100%);
+ color:white;padding:32px 34px;min-width:0;}
+.af-auth-visual:before{content:"";position:absolute;width:410px;height:410px;border-radius:50%;right:-230px;top:70px;background:linear-gradient(145deg,#4495f4,#173a91);opacity:.75;}
+.af-auth-building{position:absolute;right:-45px;bottom:110px;width:78%;height:46%;transform:skewY(-7deg);opacity:.65;pointer-events:none;}
+.af-auth-building-top{height:23px;transform:skewX(-29deg);background:#a7cdfd;box-shadow:0 0 60px #4b9fed;}
+.af-auth-building-body{height:100%;background:linear-gradient(130deg,#214d90,#082453);border:2px solid #92b9f8;padding:24px 20px;display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:repeat(4,1fr);gap:12px;}
+.af-auth-building-body>span{background:linear-gradient(145deg,#b9dafa,#6393d1);box-shadow:inset 1px 0 4px #c5eaff;border:1px solid #97bbf2;opacity:.8;}
+@media(min-width:1024px){
+ .af-auth-split{padding:24px;gap:0;}
+ .af-auth-visual{display:flex;flex-direction:column;flex:1 1 48%;max-width:610px;min-height:650px;border-radius:22px 0 0 22px;box-shadow:0 22px 55px rgba(17,38,88,.12);}
+ .af-auth-form-side{flex:1 1 52%;max-width:520px;min-height:650px;padding:28px 35px;background:white;border-radius:0 22px 22px 0;box-shadow:12px 22px 55px rgba(17,38,88,.07);}
+}
+@media(max-width:1023px){
+ .af-auth-split{background:#fff;padding:0!important;}
+ .af-auth-form-side{width:100%;max-width:580px;min-height:100dvh;padding:20px 18px;}
+ .af-auth-form-side .af-auth-card{padding:12px 2px!important;}
+}
+@media(max-width:640px){
+ .af-auth-split{width:100%;max-width:none;margin:0;padding:0!important;}
+ .af-auth-form-side{max-width:none;width:100%;padding:14px 16px;}
+ .af-auth-form-side .af-auth-card{padding:12px 0!important;}
+}
