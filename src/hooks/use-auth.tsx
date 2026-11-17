@@ -191,8 +191,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMustChangePassword(Boolean(prof?.must_change_password));
       setIsActive(prof?.is_active !== false);
       setIsSaasAdmin(isPlatformAdmin || supporting);
-      const {data:staffRole,error:staffError}=await supabase.rpc("my_platform_staff_role" as any);
-      setPlatformStaffRole(staffError?null:(typeof staffRole==="string"?staffRole:null));
+      // Do not query deprecated my_platform_staff_role RPC: this deployment
+      // does not expose it and it returned 404 on every login.
+      setPlatformStaffRole(null);
       setTenantRole(supporting || prof?.tenant_role === "tenant_admin" ? "tenant_admin" : "member");
       setTenantId(effectiveTenant);
 
@@ -253,11 +254,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (s?.user) setTimeout(() => loadFor(s.user.id), 0);
       else resetMetadata();
     });
-    supabase.auth.getSession().then(async ({ data }) => {
-      setSession(data.session);
-      if (data.session?.user) await loadFor(data.session.user.id);
-      setLoading(false);
-    });
+    let finished=false;
+    const finish=()=>{if(!finished){finished=true;setLoading(false)}};
+    const startupTimeout=window.setTimeout(finish,15000);
+    void supabase.auth.getSession()
+      .then(async({data,error})=>{
+        if(error)throw error;
+        setSession(data.session);
+        if(data.session?.user)await loadFor(data.session.user.id);
+      })
+      .catch(error=>{console.warn("[Auth] Initial session could not be loaded",error)})
+      .finally(()=>{window.clearTimeout(startupTimeout);finish()});
     return () => sub.subscription.unsubscribe();
   }, []);
 
