@@ -113,16 +113,26 @@ export async function queueTenantActivationNotice(
    t.plan_code==="starter"?"Starter":t.plan_code==="business"?"Business":
    t.plan_code==="enterprise"?"Enterprise":t.plan_code;
  const subject="Your AssetFlow360 workspace is active";
- const body=`Your ${t.name} workspace has been activated successfully.
-
-You can now sign in and manage your organisation's assets.
-
-Plan: ${planLabel}
-Renewal date: ${new Date(t.subscription_ends_at).toLocaleDateString("en-GB",{timeZone:"Africa/Kampala"})}
-
-${paid?"Your payment receipt is attached as a PDF for printing and filing.":"Your activation confirmation is attached as a PDF."}
-
-AssetFlow Operations`;
+ const startDate=new Date(t.subscription_started_at||Date.now()).toLocaleDateString("en-GB",{timeZone:"Africa/Kampala"});
+ const renewalDate=new Date(t.subscription_ends_at).toLocaleDateString("en-GB",{timeZone:"Africa/Kampala"});
+ const body=[
+   "Hello,",
+   "Your "+t.name+" workspace is activated and ready for your team to use.",
+   [
+     "Organisation: "+t.name,
+     "Subscription: "+planLabel,
+     "Activation date: "+startDate,
+     "Renewal date: "+renewalDate,
+     "Active users: "+users,
+     "Asset capacity: "+assets,
+     ...(paid?["Payment received: "+currency+" "+Number(amount).toLocaleString("en-UG"),
+               "Payment method: "+method]:[])
+   ].join("\n"),
+   paid?"Your official PDF payment receipt is attached for your accounts and filing records.":
+     "Your workspace activation confirmation is attached as a PDF.",
+   "You can sign in and continue registering, verifying and managing your organisation's assets.",
+   "AssetFlow360 Operations"
+ ].join("\n\n");
  const pdf=createAssetFlowActivationReceipt({
   receiptNo:reference,workspace:t.name,plan:planLabel,
   activatedAt:new Date(t.subscription_started_at||Date.now()),

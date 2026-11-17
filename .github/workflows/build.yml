@@ -45,6 +45,8 @@ jobs:
           PYCODE
       - name: Test asset lifecycle verification status
         run: bun run scripts/test-verification-group.ts
+      - name: Verify printable branded PDF receipt
+        run: bun run scripts/test-activation-receipt.ts
       - name: Build application
         run: bun run build
       - name: Upload compiled production bundle

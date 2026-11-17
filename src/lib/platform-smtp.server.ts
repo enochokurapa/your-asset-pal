@@ -3,6 +3,7 @@ import * as net from "node:net";
 import * as tls from "node:tls";
 import { lookup } from "node:dns/promises";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import {approvedAssetFlowLogoPng} from "./assetflow-branding.server";
 
 const db=supabaseAdmin as any;
 export type MailCategory="security"|"operations"|"finance";
@@ -347,44 +348,69 @@ export async function sendPlatformOperationsNotice(
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)||to.length>250)throw Error("Invalid notification recipient");
  if(attachment&&attachment.data.length>512*1024)throw Error("Attachment exceeds 512 KB");
  const cfg=await getConfiguredSmtpForApplication("operations");
- const encode=(x:string)=>x.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
- const esc=encode(message).replace(/\n/g,"<br/>");
- const html=`<!doctype html><html><body style="margin:0;padding:36px 12px;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;color:#172554">
- <div style="max-width:640px;margin:auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0">
- <div style="padding:24px 30px;background:#333bc1;color:#fff;font-size:21px;font-weight:700">AssetFlow360 <span style="font-size:13px;font-weight:400">Operations</span></div>
- <div style="padding:30px"><h1 style="font-size:22px;line-height:1.3;margin:0 0 18px">${encode(subject)}</h1>
- <div style="font-size:15px;line-height:1.75;color:#334155">${esc}</div>
- <p style="margin-top:28px"><a href="https://assetflow360.com/login" style="display:inline-block;padding:13px 22px;border-radius:9px;background:#333bc1;color:#fff;text-decoration:none;font-weight:bold">Open your workspace</a></p></div>
- <div style="padding:20px 30px;background:#f8fafc;border-top:1px solid #e2e8f0;color:#64748b;font-size:12px;line-height:1.7">
- AssetFlow360 Operations · Automated platform notification<br/>Please do not reply to this email.</div></div></body></html>`;
- const boundary="assetflow-"+randomBytes(15).toString("hex");
+ const esc=(v:string)=>v.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+ const isActivation=/workspace is active/i.test(subject);
+ const bodyHtml=message.split(/\n\s*\n/).map(part=>{
+   const lines=part.trim().split("\n").filter(Boolean);
+   if(lines.every(line=>/^[a-zA-Z /]+:/.test(line))){
+     return '<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:14px 0">'+
+       lines.map(line=>{const i=line.indexOf(":");return '<tr><td style="width:40%;padding:9px 4px;border-bottom:1px solid #e5ebf2;font-size:13px;color:#61728a">'+
+        esc(line.slice(0,i))+'</td><td style="padding:9px 4px;border-bottom:1px solid #e5ebf2;text-align:right;font-size:13px;color:#172554;font-weight:700">'+
+        esc(line.slice(i+1).trim())+'</td></tr>'}).join("")+'</table>';
+   }
+   return '<p style="color:#34465f;font-size:14px;line-height:1.8;margin:0 0 16px">'+lines.map(esc).join("<br>")+'</p>';
+ }).join("");
+ const html=`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+ <body style="margin:0;background:#f3f6fa;font-family:Arial,Helvetica,sans-serif;color:#172554">
+ <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f6fa"><tr><td align="center" style="padding:30px 12px">
+ <table role="presentation" width="620" cellspacing="0" cellpadding="0" style="width:100%;max-width:620px;background:#ffffff;border:1px solid #dce4ee;border-top:4px solid #3846ad;border-radius:8px">
+ <tr><td style="padding:20px 26px;border-bottom:1px solid #e5ebf2">
+  <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+  <td><img src="cid:assetflow-brand-logo" width="72" alt="AssetFlow360" style="display:block;width:72px;max-width:72px;height:auto;border:0"></td>
+  <td style="padding-left:14px"><div style="font-weight:700;font-size:20px;color:#172554">AssetFlow360</div>
+  <div style="margin-top:5px;font-size:11px;letter-spacing:1px;color:#61728a">ASSETFLOW OPERATIONS</div></td></tr></table>
+ </td></tr>
+ <tr><td style="padding:28px 26px 12px">
+  <div style="font-size:11px;letter-spacing:1.2px;color:#3e4aad;font-weight:700;margin-bottom:9px">${isActivation?"SUBSCRIPTION CONFIRMATION":"ACCOUNT COMMUNICATION"}</div>
+  <h1 style="font-size:23px;line-height:1.32;margin:0 0 21px;color:#15244a">${esc(subject)}</h1>
+  ${bodyHtml}
+  ${attachment&&isActivation?'<p style="margin:18px 0;color:#41516c;font-size:13px"><strong>Attached:</strong> Your official PDF receipt. Please save or print it for your records.</p>':""}
+  <table role="presentation" cellspacing="0" cellpadding="0" style="margin:22px 0 24px"><tr><td style="background:#3544b1;border-radius:5px">
+   <a href="https://assetflow360.com/login" style="display:inline-block;padding:13px 23px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none">Open your workspace</a>
+  </td></tr></table>
+ </td></tr>
+ <tr><td style="padding:20px 26px;background:#f8fafc;border-top:1px solid #e2e8f0">
+ <div style="font-size:13px;color:#172554;font-weight:700">AssetFlow360 Operations</div>
+ <div style="margin-top:8px;font-size:12px;line-height:1.8;color:#52647b">
+  Website: <a href="https://assetflow360.com" style="color:#3449ac">assetflow360.com</a><br>
+  Contact and support: <a href="https://assetflow360.com/contact" style="color:#3449ac">assetflow360.com/contact</a><br>
+  Workspace: <a href="https://assetflow360.com/login" style="color:#3449ac">Sign in</a>
+ </div>
+ <div style="margin-top:13px;color:#78879a;font-size:11px;line-height:1.6">Automated notification from AssetFlow360 Operations. For assistance use our contact page instead of replying to this message.</div>
+ </td></tr></table></td></tr></table></body></html>`;
+ const mixed="assetflow-mixed-"+randomBytes(12).toString("hex");
+ const related="assetflow-related-"+randomBytes(12).toString("hex");
+ const b64=(b:Buffer)=>b.toString("base64").match(/.{1,76}/g)?.join("\r\n")||"";
  const lines=[
   "From: AssetFlow Operations <"+cfg.fromEmail+">",
-  "To: "+safe(to),
-  "Subject: "+safe(subject).slice(0,170),
-  "MIME-Version: 1.0",
-  "X-Auto-Response-Suppress: All",
-  "Content-Type: multipart/mixed; boundary=\""+boundary+"\"",
-  "",
-  "--"+boundary,
-  "Content-Type: text/html; charset=UTF-8",
-  "Content-Transfer-Encoding: base64",
-  "",
-  Buffer.from(html,"utf8").toString("base64").match(/.{1,76}/g)?.join("\r\n")||"",
+  "To: "+safe(to),"Subject: "+safe(subject).slice(0,170),
+  "MIME-Version: 1.0","X-Auto-Response-Suppress: All",
+  'Content-Type: multipart/mixed; boundary="'+mixed+'"',"",
+  "--"+mixed,'Content-Type: multipart/related; boundary="'+related+'"',"",
+  "--"+related,"Content-Type: text/html; charset=UTF-8","Content-Transfer-Encoding: base64","",
+  b64(Buffer.from(html,"utf8")),
+  "--"+related,'Content-Type: image/png; name="assetflow360-logo.png"',
+  "Content-ID: <assetflow-brand-logo>","Content-Transfer-Encoding: base64",
+  'Content-Disposition: inline; filename="assetflow360-logo.png"',"",
+  b64(approvedAssetFlowLogoPng()),"--"+related+"--"
  ];
  if(attachment){
   if(!/^[a-zA-Z0-9._ -]{1,100}$/.test(attachment.name))throw Error("Unsafe attachment name");
   if(!["application/pdf","image/jpeg","image/png","application/vnd.openxmlformats-officedocument.wordprocessingml.document"].includes(attachment.mime))throw Error("Unsupported attachment");
-  lines.push(
-   "--"+boundary,
-   "Content-Type: "+attachment.mime,
-   "Content-Transfer-Encoding: base64",
-   "Content-Disposition: attachment; filename=\""+attachment.name+"\"",
-   "",
-   attachment.data.toString("base64").match(/.{1,76}/g)?.join("\r\n")||"",
-  );
+  lines.push("--"+mixed,"Content-Type: "+attachment.mime,"Content-Transfer-Encoding: base64",
+   'Content-Disposition: attachment; filename="'+attachment.name+'"',"",b64(attachment.data));
  }
- lines.push("--"+boundary+"--");
+ lines.push("--"+mixed+"--");
  const session=await connect(cfg);
  try{
   await session.send("MAIL FROM:<"+cfg.fromEmail+">");
