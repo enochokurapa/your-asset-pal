@@ -482,7 +482,7 @@
 }
 @media (max-width: 767px) {
   .af-public-site .af-site-frame,
-  .af-app-workspace > main.af-app-main { width:100%; padding-left:14px; padding-right:14px; }
+  .af-app-workspace > main.af-app-main { width:100%; padding-left:0; padding-right:0; }
 }
 /* Forms should feel quiet, readable, and reliable on mobile and desktop. */
 .af-auth-stage { background:#f7f8fb; overflow-x:hidden; }
@@ -579,4 +579,50 @@
  .af-auth-split{width:100%;max-width:none;margin:0;padding:0!important;}
  .af-auth-form-side{max-width:none;width:100%;padding:14px 16px;}
  .af-auth-form-side .af-auth-card{padding:12px 0!important;}
+}
+
+
+/* Full-bleed public website on phones and compact tablets.
+   This applies to OUTER wrappers only. Section content keeps its own
+   readable text padding. Never re-introduce a boxed site frame here. */
+@media (max-width: 1023px) {
+  .af-public-site {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: clip;
+  }
+  .af-public-site > .af-site-frame,
+  .af-public-site .af-site-frame,
+  .af-public-site main.assetflow-homepage {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-left: 0;
+    border-right: 0;
+    box-shadow: none;
+  }
+  .af-public-site main.assetflow-homepage > section {
+    max-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+  .af-public-site .af-new-hero {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    border-radius: 0;
+  }
+  .af-public-site .af-public-footer {
+    width: 100%;
+    max-width: 100%;
+    margin-inline: 0;
+    border-radius: 0;
+  }
 }
