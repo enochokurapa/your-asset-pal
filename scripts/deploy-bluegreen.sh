@@ -32,11 +32,13 @@ trap cleanup EXIT
 echo "Starting new release: $NEW"
 docker compose -f standalone.compose.yml -f "$OVERRIDE" run -d --no-deps --name "$NEW" pesapal-app >/dev/null
 for attempt in $(seq 1 15);do
- if docker exec edge-nginx wget -q -T 3 -O /dev/null "http://$NEW:3000/api/health";then break;fi
+ if docker exec edge-nginx wget -q -T 3 -O /dev/null --header "Host: assetflow360.com" "http://$NEW:3000/api/health";then break;fi
  sleep 2
 done
-docker exec edge-nginx wget -q -T 5 -O /dev/null "http://$NEW:3000/api/health"
-docker exec edge-nginx wget -q -T 5 -O /dev/null "http://$NEW:3000/login"
+docker exec edge-nginx wget -q -T 5 -O /dev/null --header "Host: assetflow360.com" "http://$NEW:3000/api/health"
+docker exec edge-nginx wget -q -T 5 -O /dev/null --header "Host: assetflow360.com" "http://$NEW:3000/login"
+# Keep the new production instance available after host/Docker restarts.
+docker update --restart unless-stopped "$NEW" >/dev/null
 echo 'New application passed internal edge-proxy health tests'
 ROLLBACK_NEEDED=1
 python3 - "$CONF_DIR" "$NEW" <<'PY'
