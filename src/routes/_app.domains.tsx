@@ -81,7 +81,12 @@ function DomainsPage() {
           <Card key={d.id} className="space-y-3 p-5">
             <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-semibold">{d.hostname}</p><p className="text-xs text-muted-foreground">Added {new Date(d.created_at).toLocaleDateString()}</p></div><Badge variant={d.status === "verified" || d.status === "active" ? "default" : "outline"} className="capitalize">{d.status}</Badge></div>
             {d.status === "pending" && <div className="rounded-lg bg-muted p-3 text-sm"><p className="font-medium">DNS ownership check</p><p className="mt-1 text-xs text-muted-foreground">Create this TXT record at your DNS provider:</p><div className="mt-2 grid gap-2 font-mono text-xs"><div><span className="text-muted-foreground">Name:</span> _assetflow.{d.hostname}</div><div className="break-all"><span className="text-muted-foreground">Value:</span> {d.verification_token}</div></div><Button variant="outline" size="sm" className="mt-3" onClick={() => verify(d.id)}><RefreshCw className="mr-2 h-3.5 w-3.5" />Verify DNS</Button></div>}
-            {(d.status === "verified" || d.status === "active") && <p className="text-sm text-muted-foreground">Ownership is verified. Final HTTPS routing is activated by the hosting gateway for this installation.</p>}
+            {d.status === "active" && /^[a-z0-9][a-z0-9.-]{1,251}[a-z0-9]$/i.test(d.hostname) &&
+              <a href={`https://${d.hostname}`} target="_blank" rel="noopener noreferrer"
+                className="inline-flex w-fit items-center rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-800 hover:bg-indigo-100">
+                Open your domain
+              </a>}
+            {d.status === "verified" && <p className="text-sm text-muted-foreground">Domain ownership verified. HTTPS routing must be activated before the link can be opened.</p>}
           </Card>
         ))}
       </div>

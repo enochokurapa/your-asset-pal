@@ -234,6 +234,11 @@ export const deleteUserAccount = createServerFn({ method: "POST" })
     const { error: archiveError } = await admin.from("profiles")
       .update({is_active:false,archived_at:new Date().toISOString()}).eq("id",data.user_id);
     if (archiveError) throw new Error("Login blocked, but profile archiving failed: "+archiveError.message);
+    await queryPostgres(
+      "INSERT INTO public.audit_log(tenant_id,entity_type,entity_id,action,actor_user_id,details) VALUES($1,'profile',$2,'user_access_removed',$3,$4::jsonb)",
+      [context.supportTenantId??(await getTenantAdminProfile(context.userId,context.supportTenantId)).tenant_id,
+       data.user_id,context.userId,JSON.stringify({accessRevoked:true,historyRetained:true})]
+    );
     await auditBusinessSupport(context,"tenant_user_access_removed",{
       targetUserId:data.user_id,retainedHistory:true
     });
