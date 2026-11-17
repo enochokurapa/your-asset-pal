@@ -1,13 +1,15 @@
-import {queryPostgres} from "./lib/postgres.server";
+import {queryPostgres,getPostgresPool} from "./lib/postgres.server";
 import {startOperationsNoticeScheduler} from "./lib/platform-operations-notices.server";
 import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { startBackupScheduler } from "./lib/backup-core.server";
+import {createR2PresignedUrl} from "./lib/backup-core.server";
 import { startTenantAutomationScheduler } from "./lib/automation-core.server";
 import { startPlatformEmailReportScheduler } from "./lib/platform-email-reports.server";
 import { createHash } from "node:crypto";
+import {handleAssetStorage,signedAssetFileUrl} from "./lib/asset-r2-storage.server";
 import { maybeHandlePlatformBrandingAsset } from "./lib/platform-branding-assets.server";
 import { supabaseAdmin } from "./integrations/supabase/client.server";
 import {maybeHandleEmailMfa,shouldRequireEmailMfa} from "./lib/platform-security-email-mfa.server";
@@ -239,7 +241,7 @@ async function maybeHandlePublicApi(request: Request): Promise<Response | null> 
   const keyHash = createHash("sha256").update(token).digest("hex");
   const { data: key, error: keyError } = await apiAdmin
     .from("api_keys")
-    .select("id,tenant_id,scopes,is_active,expires_at")
+    .select("id,tenant_id,scopes,is_active,expires_at,created_by")
     .eq("key_hash", keyHash)
     .maybeSingle();
 
@@ -363,10 +365,161 @@ async function maybeHandlePublicApi(request: Request): Promise<Response | null> 
     return jsonResponse(201, { data: { event_id: event.id, recorded_at: event.recorded_at }, meta: { api_version: "v1" } });
   }
 
-  if (request.method !== "GET") {
-    return jsonResponse(405, { error: "method_not_allowed", message: "This API v1 resource is read-only." });
+  const assetFilePath=/^assets\/([0-9a-f-]{36})\/files$/i.exec(resource);
+  if(assetFilePath){
+    const assetId=assetFilePath[1];
+    const {data:asset}=await apiAdmin.from("assets").select("id").eq("id",assetId).eq("tenant_id",key.tenant_id).maybeSingle();
+    if(!asset)return jsonResponse(404,{error:"asset_not_found"});
+    if(request.method==="GET"){
+      if(!scopes.includes("files:read"))return jsonResponse(403,{error:"missing_scope",message:"files:read required"});
+      const {data,error}=await apiAdmin.from("asset_attachments")
+        .select("id,kind,file_name,mime_type,storage_path,created_at")
+        .eq("asset_id",assetId).eq("tenant_id",key.tenant_id).order("created_at",{ascending:false}).limit(200);
+      if(error)return jsonResponse(500,{error:"file_query_failed"});
+      const entries=(data??[]).map((x:any)=>({
+        id:x.id,kind:x.kind,file_name:x.file_name,mime_type:x.mime_type,created_at:x.created_at,
+        download_url:"https://assetflow360.com"+signedAssetFileUrl(key.tenant_id,x.storage_path,300),
+        expires_in_seconds:300,
+      }));
+      return jsonResponse(200,{data:entries,meta:{api_version:"v1",count:entries.length}});
+    }
+    if(request.method==="POST"){
+      if(!scopes.includes("files:write"))return jsonResponse(403,{error:"missing_scope",message:"files:write required"});
+      let body:any;
+      try{
+        const raw=await request.text();
+        if(raw.length>4_000_000)return jsonResponse(413,{error:"file_too_large"});
+        body=JSON.parse(raw);
+      }catch{return jsonResponse(400,{error:"invalid_json"});}
+      if(!body||!["image","invoice","receipt","warranty","other"].includes(body.kind))
+        return jsonResponse(400,{error:"invalid_file_kind"});
+      const mime=String(body.content_type||"");
+      const types=["image/jpeg","image/png","image/webp","application/pdf"];
+      if(!types.includes(mime))return jsonResponse(415,{error:"file_type_not_supported"});
+      const name=String(body.file_name||"file").replace(/[^a-zA-Z0-9._-]/g,"_").slice(0,100);
+      const b64=String(body.data_base64||"");
+      if(!b64||b64.length>3_000_000||!/^[a-zA-Z0-9+/]+={0,2}$/.test(b64))
+        return jsonResponse(413,{error:"invalid_file_data"});
+      const bytes=Buffer.from(b64,"base64");
+      if(!bytes.length||bytes.length>2_000_000)return jsonResponse(413,{error:"file_too_large"});
+      const path=key.tenant_id+"/"+assetId+"/"+Date.now()+"-"+crypto.randomUUID()+"-"+name;
+      const dest=createR2PresignedUrl("PUT","asset-files/"+path,120);
+      const response=await fetch(dest,{method:"PUT",body:bytes,headers:{"content-type":mime},signal:AbortSignal.timeout(25000)});
+      if(!response.ok)return jsonResponse(502,{error:"file_storage_failed"});
+      const {data:record,error}=await apiAdmin.from("asset_attachments").insert({
+        tenant_id:key.tenant_id,asset_id:assetId,kind:body.kind,file_name:name,storage_path:path,
+        mime_type:mime,uploaded_by:key.created_by??null
+      }).select("id,kind,file_name,created_at").single();
+      if(error)return jsonResponse(500,{error:"file_metadata_failed"});
+      return jsonResponse(201,{data:record});
+    }
+    return jsonResponse(405,{error:"method_not_allowed"});
   }
-
+  const assetPath=/^assets\/([0-9a-f-]{36})$/i.exec(resource);
+  const assetId=assetPath?.[1] ?? (resource==="assets" ? url.searchParams.get("id") : null);
+  if(assetPath && request.method==="GET"){
+    if(!scopes.includes("assets:read"))return jsonResponse(403,{error:"forbidden",message:"assets:read required"});
+    const {data,error}=await apiAdmin.from("assets").select("*").eq("tenant_id",key.tenant_id).eq("id",assetId).maybeSingle();
+    if(error)return jsonResponse(500,{error:"query_failed"});
+    if(!data)return jsonResponse(404,{error:"asset_not_found"});
+    return jsonResponse(200,{data,meta:{api_version:"v1"}});
+  }
+  if((resource==="assets"||assetPath) && ["POST","PATCH","DELETE"].includes(request.method)){
+    if(!scopes.includes("assets:write"))
+      return jsonResponse(403,{error:"forbidden",message:"assets:write permission required"});
+    if(request.method==="POST"&&resource!=="assets"||request.method!=="POST"&&!assetPath)
+      return jsonResponse(405,{error:"method_not_allowed"});
+    if(request.method==="DELETE"){
+      // Soft disposal preserves verification history, custody and audit evidence.
+      const {data:current}=await apiAdmin.from("assets").select("id,status").eq("tenant_id",key.tenant_id).eq("id",assetId).maybeSingle();
+      if(!current)return jsonResponse(404,{error:"asset_not_found"});
+      const {data,error}=await apiAdmin.from("assets").update({status:"disposed"}).eq("tenant_id",key.tenant_id)
+        .eq("id",assetId).select("id,asset_tag,status").single();
+      if(error)return jsonResponse(409,{error:"asset_retirement_failed",message:"Asset could not be archived"});
+      await queryPostgres("INSERT INTO public.audit_log(tenant_id,entity_type,entity_id,action,actor_user_id,details) VALUES($1,'asset',$2,'api_soft_delete',$3,$4::jsonb)",
+        [key.tenant_id,assetId,key.created_by??null,JSON.stringify({api_key_id:key.id,previous_status:current.status})]).catch(console.error);
+      return jsonResponse(200,{data,archived:true,message:"Asset disposed; history retained."});
+    }
+    const size=Number(request.headers.get("content-length")||0);
+    if(size>32768)return jsonResponse(413,{error:"payload_too_large"});
+    let body:Record<string,any>;
+    try{
+      const raw=await request.text();
+      if(raw.length>32768)return jsonResponse(413,{error:"payload_too_large"});
+      const decoded=JSON.parse(raw);
+      if(!decoded||typeof decoded!=="object"||Array.isArray(decoded))throw Error();
+      body=decoded;
+    }catch{return jsonResponse(400,{error:"invalid_json"});}
+    const allowed=new Set(["name","asset_tag","serial_number","description","category_id","location_id","branch_id",
+      "status","condition","purchase_value","purchase_date","custom_fields"]);
+    if(Object.keys(body).some(k=>!allowed.has(k)))
+      return jsonResponse(400,{error:"unsupported_field",message:"Request contains an uneditable field"});
+    const cleaned:Record<string,unknown>={};
+    const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const statuses=new Set(["in_use","in_storage","under_repair","retired","disposed","missing","checked_out"]);
+    for(const [field,value] of Object.entries(body)){
+      if(value===null){cleaned[field]=null;continue;}
+      if(["name","asset_tag","serial_number","description"].includes(field)){
+        if(typeof value!=="string"||value.length>500 ||(field==="name"&&!value.trim()))
+          return jsonResponse(400,{error:"invalid_field",field});
+        cleaned[field]=value.trim();continue;
+      }
+      if(["category_id","location_id","branch_id"].includes(field)){
+        if(typeof value!=="string"||!uuid.test(value))return jsonResponse(400,{error:"invalid_reference",field});
+        cleaned[field]=value;continue;
+      }
+      if(field==="status"){if(!statuses.has(String(value)))return jsonResponse(400,{error:"invalid_status"});cleaned[field]=value;continue;}
+      if(field==="condition"){if(typeof value!=="string"||value.length>40)return jsonResponse(400,{error:"invalid_condition"});cleaned[field]=value;continue;}
+      if(field==="purchase_value"){
+        if(typeof value!=="number"||!Number.isFinite(value)||value<0||value>1e15)return jsonResponse(400,{error:"invalid_purchase_value"});
+        cleaned[field]=value;continue;
+      }
+      if(field==="purchase_date"){
+        if(typeof value!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(value)||Number.isNaN(Date.parse(value)))
+          return jsonResponse(400,{error:"invalid_purchase_date"});
+        cleaned[field]=value;continue;
+      }
+      if(field==="custom_fields"){
+        if(!value||Array.isArray(value)||typeof value!=="object"||JSON.stringify(value).length>8192)
+          return jsonResponse(400,{error:"invalid_custom_fields"});
+        cleaned[field]=value;continue;
+      }
+    }
+    if(request.method==="POST"){
+      if(typeof cleaned.name!=="string")return jsonResponse(400,{error:"name_required"});
+      // Lock the tenant row to allocate a unique register number under concurrent imports.
+      const client=await getPostgresPool().connect();
+      try{
+        await client.query("BEGIN");
+        await client.query("SELECT id FROM public.tenants WHERE id=$1 FOR UPDATE",[key.tenant_id]);
+        const {rows:numbers}=await client.query<{next_no:string}>(
+          "SELECT COALESCE(MAX(asset_number),0)+1 AS next_no FROM public.assets WHERE tenant_id=$1",[key.tenant_id]);
+        const fields=Object.keys(cleaned);
+        const vals=fields.map(k=>cleaned[k]);
+        const cols=["tenant_id","asset_number",...fields];
+        const result=await client.query(
+          "INSERT INTO public.assets ("+cols.map(k=>'"'+k+'"').join(",")+") VALUES ("+
+          cols.map((_,i)=>"$"+(i+1)).join(",")+") RETURNING id,asset_tag,asset_number,name,status",
+          [key.tenant_id,Number(numbers[0].next_no),...vals]);
+        await client.query("COMMIT");
+        return jsonResponse(201,{data:result.rows[0],meta:{api_version:"v1"}});
+      }catch(e){
+        await client.query("ROLLBACK");
+        console.error("[API] Asset creation rejected",String(e).slice(0,200));
+        return jsonResponse(409,{error:"asset_create_rejected",message:"Check references, subscription capacity and asset fields."});
+      }finally{client.release();}
+    }
+    if(!Object.keys(cleaned).length)return jsonResponse(400,{error:"no_changes"});
+    const {data,error}=await apiAdmin.from("assets").update(cleaned).eq("tenant_id",key.tenant_id)
+      .eq("id",assetId).select("id,asset_tag,name,status,updated_at").maybeSingle();
+    if(error)return jsonResponse(409,{error:"asset_update_rejected",message:"Check field values and organisation references."});
+    if(!data)return jsonResponse(404,{error:"asset_not_found"});
+    return jsonResponse(200,{data,meta:{api_version:"v1"}});
+  }
+  if(request.method!=="GET"){
+    return jsonResponse(405,{error:"method_not_allowed",message:"This resource is read-only"});
+  }
+  if(assetPath)return jsonResponse(404,{error:"not_found"});
   const config: Record<string, { table: string; scope: string; select: string }> = {
     assets: {
       table: "assets",
@@ -493,6 +646,8 @@ export default {
           return withSecurityHeaders(jsonResponse(503,{status:"degraded",database:"unavailable"}),request);
         }
       }
+      const storageResult=await handleAssetStorage(request);
+      if(storageResult)return withSecurityHeaders(storageResult,request);
       const domainCheck=await domainGuard(request);
       if(domainCheck)return withSecurityHeaders(domainCheck,request);
       const brandedAsset = await maybeHandlePlatformBrandingAsset(request);

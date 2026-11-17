@@ -105,6 +105,8 @@ function SaasAdminOrganizationsPage() {
   const [seatLimit,setSeatLimit] = useState("");
   const [priceOverride,setPriceOverride] = useState("");
   const [savingControls,setSavingControls] = useState(false);
+  const [draftStatus,setDraftStatus]=useState<"trial"|"active"|"expired"|"suspended">("trial");
+  const [activationSaving,setActivationSaving]=useState(false);
   const [activationPeriod,setActivationPeriod]=useState<"monthly"|"six_months"|"annual"|"365_days"|"custom_days">("annual");
   const [activationDays,setActivationDays]=useState("365");
   const [activationUsers,setActivationUsers]=useState("4");
@@ -158,6 +160,11 @@ function SaasAdminOrganizationsPage() {
     if (detailQuery.data?.tenant?.name) setNameDraft(detailQuery.data.tenant.name);
   }, [detailQuery.data?.tenant?.name]);
 
+  useEffect(()=>{
+    if(!detailQuery.data?.tenant)return;
+    const status=detailQuery.data.tenant.effective_status;
+    setDraftStatus(["trial","active","expired","suspended"].includes(status)?status:"expired");
+  },[selectedTenantId,detailQuery.data?.tenant?.effective_status]);
   useEffect(() => {
     const t = detailQuery.data?.tenant;
     if (!t) return;
@@ -185,7 +192,7 @@ function SaasAdminOrganizationsPage() {
 
   const changeTenantStatus = async (status: "trial" | "active" | "expired" | "suspended") => {
     if (!selectedTenantId) return;
-    if(status==="active"&&!window.confirm("Activate this business for the chosen duration and quotas? Users beyond the seat allowance will be deactivated."))return;
+    setActivationSaving(true);
     try {
       const users=Number(activationUsers),assets=Number(activationAssets),days=Number(activationDays);
       if(status==="active"&&(!Number.isInteger(users)||users<1||!Number.isInteger(assets)||assets< -1||
@@ -210,7 +217,7 @@ function SaasAdminOrganizationsPage() {
       toast.success(`Business is now ${status}`);
     } catch (error: any) {
       toast.error(error?.message || "Could not update business plan");
-    }
+    } finally {setActivationSaving(false);}
   };
 
   const setNamedPlan=async(plan:string)=>{
@@ -398,7 +405,7 @@ function SaasAdminOrganizationsPage() {
                   <Input aria-label="Manual activation reason" value={activationReason} maxLength={500}
                     onChange={e=>setActivationReason(e.target.value)} placeholder="Reason for administrator activation"/>
                   <label className="block text-xs font-medium">Subscription status</label>
-                  <Select value={tenant.effective_status} onValueChange={(value) => changeTenantStatus(value as any)}>
+                  <Select value={draftStatus} onValueChange={(value) => setDraftStatus(value as typeof draftStatus)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="trial">Trial</SelectItem>
@@ -407,6 +414,11 @@ function SaasAdminOrganizationsPage() {
                       <SelectItem value="suspended">Suspended</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Button type="button" className="mt-2 w-full" disabled={activationSaving}
+                    onClick={()=>void changeTenantStatus(draftStatus)}>
+                    {activationSaving?"Saving…":draftStatus==="active"?"Activate workspace":"Save subscription status"}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">Changes take effect only when you press this button.</p>
                 </div>
               </div>
 

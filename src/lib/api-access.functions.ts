@@ -51,7 +51,7 @@ export const createApiKey = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({
     name: z.string().trim().min(2).max(80),
-    key_type: z.enum(["read", "tracking"]).default("read"),
+    key_type: z.enum(["read", "write", "tracking"]).default("read"),
   }).parse(input))
   .handler(async ({ data, context }) => {
     const tenantId = await requireTenantAdmin(context.userId);
@@ -62,7 +62,9 @@ export const createApiKey = createServerFn({ method: "POST" })
     const prefix = raw.slice(0, 16);
     const scopes = data.key_type === "tracking"
       ? ["tracking:write"]
-      : ["assets:read", "locations:read", "branches:read"];
+      : data.key_type==="write"
+      ? ["assets:read","assets:write","files:read","files:write","locations:read","branches:read"]
+      : ["assets:read","files:read","locations:read","branches:read"];
     const { data: created, error } = await admin
       .from("api_keys")
       .insert({

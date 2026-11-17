@@ -43,7 +43,7 @@ function IntegrationsPage() {
   const sendMicrosoftTest = useServerFn(sendMicrosoft365TestEmail);
   const disconnectMicrosoft = useServerFn(disconnectMicrosoft365);
   const [name, setName] = useState("");
-  const [keyType, setKeyType] = useState<"read" | "tracking">("read");
+  const [keyType, setKeyType] = useState<"read" | "write" | "tracking">("read");
   const [newKey, setNewKey] = useState<string | null>(null);
   const [microsoftBusy, setMicrosoftBusy] = useState<string | null>(null);
   const [testEmail, setTestEmail] = useState("");
@@ -316,10 +316,11 @@ function IntegrationsPage() {
             </div>
             <div className="space-y-2">
               <Label>Key type</Label>
-              <Select value={keyType} onValueChange={(v) => setKeyType(v as "read" | "tracking")}>
+              <Select value={keyType} onValueChange={(v) => setKeyType(v as "read" | "write" | "tracking")}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="read">Read-only integration</SelectItem>
+                  <SelectItem value="write">Full asset management (create, edit, dispose)</SelectItem>
                   {canView("live_tracking") && <SelectItem value="tracking">Live tracking ingest</SelectItem>}
                 </SelectContent>
               </Select>
@@ -329,7 +330,11 @@ function IntegrationsPage() {
               {keyType === "tracking" ? (
                 <>Scope: <strong>tracking:write</strong>. Use only for an approved GPS/IoT provider.</>
               ) : (
-                <>Scopes: <strong>assets:read</strong>, <strong>locations:read</strong>, <strong>branches:read</strong>.</>
+                keyType==="write"?<>
+                Scopes: <strong>assets:read/write</strong>, <strong>files:read/write</strong>,
+                <strong>locations:read</strong>, <strong>branches:read</strong>.
+              </>:<>Scopes: <strong>assets:read</strong>, <strong>files:read</strong>,
+                <strong>locations:read</strong>, <strong>branches:read</strong>.</>
               )}
             </div>
           </CardContent>
@@ -340,6 +345,7 @@ function IntegrationsPage() {
             <CardTitle className="flex items-center gap-2"><PlugZap className="h-5 w-5 text-primary" /> API v1</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
+            <a className="font-semibold text-indigo-700 underline" href="/api-docs" target="_blank" rel="noopener noreferrer">Open full API documentation</a>
             <p>Base path: <code className="rounded bg-muted px-1.5 py-0.5">/api/v1</code></p>
             <div className="grid gap-2">
               <code className="rounded border p-2">GET /api/v1/assets</code>
