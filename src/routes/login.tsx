@@ -39,6 +39,21 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [unconfirmedEmail,setUnconfirmedEmail]=useState("");
+  const [resending,setResending]=useState(false);
+  const resendConfirmation=async()=>{
+    if(!unconfirmedEmail)return;
+    setResending(true);
+    try{
+      const {error}=await supabase.auth.resend({type:"signup",email:unconfirmedEmail,options:{
+        emailRedirectTo:window.location.origin+"/auth/confirm"
+      }});
+      if(error)throw error;
+      toast.success("A new confirmation email has been requested");
+    }catch(err:any){toast.error(authErrorMessage(err))}
+    finally{setResending(false)}
+  };
+
   const [existingDevices,setExistingDevices]=useState<Array<{session_id:string,device:string,last_seen:string}>>([]);
   const [takeoverOpen,setTakeoverOpen]=useState(false);
   const [googleEnabled,setGoogleEnabled]=useState(false);
@@ -68,17 +83,25 @@ function LoginPage() {
 
   if (!loading && user && !submitting && !takeoverOpen) return <Navigate to={isSaasAdmin||tenantId ? "/dashboard" : platformStaffRole ? "/platform-workspace" : "/register"} />;
 
+  const withTimeout=<T,>(promise:Promise<T>,timeoutMs:number):Promise<T>=>Promise.race([
+    promise,
+    new Promise<T>((_,reject)=>setTimeout(()=>reject(new Error("The sign-in request took too long. Please check your connection and retry.")),timeoutMs))
+  ]);
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (submitting) return;
     setSubmitting(true);
+    setUnconfirmedEmail("");
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      const { error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email: email.trim(), password }),20000);
       if (error) {
+        if(/email not confirmed/i.test(error.message))setUnconfirmedEmail(email.trim());
         toast.error(authErrorMessage(error));
         return;
       }
-      const {data:other,error:deviceError}=await supabase.rpc("other_login_sessions" as any);
+      const {data:other,error:deviceError}=await withTimeout(
+        supabase.rpc("other_login_sessions" as any),15000);
       if(deviceError){await supabase.auth.signOut({scope:"local"});toast.error("Unable to verify active sessions. Please try again.");return;}
       const devices=Array.isArray(other)?other as Array<{session_id:string,device:string,last_seen:string}>:[];
       if(devices.length){setExistingDevices(devices);setTakeoverOpen(true);return;}
@@ -166,6 +189,12 @@ function LoginPage() {
                 </span>
               ) : "Sign in"}
             </Button>
+            {unconfirmedEmail&&<div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">
+              <p className="mb-2 font-medium text-amber-900">Confirm your email before signing in.</p>
+              <Button type="button" variant="outline" disabled={resending} onClick={()=>void resendConfirmation()}>
+                {resending?"Sending…":"Resend verification email"}
+              </Button>
+            </div>}
           </form>
 
           {googleEnabled&&<>

@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { ArrowLeft, Check, Eye, EyeOff, ShieldCheck } from "lucide-react";
@@ -29,6 +29,30 @@ function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [verificationPending,setVerificationPending]=useState<string|null>(null);
+  const [resending,setResending]=useState(false);
+  useEffect(()=>{
+    if(!user||tenantId)return;
+    const metadata=user.user_metadata||{};
+    setForm(current=>({
+      ...current,
+      full_name:current.full_name||String(metadata.full_name||""),
+      organization_name:current.organization_name||String(metadata.organization_name||""),
+      email:current.email||String(user.email||""),
+    }));
+  },[user?.id,tenantId]);
+  const resendVerification=async()=>{
+    if(!verificationPending||resending)return;
+    setResending(true);
+    try{
+      const {error}=await supabase.auth.resend({type:"signup",email:verificationPending,options:{
+        emailRedirectTo:window.location.origin+"/auth/confirm",
+      }});
+      if(error)throw error;
+      toast.success("A new verification email has been requested.");
+    }catch(err:any){toast.error(err.message||"Could not resend verification email")}
+    finally{setResending(false)}
+  };
 
   if (!loading && user && tenantId) return <Navigate to="/dashboard" />;
 
@@ -45,11 +69,18 @@ function RegisterPage() {
         const { data, error } = await supabase.auth.signUp({
           email: form.email.trim(),
           password: form.password,
-          options: { data: { full_name: form.full_name.trim() } },
+          options: {
+            data: { full_name: form.full_name.trim(), organization_name:form.organization_name.trim() },
+            emailRedirectTo:window.location.origin+"/auth/confirm",
+          },
         });
         if (error) throw error;
         if (!data.user) throw new Error("Account creation did not complete.");
-        if (!data.session) throw new Error("Your account was created. Please sign in to continue.");
+        if (!data.session){
+          setVerificationPending(form.email.trim());
+          toast.success("Account created. Confirm your email to activate your workspace.");
+          return;
+        }
         createdNewAuthUser = true;
       }
 
@@ -88,11 +119,21 @@ function RegisterPage() {
             <Link to="/login" className="af-auth-link-home inline-flex items-center gap-1 rounded-md px-2 py-2 text-xs text-[#4d5881]"><ArrowLeft className="h-3.5 w-3.5"/> Sign in</Link>
           </div>
           <div className="mb-7 text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-[#18275f] sm:text-3xl">Create your workspace</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-[#18275f] sm:text-3xl">{user&&!tenantId?"Complete your workspace":"Create your workspace"}</h1>
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#5d6686]">Start your AssetFlow360 free trial. No card required.</p>
           </div>
 
-          <form onSubmit={submit} className="space-y-4">
+          {verificationPending ? (
+            <div role="status" className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50 p-5 text-sm text-slate-800">
+              <h2 className="text-lg font-bold text-indigo-900">Verify your email address</h2>
+              <p>We sent an email confirmation link to <strong>{verificationPending}</strong>.</p>
+              <p>Open that link to complete your workspace registration. You do not need to create another account.</p>
+              <Button type="button" variant="outline" disabled={resending} onClick={()=>void resendVerification()}>
+                {resending?"Sending…":"Resend verification email"}
+              </Button>
+              <p><Link className="font-semibold text-indigo-700 underline" to="/login">Already verified? Sign in</Link></p>
+            </div>
+          ) : <form onSubmit={submit} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="organization">Organization</Label>
@@ -186,7 +227,7 @@ function RegisterPage() {
                 </span>
               ) : "Start free trial"}
             </Button>
-          </form>
+          </form>}
 
           <div className="mt-5 flex items-center justify-center gap-2 rounded-xl bg-muted/45 px-3 py-2.5 text-xs text-muted-foreground">
             <ShieldCheck className="h-4 w-4 shrink-0 text-primary" />
