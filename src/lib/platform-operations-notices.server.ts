@@ -99,7 +99,7 @@ export async function queueTenantActivationNotice(
  let amount:number|null=t.last_manual_activation_amount_ugx===null?null:Number(t.last_manual_activation_amount_ugx);
  let currency="UGX";
  let paymentReference:string|null=null;
- let paid=t.last_manual_activation_method!=="admin_grant"&&amount!==null&&Number.isFinite(amount)&&amount>=0;
+ let paid=t.last_manual_activation_method!=="admin_grant"&&amount!==null&&Number.isFinite(amount)&&amount>0;
  if(source.type==="payment"){
   const tx=(await queryPostgres<{amount:string;currency:string;provider:string;provider_reference:string;status:string}>(
    `SELECT amount,currency,provider,provider_reference,status FROM public.billing_transactions WHERE id=$1 AND tenant_id=$2`,
@@ -107,21 +107,24 @@ export async function queueTenantActivationNotice(
   if(!tx||tx.status!=="successful")return;
   amount=Number(tx.amount);currency=tx.currency||"UGX";
   method=tx.provider||"Online payment";paymentReference=tx.provider_reference||source.transactionId;
-  paid=Number.isFinite(amount)&&amount>=0;
+  paid=Number.isFinite(amount)&&amount>0;
  }
+ const planLabel=t.plan_code==="paid"?"Paid Subscription":
+   t.plan_code==="starter"?"Starter":t.plan_code==="business"?"Business":
+   t.plan_code==="enterprise"?"Enterprise":t.plan_code;
  const subject="Your AssetFlow360 workspace is active";
  const body=`Your ${t.name} workspace has been activated successfully.
 
 You can now sign in and manage your organisation's assets.
 
-Plan: ${t.plan_code}
+Plan: ${planLabel}
 Renewal date: ${new Date(t.subscription_ends_at).toLocaleDateString("en-GB",{timeZone:"Africa/Kampala"})}
 
 ${paid?"Your payment receipt is attached as a PDF for printing and filing.":"Your activation confirmation is attached as a PDF."}
 
 AssetFlow Operations`;
  const pdf=createAssetFlowActivationReceipt({
-  receiptNo:reference,workspace:t.name,plan:t.plan_code,
+  receiptNo:reference,workspace:t.name,plan:planLabel,
   activatedAt:new Date(t.subscription_started_at||Date.now()),
   expiresAt:new Date(t.subscription_ends_at),
   users,assets,method,amount,currency,paymentReference,paid
