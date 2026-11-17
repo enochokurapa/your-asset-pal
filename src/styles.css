@@ -555,16 +555,16 @@
 }
 
 /* Premium split-layout authentication. Keep the form full-width on phones. */
-.af-auth-split{display:flex;align-items:center;justify-content:center;gap:0;background:#eef3fb;min-height:100dvh;}
+.af-auth-split{display:flex;align-items:center;justify-content:center;gap:0;background:#fffaf6;min-height:100dvh;}
 .af-auth-form-side{position:relative;flex:1;max-width:520px;min-width:0;padding:22px 20px;}
 .af-auth-form-side .af-auth-card{border:0!important;box-shadow:none!important;background:white!important;border-radius:0!important;}
-.af-auth-visual{display:none;position:relative;isolation:isolate;overflow:hidden;background:linear-gradient(150deg,#071b4e 0%,#153e91 61%,#317dd0 100%);
+.af-auth-visual{display:none;position:relative;isolation:isolate;overflow:hidden;background:linear-gradient(148deg,#282c87 0%,var(--af-brand-indigo,#4E51DB) 72%,#6669e8 100%);
  color:white;padding:32px 34px;min-width:0;}
-.af-auth-visual:before{content:"";position:absolute;width:410px;height:410px;border-radius:50%;right:-230px;top:70px;background:linear-gradient(145deg,#4495f4,#173a91);opacity:.75;}
+.af-auth-visual:before{content:"";position:absolute;width:410px;height:410px;border-radius:50%;right:-230px;top:70px;background:linear-gradient(145deg,#7779ef,#3639b7);opacity:.75;}
 .af-auth-building{position:absolute;right:-45px;bottom:110px;width:78%;height:46%;transform:skewY(-7deg);opacity:.65;pointer-events:none;}
-.af-auth-building-top{height:23px;transform:skewX(-29deg);background:#a7cdfd;box-shadow:0 0 60px #4b9fed;}
-.af-auth-building-body{height:100%;background:linear-gradient(130deg,#214d90,#082453);border:2px solid #92b9f8;padding:24px 20px;display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:repeat(4,1fr);gap:12px;}
-.af-auth-building-body>span{background:linear-gradient(145deg,#b9dafa,#6393d1);box-shadow:inset 1px 0 4px #c5eaff;border:1px solid #97bbf2;opacity:.8;}
+.af-auth-building-top{height:23px;transform:skewX(-29deg);background:#c9c8ff;box-shadow:0 0 60px #686be8;}
+.af-auth-building-body{height:100%;background:linear-gradient(130deg,#6c6dea,#2d2f92);border:2px solid #b4b5fb;padding:24px 20px;display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:repeat(4,1fr);gap:12px;}
+.af-auth-building-body>span{background:linear-gradient(145deg,#e0dcff,#9b9df4);box-shadow:inset 1px 0 4px #fff;border:1px solid #c1c2fa;opacity:.8;}
 @media(min-width:1024px){
  .af-auth-split{padding:24px;gap:0;}
  .af-auth-visual{display:flex;flex-direction:column;flex:1 1 48%;max-width:610px;min-height:650px;border-radius:22px 0 0 22px;box-shadow:0 22px 55px rgba(17,38,88,.12);}
@@ -626,3 +626,9 @@
     border-radius: 0;
   }
 }
+
+/* The approved marketing palette controls authentication actions too. */
+.af-auth-stage .af-auth-card button[type=submit]{background:var(--af-brand-ochre,#C87831)!important;color:white!important;}
+.af-auth-stage .af-auth-card button[type=submit]:hover{background:#ac6228!important;}
+.af-auth-stage .af-auth-card a{color:var(--af-brand-indigo,#4E51DB)!important;}
+.af-auth-stage .af-auth-card input:focus-visible{border-color:var(--af-brand-indigo,#4E51DB);box-shadow:0 0 0 3px rgba(78,81,219,.16);}
