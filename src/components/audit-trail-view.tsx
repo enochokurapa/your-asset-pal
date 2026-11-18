@@ -246,12 +246,13 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
   );
 
   const exportList = (kind: "xlsx" | "pdf") => {
-    const headers = ["When", "Record type", "Activity", "Performed by"];
+    const headers = ["When", "Record type", "Activity", "Performed by", "IP / source"];
     const data = filtered.map((r) => [
       new Date(r.created_at).toLocaleString(),
       friendlyEntity(r.entity_type),
       friendlyAction(r),
       actorLabel(r),
+      String(r.details?.ip_address||r.details?.ip_network||r.details?.source||"—"),
     ]);
     const title = "Audit trail";
     if (kind === "xlsx") exportReportXLSX(title, headers, data);
@@ -507,6 +508,7 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
                   <th className="px-2 py-1.5 text-left">Entity</th>
                   <th className="px-2 py-1.5 text-left">Action</th>
                   <th className="px-2 py-1.5 text-left">User / attempted account</th>
+                  <th className="px-2 py-1.5 text-left">IP / source</th>
                   <th className="px-2 py-1.5 text-right">View</th>
                 </tr>
               </thead>
@@ -524,6 +526,7 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
                     <td className="px-2 py-1"><Badge variant="outline" className="capitalize text-[10px]">{r.entity_type}</Badge></td>
                     <td className="px-2 py-1">{friendlyAction(r)}</td>
                     <td className="px-2 py-1">{actorLabel(r)}</td>
+                    <td className="max-w-[200px] truncate px-2 py-1" title={String(r.details?.ip_address||r.details?.ip_network||r.details?.source||"")}>{String(r.details?.ip_address||r.details?.ip_network||r.details?.source||"—")}</td>
                     <td className="px-2 py-1 text-right">
                       <Button size="sm" variant="ghost" className="h-6 gap-1 px-2" onClick={() => openDetailPdf(r)}>
                         <Eye className="h-3 w-3" /> View
