@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {resumePlatformBusinessSession} from "@/lib/platform-business-dashboard.functions";
+import {directAuthRest} from "@/lib/auth-direct-rest";
 import type { Session, User } from "@supabase/supabase-js";
 
 export type AppRole = "admin" | "manager" | "staff" | "security";
@@ -141,31 +142,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPaidOnlyModules(new Set()); setAddOnModules(new Set());
   };
 
-  const loadFor = async (uid: string) => {
+  const loadFor = async (uid: string, accessToken: string) => {
     if(pendingMetadataUid.current===uid)return;
     pendingMetadataUid.current=uid;
     setMetadataStatus("loading");
     let timer:ReturnType<typeof setTimeout>|undefined;
     try {
-      const [rRes, pRes, aRes, actRes, brRes, profRes] = await Promise.race([
-        Promise.allSettled([
-        supabase.from("user_roles").select("role").eq("user_id", uid),
-        supabase.from("user_permissions" as any).select("module,can_view").eq("user_id", uid),
-        supabase.from("user_approval_rights" as any).select("approval_kind").eq("user_id", uid),
-        supabase.from("user_action_rights" as any).select("action_kind").eq("user_id", uid),
-        supabase.from("user_branch_access" as any).select("branch_id").eq("user_id", uid),
-        (supabase as any).from("profiles").select("must_change_password,is_active,tenant_id,tenant_role,is_saas_admin").eq("id", uid).maybeSingle(),
+      const userId=encodeURIComponent(uid);
+      const [r,p,a,act,br,profileList]=await Promise.race([
+        Promise.all([
+          directAuthRest<any[]>(`/user_roles?select=role&user_id=eq.${userId}`,accessToken),
+          directAuthRest<any[]>(`/user_permissions?select=module,can_view&user_id=eq.${userId}`,accessToken),
+          directAuthRest<any[]>(`/user_approval_rights?select=approval_kind&user_id=eq.${userId}`,accessToken),
+          directAuthRest<any[]>(`/user_action_rights?select=action_kind&user_id=eq.${userId}`,accessToken),
+          directAuthRest<any[]>(`/user_branch_access?select=branch_id&user_id=eq.${userId}`,accessToken),
+          directAuthRest<any[]>(`/profiles?select=must_change_password,is_active,tenant_id,tenant_role,is_saas_admin&id=eq.${userId}&limit=1`,accessToken),
         ]),
-        new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(new Error("Workspace lookup timeout")),18000);}),
+        new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(new Error("Workspace lookup timeout")),16000);}),
       ]);
-
-      const r = rRes.status === "fulfilled" ? rRes.value.data : null;
-      const p = pRes.status === "fulfilled" ? pRes.value.data : null;
-      const a = aRes.status === "fulfilled" ? aRes.value.data : null;
-      const act = actRes.status === "fulfilled" ? actRes.value.data : null;
-      const br = brRes.status === "fulfilled" ? brRes.value.data : null;
-      if(profRes.status==="rejected" || profRes.value.error) throw new Error("Workspace profile lookup unavailable");
-      const prof: any = profRes.value.data;
+      const prof:any=profileList[0]??null;
+      // A new authenticated account may not have a provisioned profile yet.
+      // Only such an account should continue to workspace registration.
       const rs = (Array.isArray(r)?r:[]).map((x: any) => x.role as AppRole);
       const isPlatformAdmin=prof?.is_saas_admin===true;
       let support: {tenantId?:string;tenantName?:string;expiresAt?:string}|null=null;
@@ -173,10 +170,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const sessionId=window.sessionStorage.getItem("af-platform-tenant-session");
         if(sessionId){
           try {
-            const auth=(await supabase.auth.getSession()).data.session;
-            if(!auth?.access_token)throw Error("No active login session");
             support=await resumePlatformBusinessSession({
-              headers:{Authorization:`Bearer ${auth.access_token}`,
+              headers:{Authorization:`Bearer ${accessToken}`,
                 "x-assetflow-support-session":sessionId},
               data:{sessionId},
             });
@@ -270,7 +265,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(s);
       // Refreshing a token does not require reloading ten permission queries.
       if (!s?.user) resetMetadata();
-      else if(event!=="TOKEN_REFRESHED") setTimeout(() => loadFor(s.user.id), 0);
+      else if(event!=="TOKEN_REFRESHED") setTimeout(() => loadFor(s.user.id,s.access_token), 0);
     });
     let finished=false;
     const finish=()=>{if(!finished){finished=true;setLoading(false)}};
@@ -279,7 +274,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(async({data,error})=>{
         if(error)throw error;
         setSession(data.session);
-        if(data.session?.user)await loadFor(data.session.user.id);
+        if(data.session?.user)await loadFor(data.session.user.id,data.session.access_token);
       })
       .catch(error=>{console.warn("[Auth] Initial session could not be loaded",error)})
       .finally(()=>{window.clearTimeout(startupTimeout);finish()});

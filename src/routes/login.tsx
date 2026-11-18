@@ -1,3 +1,4 @@
+import {directAuthRest} from "@/lib/auth-direct-rest";
 import { createFileRoute, Navigate, Link } from "@tanstack/react-router";
 import { useState, useEffect, FormEvent } from "react";
 import { ArrowLeft, Check, Eye, EyeOff, ShieldCheck } from "lucide-react";
@@ -35,7 +36,7 @@ function authErrorMessage(error: unknown): string {
 }
 
 function LoginPage() {
-  const { user, loading, tenantId, isSaasAdmin, platformStaffRole, metadataStatus } = useAuth();
+  const { user, session, loading, tenantId, isSaasAdmin, platformStaffRole, metadataStatus } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
@@ -100,7 +101,7 @@ function LoginPage() {
     setSessionVerificationPending(true);
     setUnconfirmedEmail("");
     try {
-      const { error } = await withTimeout(
+      const { data:signInData,error } = await withTimeout(
         supabase.auth.signInWithPassword({ email: email.trim(), password }),25000);
       if (error) {
         setSessionVerificationPending(false);
@@ -108,12 +109,11 @@ function LoginPage() {
         toast.error(authErrorMessage(error));
         return;
       }
-      const {data:other,error:deviceError}=await withTimeout(
-        supabase.rpc("other_login_sessions" as any),15000);
-      if(deviceError){
-        toast.error("Session check is temporarily unavailable. Please retry signing in.");
-        return;
-      }
+      const token=signInData.session?.access_token;
+      if(!token)throw new Error("Further sign-in verification is required.");
+      const other=await directAuthRest<Array<{session_id:string,device:string,last_seen:string}>>(
+        "/rpc/other_login_sessions",token,"POST"
+      );
       const devices=Array.isArray(other)?other as Array<{session_id:string,device:string,last_seen:string}>:[];
       if(devices.length){setExistingDevices(devices);setTakeoverOpen(true);return;}
       setSessionVerificationPending(false);
@@ -130,8 +130,10 @@ function LoginPage() {
     if(submitting)return;
     setSubmitting(true);
     try{
-      const {data:other,error}=await withTimeout(supabase.rpc("other_login_sessions" as any),15000);
-      if(error)throw error;
+      if(!session?.access_token)throw new Error("Please sign in to continue");
+      const other=await directAuthRest<Array<{session_id:string,device:string,last_seen:string}>>(
+        "/rpc/other_login_sessions",session.access_token,"POST"
+      );
       const devices=Array.isArray(other)?other as Array<{session_id:string,device:string,last_seen:string}>:[];
       if(devices.length){setExistingDevices(devices);setTakeoverOpen(true);return;}
       setSessionVerificationPending(false);
@@ -142,8 +144,13 @@ function LoginPage() {
   };
   const replaceSession=async()=>{
     setSubmitting(true);
-    const {error}=await supabase.rpc("replace_other_login_sessions" as any);
-    if(error){toast.error("Could not sign out the other device.");setSubmitting(false);return;}
+    try{
+      if(!session?.access_token)throw new Error("Session missing");
+      await directAuthRest<number>("/rpc/replace_other_login_sessions",session.access_token,"POST");
+    }catch{
+      toast.error("Could not sign out the other device.");
+      setSubmitting(false);return;
+    }
     setSessionVerificationPending(false);
     window.location.assign("/dashboard");
   };
@@ -173,15 +180,15 @@ function LoginPage() {
 
           </div>
 
-          {user && sessionVerificationPending && !submitting && !takeoverOpen && <div role="status" className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-[#172554]">
-             <p>Your password may already have been accepted. Complete the device check without registering again.</p>
-             <Button type="button" variant="outline" className="mt-2" onClick={()=>void retrySessionVerification()}>Continue sign-in</Button>
-           </div>}
-          {user && metadataStatus==="loading" && <p role="status" className="mb-4 rounded-lg bg-indigo-50 p-3 text-sm text-indigo-900">Opening your existing workspace…</p>}
-           {user && metadataStatus==="error" && <div role="alert" className="mb-4 rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm">
-             <p>We couldn't load your existing workspace details.</p>
-             <Button type="button" variant="outline" className="mt-2" onClick={()=>window.location.reload()}>Retry loading workspace</Button>
-           </div>}
+          {user && (sessionVerificationPending || metadataStatus==="error") && !submitting && !takeoverOpen && (
+            <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-sm text-[#172554]">
+              <span>{sessionVerificationPending?"Finish your sign-in.":"Workspace connection interrupted."}</span>
+              <Button type="button" variant="outline" size="sm"
+                onClick={()=>sessionVerificationPending?void retrySessionVerification():window.location.reload()}>
+                {sessionVerificationPending?"Continue":"Retry"}
+              </Button>
+            </div>
+          )}
            <form onSubmit={onSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email address</Label>
