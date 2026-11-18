@@ -27,6 +27,13 @@ function MfaChallenge(){
  const [resolved,setResolved]=useState(false);
  const didAutoSend=useRef(false);
  const lastAutoCode=useRef("");
+ const [linkToken,setLinkToken]=useState("");
+ useEffect(()=>{
+  const match=/^#verify=([a-f0-9]{64})$/i.exec(window.location.hash);
+  if(!match)return;
+  setLinkToken(match[1]);
+  window.history.replaceState(window.history.state,"",window.location.pathname+window.location.search);
+ },[]);
  const [verifiedFactor,setVerifiedFactor]=useState(false);
  useEffect(()=>{
   if(!user)return;
@@ -132,6 +139,30 @@ function MfaChallenge(){
   lastAutoCode.current=code;
   void verifyEmailCode();
  },[code,method,resolved,emailSent,busy]);
+ useEffect(()=>{
+  if(!linkToken||!resolved||!session?.access_token)return;
+  const token=linkToken;
+  setLinkToken("");
+  let active=true;
+  (async()=>{
+   setBusy(true);setError("");
+   try{
+    const response=await fetch("/api/security/email-mfa/link",{
+     method:"POST",cache:"no-store",
+     headers:{Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},
+     body:JSON.stringify({token}),signal:AbortSignal.timeout(15000),
+    });
+    const result=await response.json().catch(()=>({})) as {error?:string};
+    if(!response.ok)throw new Error(result.error||"Link verification failed");
+    if(!active)return;
+    await saveSuccessfulMethod("email");
+    window.location.replace(platformStaffRole&&!isSaasAdmin?"/platform-workspace":"/dashboard");
+   }catch{
+    if(active)setError("This one-tap link could not be verified in this browser. Enter the code from your email instead.");
+   }finally{if(active)setBusy(false);}
+  })();
+  return()=>{active=false;};
+ },[linkToken,resolved,session?.access_token]);
  const submit=async(e:FormEvent)=>{
   e.preventDefault();const id=factor||enrollment?.factorId;
   if(!id||busy||!/^[0-9]{6}$/.test(code))return;
@@ -155,7 +186,7 @@ function MfaChallenge(){
   {method==="email"&&<div className="mt-5 space-y-4">
    <div className="rounded-lg border bg-[#f5f8fb] px-3 py-2.5 text-sm"><span className="block text-xs text-muted-foreground">Verification email</span><strong className="break-all">{registeredEmail||user?.email||"Your registered email"}</strong></div>
    <form onSubmit={verifyEmail} className="space-y-3">
-    <p className="text-sm text-muted-foreground" role="status">{sendingEmail?"Sending your code…":emailFailed?"Delivery is delayed. You can retry below; the code field stays ready.":emailSent?"Code requested. Check your email.":"Preparing verification. You can enter the code at any time."}</p>
+    <p className="text-sm text-muted-foreground" role="status">{sendingEmail?"Sending your code…":emailFailed?"Delivery is delayed. You can retry below; the code field stays ready.":emailSent?"Code requested. Check email for your code or one-tap verification link.":"Preparing verification. You can enter the code at any time."}</p>
     <Label htmlFor="email-mfa-code">Six-digit verification code</Label>
     <Input id="email-mfa-code" type="text" inputMode="numeric" pattern="[0-9]{6}" autoComplete="one-time-code" autoFocus value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,6))} maxLength={6} placeholder="000000" className="h-12 text-center text-xl tracking-[.32em]" aria-label="Six-digit email verification code" required/>
     <Button type="submit" className="w-full" disabled={busy||code.length!==6}>{busy?"Verifying…":"Verify and continue"}</Button>
