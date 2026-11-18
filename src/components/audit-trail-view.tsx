@@ -125,7 +125,7 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
     refetchInterval:60_000,
   });
   const rows=useMemo(
-    ()=>[...(businessRows as any[]),...(securityRows as any[])].sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))),
+    ()=>[...(businessRows as any[]),...(securityRows as any[])].sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime()),
     [businessRows,securityRows],
   );
   const isLoading=businessLoading||(mayReadSecurity&&securityLoading);
