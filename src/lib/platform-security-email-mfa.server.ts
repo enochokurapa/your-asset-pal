@@ -90,6 +90,11 @@ async function authorized(request:Request){
 }
 const errorJson=(status:number,message:string)=>new Response(JSON.stringify({error:message}),{status,headers:{"content-type":"application/json","cache-control":"no-store"}});
 const okJson=(body:Record<string,unknown>)=>new Response(JSON.stringify(body),{status:200,headers:{"content-type":"application/json","cache-control":"no-store"}});
+function signEmailMfaLink(userId:string,sessionId:string,storedHash:string){
+ const secret=process.env.SMTP_SETTINGS_ENCRYPTION_KEY?.trim();
+ if(!secret||!/^[a-f0-9]{64}$/i.test(secret))throw new Response("Security service unavailable",{status:503});
+ return createHmac("sha256",Buffer.from(secret,"hex")).update("assetflow-email-mfa-link:"+userId+":"+sessionId+":"+storedHash).digest("hex");
+}
 function hashCode(code:string,salt:string){
  const secret=process.env.SMTP_SETTINGS_ENCRYPTION_KEY?.trim();
  if(!secret||!/^[a-f0-9]{64}$/i.test(secret))throw new Response("Security service unavailable",{status:503});
@@ -130,6 +135,33 @@ export async function maybeHandleEmailMfa(request:Request):Promise<Response|null
    const response=okJson({saved:true,remembered:true});response.headers.set("set-cookie",trustedCookie(token));return response;
   }
   if(proof||trusted)return okJson({verified:true});
+  if(action==="link"){
+   const payload=await request.json().catch(()=>({})) as {token?:unknown};
+   const token=String(payload.token||"");
+   if(!/^[a-f0-9]{64}$/i.test(token))return errorJson(400,"Verification link is invalid");
+   const db=await getPostgresPool().connect();
+   try{
+    await db.query("BEGIN");
+    const row=await db.query<{code_hash:string;failed_attempts:number}>(
+     "SELECT code_hash,failed_attempts FROM public.platform_security_email_mfa WHERE user_id=$1 AND session_id=$2 AND verified_at IS NULL AND code_expires_at>now() FOR UPDATE",
+     [who.userId,who.sessionId]);
+    if(!row.rows.length||row.rows[0].failed_attempts>=5){
+     await db.query("COMMIT");return errorJson(400,"Link expired or unavailable. Enter a new code.");
+    }
+    const expected=signEmailMfaLink(who.userId,who.sessionId,row.rows[0].code_hash);
+    const valid=timingSafeEqual(Buffer.from(token,"hex"),Buffer.from(expected,"hex"));
+    if(valid){
+     await db.query("UPDATE public.platform_security_email_mfa SET verified_at=now(),code_hash=NULL,code_expires_at=NULL WHERE user_id=$1 AND session_id=$2",
+      [who.userId,who.sessionId]);
+    }else{
+     await db.query("UPDATE public.platform_security_email_mfa SET failed_attempts=failed_attempts+1 WHERE user_id=$1 AND session_id=$2",
+      [who.userId,who.sessionId]);
+    }
+    await db.query("COMMIT");
+    return valid?okJson({verified:true}):errorJson(400,"Verification link is invalid");
+   }catch(e){await db.query("ROLLBACK").catch(()=>{});throw e;}
+   finally{db.release();}
+  }
   if(action==="send"){
    if(!who.confirmed)return errorJson(403,"Verify your registered email address before using email codes");
    if(await getEmailMfaProof(who.userId,who.sessionId))return okJson({verified:true});
@@ -162,7 +194,8 @@ export async function maybeHandleEmailMfa(request:Request):Promise<Response|null
     if(pending[0]?.pending)return okJson({sent:true,alreadySent:true});
     return errorJson(429,"Please wait before requesting another code.");
    }
-   try{await sendPlatformSecurityCodeEmail(who.email,code)}catch(e){
+   const oneTapLink="https://assetflow360.com/mfa#verify="+signEmailMfaLink(who.userId,who.sessionId,value);
+   try{await sendPlatformSecurityCodeEmail(who.email,code,oneTapLink)}catch(e){
     await db.query(`DELETE FROM public.platform_security_email_mfa WHERE user_id=$1 AND session_id=$2 AND code_hash=$3 AND verified_at IS NULL`,[who.userId,who.sessionId,value]);
     console.error("[Security email] SMTP delivery rejected",e instanceof Error?e.message:"Unknown error");
     return errorJson(503,"Security email could not be sent. Try again or use your authenticator.");
