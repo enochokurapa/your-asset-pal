@@ -84,14 +84,27 @@ export async function queueTenantActivationNotice(
  WHERE tenant_id=$1 AND is_active=true AND email IS NOT NULL
  ORDER BY CASE WHEN tenant_role IN ('owner','admin','tenant_admin') THEN 0 ELSE 1 END,created_at LIMIT 1`,[tenantId]))[0];
  const businessRecipient=r&&emailOk(r.email)?r:null;
- const plan=(await queryPostgres<{included_users:number;included_assets:number}>(
-   "SELECT included_users,included_assets FROM public.saas_pricing_plans WHERE id=$1",[t.plan_code]))[0];
+ const plan=(await queryPostgres<{included_users:number;included_assets:number;features:string[]|null}>(
+   "SELECT included_users,included_assets,features FROM public.saas_pricing_plans WHERE id=$1",[t.plan_code]))[0];
 
  const users=t.paid_users_unlimited?"Unlimited":String(
     (t.paid_user_limit_override??plan?.included_users??0)+(t.paid_user_limit_override===null?Number(t.purchased_extra_users??0):0));
  const assets=t.paid_asset_limit_override===-1?"Unlimited":String(
     (t.paid_asset_limit_override??plan?.included_assets??0)+(t.paid_asset_limit_override===null?Number(t.purchased_extra_assets??0):0));
  const reference=source.type==="payment"?source.transactionId:source.eventId;
+ const eventKey=source.type==="payment"?"payment-activation:"+source.transactionId:"admin-activation:"+source.eventId;
+ // A DB sequence guarantees unique cumulative numbers across concurrent activations.
+ // Retrying the same activation returns its original number.
+ const numbered=(await queryPostgres<{receipt_no:string;issued_at:string}>(`
+  WITH number AS (SELECT nextval('public.assetflow_receipt_number_seq') AS seq)
+  INSERT INTO public.assetflow_receipt_registry(event_key,sequence_no,receipt_no)
+  SELECT $1,number.seq,'AF'||to_char(now() AT TIME ZONE 'Africa/Kampala','YYYYMMDD')||
+     lpad(number.seq::text,GREATEST(4,length(number.seq::text)),'0')
+  FROM number
+  ON CONFLICT(event_key) DO UPDATE SET event_key=excluded.event_key
+  RETURNING receipt_no,issued_at`,[eventKey]))[0];
+ if(!numbered)throw Error("Unable to issue a sequential receipt number");
+ const receiptNo=numbered.receipt_no;
  let method=t.last_manual_activation_method==="admin_grant"?"Administrator grant":
    t.last_manual_activation_method==="cash"?"Cash":
    t.last_manual_activation_method==="bank_transfer"?"Bank transfer":
@@ -112,21 +125,25 @@ export async function queueTenantActivationNotice(
  const planLabel=t.plan_code==="paid"?"Paid Subscription":
    t.plan_code==="starter"?"Starter":t.plan_code==="business"?"Business":
    t.plan_code==="enterprise"?"Enterprise":t.plan_code;
- const subject="Your AssetFlow360 workspace is active";
+ const subject="AssetFlow360 | Subscription activated | "+t.name;
  const startDate=new Date(t.subscription_started_at||Date.now()).toLocaleDateString("en-GB",{timeZone:"Africa/Kampala"});
  const renewalDate=new Date(t.subscription_ends_at).toLocaleDateString("en-GB",{timeZone:"Africa/Kampala"});
  const body=[
    "Hello,",
    "Your "+t.name+" workspace is activated and ready for your team to use.",
    [
-     "Organisation: "+t.name,
+     "Issued by: OWLTECH Solutions Ltd.",
+     "Issued to: "+t.name,
+     "Document number: "+receiptNo,
      "Subscription: "+planLabel,
      "Activation date: "+startDate,
      "Renewal date: "+renewalDate,
      "Active users: "+users,
      "Asset capacity: "+assets,
-     ...(paid?["Payment received: "+currency+" "+Number(amount).toLocaleString("en-UG"),
-               "Payment method: "+method]:[])
+     "Deliverables: Subscription access; "+users+" users; "+assets+" assets",
+     ...(paid?["Amount paid: "+currency+" "+Number(amount).toLocaleString("en-UG"),
+               "Payment method: "+method,
+               "Payment reference: "+(paymentReference||reference)]:["Payment status: Not recorded","Activation method: "+method])
    ].join("\n"),
    paid?"Your official PDF payment receipt is attached for your accounts and filing records.":
      "Your workspace activation confirmation is attached as a PDF.",
@@ -134,13 +151,13 @@ export async function queueTenantActivationNotice(
    "AssetFlow360 Operations"
  ].join("\n\n");
  const pdf=createAssetFlowActivationReceipt({
-  receiptNo:reference,workspace:t.name,plan:planLabel,
+  receiptNo,workspace:t.name,plan:planLabel,
   activatedAt:new Date(t.subscription_started_at||Date.now()),
   expiresAt:new Date(t.subscription_ends_at),
-  users,assets,method,amount,currency,paymentReference,paid
+  users,assets,method,amount,currency,paymentReference,paid,
+  issuedAt:new Date(numbered.issued_at),features:Array.isArray(plan?.features)?plan.features:[]
  });
- const eventKey=source.type==="payment"?"payment-activation:"+source.transactionId:"admin-activation:"+source.eventId;
- const attachmentName=(paid?"AssetFlow360-Receipt-":"AssetFlow360-Activation-")+reference.slice(0,18)+".pdf";
+ const attachmentName=(paid?"AssetFlow360-Receipt-":"AssetFlow360-Activation-")+receiptNo+".pdf";
  if(businessRecipient){
   const rows=await queryPostgres<{id:string}>(
    "INSERT INTO public.platform_operations_campaigns (event_key,scope,tenant_id,subject,body,attachment_name,attachment_mime,attachment_data) VALUES($1,'activation',$2,$3,$4,$5,'application/pdf',$6) ON CONFLICT(event_key) DO NOTHING RETURNING id",
@@ -164,15 +181,19 @@ export async function queueTenantActivationNotice(
   const adminBody=[
    "A business workspace has been activated on AssetFlow360.",
    [
+    "Issuer: OWLTECH Solutions Ltd.",
     "Business: "+t.name,
+    "Document number: "+receiptNo,
     "Plan: "+planLabel,
     "Activation date: "+startDate,
     "Renewal date: "+renewalDate,
     "Users: "+users,
     "Asset capacity: "+assets,
     "Activation reference: "+reference,
-    "Payment status: "+(paid?"Payment confirmed":"Administrator grant"),
-    ...(paid?["Amount: "+currency+" "+Number(amount).toLocaleString("en-UG"),"Method: "+method]:[])
+    "Deliverables: Subscription access; "+users+" users; "+assets+" assets",
+    "Payment status: "+(paid?"Payment confirmed":"No confirmed payment recorded"),
+    ...(paid?["Amount paid: "+currency+" "+Number(amount).toLocaleString("en-UG"),"Method: "+method,
+              "Payment reference: "+(paymentReference||reference)]:["Activation method: "+method])
    ].join("\n"),
    "The official activation confirmation or payment receipt is attached as a PDF.",
    "AssetFlow360 Operations"
