@@ -95,14 +95,8 @@ export async function queueTenantActivationNotice(
  const eventKey=source.type==="payment"?"payment-activation:"+source.transactionId:"admin-activation:"+source.eventId;
  // A DB sequence guarantees unique cumulative numbers across concurrent activations.
  // Retrying the same activation returns its original number.
- const numbered=(await queryPostgres<{receipt_no:string;issued_at:string}>(`
-  WITH number AS (SELECT nextval('public.assetflow_receipt_number_seq') AS seq)
-  INSERT INTO public.assetflow_receipt_registry(event_key,sequence_no,receipt_no)
-  SELECT $1,number.seq,'AF'||to_char(now() AT TIME ZONE 'Africa/Kampala','YYYYMMDD')||
-     lpad(number.seq::text,GREATEST(4,length(number.seq::text)),'0')
-  FROM number
-  ON CONFLICT(event_key) DO UPDATE SET event_key=excluded.event_key
-  RETURNING receipt_no,issued_at`,[eventKey]))[0];
+ const numbered=(await queryPostgres<{receipt_no:string;issued_at:string}>(
+  "SELECT receipt_no,issued_at FROM public.assetflow_issue_receipt_no($1)",[eventKey]))[0];
  if(!numbered)throw Error("Unable to issue a sequential receipt number");
  const receiptNo=numbered.receipt_no;
  let method=t.last_manual_activation_method==="admin_grant"?"Administrator grant":
@@ -111,7 +105,7 @@ export async function queueTenantActivationNotice(
    t.last_manual_activation_method==="external_mobile_money"?"Mobile money":"Administrator approval";
  let amount:number|null=t.last_manual_activation_amount_ugx===null?null:Number(t.last_manual_activation_amount_ugx);
  let currency="UGX";
- let paymentReference:string|null=null;
+ let paymentReference:string|null=source.type==="admin"?reference:null;
  let paid=t.last_manual_activation_method!=="admin_grant"&&amount!==null&&Number.isFinite(amount)&&amount>0;
  if(source.type==="payment"){
   const tx=(await queryPostgres<{amount:string;currency:string;provider:string;provider_reference:string;status:string}>(
