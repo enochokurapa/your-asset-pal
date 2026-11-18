@@ -40,6 +40,7 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [sessionVerificationPending,setSessionVerificationPending]=useState(false);
   const [unconfirmedEmail,setUnconfirmedEmail]=useState("");
   const [resending,setResending]=useState(false);
   const resendConfirmation=async()=>{
@@ -82,7 +83,7 @@ function LoginPage() {
     if(displaced){sessionStorage.removeItem("assetflow-session-replaced");toast.warning("Your account was signed in on another device. This device has been signed out.");}
   },[]);
 
-  if (!loading && user && !submitting && !takeoverOpen) {
+  if (!loading && user && !submitting && !takeoverOpen && !sessionVerificationPending) {
     if(isSaasAdmin || tenantId) return <Navigate to="/dashboard" />;
     if(platformStaffRole) return <Navigate to="/platform-workspace" />;
     if(metadataStatus==="ready") return <Navigate to="/register" />;
@@ -96,11 +97,13 @@ function LoginPage() {
     e.preventDefault();
     if (submitting) return;
     setSubmitting(true);
+    setSessionVerificationPending(true);
     setUnconfirmedEmail("");
     try {
       const { error } = await withTimeout(
         supabase.auth.signInWithPassword({ email: email.trim(), password }),25000);
       if (error) {
+        setSessionVerificationPending(false);
         if(/email not confirmed/i.test(error.message))setUnconfirmedEmail(email.trim());
         toast.error(authErrorMessage(error));
         return;
@@ -113,6 +116,7 @@ function LoginPage() {
       }
       const devices=Array.isArray(other)?other as Array<{session_id:string,device:string,last_seen:string}>:[];
       if(devices.length){setExistingDevices(devices);setTakeoverOpen(true);return;}
+      setSessionVerificationPending(false);
       window.location.assign("/dashboard");
     } catch (error) {
       console.error("[Login] Sign-in request failed", error);
@@ -122,14 +126,30 @@ function LoginPage() {
     }
   };
 
+  const retrySessionVerification=async()=>{
+    if(submitting)return;
+    setSubmitting(true);
+    try{
+      const {data:other,error}=await withTimeout(supabase.rpc("other_login_sessions" as any),15000);
+      if(error)throw error;
+      const devices=Array.isArray(other)?other as Array<{session_id:string,device:string,last_seen:string}>:[];
+      if(devices.length){setExistingDevices(devices);setTakeoverOpen(true);return;}
+      setSessionVerificationPending(false);
+      window.location.assign("/dashboard");
+    }catch{
+      toast.error("We couldn't confirm this device. Please retry.");
+    }finally{setSubmitting(false);}
+  };
   const replaceSession=async()=>{
     setSubmitting(true);
     const {error}=await supabase.rpc("replace_other_login_sessions" as any);
     if(error){toast.error("Could not sign out the other device.");setSubmitting(false);return;}
+    setSessionVerificationPending(false);
     window.location.assign("/dashboard");
   };
   const cancelTakeover=async()=>{
     await supabase.auth.signOut({scope:"local"});
+    setSessionVerificationPending(false);
     setTakeoverOpen(false);setExistingDevices([]);
   };
   return (
@@ -153,6 +173,10 @@ function LoginPage() {
 
           </div>
 
+          {user && sessionVerificationPending && !submitting && !takeoverOpen && <div role="status" className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-[#172554]">
+             <p>Your password may already have been accepted. Complete the device check without registering again.</p>
+             <Button type="button" variant="outline" className="mt-2" onClick={()=>void retrySessionVerification()}>Continue sign-in</Button>
+           </div>}
           {user && metadataStatus==="loading" && <p role="status" className="mb-4 rounded-lg bg-indigo-50 p-3 text-sm text-indigo-900">Opening your existing workspace…</p>}
            {user && metadataStatus==="error" && <div role="alert" className="mb-4 rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm">
              <p>We couldn't load your existing workspace details.</p>
