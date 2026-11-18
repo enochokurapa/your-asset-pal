@@ -711,3 +711,21 @@
   }
 }
 .af-app-workspace > main.af-app-main > * { min-width:0; }
+
+/* Business workspace only: fill the available dashboard area at every size.
+   Do not change the width of full-bleed marketing pages. */
+.af-app-workspace > main.af-app-main {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0;
+  box-sizing: border-box;
+}
+@media (min-width: 768px) {
+  .af-app-workspace > main.af-app-main {
+    padding-left: clamp(20px, 2.5vw, 40px) !important;
+    padding-right: clamp(20px, 2.5vw, 40px) !important;
+  }
+}
+.af-app-workspace .af-dashboard-kpi-grid > * {
+  min-width: 0;
+}
