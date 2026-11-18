@@ -1,6 +1,7 @@
 import {randomInt,randomBytes,createHmac,timingSafeEqual} from "node:crypto";
 import {getPostgresPool,queryPostgres} from "@/lib/postgres.server";
 import {sendPlatformSecurityCodeEmail} from "@/lib/platform-smtp.server";
+import {recordTenantAuthenticationEvent} from "@/lib/platform-auth-audit.server";
 
 type JwtPayload={sub?:string;session_id?:string;aal?:string;exp?:number};
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
@@ -132,6 +133,7 @@ export async function maybeHandleEmailMfa(request:Request):Promise<Response|null
    await queryPostgres(`DELETE FROM public.platform_mfa_trusted_devices WHERE user_id=$1 AND expires_at<now()`,[who.userId]);
    await queryPostgres(`INSERT INTO public.platform_mfa_trusted_devices(user_id,token_hash,expires_at)
     VALUES($1,$2,now()+interval '14 days')`,[who.userId,trustedHash(token)]);
+   await recordTenantAuthenticationEvent(who.userId,"mfa_device_remembered",{method:"email"});
    const response=okJson({saved:true,remembered:true});response.headers.set("set-cookie",trustedCookie(token));return response;
   }
   if(proof||trusted)return okJson({verified:true});
@@ -158,6 +160,7 @@ export async function maybeHandleEmailMfa(request:Request):Promise<Response|null
       [who.userId,who.sessionId]);
     }
     await db.query("COMMIT");
+    await recordTenantAuthenticationEvent(who.userId,valid?"mfa_verified":"mfa_rejected",{method:"one_tap"});
     return valid?okJson({verified:true}):errorJson(400,"Verification link is invalid");
    }catch(e){await db.query("ROLLBACK").catch(()=>{});throw e;}
    finally{db.release();}
@@ -200,6 +203,7 @@ export async function maybeHandleEmailMfa(request:Request):Promise<Response|null
     console.error("[Security email] SMTP delivery rejected",e instanceof Error?e.message:"Unknown error");
     return errorJson(503,"Security email could not be sent. Try again or use your authenticator.");
    }
+   await recordTenantAuthenticationEvent(who.userId,"mfa_code_sent",{method:"email"});
    return okJson({sent:true});
   }
   if(action==="verify"){
@@ -219,6 +223,7 @@ export async function maybeHandleEmailMfa(request:Request):Promise<Response|null
     if(valid){await db.query(`UPDATE public.platform_security_email_mfa SET verified_at=now(),code_hash=NULL,code_expires_at=NULL WHERE user_id=$1 AND session_id=$2`,[who.userId,who.sessionId]);}
     else{await db.query(`UPDATE public.platform_security_email_mfa SET failed_attempts=failed_attempts+1 WHERE user_id=$1 AND session_id=$2`,[who.userId,who.sessionId]);}
     await db.query("COMMIT");
+    await recordTenantAuthenticationEvent(who.userId,valid?"mfa_verified":"mfa_rejected",{method:"email"});
     return valid?okJson({verified:true}):errorJson(400,"Incorrect code");
    }catch(e){await db.query("ROLLBACK").catch(()=>{});throw e}
    finally{db.release()}
