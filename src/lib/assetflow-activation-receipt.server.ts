@@ -100,7 +100,7 @@ export function createAssetFlowActivationReceipt(data:ActivationReceipt):Buffer{
  doc.roundedRect(76.25,80.25,62.5,7.3,1.1,1.1,"F");
  label("ISSUED BY",12,85.9);label("ISSUED TO",79,85.9);
  wrapped(ISSUER,12,94.4,57,9.1,true,2);
- wrapped(data.workspace,79,94.4,56,9.1,true,2);
+ wrapped(data.workspace,79,93.2,56,8.5,true,3);
 
  frame(9,107,130,27);
  doc.setFillColor(...PALE);doc.roundedRect(9.25,107.25,129.5,8.0,1.0,1.0,"F");
