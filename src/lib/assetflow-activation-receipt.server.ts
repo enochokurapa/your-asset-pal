@@ -207,8 +207,8 @@ export function createAssetFlowActivationReceipt(data:ActivationReceipt):Buffer 
   if(building)iconBuilding(x+6.2,101.2,WHITE);else iconUsers(x+6.4,101.3,WHITE);
   txt(title,x+19,106.3,11.6,true,WHITE);
   setFill(ORANGE);pdf.rect(x+3.3,112.5,1.1,12.4,"F");
-  wrap(company,x+7.6,118.0,81,10.9,true,2,INK);
-  txt(sub,x+7.5,125.2,8.2,false,INK);
+  const nameLines=wrap(company,x+7.6,118.0,81,10.9,true,2,INK);
+  if(nameLines===1)txt(sub,x+7.5,125.2,8.2,false,INK);
  };
  party(8,"ISSUED BY",ISSUER,"AssetFlow360 Subscription Services",true);
  party(109,"ISSUED TO",data.workspace,"Customer / Activated Workspace",false);
