@@ -220,12 +220,12 @@ function TenantDashboard() {
         )}
       </div>
 
-      <div className="grid min-w-0 grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-5">
+      <div className="af-dashboard-kpi-grid grid w-full min-w-0 grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
         {stats.map((s) => (
           <Card
             key={s.label}
             onClick={() => setTile({ title: s.label, filter: s.filter })}
-            className="group min-w-0 cursor-pointer overflow-hidden p-3 sm:p-5 transition hover:-translate-y-0.5 hover:shadow-lg"
+            className="group min-h-[112px] min-w-0 cursor-pointer overflow-hidden p-4 sm:p-5 transition hover:-translate-y-0.5 hover:shadow-lg"
             style={{
               borderTop: `3px solid ${s.color}`,
               background: `linear-gradient(135deg, color-mix(in oklab, ${s.color} 8%, transparent), transparent 70%)`,
