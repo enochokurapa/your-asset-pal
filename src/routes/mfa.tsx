@@ -192,7 +192,7 @@ function MfaChallenge(){
     <Button type="submit" className="w-full" disabled={busy||code.length!==6}>{busy?"Verifying…":"Verify and continue"}</Button>
    </form>
    {emailFailed&&<Button variant="outline" className="w-full" onClick={sendEmail} disabled={sendingEmail||retrySeconds>0}>{retrySeconds>0?"Retry in "+retrySeconds+"s":"Try sending again"}</Button>}
-   <Button variant="link" className="px-0 text-sm" disabled={sendingEmail||retrySeconds>0} onClick={sendEmail}>{retrySeconds>0?`Resend available in ${retrySeconds}s`:"Resend code"}</Button>}
+   <Button variant="link" className="px-0 text-sm" disabled={sendingEmail||retrySeconds>0} onClick={sendEmail}>{retrySeconds>0?`Resend available in ${retrySeconds}s`:"Resend code"}</Button>
   </div>}
   {method==="app"&&<div className="mt-5 space-y-3">
    {!factor&&!enrollment&&<Button className="w-full" onClick={enroll} disabled={enrolling}>{enrolling?"Preparing…":"Set up authenticator"}</Button>}
