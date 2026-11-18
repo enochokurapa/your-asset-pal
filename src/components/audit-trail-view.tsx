@@ -119,7 +119,7 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
     (isTenantAdmin||isAdmin||roles.includes("security")||actionRights.has("manage_audit_log")||(isSaasAdmin&&supportMode));
   const {data:securityRows=[],isLoading:securityLoading,isError:securityError,refetch:refreshSecurity}=useQuery({
     queryKey:["tenant-security-audit",tenantId,supportMode],
-    queryFn:()=>getTenantSecurityAudit({headers:getServerAuthHeaders()}),
+    queryFn:async()=>getTenantSecurityAudit({headers:await getServerAuthHeaders()}),
     enabled:mayReadSecurity,
     staleTime:20_000,
     refetchInterval:60_000,
