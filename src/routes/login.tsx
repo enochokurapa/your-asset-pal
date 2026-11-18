@@ -87,16 +87,20 @@ function LoginPage() {
   if (!loading && user && !submitting && !takeoverOpen && !sessionVerificationPending) {
     if(isSaasAdmin || tenantId) return <Navigate to="/dashboard" />;
     if(platformStaffRole) return <Navigate to="/platform-workspace" />;
-    if(metadataStatus==="ready") return <Navigate to="/register" />;
+    // Never send an existing sign-in to registration automatically.
   }
 
   const withTimeout=<T,>(promise:Promise<T>,timeoutMs:number):Promise<T>=>Promise.race([
     promise,
-    new Promise<T>((_,reject)=>setTimeout(()=>reject(new Error("Sign-in verification has not finished. Please retry in a moment; do not create another account.")),timeoutMs))
+    new Promise<T>((_,reject)=>setTimeout(()=>reject(new Error("Unable to complete sign-in. Please try again.")),timeoutMs))
   ]);
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (submitting) return;
+    if (sessionVerificationPending && session?.access_token) {
+      await retrySessionVerification();
+      return;
+    }
     setSubmitting(true);
     setSessionVerificationPending(true);
     setUnconfirmedEmail("");
@@ -120,7 +124,7 @@ function LoginPage() {
       window.location.assign("/dashboard");
     } catch (error) {
       console.error("[Login] Sign-in request failed", error);
-      toast.error(authErrorMessage(error));
+      toast.error("Unable to complete sign-in. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -180,16 +184,7 @@ function LoginPage() {
 
           </div>
 
-          {user && (sessionVerificationPending || metadataStatus==="error") && !submitting && !takeoverOpen && (
-            <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-sm text-[#172554]">
-              <span>{sessionVerificationPending?"Finish your sign-in.":"Workspace connection interrupted."}</span>
-              <Button type="button" variant="outline" size="sm"
-                onClick={()=>sessionVerificationPending?void retrySessionVerification():window.location.reload()}>
-                {sessionVerificationPending?"Continue":"Retry"}
-              </Button>
-            </div>
-          )}
-           <form onSubmit={onSubmit} className="space-y-4">
+          <form onSubmit={onSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email address</Label>
               <Input
