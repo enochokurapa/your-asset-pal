@@ -13,6 +13,7 @@ import {handleAssetStorage,signedAssetFileUrl,storeAssetApiFile} from "./lib/ass
 import { maybeHandlePlatformBrandingAsset } from "./lib/platform-branding-assets.server";
 import { supabaseAdmin } from "./integrations/supabase/client.server";
 import {maybeHandleEmailMfa,shouldRequireEmailMfa} from "./lib/platform-security-email-mfa.server";
+import {recordRejectedPasswordAttempt} from "./lib/platform-auth-audit.server";
 import {confirmSaasEmailRecovery} from "./lib/platform-email-recovery.server";
 import { completeMicrosoftOAuth } from "./lib/microsoft365.server";
 import {domainGuard,protectDomainLoginResponse} from "./lib/custom-domain-guard.server";
@@ -155,6 +156,14 @@ async function maybeProxySupabase(request: Request): Promise<Response | null> {
 
   try {
     const upstreamResponse = await fetch(upstreamUrl, init);
+    // Password failures are attributable to an attempted account, not a
+    // verified user. Never persist credential payloads or access tokens.
+    if(route.prefix==="/auth/v1"&&sourceUrl.pathname==="/auth/v1/token"
+       &&sourceUrl.searchParams.get("grant_type")==="password"
+       &&request.method==="POST"&&init.body instanceof ArrayBuffer
+       &&upstreamResponse.status>=400&&upstreamResponse.status<500){
+      await recordRejectedPasswordAttempt(request,init.body,upstreamResponse.status);
+    }
     const responseHeaders = new Headers(upstreamResponse.headers);
     responseHeaders.delete("content-length");
     responseHeaders.delete("transfer-encoding");

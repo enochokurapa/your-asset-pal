@@ -1,4 +1,6 @@
 import { runPermittedExport } from "@/lib/export-permissions";
+import { getServerAuthHeaders } from "@/lib/auth-headers";
+import { getTenantSecurityAudit } from "@/lib/tenant-audit.functions";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { History, Download, FileText, Trash2, Eye } from "lucide-react";
+import { History, Download, FileText, Eye } from "lucide-react";
 import { toast } from "sonner";
 import type jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -20,6 +22,23 @@ import { exportReportXLSX, exportReportPDF } from "@/lib/depreciation-export";
 const friendlyAction = (r: any) => {
   const t = r.entity_type;
   const a = r.action as string;
+  if(t==="authentication"){
+    const labels:Record<string,string>={
+      login_success:"Sign-in successful (password accepted)",
+      login_failed:"Failed sign-in (unverified attempt)",
+      logout:"User signed out",
+      mfa_verified:"MFA verification successful",
+      mfa_rejected:"MFA verification rejected",
+      mfa_code_sent:"Email verification code requested",
+      mfa_attempted:"Authenticator verification attempted",
+      mfa_challenge_created:"MFA challenge started",
+      mfa_device_remembered:"Trusted device saved",
+      password_changed:"Password changed",
+      password_recovery_requested:"Password recovery requested",
+      session_revoked:"Session revoked",
+    };
+    return labels[a]||a.replace(/_/g," ");
+  }
   if (t === "assets") {
     if (a === "created") return "New asset added";
     if (a === "retired") return "Asset retired";
@@ -57,6 +76,9 @@ const friendlyEntity = (t: string | null | undefined) => {
     case "profiles": return "User profile";
     case "depreciation_runs": return "Depreciation run";
     case "audit_log": return "Audit entry";
+    case "authentication": return "Login & security";
+    case "user_security": return "User & permissions";
+    case "business_support": return "SaaS support";
     default:
       if (!t) return "-";
       return t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -70,7 +92,7 @@ export type AuditTrailViewProps = {
 };
 
 export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: AuditTrailViewProps) {
-  const { isAdmin, canDo, canSeeBranch } = useAuth();
+  const { isAdmin, isTenantAdmin, isSaasAdmin, supportMode, tenantId, roles, actionRights, canDo, canSeeBranch } = useAuth();
   const canManageAudit = isAdmin || canDo("manage_audit_log");
   const qc = useQueryClient();
 
@@ -83,8 +105,8 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
   const [showCleared, setShowCleared] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
 
-  const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["audit-log", showCleared, from, to],
+  const { data: businessRows = [], isLoading:businessLoading } = useQuery({
+    queryKey: ["audit-log", tenantId, showCleared, from, to],
     queryFn: async () => {
       let qy = supabase.from("audit_log").select("*").order("created_at", { ascending: false }).limit(2000);
       if (!showCleared) qy = qy.is("cleared_at", null);
@@ -93,6 +115,20 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
       return (await qy).data ?? [];
     },
   });
+  const mayReadSecurity=Boolean(tenantId)&&
+    (isTenantAdmin||isAdmin||roles.includes("security")||actionRights.has("manage_audit_log")||(isSaasAdmin&&supportMode));
+  const {data:securityRows=[],isLoading:securityLoading,isError:securityError,refetch:refreshSecurity}=useQuery({
+    queryKey:["tenant-security-audit",tenantId,supportMode],
+    queryFn:async()=>getTenantSecurityAudit({headers:await getServerAuthHeaders()}),
+    enabled:mayReadSecurity,
+    staleTime:20_000,
+    refetchInterval:60_000,
+  });
+  const rows=useMemo(
+    ()=>[...(businessRows as any[]),...(securityRows as any[])].sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime()),
+    [businessRows,securityRows],
+  );
+  const isLoading=businessLoading||(mayReadSecurity&&securityLoading);
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles-list"],
     queryFn: async () => (await supabase.from("profiles").select("id,email,full_name")).data ?? [],
@@ -128,6 +164,10 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
     return p?.full_name || p?.email || "-";
   };
 
+  const actorLabel=(r:any)=>{
+    if(r.action==="login_failed")return "Unauthenticated attempt"+(r.entity_id?" · "+userLabel(r.entity_id):"");
+    return userLabel(r.actor_user_id);
+  };
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
 
@@ -190,9 +230,9 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
       if (!inBranchScope(r)) return false;
       if (entityType !== "all" && r.entity_type !== entityType) return false;
       if (action !== "all" && r.action !== action) return false;
-      if (userId !== "all" && r.actor_user_id !== userId) return false;
+      if (userId !== "all" && r.actor_user_id !== userId && !(r.action==="login_failed"&&r.entity_id===userId)) return false;
       if (q) {
-        const actor = userLabel(r.actor_user_id);
+        const actor = actorLabel(r);
         const hay = [r.entity_type, r.action, friendlyAction(r), actor, r.entity_id].join(" ").toLowerCase();
         if (!hay.includes(q.toLowerCase())) return false;
       }
@@ -206,12 +246,13 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
   );
 
   const exportList = (kind: "xlsx" | "pdf") => {
-    const headers = ["When", "Record type", "Activity", "Performed by"];
+    const headers = ["When", "Record type", "Activity", "Performed by", "IP / source"];
     const data = filtered.map((r) => [
       new Date(r.created_at).toLocaleString(),
       friendlyEntity(r.entity_type),
       friendlyAction(r),
-      userLabel(r.actor_user_id),
+      actorLabel(r),
+      String(r.details?.ip_address||r.details?.ip_network||r.details?.source||"—"),
     ]);
     const title = "Audit trail";
     if (kind === "xlsx") exportReportXLSX(title, headers, data);
@@ -242,7 +283,7 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
         ["When", new Date(r.created_at).toLocaleString()],
         ["Record type", friendlyEntity(r.entity_type)],
         ["Activity", friendlyAction(r)],
-        ["Performed by", userLabel(r.actor_user_id)],
+        ["Performed by", actorLabel(r)],
         ["Archived", r.cleared_at ? new Date(r.cleared_at).toLocaleString() : "No"],
       ],
       styles: { fontSize: 9, overflow: "linebreak", cellWidth: "wrap" },
@@ -329,32 +370,13 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
 
   const clearAll = async () => {
     if (!confirm("Archive all currently visible audit entries? Audit history is preserved.")) return;
-    const ids = filtered.map((r: any) => r.id);
+    // Authentication records are sourced from the protected GoTrue audit and
+    // cannot be archived or deleted by tenant users.
+    const ids = filtered.map((r: any) => r.id).filter((id:string)=>UUID_RE.test(id));
+    if(!ids.length){toast.info("Protected security events cannot be archived");return;}
     const { error } = await supabase.from("audit_log").update({ cleared_at: new Date().toISOString() }).in("id", ids);
     if (error) { toast.error(error.message); return; }
     toast.success(`Archived ${ids.length} entries`);
-    qc.invalidateQueries({ queryKey: ["audit-log"] });
-  };
-
-  const deleteVisible = async () => {
-    const ids = filtered.map((r: any) => r.id);
-    if (ids.length === 0) { toast.error("Nothing to delete"); return; }
-    if (!confirm(`Permanently delete ${ids.length} visible audit ${ids.length === 1 ? "entry" : "entries"}? This cannot be undone.`)) return;
-    const { error } = await supabase.from("audit_log").delete().in("id", ids);
-    if (error) { toast.error(error.message); return; }
-    toast.success(`Deleted ${ids.length} entries`);
-    setSelectedRows(new Set());
-    qc.invalidateQueries({ queryKey: ["audit-log"] });
-  };
-
-  const deleteSelected = async () => {
-    const ids = Array.from(selectedRows);
-    if (ids.length === 0) { toast.error("Select at least one entry"); return; }
-    if (!confirm(`Permanently delete ${ids.length} selected audit ${ids.length === 1 ? "entry" : "entries"}? This cannot be undone.`)) return;
-    const { error } = await supabase.from("audit_log").delete().in("id", ids);
-    if (error) { toast.error(error.message); return; }
-    toast.success(`Deleted ${ids.length} entries`);
-    setSelectedRows(new Set());
     qc.invalidateQueries({ queryKey: ["audit-log"] });
   };
 
@@ -364,16 +386,13 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Audit Trail</h1>
-            <p className="text-sm text-muted-foreground">Every create, update, approval, and retirement action across the system.</p>
+            <p className="text-sm text-muted-foreground">Sign-ins, failed attempts, MFA, permission changes, assets and support access—scoped to this business.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {canManageAudit && (
               <>
                 <Button variant="outline" onClick={clearAll} className="gap-2">
                   <History className="h-4 w-4" /> Archive visible
-                </Button>
-                <Button variant="destructive" onClick={deleteVisible} className="gap-2">
-                  <Trash2 className="h-4 w-4" /> Delete visible
                 </Button>
               </>
             )}
@@ -382,6 +401,12 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
       )}
 
       <Card className="p-4">
+        {securityError&&mayReadSecurity&&(
+          <p role="alert" className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+            Security and login history could not be loaded. Existing activity records are still shown.
+            <Button type="button" variant="link" size="sm" onClick={()=>void refreshSecurity()}>Retry</Button>
+          </p>
+        )}
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div className="grid flex-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
             <div className="space-y-1 lg:col-span-2">
@@ -394,6 +419,9 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All entities</SelectItem>
+                  <SelectItem value="authentication">Login & security</SelectItem>
+                  <SelectItem value="user_security">User & permissions</SelectItem>
+                  <SelectItem value="business_support">SaaS support</SelectItem>
                   <SelectItem value="assets">Assets</SelectItem>
                   <SelectItem value="asset_movements">Movements</SelectItem>
                   <SelectItem value="asset_disposals">Disposals</SelectItem>
@@ -455,11 +483,6 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
               <FileText className="h-3 w-3" /> View {selectedRows.size} as one PDF
             </Button>
           )}
-          {selectedRows.size > 0 && canManageAudit && (
-            <Button size="sm" variant="destructive" className="h-7 gap-1" onClick={deleteSelected}>
-              <Trash2 className="h-3 w-3" /> Delete {selectedRows.size}
-            </Button>
-          )}
           <span className="ml-auto text-xs text-muted-foreground">
             {selectedRows.size > 0 ? `${selectedRows.size} selected · ` : ""}
             {filtered.length} entr{filtered.length === 1 ? "y" : "ies"}
@@ -484,7 +507,8 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
                   <th className="px-2 py-1.5 text-left">When</th>
                   <th className="px-2 py-1.5 text-left">Entity</th>
                   <th className="px-2 py-1.5 text-left">Action</th>
-                  <th className="px-2 py-1.5 text-left">By</th>
+                  <th className="px-2 py-1.5 text-left">User / attempted account</th>
+                  <th className="px-2 py-1.5 text-left">IP / source</th>
                   <th className="px-2 py-1.5 text-right">View</th>
                 </tr>
               </thead>
@@ -501,7 +525,8 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
                     <td className="px-2 py-1 whitespace-nowrap">{new Date(r.created_at).toLocaleString()}</td>
                     <td className="px-2 py-1"><Badge variant="outline" className="capitalize text-[10px]">{r.entity_type}</Badge></td>
                     <td className="px-2 py-1">{friendlyAction(r)}</td>
-                    <td className="px-2 py-1">{userLabel(r.actor_user_id)}</td>
+                    <td className="px-2 py-1">{actorLabel(r)}</td>
+                    <td className="max-w-[200px] truncate px-2 py-1" title={String(r.details?.ip_address||r.details?.ip_network||r.details?.source||"")}>{String(r.details?.ip_address||r.details?.ip_network||r.details?.source||"—")}</td>
                     <td className="px-2 py-1 text-right">
                       <Button size="sm" variant="ghost" className="h-6 gap-1 px-2" onClick={() => openDetailPdf(r)}>
                         <Eye className="h-3 w-3" /> View
