@@ -115,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [metadataStatus,setMetadataStatus]=useState<"loading"|"ready"|"error"|"idle">("loading");
   const pendingMetadataUid=useRef<string|null>(null);
+  const signedInUidRef=useRef<string|null>(null);
 
   // A replaced device sees a notification instead of silently retaining the UI.
   useEffect(()=>{
@@ -149,17 +150,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadFor = async (uid: string, accessToken: string) => {
     if(pendingMetadataUid.current===uid)return;
     pendingMetadataUid.current=uid;
+    signedInUidRef.current=uid;
+    // Never carry the previous user's granular privileges into a new session.
+    setPermissions(new Set());setApprovalRights(new Set());setActionRights(new Set());
+    setBranchScope(new Set());
     setMetadataStatus("loading");
     let timer:ReturnType<typeof setTimeout>|undefined;
     try {
       const userId=encodeURIComponent(uid);
-      const [r,p,a,act,br,profileList]=await Promise.race([
+      // Only the role and workspace profile are required to open the account.
+      // Optional permission queries must not make a valid login fail.
+      const [r,profileList]=await Promise.race([
         Promise.all([
           directAuthRest<any[]>(`/user_roles?select=role&user_id=eq.${userId}`,accessToken),
-          directAuthRest<any[]>(`/user_permissions?select=module,can_view&user_id=eq.${userId}`,accessToken),
-          directAuthRest<any[]>(`/user_approval_rights?select=approval_kind&user_id=eq.${userId}`,accessToken),
-          directAuthRest<any[]>(`/user_action_rights?select=action_kind&user_id=eq.${userId}`,accessToken),
-          directAuthRest<any[]>(`/user_branch_access?select=branch_id&user_id=eq.${userId}`,accessToken),
           directAuthRest<any[]>(`/profiles?select=must_change_password,is_active,tenant_id,tenant_role,is_saas_admin&id=eq.${userId}&limit=1`,accessToken),
         ]),
         new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(new Error("Workspace lookup timeout")),16000);}),
@@ -194,11 +197,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       else if(typeof window==="undefined" || !window.sessionStorage.getItem("af-platform-tenant-session")) setSupportMode(false);
 
       setRoles(supporting?["admin"]:rs);
-      setPermissions(new Set((Array.isArray(p)?p:[]).filter((x: any) => x.can_view).map((x: any) => x.module as ModuleKey)));
-      setApprovalRights(new Set((Array.isArray(a)?a:[]).map((x: any) => x.approval_kind as ApprovalKind)));
-      setActionRights(new Set((Array.isArray(act)?act:[]).map((x: any) => x.action_kind as ActionKind)));
-      const brList = (Array.isArray(br)?br:[]).map((x: any) => x.branch_id as string);
-      setBranchScope(supporting || rs.includes("admin") || brList.length === 0 ? null : new Set(brList));
+      // Optional rights load independently after basic identity has been established.
+      // A failed branch lookup must deny access, never expand it.
+      if(supporting||rs.includes("admin"))setBranchScope(null);
+      void Promise.allSettled([
+        directAuthRest<any[]>(`/user_permissions?select=module,can_view&user_id=eq.${userId}`,accessToken),
+        directAuthRest<any[]>(`/user_approval_rights?select=approval_kind&user_id=eq.${userId}`,accessToken),
+        directAuthRest<any[]>(`/user_action_rights?select=action_kind&user_id=eq.${userId}`,accessToken),
+        directAuthRest<any[]>(`/user_branch_access?select=branch_id&user_id=eq.${userId}`,accessToken),
+      ]).then(([permissions,approvals,actions,branches])=>{
+        if(signedInUidRef.current!==uid)return;
+        if(permissions.status==="fulfilled")
+          setPermissions(new Set((permissions.value||[]).filter((x:any)=>x.can_view).map((x:any)=>x.module as ModuleKey)));
+        if(approvals.status==="fulfilled")
+          setApprovalRights(new Set((approvals.value||[]).map((x:any)=>x.approval_kind as ApprovalKind)));
+        if(actions.status==="fulfilled")
+          setActionRights(new Set((actions.value||[]).map((x:any)=>x.action_kind as ActionKind)));
+        if(branches.status==="fulfilled"){
+          const list=(branches.value||[]).map((x:any)=>x.branch_id as string);
+          setBranchScope(supporting||rs.includes("admin")||list.length===0?null:new Set(list));
+        }
+      }).catch(()=>{/* Fail closed; the main login is unaffected. */});
       setMustChangePassword(Boolean(prof?.must_change_password));
       setIsActive(prof?.is_active !== false);
       setIsSaasAdmin(isPlatformAdmin || supporting);
@@ -268,6 +287,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
       // Refreshing a token does not require reloading ten permission queries.
+      signedInUidRef.current=s?.user?.id??null;
       if (!s?.user) resetMetadata();
       else if(event!=="TOKEN_REFRESHED") setTimeout(() => loadFor(s.user.id,s.access_token), 0);
     });
