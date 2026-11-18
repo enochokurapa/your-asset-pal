@@ -38,6 +38,15 @@ function authErrorMessage(error: unknown): string {
 function LoginPage() {
   const { user, session, loading, tenantId, isSaasAdmin, platformStaffRole, metadataStatus } = useAuth();
   const [email, setEmail] = useState("");
+  const [rememberEmail,setRememberEmail]=useState(false);
+  useEffect(()=>{
+    try{
+      const previous=window.localStorage.getItem("af-remembered-email");
+      if(previous && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(previous)){
+        setEmail(previous);setRememberEmail(true);
+      }
+    }catch{/* Private browsing may disable local storage. */}
+  },[]);
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -102,7 +111,6 @@ function LoginPage() {
       return;
     }
     setSubmitting(true);
-    setSessionVerificationPending(true);
     setUnconfirmedEmail("");
     try {
       const { data:signInData,error } = await withTimeout(
@@ -115,6 +123,11 @@ function LoginPage() {
       }
       const token=signInData.session?.access_token;
       if(!token)throw new Error("Further sign-in verification is required.");
+      try{
+        if(rememberEmail)window.localStorage.setItem("af-remembered-email",email.trim().toLowerCase());
+        else window.localStorage.removeItem("af-remembered-email");
+      }catch{/* Browser autofill remains available when storage is blocked. */}
+      setSessionVerificationPending(true);
       const other=await directAuthRest<Array<{session_id:string,device:string,last_seen:string}>>(
         "/rpc/other_login_sessions",token,"POST"
       );
@@ -224,7 +237,13 @@ function LoginPage() {
               </div>
             </div>
 
-            <div className="flex justify-end"><Link to="/forgot-password" className="text-sm font-medium text-primary hover:underline">Forgot password?</Link></div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-slate-600">
+                <input type="checkbox" checked={rememberEmail} onChange={event=>setRememberEmail(event.target.checked)} className="h-4 w-4 accent-[#3A3EC2]" />
+                Remember my email
+              </label>
+              <Link to="/forgot-password" className="text-sm font-medium text-primary hover:underline">Forgot password?</Link>
+            </div>
             <Button type="submit" className="h-12 w-full rounded-lg bg-[#3A3EC2] text-sm font-semibold text-white hover:bg-[#3034a8]" disabled={submitting}>
               {submitting ? (
                 <span className="inline-flex items-center gap-2">

@@ -83,7 +83,7 @@ export async function queueTenantActivationNotice(
  const r=(await queryPostgres<Recipient>(`SELECT id,email,tenant_id FROM public.profiles
  WHERE tenant_id=$1 AND is_active=true AND email IS NOT NULL
  ORDER BY CASE WHEN tenant_role IN ('owner','admin','tenant_admin') THEN 0 ELSE 1 END,created_at LIMIT 1`,[tenantId]))[0];
- if(!r||!emailOk(r.email))return;
+ const businessRecipient=r&&emailOk(r.email)?r:null;
  const plan=(await queryPostgres<{included_users:number;included_assets:number}>(
    "SELECT included_users,included_assets FROM public.saas_pricing_plans WHERE id=$1",[t.plan_code]))[0];
 
@@ -140,17 +140,57 @@ export async function queueTenantActivationNotice(
   users,assets,method,amount,currency,paymentReference,paid
  });
  const eventKey=source.type==="payment"?"payment-activation:"+source.transactionId:"admin-activation:"+source.eventId;
- const rows=await queryPostgres<{id:string}>(`INSERT INTO public.platform_operations_campaigns
- (event_key,scope,tenant_id,subject,body,attachment_name,attachment_mime,attachment_data)
- VALUES($1,'activation',$2,$3,$4,$5,'application/pdf',$6)
- ON CONFLICT(event_key) DO NOTHING RETURNING id`,
- [eventKey,tenantId,subject,body,
-  (paid?"AssetFlow360-Receipt-":"AssetFlow360-Activation-")+reference.slice(0,18)+".pdf",pdf]);
- if(!rows.length)return;
- await queryPostgres(`INSERT INTO public.platform_operations_deliveries(campaign_id,user_id,to_email)
- VALUES($1,$2,$3) ON CONFLICT DO NOTHING`,[rows[0].id,r.id,r.email]);
- await queryPostgres(`INSERT INTO public.notifications(user_id,tenant_id,type,title,body,beep)
- VALUES($1,$2,'operations',$3,$4,true)`,[r.id,tenantId,subject,body.slice(0,1000)]);
+ const attachmentName=(paid?"AssetFlow360-Receipt-":"AssetFlow360-Activation-")+reference.slice(0,18)+".pdf";
+ if(businessRecipient){
+  const rows=await queryPostgres<{id:string}>(
+   "INSERT INTO public.platform_operations_campaigns (event_key,scope,tenant_id,subject,body,attachment_name,attachment_mime,attachment_data) VALUES($1,'activation',$2,$3,$4,$5,'application/pdf',$6) ON CONFLICT(event_key) DO NOTHING RETURNING id",
+   [eventKey,tenantId,subject,body,attachmentName,pdf]);
+  if(rows.length){
+   await queryPostgres(
+    "INSERT INTO public.platform_operations_deliveries(campaign_id,user_id,to_email) VALUES($1,$2,$3) ON CONFLICT DO NOTHING",
+    [rows[0].id,businessRecipient.id,businessRecipient.email]);
+   await queryPostgres(
+    "INSERT INTO public.notifications(user_id,tenant_id,type,title,body,beep) VALUES($1,$2,'operations',$3,$4,true)",
+    [businessRecipient.id,tenantId,subject,body.slice(0,1000)]);
+  }
+ }
+ // A separate, idempotent email event ensures that SaaS administrators receive
+ // the official PDF regardless of the business-recipient queue state.
+ const platformAdmins=(await queryPostgres<{id:string;email:string}>(
+  "SELECT id,email FROM public.profiles WHERE is_saas_admin=true AND is_active=true AND email IS NOT NULL ORDER BY created_at LIMIT 50"
+ )).filter(item=>emailOk(item.email));
+ if(platformAdmins.length){
+  const adminSubject="AssetFlow360 | Business activated: "+t.name;
+  const adminBody=[
+   "A business workspace has been activated on AssetFlow360.",
+   [
+    "Business: "+t.name,
+    "Plan: "+planLabel,
+    "Activation date: "+startDate,
+    "Renewal date: "+renewalDate,
+    "Users: "+users,
+    "Asset capacity: "+assets,
+    "Activation reference: "+reference,
+    "Payment status: "+(paid?"Payment confirmed":"Administrator grant"),
+    ...(paid?["Amount: "+currency+" "+Number(amount).toLocaleString("en-UG"),"Method: "+method]:[])
+   ].join("\n"),
+   "The official activation confirmation or payment receipt is attached as a PDF.",
+   "AssetFlow360 Operations"
+  ].join("\n\n");
+  const adminRows=await queryPostgres<{id:string}>(
+   "INSERT INTO public.platform_operations_campaigns (event_key,scope,tenant_id,subject,body,attachment_name,attachment_mime,attachment_data) VALUES($1,'activation',$2,$3,$4,$5,'application/pdf',$6) ON CONFLICT(event_key) DO NOTHING RETURNING id",
+   [eventKey+":saas-admin-copy",tenantId,adminSubject,adminBody,attachmentName,pdf]);
+  if(adminRows.length){
+   for(const admin of platformAdmins){
+    await queryPostgres(
+     "INSERT INTO public.platform_operations_deliveries(campaign_id,user_id,to_email) VALUES($1,$2,$3) ON CONFLICT DO NOTHING",
+     [adminRows[0].id,admin.id,admin.email]);
+    await queryPostgres(
+     "INSERT INTO public.notifications(user_id,tenant_id,type,title,body,beep) VALUES($1,$2,'operations',$3,$4,true)",
+     [admin.id,tenantId,adminSubject,adminBody.slice(0,1000)]);
+   }
+  }
+ }
  void flushOperationsNotices().catch(e=>console.error("[Activation notice] Mail queue error",e));
 }
 export async function flushOperationsNotices(){

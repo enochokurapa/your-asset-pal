@@ -696,3 +696,18 @@
   .af-auth-stage.af-auth-split .af-auth-card {padding:0!important;}
   .af-auth-stage.af-auth-split h1 {font-size:clamp(21px,5.3vw,27px);line-height:1.25;}
 }
+
+/* Auth release 2026-11-18: restore dashboard interior gutters without
+   changing the full-bleed public homepage or organization branding. */
+.af-app-workspace > main.af-app-main {
+  box-sizing:border-box;
+  padding-inline:clamp(18px,2.4vw,38px)!important;
+}
+@media (max-width:767px) {
+  .af-app-workspace > main.af-app-main {
+    width:100%;
+    padding-left:16px!important;
+    padding-right:16px!important;
+  }
+}
+.af-app-workspace > main.af-app-main > * { min-width:0; }

@@ -50,7 +50,7 @@ jobs:
       - name: Build application
         run: bun run build
       - name: Upload compiled production bundle
-        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event_name == 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: assetflow-bundle-${{ github.sha }}
