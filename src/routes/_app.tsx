@@ -74,7 +74,7 @@ const saasAdminNav: NavItem[] = [
 
 function AppLayout() {
   const {
-    user, loading, signOut, isAdmin, isTenantAdmin, isSaasAdmin, supportMode, supportRestoreError, platformStaffRole, roles, canView, isPaidFeature, isAddOnFeature,
+    user, session, loading, signOut, isAdmin, isTenantAdmin, isSaasAdmin, supportMode, supportRestoreError, platformStaffRole, roles, canView, isPaidFeature, isAddOnFeature,
     mustChangePassword, canExportReports, subscriptionStatus, trialEndsAt, tenantId, tenantName,
   } = useAuth();
   // Share business-selected theme across all workspace users, not just the local browser.
@@ -122,16 +122,26 @@ function AppLayout() {
     if(!user||loading){setMfaChecked(false);setMfaRequired(false);return;}
     let active=true;
     setMfaChecked(false);
-    import("@/integrations/supabase/client").then(async({supabase})=>{
-      const {data:{session}}=await supabase.auth.getSession();
-      if(!session?.access_token)throw new Error("Sign-in session unavailable");
-      const response=await fetch("/api/security/email-mfa/status",{method:"POST",headers:{Authorization:"Bearer "+session.access_token},cache:"no-store"});
+    // Use the session already verified by AuthProvider. Calling getSession()
+    // again here can contend for the auth storage lock and indefinitely
+    // stall the dashboard after an otherwise successful password login.
+    const accessToken=session?.access_token;
+    if(!accessToken){setMfaRequired(true);setMfaChecked(true);return;}
+    fetch("/api/security/email-mfa/status",{
+      method:"POST",
+      headers:{Authorization:"Bearer "+accessToken},
+      cache:"no-store",
+      signal:AbortSignal.timeout(12000),
+    }).then(async(response)=>{
       if(!response.ok)throw new Error("Security status unavailable");
       const status=await response.json() as {verified?:boolean};
       if(active){setMfaRequired(!status.verified);setMfaChecked(true);}
-    }).catch(()=>{if(active){setMfaRequired(true);setMfaChecked(true);}});
+    }).catch(()=>{
+      // Fail closed on MFA status errors but always finish the loading state.
+      if(active){setMfaRequired(true);setMfaChecked(true);}
+    });
     return ()=>{active=false;};
-  },[user?.id,loading,platformControl,isTenantAdmin]);
+  },[user?.id,session?.access_token,loading,platformControl,isTenantAdmin]);
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   useEffect(()=>{

@@ -118,11 +118,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // A replaced device sees a notification instead of silently retaining the UI.
   useEffect(()=>{
-    if(!session?.user?.id)return;
+    const accessToken=session?.access_token;
+    if(!session?.user?.id || !accessToken)return;
     let stopped=false;
     const check=async()=>{
-      const {data,error}=await supabase.rpc("current_login_session_valid" as any);
-      if(stopped||error||data!==false)return;
+      // Explicit-token fetch avoids acquiring a second auth storage lock.
+      let valid:boolean;
+      try {valid=await directAuthRest<boolean>("/rpc/current_login_session_valid",accessToken,"POST");}
+      catch{return;} // Network failure is not proof of a replaced session.
+      if(stopped||valid!==false)return;
       sessionStorage.setItem("assetflow-session-replaced","1");
       await supabase.auth.signOut({scope:"local"});
       window.location.replace("/login?session_replaced=1");
