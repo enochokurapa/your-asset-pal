@@ -62,7 +62,7 @@ export const getTenantSecurityAudit=createServerFn({method:"GET"})
    actor_user_id:item.actor_user_id,source:"auth_service",
    details:{source:"Verified authentication service",...(item.provider?{method:item.provider}:{}),
             ...(item.ip_address?{ip_address:item.ip_address}:{})},
-   created_at:item.created_at,cleared_at:null,
+   created_at:new Date(item.created_at).toISOString(),cleared_at:null,
   }));
   const other=[
    {rows:security,source:"tenant_security",entity_type:"user_security"},
@@ -73,9 +73,9 @@ export const getTenantSecurityAudit=createServerFn({method:"GET"})
    entity_type,entity_id:null,action:item.action,
    actor_user_id:item.actor_id,
    details:{source:source.replace(/_/g," ")},
-   source,created_at:item.recorded_at,cleared_at:null,
+   source,created_at:new Date(item.recorded_at).toISOString(),cleared_at:null,
   })));
   return [...native,...other]
-    .sort((a,b)=>b.created_at.localeCompare(a.created_at))
+    .sort((a,b)=>new Date(b.created_at).getTime()-new Date(a.created_at).getTime())
     .slice(0,900);
  });
