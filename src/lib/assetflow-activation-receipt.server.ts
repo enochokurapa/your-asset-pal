@@ -8,158 +8,142 @@ export type ActivationReceipt={
 };
 
 const ISSUER="OWLTECH Solutions Ltd.";
-const SUPPORT_EMAIL="info@assetflow360.com";
-const SUPPORT_PHONE="+256 741 303496";
-const WEBSITE="www.assetflow360.com";
-// These colours match the approved public AssetFlow360 brand palette,
-// not the unrelated dark-navy artwork used in an earlier draft.
-const INDIGO:[number,number,number]=[78,81,219];   // #4E51DB
-const OCHRE:[number,number,number]=[200,120,49];   // #C87831
-const BODY:[number,number,number]=[38,43,62];
-const MUTED:[number,number,number]=[100,105,122];
-const BORDER:[number,number,number]=[224,219,215];
-const PALE:[number,number,number]=[249,247,254];
-const CREAM:[number,number,number]=[255,249,242];
+const INDIGO:[number,number,number]=[78,81,219];  // AssetFlow360 #4E51DB
+const OCHRE:[number,number,number]=[200,120,49];  // AssetFlow360 #C87831
+const INK:[number,number,number]=[35,43,62];
+const SECONDARY:[number,number,number]=[101,109,125];
+const EDGE:[number,number,number]=[221,223,231];
+const PALE:[number,number,number]=[249,248,253];
+const WARM:[number,number,number]=[255,249,242];
+const clean=(v:string,max=200)=>String(v||"").replace(/[\r\n\x00-\x1f]/g," ").trim().slice(0,max);
+const shortDate=(v:Date)=>new Intl.DateTimeFormat("en-GB",{day:"2-digit",month:"short",year:"numeric",timeZone:"Africa/Kampala"}).format(v);
+const cash=(v:number,currency:string)=>clean(currency,8)+" "+v.toLocaleString("en-UG",{maximumFractionDigits:2});
 
-const clean=(v:string,max=180)=>String(v||"").replace(/[\r\n\x00-\x1f]/g," ").trim().slice(0,max);
-const date=(v:Date)=>new Intl.DateTimeFormat("en-GB",{day:"2-digit",month:"short",year:"numeric",timeZone:"Africa/Kampala"}).format(v);
-const money=(v:number,currency:string)=>clean(currency,8)+" "+v.toLocaleString("en-UG",{minimumFractionDigits:0,maximumFractionDigits:2});
-
-export function createAssetFlowActivationReceipt(data:ActivationReceipt):Buffer {
+/** Print-friendly A5 receipt: all financial and delivery details, no empty A4 half-page. */
+export function createAssetFlowActivationReceipt(data:ActivationReceipt):Buffer{
  if(data.paid&&(!Number.isFinite(data.amount)||data.amount===null||data.amount<=0))
   throw Error("A payment receipt requires a verified positive payment amount");
- if(!data.receiptNo||!data.workspace||!data.plan)throw Error("Receipt identity and subscription details required");
- const p=new jsPDF({unit:"mm",format:"a4",orientation:"portrait",compress:true});
- const x=13,w=184,right=197;
- const box=(bx:number,by:number,bw:number,bh:number,fill?:[number,number,number],stroke=BORDER,radius=2)=>{
-  p.setLineWidth(.32);p.setDrawColor(...stroke);
-  if(fill)p.setFillColor(...fill);
-  p.roundedRect(bx,by,bw,bh,radius,radius,fill?"FD":"S");
+ if(!data.receiptNo||!data.workspace||!data.plan)
+  throw Error("Receipt identity and subscription details required");
+
+ const doc=new jsPDF({unit:"mm",format:"a5",orientation:"portrait",compress:true});
+ const txt=(value:string,x:number,y:number,size=8.5,bold=false,color=INK)=>{
+  doc.setFont("helvetica",bold?"bold":"normal");
+  doc.setFontSize(size);doc.setTextColor(...color);doc.text(clean(value),x,y);
  };
- const tx=(value:string,xp:number,yp:number,size=8.5,bold=false,color=BODY)=>{
-  p.setFont("helvetica",bold?"bold":"normal");p.setFontSize(size);p.setTextColor(...color);
-  p.text(clean(value,220),xp,yp);
+ const right=(value:string,x:number,y:number,size=8.5,bold=false,color=INK)=>{
+  doc.setFont("helvetica",bold?"bold":"normal");
+  doc.setFontSize(size);doc.setTextColor(...color);doc.text(clean(value),x,y,{align:"right"});
  };
- const rt=(value:string,xp:number,yp:number,size=8.5,bold=false,color=BODY)=>{
-  p.setFont("helvetica",bold?"bold":"normal");p.setFontSize(size);p.setTextColor(...color);
-  p.text(clean(value,220),xp,yp,{align:"right"});
+ const fitted=(value:string,x:number,y:number,maxWidth:number,size=8.5,bold=false,color=INK)=>{
+  const v=clean(value);
+  doc.setFont("helvetica",bold?"bold":"normal");
+  let current=size;doc.setFontSize(current);
+  while(doc.getTextWidth(v)>maxWidth&&current>6.1){current-=.2;doc.setFontSize(current);}
+  if(doc.getTextWidth(v)<=maxWidth){
+   doc.setTextColor(...color);doc.text(v,x,y,{align:"right"});
+  }else{
+   const pieces=doc.splitTextToSize(v,maxWidth) as string[];
+   right(pieces[0]||"",x,y,current,bold,color);
+   if(pieces[1])right(pieces[1],x,y+3.0,current-.3,bold,color);
+  }
  };
- const fitRight=(value:string,xp:number,yp:number,maxWidth:number,size=8.3,bold=false,color=BODY)=>{
-  const v=clean(value,125);
-  p.setFont("helvetica",bold?"bold":"normal");
-  let actual=size;p.setFontSize(actual);
-  while(actual>6.3&&p.getTextWidth(v)>maxWidth){actual-=.3;p.setFontSize(actual);}
-  if(p.getTextWidth(v)>maxWidth){
-   const parts=p.splitTextToSize(v,maxWidth) as string[];
-   rt(parts[0]||"",xp,yp,actual,bold,color);
-   if(parts[1])rt(parts[1],xp,yp+3.3,actual-.4,bold,color);
-  }else rt(v,xp,yp,actual,bold,color);
+ const wrapped=(value:string,x:number,y:number,maxWidth:number,size=8.5,bold=false,maxLines=2,color=INK)=>{
+  doc.setFont("helvetica",bold?"bold":"normal");
+  doc.setFontSize(size);doc.setTextColor(...color);
+  const lines=(doc.splitTextToSize(clean(value,360),maxWidth) as string[]).slice(0,maxLines);
+  doc.text(lines,x,y);return lines.length;
  };
- const wrapped=(value:string,xp:number,yp:number,maxWidth:number,size=8.6,bold=false,maxLines=2,color=BODY)=>{
-  p.setFont("helvetica",bold?"bold":"normal");p.setFontSize(size);p.setTextColor(...color);
-  const lines=(p.splitTextToSize(clean(value,300),maxWidth) as string[]).slice(0,maxLines);
-  p.text(lines,xp,yp);return lines.length;
+ const rule=(x1:number,y:number,x2:number)=>{
+  doc.setLineWidth(.24);doc.setDrawColor(...EDGE);doc.line(x1,y,x2,y);
  };
- const tag=(value:string,xp:number,yp:number)=>tx(value.toUpperCase(),xp,yp,7.1,true,MUTED);
+ const frame=(x:number,y:number,w:number,h:number,shade?:[number,number,number])=>{
+  doc.setLineWidth(.27);doc.setDrawColor(...EDGE);
+  if(shade){doc.setFillColor(...shade);doc.roundedRect(x,y,w,h,1.5,1.5,"FD");}
+  else doc.roundedRect(x,y,w,h,1.5,1.5,"S");
+ };
+ const label=(v:string,x:number,y:number)=>txt(v.toUpperCase(),x,y,6.5,true,SECONDARY);
 
- p.setFillColor(255,255,255);p.rect(0,0,210,297,"F");
- box(x,11,w,273,undefined,BORDER,3);
- p.setFillColor(...INDIGO);p.rect(x,11,w-25,2.1,"F");
- p.setFillColor(...OCHRE);p.rect(right-25,11,25,2.1,"F");
+ doc.setFillColor(255,255,255);doc.rect(0,0,148,210,"F");
+ frame(7,7,134,200);
+ doc.setFillColor(...INDIGO);doc.rect(7,7,107,1.6,"F");
+ doc.setFillColor(...OCHRE);doc.rect(114,7,27,1.6,"F");
 
- // Compact, original-brand letterhead: genuine AssetFlow360 mark and brand colours.
- p.addImage(new Uint8Array(approvedAssetFlowLogoPng()),"PNG",18,17.5,19.5,19.8,undefined,"FAST");
- tx("AssetFlow360",42,24.5,15.5,true,INDIGO);
- tx("FIXED ASSET MANAGEMENT",42,31.7,8.3,true,MUTED);
- rt(ISSUER,191,21.5,9.5,true,INDIGO);
- rt(SUPPORT_EMAIL,191,28.3,8.0,false,BODY);
- rt("Tel: "+SUPPORT_PHONE,191,34.3,8.0,false,BODY);
- rt(WEBSITE,191,40.3,7.9,false,MUTED);
- p.setDrawColor(...BORDER);p.line(18,44,192,44);
- tx("Asset Registration  |  Verification  |  Depreciation  |  Reporting  |  Asset Management",
-    18,49,7.8,false,INDIGO);
+ // Preserve the official AssetFlow360 mark and approved colours.
+ doc.addImage(new Uint8Array(approvedAssetFlowLogoPng()),"PNG",10,12,16,16,undefined,"FAST");
+ txt("AssetFlow360",29,19.4,11.8,true,INDIGO);
+ txt("FIXED ASSET MANAGEMENT",29,25.1,6.9,true,SECONDARY);
+ right(ISSUER,138,15.4,7.5,true,INDIGO);
+ right("info@assetflow360.com",138,21.1,6.9,false,INK);
+ right("Tel: +256 741 303496",138,26.5,6.9,false,INK);
+ right("www.assetflow360.com",138,31.9,6.8,false,SECONDARY);
+ rule(10,34.3,138);
+ txt("Asset Registration  |  Verification  |  Depreciation  |  Reporting",11,39.2,6.7,false,INDIGO);
 
- // Receipt heading with small ochre accent; no unfamiliar navy colour blocks.
- box(17,54.5,176,15,[255,255,255],BORDER,2);
- p.setFillColor(...OCHRE);p.roundedRect(17,54.5,2.9,15,1,1,"F");
- tx(data.paid?"OFFICIAL PAYMENT RECEIPT":"WORKSPACE ACTIVATION CONFIRMATION",
-    23,64.4,data.paid?13.1:11.7,true,INDIGO);
- box(160,57.5,30,9,data.paid?PALE:CREAM,data.paid?INDIGO:OCHRE,1.8);
- rt(data.paid?"PAID":"ADMIN GRANT",186,63.5,8.3,true,data.paid?INDIGO:OCHRE);
+ frame(9,43,130,13,PALE);
+ doc.setFillColor(...OCHRE);doc.rect(9,43,2.0,13,"F");
+ txt(data.paid?"OFFICIAL PAYMENT RECEIPT":"WORKSPACE ACTIVATION CONFIRMATION",
+     14,51.5,data.paid?10.2:8.9,true,INDIGO);
+ frame(115,46.1,21,6.7,data.paid?PALE:WARM);
+ right(data.paid?"PAID":"GRANT",132.5,50.7,7.5,true,data.paid?INDIGO:OCHRE);
 
- // Compact metadata strip.
- box(17,73,176,22,undefined,BORDER,2);
- p.setDrawColor(...BORDER);p.line(92,73,92,95);p.line(141,73,141,95);
- tag(data.paid?"Receipt no.":"Document no.",21,80);
- tx(data.receiptNo,21,89.5,10.6,true,INDIGO);
- tag("Issue date",96,80);tx(date(data.issuedAt??new Date()),96,89.5,9.2,true);
- tag("Renewal date",145,80);tx(date(data.expiresAt),145,89.5,9.2,true);
+ frame(9,59,130,18);
+ doc.setDrawColor(...EDGE);doc.line(62,59,62,77);doc.line(101,59,101,77);
+ label(data.paid?"Receipt number":"Document number",12,65.1);
+ txt(data.receiptNo,12,73.4,9.5,true,INDIGO);
+ label("Issued",65,65.1);txt(shortDate(data.issuedAt??new Date()),65,73.4,8.3,true);
+ label("Renewal",104,65.1);txt(shortDate(data.expiresAt),104,73.4,8.3,true);
 
- // Bill-from / bill-to pair with strong separation and tidy borders.
- box(17,99,85.5,26,undefined,BORDER,2);
- box(107.5,99,85.5,26,undefined,BORDER,2);
- p.setFillColor(...PALE);p.roundedRect(17.3,99.3,84.9,8,1.5,1.5,"F");
- p.roundedRect(107.8,99.3,84.9,8,1.5,1.5,"F");
- tag("ISSUED BY",21,105.2);tag("ISSUED TO",111.5,105.2);
- wrapped(ISSUER,21,114.5,75,10.0,true,2);
- wrapped(data.workspace,111.5,114.5,76,10.0,true,2);
- tx("AssetFlow360 subscription services",21,121,7.0,false,MUTED);
- tx("Customer / activated workspace",111.5,121,7.0,false,MUTED);
+ frame(9,80,63,24);frame(76,80,63,24);
+ doc.setFillColor(...PALE);
+ doc.roundedRect(9.25,80.25,62.5,7.3,1.1,1.1,"F");
+ doc.roundedRect(76.25,80.25,62.5,7.3,1.1,1.1,"F");
+ label("ISSUED BY",12,85.9);label("ISSUED TO",79,85.9);
+ wrapped(ISSUER,12,94.4,57,9.1,true,2);
+ wrapped(data.workspace,79,94.4,56,9.1,true,2);
 
- // One-line invoice table showing what was purchased and for what period.
- box(17,129,176,36,undefined,BORDER,2);
- p.setFillColor(...PALE);p.roundedRect(17.3,129.3,175.4,9.2,1.5,1.5,"F");
- p.setDrawColor(...BORDER);p.line(111,129,111,165);p.line(158,129,158,165);p.line(17,139,193,139);
- tag("SERVICE / DESCRIPTION",21,135.4);
- tag("SUBSCRIPTION PERIOD",115,135.4);
- tag(data.paid?"AMOUNT PAID":"PAYMENT",162,135.4);
- wrapped("AssetFlow360 - "+data.plan,21,147.2,86,9.3,true,2);
- tx("Subscription access and enabled modules",21,157.7,7.6,false,MUTED);
- tx(date(data.activatedAt),115,147.2,8.3,true);
- tx("to "+date(data.expiresAt),115,157,7.9,false,MUTED);
- fitRight(data.paid?money(Number(data.amount),data.currency):"No charge",189,151,28,10,true,INDIGO);
+ frame(9,107,130,27);
+ doc.setFillColor(...PALE);doc.roundedRect(9.25,107.25,129.5,8.0,1.0,1.0,"F");
+ doc.setDrawColor(...EDGE);doc.line(73,107,73,134);doc.line(110,107,110,134);
+ label("SERVICE / DESCRIPTION",12,112.8);
+ label("PERIOD",76,112.8);
+ label(data.paid?"PAID":"STATUS",113,112.8);
+ wrapped("AssetFlow360 - "+data.plan,12,122,58,8.2,true,2);
+ txt("Subscription and enabled services",12,130.1,6.6,false,SECONDARY);
+ txt(shortDate(data.activatedAt),76,122.1,7.8,true);
+ txt("to "+shortDate(data.expiresAt),76,129.8,7.5,false,SECONDARY);
+ fitted(data.paid?cash(Number(data.amount),data.currency):"No charge",136,124.4,24,8.8,true,INDIGO);
 
- // Two short, aligned information panels instead of oversized stacked sections.
- box(17,169,85.5,65,undefined,BORDER,2);
- box(107.5,169,85.5,65,undefined,BORDER,2);
- p.setFillColor(...PALE);p.roundedRect(17.3,169.3,84.9,9,1.5,1.5,"F");
- p.roundedRect(107.8,169.3,84.9,9,1.5,1.5,"F");
- tag("INCLUDED DELIVERABLES",21,175.4);
- tag("PAYMENT & DATES",111.5,175.4);
+ frame(9,137,63,41);frame(76,137,63,41);
+ doc.setFillColor(...PALE);
+ doc.roundedRect(9.25,137.25,62.5,7.6,1.0,1.0,"F");
+ doc.roundedRect(76.25,137.25,62.5,7.6,1.0,1.0,"F");
+ label("DELIVERABLES",12,143);label("PAYMENT DETAILS",79,143);
+ txt("Workspace",12,152.3,7.7);right("Included",69,152.3,7.4,true,INDIGO);rule(12,155.3,69);
+ txt("Users",12,161.2,7.7);fitted(data.users,69,161.2,26,7.7,true);rule(12,164.4,69);
+ txt("Asset capacity",12,170.0,7.7);fitted(data.assets,69,170.0,31,7.7,true);
+ const features=(data.features??[]).filter(v=>typeof v==="string"&&v.trim()).slice(0,2);
+ if(features.length)wrapped(features.map(v=>clean(v,30)).join(" | "),12,175.1,56,6.1,false,1,SECONDARY);
 
- const line=(l:number,y:number,r:number)=>{p.setDrawColor(...BORDER);p.setLineWidth(.2);p.line(l,y,r,y);};
- tx("Workspace access",21,187,8.3);rt("Included",98,187,8.2,true,INDIGO);line(21,190,99);
- tx("User allowance",21,198.5,8.3);fitRight(data.users,98,198.5,30,8.4,true);line(21,201.2,99);
- tx("Asset capacity",21,210,8.3);fitRight(data.assets,98,210,34,8.4,true);line(21,212.7,99);
- tag("Plan features",21,220);
- const features=(data.features??[]).filter(v=>typeof v==="string"&&v.trim()).slice(0,3);
- const featuresText=features.length?features.map(v=>clean(v,36)).join("; "):"Modules included in your active package";
- wrapped(featuresText,21,226,76,7.4,false,2,MUTED);
+ txt("Method",79,152.3,7.5,false,SECONDARY);
+ fitted(data.method,136,152.3,36,7.7,true);rule(79,155.3,136);
+ txt("Reference",79,161.2,7.5,false,SECONDARY);
+ const ref=data.paid?(data.paymentReference||"Confirmed payment"):"Not applicable";
+ wrapped(ref,79,169.1,56,6.5,true,2,INK);
 
- tx("Method",111.5,187,8.1,false,MUTED);
- fitRight(data.method,189,187,47,8.5,true);line(111.5,190,189);
- tx("Payment ref.",111.5,198.5,8.1,false,MUTED);
- fitRight(data.paid?(data.paymentReference||"Confirmed payment"):"Not applicable",189,198.5,49,8.0,true);line(111.5,201.2,189);
- tx("Activation",111.5,210,8.1,false,MUTED);
- rt(date(data.activatedAt),189,210,8.5,true);line(111.5,212.7,189);
- tx("Renewal",111.5,221.5,8.1,false,MUTED);
- rt(date(data.expiresAt),189,221.5,8.5,true);
+ frame(9,181,130,13,WARM);
+ doc.setFillColor(...OCHRE);doc.rect(9,181,2,13,"F");
+ txt(data.paid?"TOTAL PAID":"PAYMENT STATUS",14,189.4,8.8,true,INDIGO);
+ fitted(data.paid?cash(Number(data.amount),data.currency):"NO PAYMENT RECORDED",
+      135,189.5,64,data.paid?11.5:9.0,true,INDIGO);
 
- box(17,239,176,19,CREAM,BORDER,2);
- p.setFillColor(...OCHRE);p.roundedRect(17.3,239.3,2.9,18.3,1,1,"F");
- tx(data.paid?"TOTAL PAYMENT RECEIVED":"PAYMENT STATUS",24,250.9,10.4,true,INDIGO);
- fitRight(data.paid?money(Number(data.amount),data.currency):"NO PAYMENT RECORDED",
-   188,251,76,data.paid?13.2:10.0,true,INDIGO);
+ rule(11,197.3,137);
+ txt(data.paid?"Payment recorded for the subscription above.":"Administrator-granted access; no payment certified.",
+    11,201,6.6,false,SECONDARY);
+ right("Issued by "+ISSUER,137,205.2,6.7,false,SECONDARY);
 
- tx(data.paid?"Payment recorded against the subscription shown above.":
-    "An administrator activated this workspace; no payment is certified by this document.",
-    19,265.2,7.5,false,MUTED);
- line(19,270,191);
- tx("Thank you for choosing AssetFlow360.",19,278.2,8.6,true,INDIGO);
- rt("Issued electronically by "+ISSUER,191,278.2,7.4,false,MUTED);
-
- const result=Buffer.from(p.output("arraybuffer"));
- if(!result.subarray(0,4).equals(Buffer.from("%PDF"))||result.length>512*1024)
-  throw Error("AssetFlow360 receipt PDF generation failed");
- return result;
+ const pdf=Buffer.from(doc.output("arraybuffer"));
+ if(!pdf.subarray(0,4).equals(Buffer.from("%PDF"))||pdf.length>512*1024)
+  throw Error("Compact receipt PDF generation failed");
+ return pdf;
 }
