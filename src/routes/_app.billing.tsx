@@ -36,7 +36,7 @@ function money(amount: number, currency: string) {
 
 function BillingPage() {
   const {section}=Route.useSearch();
-  const { isTenantAdmin, subscriptionStatus, tenantName, trialEndsAt } = useAuth();
+  const { isTenantAdmin, isSaasAdmin, supportMode, tenantId, subscriptionStatus, tenantName, trialEndsAt } = useAuth();
   const qc = useQueryClient();
   const getCtx = useServerFn(getSaasContext);
   const getHistory=useServerFn(getTenantPaymentHistory);
@@ -75,9 +75,9 @@ function BillingPage() {
   const [addonTransaction, setAddonTransaction] = useState<string | null>(null);
   const [addonKey, setAddonKey] = useState<string | null>(null);
 
-  const {data:paymentHistory=[],isLoading:historyLoading}=useQuery({
-    queryKey:["tenant-payment-history"],queryFn:async()=>getHistory({headers:await getServerAuthHeaders()}),
-    enabled:section==="history"&&isTenantAdmin,
+  const {data:paymentHistory=[],isLoading:historyLoading,isError:historyError,refetch:refreshHistory}=useQuery({
+    queryKey:["tenant-payment-history",tenantId],queryFn:async()=>getHistory({headers:await getServerAuthHeaders()}),
+    enabled:section==="history"&&Boolean(tenantId)&&(isTenantAdmin||(isSaasAdmin&&supportMode)),
     staleTime:10000,
   });
   const { data: ctx, refetch } = useQuery({
@@ -142,23 +142,53 @@ function BillingPage() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
+    <div className={`mx-auto w-full space-y-4 ${section==="history"?"max-w-5xl":"max-w-3xl"}`}>
       <div><h1 className="text-xl font-bold tracking-tight sm:text-2xl">{section==="history"?"Payments & receipts":section==="addons"?"Add-ons":"Subscription & billing"}</h1>
        <p className="mt-1 text-xs text-muted-foreground">{tenantName || "Workspace"}</p></div>
 
 
-      {section==="history"&&<Card className="space-y-3 p-4"><div><h2 className="font-semibold">Payment history</h2><p className="text-xs text-muted-foreground">Confirmed payments, activation receipts and other billing transactions recorded for your workspace.</p></div>
-       {historyLoading?<p className="text-sm">Loading payments…</p>:!paymentHistory.length?<p className="text-sm text-muted-foreground">No payments recorded yet.</p>:
-       <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="border-b bg-muted/30"><tr><th className="px-3 py-2">Date</th><th className="px-3 py-2">Purchase</th><th className="px-3 py-2">Amount</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Reference</th><th className="px-3 py-2">Receipt</th></tr></thead><tbody>
-       {paymentHistory.map((tx:any)=><tr key={tx.id} className="border-b"><td className="whitespace-nowrap px-3 py-3">{new Date(tx.created_at).toLocaleDateString()}</td><td className="px-3 py-3">{tx.type}</td><td className="whitespace-nowrap px-3 py-3">{tx.amount===null?"See receipt":money(Number(tx.amount),tx.currency||"UGX")}</td><td className="px-3 py-3 capitalize">{tx.status}</td><td className="px-3 py-3 font-mono text-xs">{tx.provider_reference||"—"}</td>
-          <td className="px-3 py-3">{tx.receipt_id?
-            <Button type="button" size="sm" variant="outline" disabled={Boolean(receiptBusy)}
-              onClick={()=>void downloadReceipt(tx.receipt_id)}>
-              {receiptBusy===tx.receipt_id?"Opening…":"Download PDF"}
-            </Button>:"—"}</td>
-          </tr>)}
-       </tbody></table></div>}
-       <p className="text-xs text-muted-foreground">Formal invoices, where issued, should use the business's approved invoicing process. This page does not manufacture invoice numbers or tax documents.</p>
+      {section==="history"&&<Card className="space-y-3 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+           <h2 className="font-semibold">Payment and activation history</h2>
+           <p className="text-xs text-muted-foreground">Completed gateway transactions and administrator-recorded activations remain in your workspace records.</p>
+          </div>
+          <Button type="button" size="sm" variant="outline" disabled={historyLoading}
+            onClick={()=>void refreshHistory()}>Refresh history</Button>
+        </div>
+        {historyLoading?<p role="status" className="text-sm text-muted-foreground">Loading your billing records…</p>:
+         historyError?<p role="alert" className="text-sm text-destructive">Billing history could not be loaded. Please retry; no records have been deleted.</p>:
+         !paymentHistory.length?<p className="text-sm text-muted-foreground">No payment or activation records have been recorded for this workspace.</p>:
+         <div className="overflow-x-auto rounded-lg border">
+           <table className="w-full min-w-[850px] text-left text-sm">
+             <thead className="border-b bg-muted/30"><tr>
+              <th className="px-3 py-2">Date</th>
+              <th className="px-3 py-2">Description</th>
+              <th className="px-3 py-2">Amount</th>
+              <th className="px-3 py-2">Method</th>
+              <th className="px-3 py-2">Status</th>
+              <th className="px-3 py-2">Receipt / reference</th>
+              <th className="px-3 py-2 text-right">Document</th>
+             </tr></thead>
+             <tbody>{paymentHistory.map((tx:any)=><tr key={tx.id} className="border-b last:border-0">
+              <td className="whitespace-nowrap px-3 py-3 text-xs">{new Date(tx.created_at).toLocaleDateString("en-UG",{day:"2-digit",month:"short",year:"numeric"})}</td>
+              <td className="px-3 py-3 font-medium">{tx.type}</td>
+              <td className="whitespace-nowrap px-3 py-3 font-semibold">{tx.amount===null?"—":money(Number(tx.amount),tx.currency||"UGX")}</td>
+              <td className="px-3 py-3 text-xs">{tx.payment_channel||"—"}</td>
+              <td className="px-3 py-3 text-xs capitalize">{tx.status}</td>
+              <td className="px-3 py-3">
+               {tx.receipt_no&&<div className="font-mono text-xs font-semibold">{tx.receipt_no}</div>}
+               {tx.provider_reference&&<div className="max-w-[220px] break-all font-mono text-[11px] text-muted-foreground">{tx.provider_reference}</div>}
+              </td>
+              <td className="px-3 py-3 text-right">{tx.receipt_id?
+               <Button type="button" size="sm" variant="outline" disabled={Boolean(receiptBusy)}
+                onClick={()=>void downloadReceipt(tx.receipt_id)}>
+                {receiptBusy===tx.receipt_id?"Opening…":"Download PDF"}
+               </Button>:"—"}</td>
+             </tr>)}</tbody>
+           </table>
+         </div>}
+        <p className="text-xs text-muted-foreground">Manual bank or cash payments are recorded as administrator-confirmed, not as gateway-verified PesaPal transactions. Activations without payment are shown separately and are not counted as income.</p>
       </Card>}
       {section==="seats"&&<Card className="space-y-4 border-primary/20 p-4">
         <div><h2 className="text-lg font-semibold">Team seats</h2><p className="text-xs text-muted-foreground">Available seats: {totalSeats}</p></div>
