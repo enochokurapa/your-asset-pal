@@ -356,52 +356,105 @@ export const getSaasContext = createServerFn({ method: "GET" })
     };
   });
 
-/** Historical payment records, scoped strictly to the requesting business. */
+/**
+ * Only these read-only billing endpoints may use a verified Business Support
+ * session. The authentication middleware has already checked ownership,
+ * expiration and SaaS-admin status for context.supportTenantId.
+ * Checkout and plan modification continue to require a real tenant admin.
+ */
+async function billingReadTenant(context:{userId:string;supportTenantId?:string|null}){
+ if(context.supportTenantId){
+  const viewer=await getProfile(context.userId);
+  if(!viewer.is_saas_admin||!viewer.is_active)
+   throw Error("Business support access is not authorized");
+  return context.supportTenantId;
+ }
+ return (await assertTenantAdmin(context.userId)).tenant_id as string;
+}
+
+type BillingReceiptRow={
+ id:string;event_key:string;created_at:string;
+ attachment_name:string|null;body:string|null;
+};
+
+/**
+ * Receipt campaigns preserve an immutable snapshot of manually confirmed
+ * payments, which are deliberately NOT represented as PesaPal/Yo transactions.
+ * Avoid double-counting payment-activation receipts that correspond to a
+ * real billing transaction and ignore separate SaaS Admin email copies.
+ */
 export const getTenantPaymentHistory=createServerFn({method:"GET"})
  .middleware([requireSupabaseAuth])
  .handler(async({context})=>{
-  const p=await assertTenantAdmin(context.userId);
+  const tenantId=await billingReadTenant(context);
   const [plans,seats,capacity,receipts]=await Promise.all([
-   admin.from("billing_transactions").select("id,amount,currency,status,created_at,provider_reference,module_key").eq("tenant_id",p.tenant_id).order("created_at",{ascending:false}).limit(200),
-   admin.from("seat_purchase_transactions").select("id,amount,currency,status,created_at,provider_reference").eq("tenant_id",p.tenant_id).order("created_at",{ascending:false}).limit(200),
-   admin.from("asset_capacity_purchases").select("id,amount,currency,status,created_at,provider_reference").eq("tenant_id",p.tenant_id).order("created_at",{ascending:false}).limit(200),
-   admin.from("platform_operations_campaigns")
-    .select("id,event_key,created_at,attachment_name,attachment_mime").eq("tenant_id",p.tenant_id)
-    .eq("scope","activation").eq("attachment_mime","application/pdf")
-    .order("created_at",{ascending:false}).limit(200),
+   admin.from("billing_transactions").select("id,amount,currency,status,created_at,provider,provider_reference,module_key").eq("tenant_id",tenantId).order("created_at",{ascending:false}).limit(200),
+   admin.from("seat_purchase_transactions").select("id,amount,currency,status,created_at,provider_reference").eq("tenant_id",tenantId).order("created_at",{ascending:false}).limit(200),
+   admin.from("asset_capacity_purchases").select("id,amount,currency,status,created_at,provider_reference").eq("tenant_id",tenantId).order("created_at",{ascending:false}).limit(200),
+   queryPostgres<BillingReceiptRow>(`
+    SELECT id::text,event_key,created_at::text,attachment_name,body
+    FROM public.platform_operations_campaigns
+    WHERE tenant_id=$1 AND scope='activation'
+      AND event_key NOT LIKE '%:saas-admin-copy'
+      AND event_key NOT LIKE 'activation-name-correction:%'
+    ORDER BY created_at DESC LIMIT 200`,[tenantId]),
   ]);
-  for(const result of [plans,seats,capacity,receipts])if(result.error)throw Error("Payment history unavailable");
-  const rows=[
-   ...(plans.data||[]).map((tx:any)=>({...tx,type:tx.module_key?"Add-on · "+tx.module_key:"Subscription"})),
-   ...(seats.data||[]).map((tx:any)=>({...tx,type:"Additional user seats"})),
-   ...(capacity.data||[]).map((tx:any)=>({...tx,type:"Additional asset capacity"})),
-   ...(receipts.data||[]).map((tx:any)=>({
-     id:tx.id,created_at:tx.created_at,
-     type:tx.attachment_name?.includes("Receipt")?"Administrator-confirmed payment":"Workspace activation",
-     status:"confirmed",currency:null,amount:null,
-     provider_reference:tx.event_key?.split(":").slice(1).join(":")||tx.id,
-     receipt_id:tx.id,receipt_name:tx.attachment_name,
-   })),
+  for(const result of [plans,seats,capacity])if(result.error)
+   throw Error("Payment history unavailable: "+result.error.message);
+  const rows:any[]=[
+   ...(plans.data||[]).map((tx:any)=>({...tx,type:tx.module_key?"Add-on · "+tx.module_key:"Subscription",payment_channel:tx.provider||"Online payment",receipt_id:null as string|null,receipt_no:null as string|null})),
+   ...(seats.data||[]).map((tx:any)=>({...tx,type:"Additional user seats",payment_channel:"Online payment",receipt_id:null as string|null,receipt_no:null as string|null})),
+   ...(capacity.data||[]).map((tx:any)=>({...tx,type:"Additional asset capacity",payment_channel:"Online payment",receipt_id:null as string|null,receipt_no:null as string|null})),
   ];
+  const paymentRecords=new Map<string,any>((plans.data||[]).map((tx:any)=>[String(tx.id),rows.find(r=>r.id===tx.id)]));
+  for(const receipt of receipts){
+   const key=receipt.event_key||"";
+   const hasPdf=receipt.attachment_name?.toLowerCase().endsWith(".pdf")??false;
+   const receiptNo=receipt.attachment_name?.match(/AF\d{12,}/)?.[0]||null;
+   if(key.startsWith("payment-activation:")){
+    const matching=paymentRecords.get(key.slice("payment-activation:".length));
+    if(matching){
+     if(hasPdf){matching.receipt_id=receipt.id;matching.receipt_no=receiptNo;}
+     continue;
+    }
+    // An older verified gateway transaction may have been trimmed from the
+    // 200-row query. Preserve the archived receipt without inventing a value.
+   }
+   const body=(receipt.body||"").replace(/\\r\\n|\\n/g,"\n");
+   const amountLine=body.match(/(?:Amount paid|Payment received):\s*([A-Z]{3})\s*([\d,]+(?:\.\d{1,2})?)/i);
+   const methodLine=body.match(/(?:Payment method|Method):\s*([^\n\r]+)/i);
+   const method=methodLine?.[1]?.trim()||"Not specified";
+   const amount=amountLine?Number(amountLine[2].replace(/,/g,"")):null;
+   const paid=Boolean(amountLine&&Number.isFinite(amount)&&Number(amount)>0&&hasPdf);
+   const legacy=key.startsWith("payment-activation:");
+   rows.push({
+    id:receipt.id,created_at:receipt.created_at,
+    type:paid?"Manual subscription payment":legacy?"Historical payment receipt":"Workspace activation",
+    status:paid?"confirmed manually":legacy?"recorded":"recorded",
+    amount:paid?amount:null,currency:paid?amountLine?.[1].toUpperCase():null,
+    payment_channel:paid?method:legacy?"Gateway payment":"No payment recorded",
+    provider_reference:key.split(":").slice(1).join(":")||receipt.id,
+    receipt_id:hasPdf?receipt.id:null,receipt_no:receiptNo,
+   });
+  }
   return rows.sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,300);
  });
 
-/** Retrieve only the signed-in organisation's immutable activation PDF. */
+/** Retrieve one immutable PDF belonging to the verified business workspace. */
 export const getTenantActivationReceipt=createServerFn({method:"POST"})
  .middleware([requireSupabaseAuth])
  .inputValidator((raw)=>z.object({receiptId:z.string().uuid()}).parse(raw))
  .handler(async({data,context})=>{
-   const profile=await assertTenantAdmin(context.userId);
-   const {data:document,error}=await admin.from("platform_operations_campaigns")
-     .select("attachment_name,attachment_mime,attachment_data")
-     .eq("tenant_id",profile.tenant_id).eq("id",data.receiptId).eq("scope","activation")
-     .eq("attachment_mime","application/pdf").single();
-   if(error||!document||!document.attachment_data)throw new Error("Receipt unavailable");
-   const raw=document.attachment_data;
-   const buffer=typeof raw==="string"?
-     Buffer.from(raw.startsWith("\\x")?raw.slice(2):raw,"hex"):Buffer.from(raw);
+   const tenantId=await billingReadTenant(context);
+   const document=(await queryPostgres<{attachment_name:string|null;attachment_data:Buffer|null}>(
+    `SELECT attachment_name,attachment_data FROM public.platform_operations_campaigns
+      WHERE id=$1 AND tenant_id=$2 AND scope='activation'
+      AND attachment_mime='application/pdf' AND attachment_data IS NOT NULL`,
+    [data.receiptId,tenantId]))[0];
+   if(!document?.attachment_data)throw Error("Receipt unavailable");
+   const buffer=Buffer.from(document.attachment_data);
    if(buffer.subarray(0,4).toString()!=="%PDF"||buffer.length>2_000_000)
-     throw new Error("Receipt unavailable");
+    throw Error("Receipt unavailable");
    return {name:String(document.attachment_name||"AssetFlow360-receipt.pdf").replace(/[^a-zA-Z0-9._-]/g,"_"),
       base64:buffer.toString("base64")};
  });
