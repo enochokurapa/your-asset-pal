@@ -369,7 +369,10 @@ export function AuditTrailView({ initialQ, initialEntity, showHeader = true }: A
 
   const clearAll = async () => {
     if (!confirm("Archive all currently visible audit entries? Audit history is preserved.")) return;
-    const ids = filtered.map((r: any) => r.id);
+    // Authentication records are sourced from the protected GoTrue audit and
+    // cannot be archived or deleted by tenant users.
+    const ids = filtered.map((r: any) => r.id).filter((id:string)=>UUID_RE.test(id));
+    if(!ids.length){toast.info("Protected security events cannot be archived");return;}
     const { error } = await supabase.from("audit_log").update({ cleared_at: new Date().toISOString() }).in("id", ids);
     if (error) { toast.error(error.message); return; }
     toast.success(`Archived ${ids.length} entries`);
