@@ -95,10 +95,6 @@ export async function queueTenantActivationNotice(
  const eventKey=source.type==="payment"?"payment-activation:"+source.transactionId:"admin-activation:"+source.eventId;
  // A DB sequence guarantees unique cumulative numbers across concurrent activations.
  // Retrying the same activation returns its original number.
- const numbered=(await queryPostgres<{receipt_no:string;issued_at:string}>(
-  "SELECT receipt_no,issued_at FROM public.assetflow_issue_receipt_no($1)",[eventKey]))[0];
- if(!numbered)throw Error("Unable to issue a sequential receipt number");
- const receiptNo=numbered.receipt_no;
  let method=t.last_manual_activation_method==="admin_grant"?"Administrator grant":
    t.last_manual_activation_method==="cash"?"Cash":
    t.last_manual_activation_method==="bank_transfer"?"Bank transfer":
@@ -119,6 +115,10 @@ export async function queueTenantActivationNotice(
  const planLabel=t.plan_code==="paid"?"Paid Subscription":
    t.plan_code==="starter"?"Starter":t.plan_code==="business"?"Business":
    t.plan_code==="enterprise"?"Enterprise":t.plan_code;
+ const numbered=(await queryPostgres<{receipt_no:string;issued_at:string}>(
+  "SELECT receipt_no,issued_at FROM public.assetflow_issue_receipt_no($1)",[eventKey]))[0];
+ if(!numbered)throw Error("Unable to issue a sequential receipt number");
+ const receiptNo=numbered.receipt_no;
  const subject="AssetFlow360 | Subscription activated | "+t.name;
  const startDate=new Date(t.subscription_started_at||Date.now()).toLocaleDateString("en-GB",{timeZone:"Africa/Kampala"});
  const renewalDate=new Date(t.subscription_ends_at).toLocaleDateString("en-GB",{timeZone:"Africa/Kampala"});
