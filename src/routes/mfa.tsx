@@ -142,7 +142,6 @@ function MfaChallenge(){
  useEffect(()=>{
   if(!linkToken||!resolved||!session?.access_token)return;
   const token=linkToken;
-  setLinkToken("");
   let active=true;
   (async()=>{
    setBusy(true);setError("");
