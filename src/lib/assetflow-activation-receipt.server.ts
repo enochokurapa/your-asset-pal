@@ -157,7 +157,7 @@ export function createAssetFlowActivationReceipt(data:ActivationReceipt):Buffer 
  pdf.addImage(new Uint8Array(approvedAssetFlowLogoPng()),"PNG",11,10,22,22,undefined,"FAST");
  txt("AssetFlow",35.5,20.0,19.2,true,PURPLE_DARK);
  pdf.setFont("helvetica","bold");pdf.setFontSize(19.2);
- const wordWidth=pdf.getTextWidth("AssetFlow")/2.834645669;
+ const wordWidth=pdf.getTextWidth("AssetFlow");
  txt("360",35.5+wordWidth+.7,20.0,19.2,true,ORANGE);
  txt("FIXED ASSET MANAGEMENT",36,27.2,8.7,true,INK);
  line(106,9.2,106,33,PURPLE,.35);
@@ -256,7 +256,7 @@ export function createAssetFlowActivationReceipt(data:ActivationReceipt):Buffer 
   if(i===1){
    txt(label+":",13.4,y,8.3);
    // Two lines, so UUID-sized payment references remain fully legible.
-   const labelWidth=pdf.getTextWidth(label+":")/2.834645669;
+   const labelWidth=pdf.getTextWidth(label+":");
    const maxW=Math.max(40,88-(13.4+labelWidth+1.5));
    pdf.setFont("helvetica","bold");pdf.setFontSize(7.5);
    const refs=pdf.splitTextToSize(clear(value,135),maxW) as string[];
