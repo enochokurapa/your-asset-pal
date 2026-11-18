@@ -508,6 +508,8 @@ export const updateTenantSubscription = createServerFn({ method: "POST" })
   if(data.status==="active"&&(!data.period||!data.reason||data.paid_user_limit===undefined||data.paid_asset_limit===undefined||!data.payment_method))
    throw Error("Select duration, user/asset limits, payment method, and audit reason before activation");
   if(data.period==="custom_days"&&!data.duration_days)throw Error("Number of days is required");
+  if(data.status==="active"&&data.payment_method==="admin_grant"&&data.amount_received_ugx&&data.amount_received_ugx>0)
+   throw Error("An administrator grant cannot be issued as a paid receipt. Select a verified payment method.");
   if(data.status==="active"&&data.payment_method!=="admin_grant"&&
     !(data.amount_received_ugx!==undefined&&data.amount_received_ugx>0))
     throw Error("Enter the confirmed amount received before issuing a cash or external-payment receipt");

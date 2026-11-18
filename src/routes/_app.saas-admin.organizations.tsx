@@ -208,7 +208,7 @@ function SaasAdminOrganizationsPage() {
           paid_user_limit:status==="active"?Number(activationUsers):undefined,
           paid_asset_limit:status==="active"?Number(activationAssets):undefined,
           payment_method:status==="active"?activationMethod:undefined,
-          amount_received_ugx:status==="active"&&activationAmount.trim()?Number(activationAmount):undefined,
+          amount_received_ugx:status==="active"&&activationMethod!=="admin_grant"&&activationAmount.trim()?Number(activationAmount):undefined,
           reason:status==="active"?activationReason:undefined,
         },
       });
@@ -374,7 +374,7 @@ function SaasAdminOrganizationsPage() {
                   {tenant.effective_status==="active"&&
                     <Button type="button" className="ml-2 mt-3" variant="outline" disabled={reissuingDocument}
                       onClick={()=>void reissueDocument()}>
-                      {reissuingDocument?"Queueing…":"Resend activation receipt"}
+                      {reissuingDocument?"Queueing…":"Resend activation document"}
                     </Button>}
                 </div>
                 <div className="w-full sm:w-52 space-y-2"><label className="block text-xs font-medium">Assigned paid package</label><Select value={["starter","business","enterprise"].includes(tenant.plan_code)?tenant.plan_code:"legacy"} disabled={tenant.effective_status!=="active"} onValueChange={v=>setNamedPlan(v==="legacy"?"paid":v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="legacy">Legacy paid plan</SelectItem><SelectItem value="starter">Starter</SelectItem><SelectItem value="business">Business</SelectItem><SelectItem value="enterprise">Enterprise</SelectItem></SelectContent></Select><p className="text-xs text-muted-foreground">SaaS Admin sets the package without changing the subscription expiry.</p></div><div className="w-full sm:w-52 space-y-2">
@@ -393,14 +393,16 @@ function SaasAdminOrganizationsPage() {
                   <Input type="number" min={-1} value={activationAssets} onChange={e=>setActivationAssets(e.target.value)}/>
                   <label className="block text-xs font-medium">Payment method</label>
                   <select className="h-10 w-full rounded-md border bg-background px-2" value={activationMethod}
-                    onChange={e=>setActivationMethod(e.target.value as typeof activationMethod)}>
+                    onChange={e=>{const chosen=e.target.value as typeof activationMethod;setActivationMethod(chosen);if(chosen==="admin_grant")setActivationAmount("");}}>
                     <option value="cash">Cash received</option><option value="bank_transfer">Bank transfer</option>
                     <option value="external_mobile_money">Mobile money outside platform</option>
                     <option value="admin_grant">Administrator-approved (no payment)</option>
                   </select>
-                  <label className="block text-xs font-medium">Amount collected outside AssetFlow (UGX)</label>
-                  <Input type="number" min={0} value={activationAmount} placeholder="Optional verified amount"
-                    onChange={e=>setActivationAmount(e.target.value)}/>
+                  {activationMethod==="admin_grant"?
+                    <p className="text-xs text-muted-foreground">No payment is recorded. An activation confirmation will be issued, not a payment receipt.</p>:
+                    <><label className="block text-xs font-medium">Verified amount received (UGX)</label>
+                      <Input type="number" min={1} value={activationAmount} placeholder="Required amount paid"
+                        onChange={e=>setActivationAmount(e.target.value)}/></>}
                   <label className="block text-xs font-medium">Reason for manual activation</label>
                   <Input aria-label="Manual activation reason" value={activationReason} maxLength={500}
                     onChange={e=>setActivationReason(e.target.value)} placeholder="Reason for administrator activation"/>

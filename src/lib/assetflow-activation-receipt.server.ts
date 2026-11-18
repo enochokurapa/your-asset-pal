@@ -4,80 +4,93 @@ import {approvedAssetFlowLogoPng} from "./assetflow-branding.server";
 export type ActivationReceipt={
  receiptNo:string;workspace:string;plan:string;activatedAt:Date;expiresAt:Date;
  users:string;assets:string;method:string;amount:number|null;currency:string;
- paymentReference:string|null;paid:boolean;
+ paymentReference:string|null;paid:boolean;issuedAt?:Date;features?:string[];
 };
-const clean=(v:string,max=170)=>String(v||"").replace(/[\r\n\x00-\x1f]/g," ").trim().slice(0,max);
+const issuer="OWLTECH Solutions Ltd.";
+const clean=(v:string,max=180)=>String(v||"").replace(/[\r\n\x00-\x1f]/g," ").trim().slice(0,max);
 const formatDate=(v:Date)=>new Intl.DateTimeFormat("en-GB",{day:"2-digit",month:"short",year:"numeric",timeZone:"Africa/Kampala"}).format(v);
-const money=(v:number,currency:string)=>clean(currency,6)+" "+v.toLocaleString("en-UG",{minimumFractionDigits:0,maximumFractionDigits:2});
-export function createAssetFlowActivationReceipt(data:ActivationReceipt):Buffer{
+const money=(v:number,currency:string)=>clean(currency,8)+" "+v.toLocaleString("en-UG",{minimumFractionDigits:0,maximumFractionDigits:2});
+
+export function createAssetFlowActivationReceipt(data:ActivationReceipt):Buffer {
  if(data.paid&&(!Number.isFinite(data.amount)||data.amount===null||data.amount<=0))
   throw Error("A payment receipt requires a verified positive payment amount");
- const p=new jsPDF({unit:"mm",format:"a5",orientation:"portrait",compress:true});
- const blue:[number,number,number]=[33,55,145],dark:[number,number,number]=[25,40,70],
-  muted:[number,number,number]=[83,100,120],border:[number,number,number]=[211,219,231];
- const X=13,W=122,R=135;
- const line=(y:number)=>{p.setDrawColor(...border);p.setLineWidth(.24);p.line(X,y,R,y);};
- const txt=(value:string,x:number,y:number,size=8,bold=false,color=dark)=>{
-  p.setTextColor(...color);p.setFont("helvetica",bold?"bold":"normal");p.setFontSize(size);
-  p.text(clean(value),x,y);
+ if(!data.receiptNo||!data.workspace||!data.plan)throw Error("Receipt identity and subscription details required");
+ const p=new jsPDF({unit:"mm",format:"a4",orientation:"portrait",compress:true});
+ const indigo:[number,number,number]=[40,55,158],
+       dark:[number,number,number]=[23,37,63],
+       muted:[number,number,number]=[91,107,126],
+       border:[number,number,number]=[213,221,232];
+ const left=19,right=191,width=right-left;
+ const line=(y:number)=>{p.setDrawColor(...border);p.setLineWidth(.26);p.line(left,y,right,y)};
+ const text=(v:string,x:number,y:number,size=9,bold=false,color=dark)=>{
+  p.setFont("helvetica",bold?"bold":"normal");p.setFontSize(size);p.setTextColor(...color);
+  p.text(clean(v),x,y);
  };
- const right=(value:string,y:number,size=8,bold=false,x=R)=>{
-  p.setTextColor(...dark);p.setFont("helvetica",bold?"bold":"normal");p.setFontSize(size);
-  p.text(clean(value),x,y,{align:"right"});
+ const rightText=(v:string,y:number,x=right,size=9,bold=false,color=dark)=>{
+  p.setFont("helvetica",bold?"bold":"normal");p.setFontSize(size);p.setTextColor(...color);
+  p.text(clean(v),x,y,{align:"right"});
  };
- const label=(value:string,x:number,y:number)=>txt(value.toUpperCase(),x,y,6.6,true,muted);
- // White print-friendly document, single restrained brand accent and proper borders.
- p.setFillColor(255,255,255);p.rect(0,0,148,210,"F");
- p.setDrawColor(...border);p.setLineWidth(.35);p.rect(8,8,132,194,"S");
- p.setFillColor(...blue);p.rect(8,8,132,2.1,"F");
- const logo=approvedAssetFlowLogoPng();
- p.addImage(new Uint8Array(logo),"PNG",13,13.5,18,18,undefined,"FAST");
- txt("ASSETFLOW360",36,19.5,12,true,blue);
- txt("ASSETFLOW OPERATIONS",36,25,7.3,true,muted);
- txt("assetflow360.com  |  assetflow360.com/contact",36,30,6.4,false,muted);
- line(36);
- txt(data.paid?"OFFICIAL PAYMENT RECEIPT":"WORKSPACE ACTIVATION CONFIRMATION",X,44,12,true,dark);
- label("Receipt / document no.",X,50);
- txt(clean(data.receiptNo,48),X,55,7.5,true);
- label("Date issued",90,50);right(formatDate(new Date()),55,8,true);
- line(60);
- label("Issued by",X,67);txt("AssetFlow360 Operations",X,72,8.4,true);
- txt("AROSOFT Innovations Ltd",X,77,7.1,false,muted);
- label("Issued to",78,67);
- const org=p.splitTextToSize(clean(data.workspace,100),55);
- p.setFont("helvetica","bold");p.setFontSize(8.3);p.setTextColor(...dark);p.text(org.slice(0,2),78,72);
- line(85);
- p.setFillColor(240,244,249);p.rect(X,89,W,8,"F");
- label("SERVICE / SUBSCRIPTION",16,94);
- label("PERIOD",86,94);
- label("AMOUNT",115,94);
- txt(clean(data.plan,48),16,103,8.6,true);
- txt(formatDate(data.activatedAt)+" –",86,102,6.9);
- txt(formatDate(data.expiresAt),86,106,6.9);
- right(data.paid?money(Number(data.amount),data.currency):"—",104,8.2,true);
- line(111);
- label("PAYMENT AND SUBSCRIPTION DETAILS",X,119);
- const row=(y:number,key:string,value:string)=>{
-  txt(key,X+2,y,7.9,false,muted);
-  const truncated=clean(value,88);
-  const split=p.splitTextToSize(truncated,74);
-  p.setTextColor(...dark);p.setFont("helvetica","bold");p.setFontSize(8.1);
-  p.text(split.slice(0,2),R-2,y,{align:"right"});
+ const label=(v:string,x:number,y:number)=>text(v.toUpperCase(),x,y,7.4,true,muted);
+ const wrap=(v:string,x:number,y:number,maxWidth:number,size=9,bold=false,maxLines=3,color=dark)=>{
+  p.setFont("helvetica",bold?"bold":"normal");p.setFontSize(size);p.setTextColor(...color);
+  const lines=p.splitTextToSize(clean(v,400),maxWidth).slice(0,maxLines) as string[];
+  p.text(lines,x,y);return y+(lines.length-1)*size*.43;
  };
- row(126,"Payment method",data.paid?data.method:"Not applicable");
- row(134,"Payment reference",data.paymentReference||clean(data.receiptNo,40));
- row(142,"Activation date",formatDate(data.activatedAt));
- row(150,"Renewal / expiry date",formatDate(data.expiresAt));
- row(158,"Active user allowance",data.users);
- row(166,"Asset allowance",data.assets);
- p.setDrawColor(...border);p.line(X,171,R,171);
- p.setFillColor(235,240,250);p.roundedRect(X,174,W,15,1.3,1.3,"F");
- txt(data.paid?"TOTAL PAYMENT RECEIVED":"WORKSPACE STATUS",X+4,183,9.3,true,dark);
- right(data.paid?money(Number(data.amount),data.currency):"ACTIVE",183,10.3,true,R-4);
- line(194);
- txt("Issued electronically by AssetFlow360 Operations",X,198,6.3,false,muted);
- right("assetflow360.com/contact",198,6.3,false);
+ p.setFillColor(255,255,255);p.rect(0,0,210,297,"F");
+ p.setFillColor(...indigo);p.rect(0,0,210,4,"F");
+ p.addImage(new Uint8Array(approvedAssetFlowLogoPng()),"PNG",left,17,20,20,undefined,"FAST");
+ text("ASSETFLOW360",44,25,16,true,indigo);
+ text("SUBSCRIPTIONS & BILLING",44,32,8,true,muted);
+ rightText("assetflow360.com",25,right,8,false,muted);
+ rightText("Issued by "+issuer,32,right,8.5,true,dark);
+ line(45);
+ text(data.paid?"OFFICIAL PAYMENT RECEIPT":"WORKSPACE ACTIVATION CONFIRMATION",left,58,15,true);
+ label(data.paid?"Receipt number":"Document number",left,69);
+ text(data.receiptNo,left,77,11,true,indigo);
+ label("Issue date",133,69);rightText(formatDate(data.issuedAt??new Date()),77,right,9.4,true);
+ line(84);
+ label("ISSUED BY",left,95);label("ISSUED TO",109,95);
+ wrap(issuer,left,103,81,10.3,true,2);
+ wrap(data.workspace,109,103,82,10.3,true,2);
+ text("AssetFlow360 subscription services",left,116,8,false,muted);
+ text("Customer / activated workspace",109,116,8,false,muted);
+ line(125);
+
+ p.setFillColor(240,244,250);p.roundedRect(left,133,width,11,1.4,1.4,"F");
+ label("SERVICE / DESCRIPTION",left+4,140);
+ label("PERIOD",110,140);
+ label(data.paid?"AMOUNT PAID":"PAYMENT",157,140);
+ wrap("AssetFlow360 - "+data.plan,left+4,153,80,10,true,2);
+ text(formatDate(data.activatedAt),110,151,8.1);
+ text("to "+formatDate(data.expiresAt),110,160,8.1);
+ rightText(data.paid?money(Number(data.amount),data.currency):"Not recorded",161,right-4,9.2,true);
+ line(171);
+
+ label("INCLUDED DELIVERABLES",left,181);
+ text("Platform subscription access",left+3,191,9);
+ rightText(data.plan,191,right-3,9,true);
+ text("User access allowance",left+3,201,9);
+ rightText(data.users,201,right-3,9,true);
+ text("Asset registration / management capacity",left+3,211,9);
+ rightText(data.assets,211,right-3,9,true);
+ const features=(data.features??[]).filter(x=>typeof x==="string"&&x.trim()).slice(0,3);
+ if(features.length)wrap("Plan features: "+features.map(x=>clean(x,36)).join(" · "),left+3,219,width-6,7.8,false,2,muted);
+ line(230);
+
+ label("PAYMENT DETAILS",left,240);
+ text("Payment method",left+3,250,8.8,false,muted);
+ rightText(data.method,250,right-3,9,true);
+ text("Payment reference",left+3,259,8.8,false,muted);
+ rightText(data.paid?clean(data.paymentReference||"Confirmed payment",36):"Not applicable - administrator grant",259,right-3,8.2,true);
+ p.setFillColor(237,240,251);p.roundedRect(left,266,width,14,2,2,"F");
+ text(data.paid?"TOTAL RECEIVED":"PAYMENT STATUS",left+4,275,9.5,true,indigo);
+ rightText(data.paid?money(Number(data.amount),data.currency):"No payment recorded",275,right-4,10,true,indigo);
+ text(data.paid?"Payment recorded against the subscription shown above.":
+  "An administrator activated this workspace. This document does not certify payment.",left,285,7.3,false,muted);
+ line(289);
+ text("Electronically generated by "+issuer,left,293,7.1,false,muted);
+ rightText("assetflow360.com",293,right,7.1,false,muted);
  const pdf=Buffer.from(p.output("arraybuffer"));
- if(!pdf.subarray(0,4).equals(Buffer.from("%PDF")))throw Error("Receipt PDF generation failed");
+ if(!pdf.subarray(0,4).equals(Buffer.from("%PDF"))||pdf.length>512*1024)throw Error("Receipt PDF generation failed");
  return pdf;
 }

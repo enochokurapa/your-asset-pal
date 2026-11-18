@@ -75,11 +75,9 @@ async function getTenantAdminProfile(userId: string,supportTenantId?:string|null
 
 async function assertSameTenant(adminUserId: string, targetUserId: string,supportTenantId?:string|null) {
   const p = await getTenantAdminProfile(adminUserId,supportTenantId);
-  const { data: target, error } = await admin.from("profiles")
-    .select("tenant_id,is_saas_admin,archived_at")
-    .eq("id", targetUserId)
-    .single();
-  if (error || !target || target.tenant_id !== p.tenant_id) {
+  const target = (await queryPostgres<{tenant_id:string;is_saas_admin:boolean;archived_at:string|null}>(
+    "SELECT tenant_id,is_saas_admin,archived_at FROM public.profiles WHERE id=$1",[targetUserId]))[0];
+  if (!target || target.tenant_id !== p.tenant_id) {
     throw new Error("You cannot manage a user from another workspace");
   }
   if (target.is_saas_admin) throw new Error("Admins cannot manage the SaaS Admin account");
@@ -231,9 +229,11 @@ export const deleteUserAccount = createServerFn({ method: "POST" })
       ban_duration:"876000h"
     });
     if (banError) throw new Error("Unable to revoke account login: "+banError.message);
-    const { error: archiveError } = await admin.from("profiles")
-      .update({is_active:false,archived_at:new Date().toISOString()}).eq("id",data.user_id);
-    if (archiveError) throw new Error("Login blocked, but profile archiving failed: "+archiveError.message);
+    // Direct PostgreSQL avoids stale PostgREST schema-cache failures for archived_at.
+    const archived=await queryPostgres<{id:string}>(
+      "UPDATE public.profiles SET is_active=false,archived_at=now() WHERE id=$1 AND tenant_id=$2 AND archived_at IS NULL RETURNING id",
+      [data.user_id,context.supportTenantId??(await getTenantAdminProfile(context.userId,context.supportTenantId)).tenant_id]);
+    if(!archived.length)throw Error("Account archive was not completed. Access remains blocked; contact an administrator.");
     await queryPostgres(
       "INSERT INTO public.audit_log(tenant_id,entity_type,entity_id,action,actor_user_id,details) VALUES($1,'profile',$2,'user_access_removed',$3,$4::jsonb)",
       [context.supportTenantId??(await getTenantAdminProfile(context.userId,context.supportTenantId)).tenant_id,
