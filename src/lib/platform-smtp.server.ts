@@ -350,8 +350,11 @@ export async function sendPlatformOperationsNotice(
  if(attachment&&attachment.data.length>512*1024)throw Error("Attachment exceeds 512 KB");
  const cfg=await getConfiguredSmtpForApplication("operations");
  const esc=(v:string)=>v.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
- const isActivation=/workspace is active/i.test(subject);
- const bodyHtml=message.split(/\n\s*\n/).map(part=>{
+ const isActivation=/(workspace is active|subscription activated|business activated|corrected business name)/i.test(subject);
+ const isPaymentReceipt=Boolean(attachment?.name.startsWith("AssetFlow360-Receipt-"));
+ // Handle actual newlines and the literal \n characters in legacy queued mail.
+ const normalizedMessage=message.replace(/\r\n?/g,"\n").replace(/\\r\\n|\\n/g,"\n").trim();
+ const bodyHtml=normalizedMessage.split(/\n\s*\n/).map(part=>{
    const lines=part.trim().split("\n").filter(Boolean);
    if(lines.every(line=>/^[a-zA-Z /]+:/.test(line))){
      return '<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:14px 0">'+
@@ -359,7 +362,7 @@ export async function sendPlatformOperationsNotice(
         esc(line.slice(0,i))+'</td><td style="padding:9px 4px;border-bottom:1px solid #e5ebf2;text-align:right;font-size:13px;color:#172554;font-weight:700">'+
         esc(line.slice(i+1).trim())+'</td></tr>'}).join("")+'</table>';
    }
-   return '<p style="color:#34465f;font-size:14px;line-height:1.8;margin:0 0 16px">'+lines.map(esc).join("<br>")+'</p>';
+   return '<p style="color:#34465f;font-size:14px;line-height:1.8;overflow-wrap:break-word;margin:0 0 16px">'+lines.map(esc).join("<br>")+'</p>';
  }).join("");
  const html=`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
  <body style="margin:0;background:#f3f6fa;font-family:Arial,Helvetica,sans-serif;color:#172554">
@@ -375,13 +378,13 @@ export async function sendPlatformOperationsNotice(
   <div style="font-size:11px;letter-spacing:1.2px;color:#3e4aad;font-weight:700;margin-bottom:9px">${isActivation?"SUBSCRIPTION CONFIRMATION":"ACCOUNT COMMUNICATION"}</div>
   <h1 style="font-size:23px;line-height:1.32;margin:0 0 21px;color:#15244a">${esc(subject)}</h1>
   ${bodyHtml}
-  ${attachment&&isActivation?'<p style="margin:18px 0;color:#41516c;font-size:13px"><strong>Attached:</strong> Your official PDF receipt. Please save or print it for your records.</p>':""}
+   ${attachment&&isActivation?'<p style="margin:18px 0;color:#41516c;font-size:13px"><strong>Attached:</strong> Your '+(isPaymentReceipt?"official PDF payment receipt":"PDF activation confirmation")+'. Please save it for your records.</p>':""}
   <table role="presentation" cellspacing="0" cellpadding="0" style="margin:22px 0 24px"><tr><td style="background:#3544b1;border-radius:5px">
    <a href="https://assetflow360.com/login" style="display:inline-block;padding:13px 23px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none">Open your workspace</a>
   </td></tr></table>
  </td></tr>
  <tr><td style="padding:20px 26px;background:#f8fafc;border-top:1px solid #e2e8f0">
- <div style="font-size:13px;color:#172554;font-weight:700">AssetFlow360 Operations</div>
+ <div style="font-size:13px;color:#172554;font-weight:700">${isActivation?"OWLTECH Solutions Ltd. | AssetFlow360":"AssetFlow360 Operations"}</div>
  <div style="margin-top:8px;font-size:12px;line-height:1.8;color:#52647b">
   Website: <a href="https://assetflow360.com" style="color:#3449ac">assetflow360.com</a><br>
   Contact and support: <a href="https://assetflow360.com/contact" style="color:#3449ac">assetflow360.com/contact</a><br>
