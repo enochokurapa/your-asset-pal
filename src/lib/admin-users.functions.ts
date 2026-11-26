@@ -135,6 +135,49 @@ async function enforceSeatLimit(tenantId: string) {
   if(!trialStillValid&&tenant.subscription_status!=="active")throw new Error("Renew or activate your subscription before adding users.");
 }
 
+
+/** Tenant-scoped read model for the users dashboard. Mutation enforcement remains server-side. */
+export const getUserLicenseOverview = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const p = await getTenantAdminProfile(context.userId, context.supportTenantId);
+    const activeActor = (await queryPostgres<{is_active:boolean}>(
+      "SELECT is_active FROM public.profiles WHERE id=$1", [context.userId]))[0];
+    if (!activeActor?.is_active) throw new Error("Active administrator required");
+    const tenantId = p.tenant_id;
+    const [tenantResult, settingsResult, counts, archived, events] = await Promise.all([
+      admin.from("tenants").select("subscription_status,trial_ends_at,trial_user_limit_override,purchased_extra_users,paid_user_limit_override,paid_users_unlimited,subscription_ends_at,plan_code").eq("id", tenantId).single(),
+      admin.from("saas_settings").select("trial_user_limit,included_paid_users").eq("id",true).single(),
+      queryPostgres<{active:number;inactive:number;archived:number}>(
+        "SELECT count(*) FILTER (WHERE is_active=true)::int AS active, count(*) FILTER (WHERE is_active=false AND archived_at IS NULL)::int AS inactive, count(*) FILTER (WHERE archived_at IS NOT NULL)::int AS archived FROM public.profiles WHERE tenant_id=$1 AND is_saas_admin=false", [tenantId]),
+      queryPostgres<{id:string;full_name:string|null;email:string|null;archived_at:string}>(
+        "SELECT id,full_name,email,archived_at FROM public.profiles WHERE tenant_id=$1 AND is_saas_admin=false AND archived_at IS NOT NULL ORDER BY archived_at DESC LIMIT 100", [tenantId]),
+      queryPostgres<{id:string;action:string;created_at:string;target_name:string|null;actor_name:string|null}>(
+        "SELECT a.id::text,a.action,a.created_at::text,coalesce(t.full_name,t.email) AS target_name,coalesce(u.full_name,u.email) AS actor_name FROM public.audit_log a LEFT JOIN public.profiles t ON t.id::text=a.entity_id::text AND t.tenant_id=a.tenant_id LEFT JOIN public.profiles u ON u.id=a.actor_user_id AND u.tenant_id=a.tenant_id WHERE a.tenant_id=$1 AND a.entity_type='profile' AND a.action IN ('user_access_removed','user_created','user_deactivated','user_reactivated','user_license_transferred') ORDER BY a.created_at DESC LIMIT 100", [tenantId]),
+    ]);
+    if(tenantResult.error || !tenantResult.data || settingsResult.error || !settingsResult.data) throw new Error("Unable to load subscription capacity");
+    const t=tenantResult.data, s=settingsResult.data;
+    const count=counts[0] ?? {active:0,inactive:0,archived:0};
+    const validTrial=t.subscription_status==="trial" && !!t.trial_ends_at && new Date(t.trial_ends_at).getTime()>Date.now();
+    const validPaid=t.subscription_status==="active" && (!t.subscription_ends_at || new Date(t.subscription_ends_at).getTime()>Date.now());
+    let limit:number|null=0;
+    if(t.subscription_status==="trial") limit=Number(t.trial_user_limit_override??s.trial_user_limit);
+    else if(t.paid_users_unlimited) limit=null;
+    else if(t.paid_user_limit_override!=null) limit=Number(t.paid_user_limit_override);
+    else {
+      let base=Number(s.included_paid_users);
+      if(["starter","business","enterprise"].includes(t.plan_code)){
+        const {data:plan,error}=await admin.from("saas_pricing_plans").select("included_users").eq("id",t.plan_code).single();
+        if(error||!plan)throw new Error("Assigned plan not found");
+        base=Number(plan.included_users);
+      }
+      limit=base+Number(t.purchased_extra_users??0);
+    }
+    if(limit!==null && (!Number.isInteger(limit)||limit<0))throw new Error("Invalid seat capacity");
+    const available=limit===null?null:Math.max(0,limit-count.active);
+    return {...count,limit,available,subscriptionValid:validTrial||validPaid,canAdd:(validTrial||validPaid)&&(available===null||available>0),archivedUsers:archived,events};
+  });
+
 export const createUserAccount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({

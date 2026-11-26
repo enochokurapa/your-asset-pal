@@ -6,7 +6,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, AppRole, ALL_MODULES, ALL_APPROVAL_KINDS, ALL_ACTION_KINDS, ModuleKey, ApprovalKind, ActionKind } from "@/hooks/use-auth";
 import {
-  createUserAccount, adminResetPassword, setUserActive, deleteUserAccount,
+  createUserAccount, adminResetPassword, setUserActive, deleteUserAccount, getUserLicenseOverview,
   setUserRole, setUserModulePermission, setUserApprovalRight, setUserActionRight, setUserBranchAccess,
 } from "@/lib/admin-users.functions";
 import { Button } from "@/components/ui/button";
@@ -87,7 +87,16 @@ function UsersPage() {
     catch(e:any){toast.error(e?.message||"Could not assign role");}
   };
   const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["users-with-roles",tenantId] });
+  const invalidate = () => Promise.all([
+    qc.invalidateQueries({queryKey:["users-with-roles",tenantId]}),
+    qc.invalidateQueries({queryKey:["user-license-overview",tenantId]}),
+  ]);
+  const [tab,setTab]=useState<"users"|"archived"|"history">("users");
+  const overviewFn=useServerFn(getUserLicenseOverview);
+  const overview=useQuery({queryKey:["user-license-overview",tenantId],enabled:!!tenantId&&isTenantAdmin&&!platformControl,
+    queryFn:async()=>overviewFn({headers:await getAuthHeaders()})});
+  const seats=overview.data;
+  const usage=seats?.limit!=null && seats.limit>0 ? Math.round(100*seats.active/seats.limit) : null;
   const [userSearch,setUserSearch]=useState("");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ email: "", password: "", full_name: "", role: "staff" as AppRole });
@@ -110,8 +119,8 @@ function UsersPage() {
     queryFn: async () => (await supabase.from("branches").select("id,name,code").order("name")).data ?? [],
   });
 
-  const { data = [], isLoading } = useQuery({
-    queryKey: ["users-with-roles"],
+  const { data = [], isLoading, error: usersError } = useQuery({
+    queryKey: ["users-with-roles",tenantId],
     enabled: isTenantAdmin && !platformControl,
     queryFn: async () => {
       if(!tenantId) return [];
@@ -208,8 +217,8 @@ function UsersPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Users & responsibilities</h1>
-          <p className="text-sm text-muted-foreground">Tenant administrators create accounts and assign roles, modules, branches and approval rights.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-[#4B47DC] dark:text-foreground">Users & Responsibilities</h1>
+          <p className="text-sm text-muted-foreground">Manage team access, monitor licenses and assign responsibilities.</p>
         </div>
         <Button variant="outline" onClick={()=>editRole()}>Manage Roles</Button>
         <Dialog open={roleEditorOpen} onOpenChange={setRoleEditorOpen}>
@@ -238,7 +247,7 @@ function UsersPage() {
           </DialogContent>
         </Dialog>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button><UserPlus className="mr-2 h-4 w-4" /> New user</Button></DialogTrigger>
+          <DialogTrigger asChild><Button className="bg-[#4B47DC] text-white hover:bg-[#3834b8]" disabled={!seats?.canAdd||overview.isFetching}><UserPlus className="mr-2 h-4 w-4" /> New user</Button></DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create user account</DialogTitle>
@@ -261,7 +270,40 @@ function UsersPage() {
         </Dialog>
       </div>
 
-      <Card className="p-4 space-y-3">
+      {overview.error && <p role="alert" className="text-sm text-destructive">License information could not be loaded. <Button size="sm" variant="outline" onClick={()=>overview.refetch()}>Retry</Button></p>}
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {[
+          {label:"Licensed users",value:seats?(seats.limit??"Unlimited"):"—"},
+          {label:"Active users",value:seats?.active??"—"},
+          {label:"Available licenses",value:seats?(seats.available??"Unlimited"):"—"},
+          {label:"Archived users",value:seats?.archived??"—"},
+        ].map((item,i)=><Card key={item.label} className="rounded-lg border p-4 shadow-none">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground"><UsersIcon className={i===2?"h-4 w-4 text-[#C77435]":"h-4 w-4 text-[#4B47DC]"} />{item.label}</div>
+          <p className="mt-2 text-2xl font-semibold tabular-nums">{item.value}</p>
+        </Card>)}
+      </div>
+      <Card className="space-y-3 rounded-lg p-4 shadow-none">
+        <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">License utilisation</h2><span className="text-sm font-semibold">{usage!==null?usage+"%":seats?.limit===null?"Unlimited":"—"}</span></div>
+        {usage!==null && <div role="progressbar" aria-label="License utilisation" aria-valuenow={Math.min(100,usage)} className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-[#4B47DC]" style={{width:Math.min(100,usage)+"%"}}/></div>}
+        {seats && !seats.subscriptionValid ? <p className="text-sm text-muted-foreground">Renew or activate the subscription before adding users.</p> : seats?.available===0 ? <p className="text-sm text-muted-foreground">All licenses are in use. Deactivate an existing user to release a seat, then add the replacement.</p> : <p className="text-sm text-muted-foreground">Inactive and archived users do not occupy active seats.</p>}
+      </Card>
+      <div className="flex flex-wrap gap-1 border-b" aria-label="User views">
+        {([{id:"users",label:"All users"},{id:"archived",label:"Archived users"},{id:"history",label:"Recorded activity"}] as const).map(t=><button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-pressed={tab===t.id} className={"border-b-2 px-4 py-3 text-sm font-medium "+(tab===t.id?"border-[#C77435] text-[#4B47DC] dark:text-foreground":"border-transparent text-muted-foreground")}>{t.label}</button>)}
+      </div>
+      {tab==="archived" && <Card className="overflow-hidden rounded-lg shadow-none">
+        <div className="border-b p-4"><h2 className="font-semibold">Archived users</h2><p className="text-sm text-muted-foreground">Historical identities are retained without active licenses. Showing up to 100 latest records.</p></div>
+        {seats?.archivedUsers.map(u=><div key={u.id} className="flex flex-wrap items-center justify-between gap-2 border-b p-4 last:border-0"><div><p className="font-medium">{u.full_name||u.email||"Archived account"}</p><p className="text-sm text-muted-foreground">{u.email}</p></div><span className="text-sm text-muted-foreground">{new Date(u.archived_at).toLocaleDateString()}</span></div>)}
+        {seats && !seats.archivedUsers.length && <p className="p-6 text-sm text-muted-foreground">No archived users.</p>}
+        {!seats && <p className="p-6 text-sm text-muted-foreground">Archive information unavailable.</p>}
+      </Card>}
+      {tab==="history" && <Card className="overflow-hidden rounded-lg shadow-none">
+        <div className="border-b p-4"><h2 className="font-semibold">Recorded user activity</h2><p className="text-sm text-muted-foreground">Existing audit entries only; complete license transfer history is not yet supported. Showing up to 100 latest records.</p></div>
+        {seats?.events.map(e=><div key={e.id} className="grid gap-1 border-b p-4 text-sm last:border-0 sm:grid-cols-3"><div className="font-medium capitalize">{e.action.replace(/_/g," ")}</div><div>{e.target_name||"User"}<p className="text-muted-foreground">By {e.actor_name||"Recorded administrator"}</p></div><div className="text-muted-foreground">{new Date(e.created_at).toLocaleString()}</div></div>)}
+        {seats && !seats.events.length && <p className="p-6 text-sm text-muted-foreground">No recorded user activity.</p>}
+        {!seats && <p className="p-6 text-sm text-muted-foreground">Activity information unavailable.</p>}
+      </Card>}
+      {tab==="users" && <>
+      <Card className="p-4 space-y-3 rounded-lg shadow-none">
         <div className="flex items-center justify-between"><h2 className="font-semibold">Business Roles</h2><span className="text-xs text-muted-foreground">Create and edit your organization's positions</span></div>
         {roleList.isLoading&&<p className="text-sm">Loading roles…</p>}
         {roleList.error&&<p className="text-sm text-destructive">Could not load roles</p>}
@@ -278,13 +320,14 @@ function UsersPage() {
           value={userSearch} onChange={e=>setUserSearch(e.target.value)}/>
         <p className="text-xs text-muted-foreground">{data.length} user(s)</p>
       </div>
-      <Card className="p-4">
-        {isLoading ? (
+      <Card className="overflow-hidden rounded-lg shadow-none p-0">
+        {usersError ? <p role="alert" className="p-6 text-sm text-destructive">Unable to load users.</p> : isLoading ? (
           <p className="py-12 text-center text-sm text-muted-foreground">Loading…</p>
         ) : data.length === 0 ? (
           <div className="py-12 text-center"><UsersIcon className="mx-auto h-10 w-10 text-muted-foreground/40" /><p className="mt-3 text-sm text-muted-foreground">No tenant users yet.</p></div>
         ) : (
-          <div className="space-y-3">
+          <div className="divide-y">
+            <div className="hidden bg-muted/60 px-4 py-3 text-xs font-semibold text-muted-foreground md:grid md:grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_auto] md:gap-4"><span>User</span><span>Role</span><span>Status</span><span>License</span><span>Actions</span></div>
             {data.filter((u:any)=>!userSearch.trim()||[u.email,u.full_name].some(v=>String(v??"").toLowerCase().includes(userSearch.toLowerCase().trim()))).map((u: any) => (
               <UserRow
                 key={u.id}
@@ -307,6 +350,8 @@ function UsersPage() {
           </div>
         )}
       </Card>
+      <Card className="rounded-lg border-l-4 border-l-[#C77435] p-4 shadow-none"><h2 className="font-semibold">Reassign a license</h2><p className="mt-1 text-sm text-muted-foreground">Deactivate or remove the departing employee, then create a new account using the released seat. The original account and its history remain separate. A dedicated atomic transfer with a reason and audit reference will require the next backend release.</p></Card>
+      </>}
     </div>
   );
 }
@@ -315,23 +360,21 @@ function UserRow({ u, self, branchesAll, onRole, onModule, onApproval, onAction,
   const [resetOpen, setResetOpen] = useState(false);
   const [newPwd, setNewPwd] = useState("");
   const [permsOpen, setPermsOpen] = useState(false);
+  const [manageOpen,setManageOpen]=useState(false);
 
   return (
-    <div className="rounded-xl border bg-card p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="font-semibold">{u.full_name || u.email}</p>
-            {!u.is_active && <Badge variant="destructive">Inactive</Badge>}
-            {self && <Badge variant="secondary">You</Badge>}
-          </div>
-          <p className="truncate text-sm text-muted-foreground">{u.email}</p>
+    <div className="bg-card px-4 py-3">
+      <div className="grid grid-cols-2 items-center gap-3 md:grid-cols-[minmax(0,2fr)_1fr_1fr_1fr_auto] md:gap-4">
+        <div className="col-span-2 flex min-w-0 items-center gap-3 md:col-span-1">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#4B47DC]/10 text-xs font-semibold text-[#4B47DC]">{String(u.full_name||u.email||"U").split(/[ @]/).filter(Boolean).slice(0,2).map((s:string)=>s[0]?.toUpperCase()).join("")}</span>
+          <div className="min-w-0"><p className="truncate text-sm font-semibold">{u.full_name||u.email} {self&&<span className="text-xs text-muted-foreground">(You)</span>}</p><p className="truncate text-xs text-muted-foreground">{u.email}</p></div>
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          {(u.roles??[]).map((r:string)=><Badge key={r} variant="secondary" className="capitalize">{r}</Badge>)}
-        </div>
+        <div className="text-sm capitalize">{(u.roles??[]).join(", ")||"—"}</div>
+        <div className="text-sm"><span className={u.is_active?"text-success":"text-muted-foreground"}>{u.is_active?"● Active":"○ Inactive"}</span></div>
+        <div className="text-sm text-muted-foreground">{u.is_active?"Assigned":"Released"}</div>
+        <Button variant="outline" size="sm" aria-expanded={manageOpen} onClick={()=>{setManageOpen(v=>!v);setPermsOpen(false)}}>{manageOpen?"Close":"Manage"}</Button>
       </div>
-
+      {manageOpen && <>
       {!self&&customRoles?.length>0&&<div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
         <Label>Custom role</Label>
         <Select value={assignedRole??""} onValueChange={v=>onAssign(u.id,v)}>
@@ -354,7 +397,7 @@ function UserRow({ u, self, branchesAll, onRole, onModule, onApproval, onAction,
           <AlertDialog>
             <AlertDialogTrigger asChild><Button variant="destructive" size="sm" className="ml-auto"><Trash2 className="mr-2 h-4 w-4" /> Remove access</Button></AlertDialogTrigger>
             <AlertDialogContent>
-              <AlertDialogHeader><AlertDialogTitle>Remove this user's access?</AlertDialogTitle><AlertDialogDescription>This will block <strong>{u.email}</strong> from signing in and archive their profile from active user management. Their asset and audit history will remain.</AlertDialogDescription></AlertDialogHeader>
+              <AlertDialogHeader><AlertDialogTitle>Remove this user's access?</AlertDialogTitle><AlertDialogDescription>This will block <strong>{u.email}</strong> from signing in and archive their profile, releasing the active license. Their asset and audit history will remain.</AlertDialogDescription></AlertDialogHeader>
               <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => onDelete(u.id)}>Remove access</AlertDialogAction></AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
@@ -397,6 +440,7 @@ function UserRow({ u, self, branchesAll, onRole, onModule, onApproval, onAction,
           </div>
         </div>
       )}
+      </>}
     </div>
   );
 }
