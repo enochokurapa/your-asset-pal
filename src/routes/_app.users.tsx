@@ -1,3 +1,4 @@
+import { passwordPolicyError } from "@/lib/password-policy";
 import {listTenantRoleTemplates,saveTenantRoleTemplate,assignTenantRoleTemplate} from "@/lib/tenant-roles.functions";
 import { useState } from "react";
 import { createFileRoute, Navigate } from "@tanstack/react-router";
@@ -111,6 +112,7 @@ function UsersPage() {
   };
   const submitTransfer=async()=>{
     if(!transfer.source_user_id||!transfer.full_name.trim()||!transfer.email.trim()||transfer.password.length<8||transfer.reason.trim().length<5){toast.error("Complete the replacement details and reason.");return;}
+    const issue=passwordPolicyError(transfer.password); if(issue){toast.error(issue);return;}
     setTransferBusy(true);
     try{
       const result=await transferFn({data:transfer,headers:await getAuthHeaders()});
@@ -178,7 +180,7 @@ function UsersPage() {
 
   const create = async () => {
     if (!form.email || !form.password) return toast.error("Email and password required");
-    if (form.password.length < 6) return toast.error("Password must be at least 6 characters");
+    const issue=passwordPolicyError(form.password); if(issue)return toast.error(issue);
     setSubmitting(true);
     try {
       const headers = await getAuthHeaders();
@@ -439,7 +441,7 @@ function UserRow({ u, self, branchesAll, onRole, onModule, onApproval, onAction,
           <DialogContent>
             <DialogHeader><DialogTitle>Reset password for {u.email}</DialogTitle><DialogDescription>Set a temporary password. The user must change it on next sign-in.</DialogDescription></DialogHeader>
             <div className="space-y-2 py-2"><Label>New temporary password</Label><Input type="password" autoComplete="new-password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} /></div>
-            <DialogFooter><Button variant="outline" onClick={() => setResetOpen(false)}>Cancel</Button><Button onClick={async () => { if (newPwd.length < 6) return toast.error("At least 6 characters"); try { await onReset(u.id, newPwd); setNewPwd(""); setResetOpen(false); } catch {} }}>Save</Button></DialogFooter>
+            <DialogFooter><Button variant="outline" onClick={() => setResetOpen(false)}>Cancel</Button><Button onClick={async () => { const issue=passwordPolicyError(newPwd); if(issue)return toast.error(issue); try { await onReset(u.id, newPwd); setNewPwd(""); setResetOpen(false); } catch {} }}>Save</Button></DialogFooter>
           </DialogContent>
         </Dialog>
         <div className="flex items-center gap-2 text-sm"><Switch checked={u.is_active !== false} disabled={self} onCheckedChange={(v) => onActive(u.id, v)} /><span className="text-muted-foreground">{u.is_active !== false ? "Active" : "Inactive"}</span></div>

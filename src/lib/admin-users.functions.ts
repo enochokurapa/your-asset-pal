@@ -1,3 +1,4 @@
+import { passwordPolicyError } from "@/lib/password-policy";
 import { randomBytes } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -58,10 +59,10 @@ async function getTenantAdminProfile(userId: string,supportTenantId?:string|null
   if (!userId) throw new Error("Administrator privileges required: Not authenticated");
   const [{ data: role, error: roleError }, { data: profile, error: profileError }] = await Promise.all([
     admin.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle(),
-    admin.from("profiles").select("id,tenant_id,tenant_role,is_saas_admin").eq("id", userId).single(),
+    admin.from("profiles").select("id,tenant_id,tenant_role,is_saas_admin,is_active").eq("id", userId).single(),
   ]);
   if (roleError) throw new Error(roleError.message);
-  if (profileError || !profile) throw new Error("Administrator profile is not configured");
+  if (profileError || !profile || profile.is_active !== true) throw new Error("Active administrator profile is required");
 
   if (profile.is_saas_admin) {
     if(!supportTenantId)throw new Error("Open a business support session before managing customer users");
@@ -121,25 +122,13 @@ export const getUserLicenseOverview = createServerFn({ method: "GET" })
   });
 
 
-function transferPasswordValid(password:string) {
-  if(password.length<8 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9\s]/.test(password))return false;
-  for(let i=0;i<=password.length-4;i++){
-    const part=password.slice(i,i+4);
-    if(/^\d{4}$/.test(part)){
-      const n=[...part].map(Number);
-      if(n.every((v,j)=>j===0||v===n[j-1]+1)||n.every((v,j)=>j===0||v===n[j-1]-1))return false;
-    }
-  }
-  return true;
-}
-
 export const transferUserLicense = createServerFn({method:"POST"})
  .middleware([requireSupabaseAuth])
  .inputValidator(input=>z.object({
    source_user_id:z.string().uuid(),request_id:z.string().uuid(),
    full_name:z.string().trim().min(1).max(200),
    email:z.string().trim().email().max(254).transform(v=>v.toLowerCase()),
-   password:z.string().min(8).max(72).refine(transferPasswordValid,"Use uppercase, lowercase, a number and symbol; avoid four ascending or descending digits."),
+   password:z.string().min(8).max(72).refine(v=>passwordPolicyError(v)===null,"Use uppercase, lowercase, a number and symbol; avoid four ascending or descending digits."),
    role:roleSchema,reason:z.string().trim().min(5).max(500),
  }).parse(input))
  .handler(async({data,context})=>{
@@ -213,7 +202,7 @@ export const createUserAccount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({
     email: z.string().email(),
-    password: z.string().min(6).max(72),
+    password: z.string().min(8).max(72).refine(v=>passwordPolicyError(v)===null,"Password must meet the account security policy."),
     full_name: z.string().min(1).max(200),
     role: roleSchema,
   }).parse(input))
@@ -258,7 +247,7 @@ export const adminResetPassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({
     user_id: z.string().uuid(),
-    new_password: z.string().min(6).max(72),
+    new_password: z.string().min(8).max(72).refine(v=>passwordPolicyError(v)===null,"Password must meet the account security policy."),
   }).parse(input))
   .handler(async ({ data, context }) => {
     await assertSameTenant(context.userId, data.user_id,context.supportTenantId);

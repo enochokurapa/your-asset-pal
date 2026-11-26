@@ -1,0 +1,40 @@
+name: Isolated user licensing tests
+on:
+  push:
+    branches: [feat/users-license-dashboard-20261126]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  license-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: isolated-test-only
+          POSTGRES_DB: license_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d license_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      PGPASSWORD: isolated-test-only
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create disposable schema
+        run: psql -h localhost -U postgres -d license_test -v ON_ERROR_STOP=1 -f tests/license-transfer-fixture.sql
+      - name: Apply candidate migration
+        run: psql -h localhost -U postgres -d license_test -v ON_ERROR_STOP=1 -f supabase/migrations/20261126120000_auditable_user_license_transfer.sql
+      - name: Test transfer and database restrictions
+        run: psql -h localhost -U postgres -d license_test -v ON_ERROR_STOP=1 -f tests/license-transfer-checks.sql
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun test
+      - run: bun run build
