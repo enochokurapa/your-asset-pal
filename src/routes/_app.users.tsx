@@ -6,7 +6,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, AppRole, ALL_MODULES, ALL_APPROVAL_KINDS, ALL_ACTION_KINDS, ModuleKey, ApprovalKind, ActionKind } from "@/hooks/use-auth";
 import {
-  createUserAccount, adminResetPassword, setUserActive, deleteUserAccount, getUserLicenseOverview,
+  createUserAccount, adminResetPassword, setUserActive, deleteUserAccount, getUserLicenseOverview, transferUserLicense,
   setUserRole, setUserModulePermission, setUserApprovalRight, setUserActionRight, setUserBranchAccess,
 } from "@/lib/admin-users.functions";
 import { Button } from "@/components/ui/button";
@@ -101,6 +101,28 @@ function UsersPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ email: "", password: "", full_name: "", role: "staff" as AppRole });
   const [submitting, setSubmitting] = useState(false);
+  const [transferOpen,setTransferOpen]=useState(false);
+  const [transferBusy,setTransferBusy]=useState(false);
+  const [transfer,setTransfer]=useState({source_user_id:"",request_id:"",full_name:"",email:"",password:"",role:"staff" as AppRole,reason:""});
+  const transferFn=useServerFn(transferUserLicense);
+  const beginTransfer=(source:string)=>{
+    setTransfer({source_user_id:source,request_id:crypto.randomUUID(),full_name:"",email:"",password:"",role:"staff",reason:""});
+    setTransferOpen(true);
+  };
+  const submitTransfer=async()=>{
+    if(!transfer.source_user_id||!transfer.full_name.trim()||!transfer.email.trim()||transfer.password.length<8||transfer.reason.trim().length<5){toast.error("Complete the replacement details and reason.");return;}
+    setTransferBusy(true);
+    try{
+      const result=await transferFn({data:transfer,headers:await getAuthHeaders()});
+      toast.success("License transferred. Reference: "+result.id);
+      if(result.welcomeEmailAccepted===false)toast.warning("Account created; welcome email was not accepted. Share temporary credentials securely.");
+      setTransferOpen(false);
+      setTransfer(prev=>({...prev,password:""}));
+      setTab("history");
+      await invalidate();
+    }catch(e:any){toast.error(e?.message||"Transfer could not be completed. Check License History before retrying.");}
+    finally{setTransferBusy(false);}
+  };
 
   const createFn = useServerFn(createUserAccount);
   const resetFn = useServerFn(adminResetPassword);
@@ -288,7 +310,7 @@ function UsersPage() {
         {seats && !seats.subscriptionValid ? <p className="text-sm text-muted-foreground">Renew or activate the subscription before adding users.</p> : seats?.available===0 ? <p className="text-sm text-muted-foreground">All licenses are in use. Deactivate an existing user to release a seat, then add the replacement.</p> : <p className="text-sm text-muted-foreground">Inactive and archived users do not occupy active seats.</p>}
       </Card>
       <div className="flex flex-wrap gap-1 border-b" aria-label="User views">
-        {([{id:"users",label:"All users"},{id:"archived",label:"Archived users"},{id:"history",label:"Recorded activity"}] as const).map(t=><button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-pressed={tab===t.id} className={"border-b-2 px-4 py-3 text-sm font-medium "+(tab===t.id?"border-[#C77435] text-[#4B47DC] dark:text-foreground":"border-transparent text-muted-foreground")}>{t.label}</button>)}
+        {([{id:"users",label:"All users"},{id:"archived",label:"Archived users"},{id:"history",label:"License history"}] as const).map(t=><button key={t.id} type="button" onClick={()=>setTab(t.id)} aria-pressed={tab===t.id} className={"border-b-2 px-4 py-3 text-sm font-medium "+(tab===t.id?"border-[#C77435] text-[#4B47DC] dark:text-foreground":"border-transparent text-muted-foreground")}>{t.label}</button>)}
       </div>
       {tab==="archived" && <Card className="overflow-hidden rounded-lg shadow-none">
         <div className="border-b p-4"><h2 className="font-semibold">Archived users</h2><p className="text-sm text-muted-foreground">Historical identities are retained without active licenses. Showing up to 100 latest records.</p></div>
@@ -297,7 +319,15 @@ function UsersPage() {
         {!seats && <p className="p-6 text-sm text-muted-foreground">Archive information unavailable.</p>}
       </Card>}
       {tab==="history" && <Card className="overflow-hidden rounded-lg shadow-none">
-        <div className="border-b p-4"><h2 className="font-semibold">Recorded user activity</h2><p className="text-sm text-muted-foreground">Existing audit entries only; complete license transfer history is not yet supported. Showing up to 100 latest records.</p></div>
+        <div className="border-b p-4"><h2 className="font-semibold">License transfer history</h2><p className="text-sm text-muted-foreground">Latest 100 permanent transfer records. Earlier account activity is shown separately below.</p></div>
+        {seats?.transfers.map(e=><div key={e.id} className="space-y-2 border-b p-4 text-sm">
+          <div className="flex flex-wrap justify-between gap-2"><span className="font-semibold text-[#4B47DC] dark:text-foreground">License transfer</span><span className="text-muted-foreground">{new Date(e.created_at).toLocaleString()}</span></div>
+          <div className="grid gap-2 sm:grid-cols-2"><div><span className="text-muted-foreground">From</span><p className="font-medium">{e.source_name}</p><p className="text-xs text-muted-foreground">{e.source_email}</p></div><div><span className="text-muted-foreground">To</span><p className="font-medium">{e.target_name}</p><p className="text-xs text-muted-foreground">{e.target_email} · {e.target_role}</p></div></div>
+          <p>Reason: {e.reason}</p><p className="text-muted-foreground">By {e.actor_name} · Seats {e.seats_before} → {e.seats_after} / {e.seat_limit??"Unlimited"}</p>
+          <p className="break-all text-xs text-muted-foreground">Reference: {e.id}</p>
+        </div>)}
+        {seats&&!seats.transfers.length&&<p className="p-4 text-sm text-muted-foreground">No license transfers yet.</p>}
+        <h3 className="border-b bg-muted/40 px-4 py-3 text-sm font-semibold">Previous user activity</h3>
         {seats?.events.map(e=><div key={e.id} className="grid gap-1 border-b p-4 text-sm last:border-0 sm:grid-cols-3"><div className="font-medium capitalize">{e.action.replace(/_/g," ")}</div><div>{e.target_name||"User"}<p className="text-muted-foreground">By {e.actor_name||"Recorded administrator"}</p></div><div className="text-muted-foreground">{new Date(e.created_at).toLocaleString()}</div></div>)}
         {seats && !seats.events.length && <p className="p-6 text-sm text-muted-foreground">No recorded user activity.</p>}
         {!seats && <p className="p-6 text-sm text-muted-foreground">Activity information unavailable.</p>}
@@ -342,6 +372,8 @@ function UsersPage() {
                 onActive={onToggleActive}
                 onDelete={onDelete}
                 onReset={onReset}
+                onTransfer={beginTransfer}
+                transferAllowed={!!seats?.subscriptionValid&&(seats.limit===null||seats.active<=seats.limit)}
                 customRoles={roleList.data?.roles??[]}
                 assignedRole={(roleList.data?.assignments??[]).find((a:any)=>a.user_id===u.id)?.template_id}
                 onAssign={assignRole}
@@ -350,13 +382,31 @@ function UsersPage() {
           </div>
         )}
       </Card>
-      <Card className="rounded-lg border-l-4 border-l-[#C77435] p-4 shadow-none"><h2 className="font-semibold">Reassign a license</h2><p className="mt-1 text-sm text-muted-foreground">Deactivate or remove the departing employee, then create a new account using the released seat. The original account and its history remain separate. A dedicated atomic transfer with a reason and audit reference will require the next backend release.</p></Card>
+      <Card className="rounded-lg border-l-4 border-l-[#C77435] p-4 shadow-none">
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold">Reassign a license</h2><p className="mt-1 text-sm text-muted-foreground">Replace an active employee with a new account without increasing the seat count. The original identity and asset history are retained.</p></div>
+          <Button className="bg-[#4B47DC] text-white hover:bg-[#3834b8]" disabled={!seats?.subscriptionValid||!data.some((u:any)=>u.is_active&&u.id!==me?.id)||(seats.limit!==null&&seats.active>seats.limit)} onClick={()=>beginTransfer("")}>Transfer license</Button></div>
+      </Card>
       </>}
+      <Dialog open={transferOpen} onOpenChange={v=>{if(!transferBusy){setTransferOpen(v);if(!v)setTransfer(prev=>({...prev,password:""}));}}}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader><DialogTitle>Transfer license</DialogTitle><DialogDescription>The departing user's access will be revoked. A separate new account will receive the released license. Purchased capacity and subscription dates remain unchanged.</DialogDescription></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Departing user</Label><Select value={transfer.source_user_id} onValueChange={v=>setTransfer(p=>({...p,source_user_id:v}))} disabled={transferBusy}><SelectTrigger><SelectValue placeholder="Select an active user"/></SelectTrigger><SelectContent>{data.filter((u:any)=>u.is_active&&u.id!==me?.id).map((u:any)=><SelectItem key={u.id} value={u.id}>{u.full_name||u.email}</SelectItem>)}</SelectContent></Select></div>
+            <div className="grid gap-3 sm:grid-cols-2"><div><Label htmlFor="transfer-name">Replacement name</Label><Input id="transfer-name" value={transfer.full_name} maxLength={200} disabled={transferBusy} onChange={e=>setTransfer(p=>({...p,full_name:e.target.value}))}/></div>
+            <div><Label>Initial role</Label><Select value={transfer.role} disabled={transferBusy} onValueChange={v=>setTransfer(p=>({...p,role:v as AppRole}))}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{ROLES.map(r=><SelectItem value={r} key={r}>{r}</SelectItem>)}</SelectContent></Select></div></div>
+            <div><Label htmlFor="transfer-email">Replacement email</Label><Input id="transfer-email" type="email" value={transfer.email} disabled={transferBusy} onChange={e=>setTransfer(p=>({...p,email:e.target.value}))}/></div>
+            <div><Label htmlFor="transfer-password">Temporary password</Label><Input id="transfer-password" type="password" autoComplete="new-password" value={transfer.password} disabled={transferBusy} onChange={e=>setTransfer(p=>({...p,password:e.target.value}))}/><p className="text-xs text-muted-foreground">At least 8 characters with uppercase, lowercase, number and symbol; no four ascending or descending digits.</p></div>
+            <div><Label htmlFor="transfer-reason">Reason for transfer</Label><textarea id="transfer-reason" className="w-full rounded-md border bg-background p-2 text-sm" rows={3} maxLength={500} value={transfer.reason} disabled={transferBusy} onChange={e=>setTransfer(p=>({...p,reason:e.target.value}))} placeholder="Employee replacement, resignation, or role change"/></div>
+            <p className="rounded-md bg-muted p-3 text-xs">The transfer is recorded permanently with both accounts, the administrator, reason, date and seat count. No passwords are recorded.</p>
+          </div>
+          <DialogFooter><Button variant="outline" disabled={transferBusy} onClick={()=>{setTransferOpen(false);setTransfer(p=>({...p,password:""}));}}>Cancel</Button><Button className="bg-[#4B47DC] text-white hover:bg-[#3834b8]" disabled={transferBusy} onClick={submitTransfer}>{transferBusy?"Transferring…":"Confirm transfer"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function UserRow({ u, self, branchesAll, onRole, onModule, onApproval, onAction, onBranch, onActive, onDelete, onReset, customRoles, assignedRole, onAssign }: any) {
+function UserRow({ u, self, branchesAll, onRole, onModule, onApproval, onAction, onBranch, onActive, onDelete, onReset, onTransfer, transferAllowed, customRoles, assignedRole, onAssign }: any) {
   const [resetOpen, setResetOpen] = useState(false);
   const [newPwd, setNewPwd] = useState("");
   const [permsOpen, setPermsOpen] = useState(false);
@@ -393,6 +443,7 @@ function UserRow({ u, self, branchesAll, onRole, onModule, onApproval, onAction,
           </DialogContent>
         </Dialog>
         <div className="flex items-center gap-2 text-sm"><Switch checked={u.is_active !== false} disabled={self} onCheckedChange={(v) => onActive(u.id, v)} /><span className="text-muted-foreground">{u.is_active !== false ? "Active" : "Inactive"}</span></div>
+        {!self && u.is_active && <Button variant="outline" size="sm" disabled={!transferAllowed} onClick={()=>onTransfer(u.id)}>Transfer license</Button>}
         {!self && (
           <AlertDialog>
             <AlertDialogTrigger asChild><Button variant="destructive" size="sm" className="ml-auto"><Trash2 className="mr-2 h-4 w-4" /> Remove access</Button></AlertDialogTrigger>
